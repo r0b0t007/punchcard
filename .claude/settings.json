@@ -1,0 +1,130 @@
+{
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "permissions": {
+        "allow": [
+            "Bash(php artisan test *)",
+            "Bash(php artisan test)",
+            "Bash(php artisan route:list *)",
+            "Bash(php artisan wayfinder:generate *)",
+            "Bash(php artisan make:*)",
+            "Bash(php -l *)",
+            "Bash(vendor/bin/pint *)",
+            "Bash(vendor/bin/phpstan *)",
+            "Bash(vendor/bin/rector process --dry-run *)",
+            "Bash(composer analyse)",
+            "Bash(composer refactor:check)",
+            "Bash(composer lint)",
+            "Bash(composer lint:check)",
+            "Bash(npm run check)",
+            "Bash(npm run check:fix)",
+            "Bash(npm run types:check)",
+            "Bash(npm run build)",
+            "Bash(npx playwright test *)",
+            "Bash(git status)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git branch *)",
+            "Bash(git switch *)",
+            "Bash(git checkout -b *)",
+            "Bash(git add *)",
+            "Bash(git commit *)"
+        ],
+        "ask": [
+            "Bash(composer require *)",
+            "Bash(composer remove *)",
+            "Bash(npm install *)",
+            "Bash(npm uninstall *)",
+            "Bash(php artisan migrate *)",
+            "Bash(php artisan migrate)",
+            "Bash(git push *)"
+        ],
+        "deny": [
+            "Read(./.env)",
+            "Read(./.env.*)",
+            "Edit(./.env)",
+            "Edit(./.env.*)",
+            "Read(./storage/app/private/wallet-certs/**)",
+            "Read(./**/*.p12)",
+            "Read(./**/*.pem)",
+            "Read(./**/*.key)",
+            "Bash(php artisan migrate:fresh *)",
+            "Bash(php artisan migrate:fresh)",
+            "Bash(php artisan migrate:reset *)",
+            "Bash(php artisan db:wipe *)",
+            "Bash(php artisan db:wipe)",
+            "Bash(php artisan db:seed --force *)",
+            "Bash(git push --force *)",
+            "Bash(git push -f *)",
+            "Bash(git reset --hard *)",
+            "Bash(rm -rf *)"
+        ]
+    },
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write|MultiEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "php",
+                        "args": [
+                            "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.php"
+                        ],
+                        "timeout": 60,
+                        "statusMessage": "Formatting with Pint"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "php",
+                        "args": [
+                            "${CLAUDE_PROJECT_DIR}/.claude/hooks/stop-checks.php"
+                        ],
+                        "timeout": 600,
+                        "statusMessage": "Running tests before finishing"
+                    }
+                ]
+            }
+        ]
+    },
+    "enableAllProjectMcpServers": true,
+    "extraKnownMarketplaces": {
+        "claude-plugins-official": {
+            "source": {
+                "source": "github",
+                "repo": "anthropics/claude-plugins-official"
+            }
+        },
+        "laravel": {
+            "source": {
+                "source": "github",
+                "repo": "laravel/agent-skills"
+            }
+        },
+        "anthropic-agent-skills": {
+            "source": {
+                "source": "github",
+                "repo": "anthropics/skills"
+            }
+        }
+    },
+    "enabledPlugins": {
+        "laravel@laravel": true,
+        "superpowers@claude-plugins-official": true,
+        "context7@claude-plugins-official": true,
+        "playwright@claude-plugins-official": true,
+        "github@claude-plugins-official": true,
+        "linear@claude-plugins-official": true,
+        "frontend-design@claude-plugins-official": true,
+        "code-review@claude-plugins-official": true,
+        "pr-review-toolkit@claude-plugins-official": true,
+        "security-guidance@claude-plugins-official": true,
+        "php-lsp@claude-plugins-official": true,
+        "example-skills@anthropic-agent-skills": true
+    }
+}

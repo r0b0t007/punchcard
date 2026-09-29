@@ -1,0 +1,124 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.4'
+  NODE_VERSION: '22'
+
+jobs:
+  quality:
+    name: Quality (Pint, Larastan, Rector, lint, types, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: intl, bcmath, pdo_pgsql, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Composer install
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=pgsql/DB_CONNECTION=sqlite/' .env
+          php artisan key:generate
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Pint
+        run: vendor/bin/pint --test
+
+      - name: Larastan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: Rector (dry run)
+        run: vendor/bin/rector process --dry-run --no-progress-bar
+
+      - name: Lint and format (vite-plus)
+        run: npm run check
+
+      - name: Build (generates Wayfinder routes)
+        run: npm run build
+
+      - name: TypeScript
+        run: npm run types:check
+
+  tests:
+    name: Tests (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, pgsql]
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_DB: punchcard_test
+          POSTGRES_USER: punchcard
+          POSTGRES_PASSWORD: punchcard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U punchcard -d punchcard_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: intl, bcmath, pdo_pgsql, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=pgsql/DB_CONNECTION=sqlite/' .env
+          php artisan key:generate
+          npm run build
+
+      - name: Pest
+        run: php artisan test
+        env:
+          # phpunit.xml defaults to in-memory SQLite; the pgsql leg overrides it.
+          DB_CONNECTION: ${{ matrix.db }}
+          DB_HOST: ${{ matrix.db == 'pgsql' && '127.0.0.1' || '' }}
+          DB_PORT: ${{ matrix.db == 'pgsql' && '5432' || '' }}
+          DB_DATABASE: ${{ matrix.db == 'pgsql' && 'punchcard_test' || ':memory:' }}
+          DB_USERNAME: ${{ matrix.db == 'pgsql' && 'punchcard' || '' }}
+          DB_PASSWORD: ${{ matrix.db == 'pgsql' && 'punchcard' || '' }}

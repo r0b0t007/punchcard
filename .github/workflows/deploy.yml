@@ -1,0 +1,66 @@
+name: deploy
+
+# Staging deploys on every push to main; production deploys when a GitHub release is published
+# and the `production` environment reviewer approves. Disabled until the repository variable
+# DEPLOY_ENABLED is set to 'true' and the Forge (or Ploi) deploy hook secrets exist.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event_name == 'release' && 'production' || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    if: >
+      vars.DEPLOY_ENABLED == 'true' && (
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'))
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - name: Trigger zero-downtime deploy
+        run: curl -fsS -X POST "${{ secrets.FORGE_DEPLOY_HOOK_STAGING }}"
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS "${{ vars.STAGING_URL }}/up" && exit 0
+            sleep 10
+          done
+          echo "Staging did not become healthy" && exit 1
+
+  production:
+    if: >
+      vars.DEPLOY_ENABLED == 'true' && (
+        github.event_name == 'release' ||
+        (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - name: Trigger zero-downtime deploy
+        run: curl -fsS -X POST "${{ secrets.FORGE_DEPLOY_HOOK_PRODUCTION }}"
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS "${{ vars.PRODUCTION_URL }}/up" && exit 0
+            sleep 10
+          done
+          echo "Production did not become healthy" && exit 1

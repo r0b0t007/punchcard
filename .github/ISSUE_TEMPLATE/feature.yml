@@ -1,0 +1,23 @@
+name: Feature
+description: A user-facing capability (prefer creating it in Linear, team CHW)
+labels: [feature]
+body:
+  - type: input
+    id: screens
+    attributes:
+      label: Screen IDs / endpoints
+      description: From docs/spec.md, e.g. C2, B6, POST /api/rewards/{id}/redeem
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+    validations:
+      required: true

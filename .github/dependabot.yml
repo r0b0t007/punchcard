@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      laravel:
+        patterns: ["laravel/*", "inertiajs/*", "filament/*"]
+      dev-tools:
+        dependency-type: "development"
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react*", "@inertiajs/*"]
+      radix:
+        patterns: ["@radix-ui/*"]
+      tooling:
+        dependency-type: "development"
+        patterns: ["*"]
+    open-pull-requests-limit: 5
