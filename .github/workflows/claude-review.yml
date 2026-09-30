@@ -42,6 +42,9 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Secrets can't be read in step conditions, and fork PRs never receive them.
+      HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,8 +58,12 @@ jobs:
             echo "sensitive=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Warn when the security review cannot run
+        if: steps.paths.outputs.sensitive == 'true' && env.HAS_API_KEY != 'true'
+        run: echo "::warning::Sensitive paths changed but ANTHROPIC_API_KEY is not set; Claude security review skipped. Run the stamp-flow-reviewer agent locally."
+
       - uses: anthropics/claude-code-security-review@main
-        if: steps.paths.outputs.sensitive == 'true'
+        if: steps.paths.outputs.sensitive == 'true' && env.HAS_API_KEY == 'true'
         with:
           claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           comment-pr: true
