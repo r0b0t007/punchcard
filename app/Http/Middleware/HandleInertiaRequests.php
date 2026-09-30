@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Locales;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -35,6 +37,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $locale = app()->getLocale();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -42,6 +46,15 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'locale' => $locale,
+            'dir' => Locales::direction($locale),
+            'locales' => collect(Locales::names())
+                ->map(fn (string $name, string $code): array => ['code' => $code, 'name' => $name])
+                ->values()
+                ->all(),
+            // Sent once per locale and cached by the client; switching language changes the key.
+            'translations' => Inertia::once(fn (): array => Locales::translations($locale))
+                ->as('translations-'.$locale),
         ];
     }
 }

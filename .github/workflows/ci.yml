@@ -67,6 +67,9 @@ jobs:
       - name: TypeScript
         run: npm run types:check
 
+      - name: JS unit tests (vite-plus / Vitest)
+        run: npm test
+
   tests:
     name: Tests (${{ matrix.db }})
     runs-on: ubuntu-latest
