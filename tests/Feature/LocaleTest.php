@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 describe('locale resolution', function (): void {
@@ -112,4 +114,34 @@ describe('switching locale', function (): void {
 
         expect($user->refresh()->locale)->toBe('fr');
     })->with(['de', '', 'ar-SA', null]);
+});
+
+describe('notifications', function (): void {
+    it('sends emails in the user\'s saved language', function (): void {
+        Notification::fake();
+        $user = User::factory()->create(['locale' => 'ar']);
+
+        $this->withCookie('locale', 'fr')
+            ->post(route('password.email'), ['email' => $user->email]);
+
+        Notification::assertSentTo(
+            $user,
+            ResetPassword::class,
+            fn (ResetPassword $notification, array $channels, User $notifiable, ?string $locale): bool => $locale === 'ar',
+        );
+    });
+
+    it('falls back to the request language when the user has not chosen one', function (): void {
+        Notification::fake();
+        $user = User::factory()->create(['locale' => null]);
+
+        $this->withCookie('locale', 'fr')
+            ->post(route('password.email'), ['email' => $user->email]);
+
+        Notification::assertSentTo(
+            $user,
+            ResetPassword::class,
+            fn (ResetPassword $notification, array $channels, User $notifiable, ?string $locale): bool => in_array($locale, [null, 'fr'], true),
+        );
+    });
 });
