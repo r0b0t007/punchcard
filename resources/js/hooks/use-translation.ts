@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, createElement, Fragment, useContext } from 'react';
 import type { Replacements, Translations } from '@/lib/i18n';
-import { interpolate, translate } from '@/lib/i18n';
+import { translate, translateNodes } from '@/lib/i18n';
 import type { TextDirection } from '@/types';
 
 export type TranslateFn = (key: string, replacements?: Replacements) => string;
@@ -29,8 +29,8 @@ export function createI18n(
         translate(translations, locale, key, replacements);
 
     const tn: TranslateNodesFn = (key, nodes, replacements) =>
-        interpolate(t(key, replacements), nodes).map((part, index) =>
-            createElement(Fragment, { key: index }, part),
+        translateNodes(translations, locale, key, nodes, replacements).map(
+            (part, index) => createElement(Fragment, { key: index }, part),
         );
 
     return { locale, dir, t, tn };

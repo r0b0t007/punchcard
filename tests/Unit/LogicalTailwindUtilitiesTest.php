@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Symfony\Component\Finder\Finder;
+use Tests\Support\PhysicalUtilities;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,46 +24,6 @@ use Symfony\Component\Finder\Finder;
 |
 */
 
-const PHYSICAL_UTILITY = '/(?<![\w\-\[=])!?-?(?:'
-    .'(?:scroll-)?[mp][lr]-[\w\[\]\(\)\.\/%\-]+'
-    .'|(?:left|right)-[\w\[\]\(\)\.\/%\-]+'
-    .'|(?:text|float|clear)-(?:left|right)'
-    .'|border-[lr](?:-[\w\[\]\(\)\.\/%\-]+)?'
-    .'|rounded-(?:[lr]|[tb][lr])(?:-[\w\[\]\(\)\.\/%\-]+)?'
-    .'|(?<!side=left\]:)(?<!side=right\]:)slide-(?:in-from|out-to)-(?:left|right)(?:-[\w\[\]\(\)\.\/%\-]+)?'
-    .'|cursor-(?:w|e|nw|ne|sw|se)-resize'
-    .')(?![\w\-])/';
-
-/**
- * @param  list<string>  $lines
- * @return list<array{line: int, class: string}>
- */
-function physicalUtilitiesIn(array $lines): array
-{
-    $found = [];
-
-    foreach ($lines as $index => $line) {
-        $allowed = [];
-
-        foreach ([$line, $lines[$index - 1] ?? ''] as $candidate) {
-            if (preg_match('/rtl-physical-ok\(([^)]*)\)/', $candidate, $marker) === 1) {
-                $allowed = [...$allowed, ...preg_split('/[\s,]+/', trim($marker[1]), flags: PREG_SPLIT_NO_EMPTY) ?: []];
-            }
-        }
-
-        // The marker names classes itself; don't scan it.
-        preg_match_all(PHYSICAL_UTILITY, (string) preg_replace('/rtl-physical-ok\([^)]*\)/', '', $line), $matches);
-
-        foreach ($matches[0] as $class) {
-            if (! in_array(ltrim($class, '!-'), $allowed, true)) {
-                $found[] = ['line' => $index + 1, 'class' => $class];
-            }
-        }
-    }
-
-    return $found;
-}
-
 it('uses logical Tailwind utilities in resources/js', function (): void {
     $files = Finder::create()
         ->files()
@@ -73,7 +34,7 @@ it('uses logical Tailwind utilities in resources/js', function (): void {
     $violations = [];
 
     foreach ($files as $file) {
-        foreach (physicalUtilitiesIn(explode("\n", $file->getContents())) as $hit) {
+        foreach (PhysicalUtilities::in(explode("\n", $file->getContents())) as $hit) {
             $violations[] = $file->getRelativePathname().':'.$hit['line'].'  '.$hit['class'];
         }
     }
@@ -82,7 +43,7 @@ it('uses logical Tailwind utilities in resources/js', function (): void {
 });
 
 it('detects physical utilities and ignores logical ones', function (string $line, bool $flagged): void {
-    expect(physicalUtilitiesIn([$line]) !== [])->toBe($flagged);
+    expect(PhysicalUtilities::in([$line]) !== [])->toBe($flagged);
 })->with([
     ['className="ml-2 flex"', true],
     ['className="-mr-1"', true],
@@ -103,7 +64,7 @@ it('detects physical utilities and ignores logical ones', function (string $line
 ]);
 
 it('exempts only the classes named in an rtl-physical-ok marker', function (): void {
-    $hits = physicalUtilitiesIn([
+    $hits = PhysicalUtilities::in([
         '// rtl-physical-ok(left-[50%]): centred',
         '"fixed left-[50%] translate-x-[-50%] pl-4"',
         '"right-2 cursor-w-resize" // rtl-physical-ok(right-2, cursor-w-resize)',

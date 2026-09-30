@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { interpolate, pluralIndex, translate } from '@/lib/i18n';
+import {
+    interpolate,
+    pluralIndex,
+    translate,
+    translateNodes,
+} from '@/lib/i18n';
 
 describe('translate', () => {
     const fr = {
@@ -130,5 +135,39 @@ describe('interpolate', () => {
 
     it('returns the message unchanged when there are no nodes', () => {
         expect(interpolate('Plain text', {})).toEqual(['Plain text']);
+    });
+});
+
+describe('translateNodes', () => {
+    const button = { type: 'button' };
+
+    it('splits on the raw translation, so user values never become nodes', () => {
+        expect(
+            translateNodes(
+                {},
+                'en',
+                'Remove :name? :button',
+                { button },
+                {
+                    name: ':button',
+                },
+            ),
+        ).toEqual(['Remove :button? ', button]);
+    });
+
+    it('translates, pluralises and replaces text around the nodes', () => {
+        const fr = {
+            ':count codes left, :link':
+                '{1} :count code restant, :link|[2,*] :count codes restants, :link',
+        };
+        expect(
+            translateNodes(
+                fr,
+                'fr',
+                ':count codes left, :link',
+                { link: button },
+                { count: 3 },
+            ),
+        ).toEqual(['3 codes restants, ', button]);
     });
 });

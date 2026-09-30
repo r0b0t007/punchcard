@@ -17,37 +17,16 @@ use Tests\Support\TranslationKeys;
 |
 */
 
-/**
- * @return array<string, string>
- */
-function jsonTranslations(string $locale): array
-{
-    /** @var array<string, string> */
-    return json_decode((string) file_get_contents(lang_path($locale.'.json')), true, flags: JSON_THROW_ON_ERROR);
-}
-
-/**
- * @return list<string>
- */
-function placeholdersIn(string $text): array
-{
-    preg_match_all('/:([a-zA-Z_]+)/', $text, $matches);
-    $names = array_values(array_unique(array_map(strtolower(...), $matches[1])));
-    sort($names);
-
-    return $names;
-}
-
 dataset('translated locales', ['fr', 'ar']);
 
 it('translates every key the app uses', function (string $locale): void {
-    $missing = array_values(array_diff(TranslationKeys::all(), array_keys(jsonTranslations($locale))));
+    $missing = array_values(array_diff(TranslationKeys::all(), array_keys(TranslationKeys::json($locale))));
 
     expect($missing)->toBe([]);
 })->with('translated locales');
 
 it('has no stale keys', function (string $locale): void {
-    $stale = array_values(array_diff(array_keys(jsonTranslations($locale)), TranslationKeys::all()));
+    $stale = array_values(array_diff(array_keys(TranslationKeys::json($locale)), TranslationKeys::all()));
 
     expect($stale)->toBe([]);
 })->with('translated locales');
@@ -55,8 +34,8 @@ it('has no stale keys', function (string $locale): void {
 it('keeps the placeholders of each key', function (string $locale): void {
     $mismatched = [];
 
-    foreach (jsonTranslations($locale) as $key => $translation) {
-        if (placeholdersIn($key) !== placeholdersIn($translation)) {
+    foreach (TranslationKeys::json($locale) as $key => $translation) {
+        if (TranslationKeys::placeholders($key) !== TranslationKeys::placeholders($translation)) {
             $mismatched[] = $key;
         }
     }
@@ -65,11 +44,11 @@ it('keeps the placeholders of each key', function (string $locale): void {
 })->with('translated locales');
 
 it('has no empty translations', function (string $locale): void {
-    expect(array_keys(array_filter(jsonTranslations($locale), fn (string $value): bool => trim($value) === '')))->toBe([]);
+    expect(array_keys(array_filter(TranslationKeys::json($locale), fn (string $value): bool => trim($value) === '')))->toBe([]);
 })->with('translated locales');
 
 it('keeps English as the key', function (): void {
-    expect(jsonTranslations('en'))->toBe([]);
+    expect(TranslationKeys::json('en'))->toBe([]);
 });
 
 it('defines the same PHP message keys for French and Arabic', function (string $file): void {
@@ -79,6 +58,6 @@ it('defines the same PHP message keys for French and Arabic', function (string $
     expect(array_keys($ar))->toBe(array_keys($fr));
 
     foreach ($fr as $key => $message) {
-        expect(placeholdersIn($ar[$key]))->toBe(placeholdersIn($message), "{$file}.{$key}");
+        expect(TranslationKeys::placeholders($ar[$key]))->toBe(TranslationKeys::placeholders($message), "{$file}.{$key}");
     }
 })->with(['auth', 'passwords', 'validation']);

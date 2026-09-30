@@ -166,31 +166,66 @@ export function interpolate<T>(
     message: string,
     nodes: Record<string, T>,
 ): Array<string | T> {
-    const names = Object.keys(nodes).sort((a, b) => b.length - a.length);
+    return split(message, Object.keys(nodes)).map((segment) =>
+        'text' in segment ? segment.text : nodes[segment.name],
+    );
+}
 
+/**
+ * translate() for messages that embed React elements. Picks the plural form
+ * and splits on the node placeholders of the *raw* translation first, then
+ * fills string replacements into the text around them, so a user-supplied
+ * value such as a passkey named ":button" stays text.
+ */
+export function translateNodes<T>(
+    translations: Translations,
+    locale: string,
+    key: string,
+    nodes: Record<string, T>,
+    replacements: Replacements = {},
+): Array<string | T> {
+    let message = translations[key] ?? key;
+
+    if (typeof replacements.count === 'number' && message.includes('|')) {
+        message = choose(message, replacements.count, locale);
+    }
+
+    return split(message, Object.keys(nodes)).map((segment) =>
+        'text' in segment
+            ? replace(segment.text, replacements)
+            : nodes[segment.name],
+    );
+}
+
+type Segment = { text: string } | { name: string };
+
+function split(message: string, names: string[]): Segment[] {
     if (names.length === 0) {
-        return [message];
+        return [{ text: message }];
     }
 
     const pattern = new RegExp(
-        `:(${names.map(escapeRegExp).join('|')})(?![A-Za-z0-9_])`,
+        `:(${[...names]
+            .sort((a, b) => b.length - a.length)
+            .map(escapeRegExp)
+            .join('|')})(?![A-Za-z0-9_])`,
         'g',
     );
-    const parts: Array<string | T> = [];
+    const segments: Segment[] = [];
     let last = 0;
 
     for (const match of message.matchAll(pattern)) {
         if (match.index > last) {
-            parts.push(message.slice(last, match.index));
+            segments.push({ text: message.slice(last, match.index) });
         }
 
-        parts.push(nodes[match[1]]);
+        segments.push({ name: match[1] });
         last = match.index + match[0].length;
     }
 
     if (last < message.length) {
-        parts.push(message.slice(last));
+        segments.push({ text: message.slice(last) });
     }
 
-    return parts;
+    return segments;
 }

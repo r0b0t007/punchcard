@@ -1,6 +1,8 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-{{-- Published only to add dir: Arabic emails must lay out right to left. The theme's text-align: left became start. --}}
-<html xmlns="http://www.w3.org/1999/xhtml" lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\Locales::direction(app()->getLocale()) }}">
+{{-- Published only for right-to-left emails (Arabic). Gmail and Outlook.com drop <html>/<body> attributes and
+     Outlook desktop ignores text-align: start, so dir and a physical alignment also sit on the wrapper and content cell. --}}
+@php($dir = \App\Support\Locales::direction(app()->getLocale()))
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ $dir }}">
 <head>
 <title>{{ config('app.name') }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -26,9 +28,9 @@ width: 100% !important;
 </style>
 {!! $head ?? '' !!}
 </head>
-<body>
+<body dir="{{ $dir }}">
 
-<table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
+<table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation" dir="{{ $dir }}">
 <tr>
 <td align="center">
 <table class="content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -40,7 +42,7 @@ width: 100% !important;
 <table class="inner-body" align="center" width="570" cellpadding="0" cellspacing="0" role="presentation">
 <!-- Body content -->
 <tr>
-<td class="content-cell">
+<td class="content-cell" dir="{{ $dir }}" style="text-align: {{ $dir === 'rtl' ? 'right' : 'left' }};">
 {!! Illuminate\Mail\Markdown::parse($slot) !!}
 
 {!! $subcopy ?? '' !!}

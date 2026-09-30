@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Mail\Transport\ArrayTransport;
 use Inertia\Testing\AssertableInertia as Assert;
-use Symfony\Component\Mime\Email;
+use Tests\Support\Mailbox;
 
 describe('locale resolution', function (): void {
     it('defaults to French', function (): void {
@@ -117,42 +116,37 @@ describe('switching locale', function (): void {
 });
 
 describe('emails', function (): void {
-    /**
-     * Request a password reset and return the email that was actually sent
-     * through the test "array" mailer.
-     */
-    function sentResetEmail(User $user, string $requestLocale): Email
-    {
-        test()->withCookie('locale', $requestLocale)
-            ->post(route('password.email'), ['email' => $user->email]);
-
-        /** @var ArrayTransport $transport */
-        $transport = app('mail.manager')->mailer('array')->getSymfonyTransport();
-        $message = $transport->messages()->last()?->getOriginalMessage();
-
-        expect($message)->toBeInstanceOf(Email::class);
-
-        return $message;
-    }
-
     it('sends emails in the user\'s saved language, laid out right to left for Arabic', function (): void {
-        $email = sentResetEmail(User::factory()->create(['locale' => 'ar']), requestLocale: 'fr');
+        $user = User::factory()->create(['locale' => 'ar']);
 
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+        $email = Mailbox::lastEmail();
+
+        // Gmail and Outlook.com drop <html>/<body> attributes and Outlook ignores
+        // text-align: start, so the wrapper and content cell carry dir and alignment.
         expect($email->getSubject())->toBe('أعد تعيين كلمة المرور')
             ->and($email->getHtmlBody())->toContain('lang="ar" dir="rtl"')
-            ->and($email->getHtmlBody())->not->toContain('text-align: left');
+            ->toMatch('/<table class="wrapper"[^>]*dir="rtl"/')
+            ->toMatch('/<td class="content-cell"(?=[^>]*dir="rtl")(?=[^>]*text-align: right)/')
+            ->not->toContain('text-align: left');
     });
 
     it('falls back to the request language when the user has not chosen one', function (): void {
-        $email = sentResetEmail(User::factory()->create(['locale' => null]), requestLocale: 'fr');
+        $user = User::factory()->create(['locale' => null]);
+
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+        $email = Mailbox::lastEmail();
 
         expect($email->getSubject())->toBe('Réinitialisez votre mot de passe')
-            ->and($email->getHtmlBody())->toContain('lang="fr" dir="ltr"');
+            ->and($email->getHtmlBody())->toContain('lang="fr" dir="ltr"')
+            ->toMatch('/<td class="content-cell"(?=[^>]*dir="ltr")(?=[^>]*text-align: left)/');
     });
 
     it('ignores a saved locale that is no longer supported', function (): void {
-        $email = sentResetEmail(User::factory()->create(['locale' => 'de']), requestLocale: 'fr');
+        $user = User::factory()->create(['locale' => 'de']);
 
-        expect($email->getSubject())->toBe('Réinitialisez votre mot de passe');
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+
+        expect(Mailbox::lastEmail()->getSubject())->toBe('Réinitialisez votre mot de passe');
     });
 });

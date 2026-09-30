@@ -12,8 +12,7 @@ use Symfony\Component\Finder\Finder;
  * Keys are English source strings. They come from:
  * - t('…') and tn('…') calls in resources/js (single- or multi-line);
  * - English strings kept in data and translated where rendered
- *   (`title:`, `description:`, `label:`, `buttonText:` in resources/js, and
- *   error messages handed to AlertError);
+ *   (`title:`, `description:`, `label:`, `buttonText:` in resources/js);
  * - __(), @lang(), trans(), trans_choice(), Lang::get()/choice() in app/ and
  *   resources/views;
  * - strings that vendor code translates for our users (VENDOR_KEYS).
@@ -80,7 +79,6 @@ final class TranslationKeys
         $patterns = [
             '/\btn?\(\s*'.self::STRING.'/s',
             '/\b(?:title|description|label|buttonText)\s*:\s*'.self::STRING.'/',
-            '/\bsetErrors?\(\s*(?:\(?[^)]*\)?\s*=>\s*)?\[?[^\'"\]]*'.self::STRING.'/',
         ];
 
         $keys = [];
@@ -126,6 +124,31 @@ final class TranslationKeys
         }
 
         return $keys;
+    }
+
+    /**
+     * The JSON translations for one locale (lang/{locale}.json).
+     *
+     * @return array<string, string>
+     */
+    public static function json(string $locale): array
+    {
+        /** @var array<string, string> */
+        return json_decode((string) file_get_contents(lang_path($locale.'.json')), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * The :placeholder names in a message, lower-cased and sorted.
+     *
+     * @return list<string>
+     */
+    public static function placeholders(string $text): array
+    {
+        preg_match_all('/:([a-zA-Z_]+)/', $text, $matches);
+        $names = array_values(array_unique(array_map(strtolower(...), $matches[1])));
+        sort($names);
+
+        return $names;
     }
 
     /**
