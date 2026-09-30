@@ -1,5 +1,6 @@
 import { useHttp } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from '@/hooks/use-translation';
 import { qrCode, recoveryCodes, secretKey } from '@/routes/two-factor';
 
 export type UseTwoFactorAuthReturn = {
@@ -20,6 +21,7 @@ export type UseTwoFactorAuthReturn = {
 export const OTP_MAX_LENGTH = 6;
 
 export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
+    const { t } = useTranslation();
     const { submit } = useHttp();
 
     const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
@@ -55,10 +57,10 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
 
             setQrCodeSvg(svg);
         } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch QR code']);
+            setErrors((prev) => [...prev, t('Failed to fetch QR code')]);
             setQrCodeSvg(null);
         }
-    }, [submit]);
+    }, [submit, t]);
 
     const fetchSetupKey = useCallback(async (): Promise<void> => {
         try {
@@ -68,10 +70,10 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
 
             setManualSetupKey(key);
         } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch a setup key']);
+            setErrors((prev) => [...prev, t('Failed to fetch a setup key')]);
             setManualSetupKey(null);
         }
-    }, [submit]);
+    }, [submit, t]);
 
     const fetchRecoveryCodes = useCallback(async (): Promise<void> => {
         try {
@@ -79,10 +81,10 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
             const codes = (await submit(recoveryCodes())) as string[];
             setRecoveryCodesList(codes);
         } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch recovery codes']);
+            setErrors((prev) => [...prev, t('Failed to fetch recovery codes')]);
             setRecoveryCodesList([]);
         }
-    }, [submit]);
+    }, [submit, t]);
 
     const fetchSetupData = useCallback(async (): Promise<void> => {
         try {

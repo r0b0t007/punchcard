@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { pluralIndex, translate } from '@/lib/i18n';
+import {
+    interpolate,
+    pluralIndex,
+    translate,
+    translateNodes,
+} from '@/lib/i18n';
 
 describe('translate', () => {
     const fr = {
@@ -91,5 +96,78 @@ describe('pluralIndex', () => {
                 pluralIndex('ar', n),
             ),
         ).toEqual([0, 1, 2, 3, 3, 4, 4, 5, 5, 3, 4]);
+    });
+});
+
+describe('interpolate', () => {
+    const link = { type: 'link' };
+
+    it('splits a message around non-string placeholders, keeping word order', () => {
+        expect(interpolate('Or, return to :link', { link })).toEqual([
+            'Or, return to ',
+            link,
+        ]);
+        expect(interpolate('ارجع إلى :link الآن', { link })).toEqual([
+            'ارجع إلى ',
+            link,
+            ' الآن',
+        ]);
+    });
+
+    it('supports several placeholders and repeats', () => {
+        const a = { id: 'a' };
+        const b = { id: 'b' };
+        expect(interpolate(':b then :a then :b', { a, b })).toEqual([
+            b,
+            ' then ',
+            a,
+            ' then ',
+            b,
+        ]);
+    });
+
+    it('does not match a placeholder that is a prefix of a longer word', () => {
+        expect(interpolate(':linked and :link', { link })).toEqual([
+            ':linked and ',
+            link,
+        ]);
+    });
+
+    it('returns the message unchanged when there are no nodes', () => {
+        expect(interpolate('Plain text', {})).toEqual(['Plain text']);
+    });
+});
+
+describe('translateNodes', () => {
+    const button = { type: 'button' };
+
+    it('splits on the raw translation, so user values never become nodes', () => {
+        expect(
+            translateNodes(
+                {},
+                'en',
+                'Remove :name? :button',
+                { button },
+                {
+                    name: ':button',
+                },
+            ),
+        ).toEqual(['Remove :button? ', button]);
+    });
+
+    it('translates, pluralises and replaces text around the nodes', () => {
+        const fr = {
+            ':count codes left, :link':
+                '{1} :count code restant, :link|[2,*] :count codes restants, :link',
+        };
+        expect(
+            translateNodes(
+                fr,
+                'fr',
+                ':count codes left, :link',
+                { link: button },
+                { count: 3 },
+            ),
+        ).toEqual(['3 codes restants, ', button]);
     });
 });

@@ -1,37 +1,37 @@
 import { createInertiaApp } from '@inertiajs/react';
-import AppDirectionProvider from '@/components/app-direction-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
+import I18nLayout from '@/layouts/i18n-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    // I18nLayout comes first on every page: it provides translations and text
+    // direction from the page props.
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
-                return null;
+                return I18nLayout;
             case name.startsWith('auth/'):
-                return AuthLayout;
+                return [I18nLayout, AuthLayout];
             case name.startsWith('settings/'):
-                return [AppLayout, SettingsLayout];
+                return [I18nLayout, AppLayout, SettingsLayout];
             default:
-                return AppLayout;
+                return [I18nLayout, AppLayout];
         }
     },
     strictMode: true,
     withApp(app) {
         return (
-            <AppDirectionProvider>
-                <TooltipProvider delayDuration={0}>
-                    {app}
-                    <Toaster />
-                </TooltipProvider>
-            </AppDirectionProvider>
+            <TooltipProvider delayDuration={0}>
+                {app}
+                <Toaster />
+            </TooltipProvider>
         );
     },
     progress: {

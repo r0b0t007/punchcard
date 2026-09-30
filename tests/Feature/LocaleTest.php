@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\Mailbox;
 
 describe('locale resolution', function (): void {
     it('defaults to French', function (): void {
@@ -112,4 +113,40 @@ describe('switching locale', function (): void {
 
         expect($user->refresh()->locale)->toBe('fr');
     })->with(['de', '', 'ar-SA', null]);
+});
+
+describe('emails', function (): void {
+    it('sends emails in the user\'s saved language, laid out right to left for Arabic', function (): void {
+        $user = User::factory()->create(['locale' => 'ar']);
+
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+        $email = Mailbox::lastEmail();
+
+        // Gmail and Outlook.com drop <html>/<body> attributes and Outlook ignores
+        // text-align: start, so the wrapper and content cell carry dir and alignment.
+        expect($email->getSubject())->toBe('أعد تعيين كلمة المرور')
+            ->and($email->getHtmlBody())->toContain('lang="ar" dir="rtl"')
+            ->toMatch('/<table class="wrapper"[^>]*dir="rtl"/')
+            ->toMatch('/<td class="content-cell"(?=[^>]*dir="rtl")(?=[^>]*text-align: right)/')
+            ->not->toContain('text-align: left');
+    });
+
+    it('falls back to the request language when the user has not chosen one', function (): void {
+        $user = User::factory()->create(['locale' => null]);
+
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+        $email = Mailbox::lastEmail();
+
+        expect($email->getSubject())->toBe('Réinitialisez votre mot de passe')
+            ->and($email->getHtmlBody())->toContain('lang="fr" dir="ltr"')
+            ->toMatch('/<td class="content-cell"(?=[^>]*dir="ltr")(?=[^>]*text-align: left)/');
+    });
+
+    it('ignores a saved locale that is no longer supported', function (): void {
+        $user = User::factory()->create(['locale' => 'de']);
+
+        $this->withCookie('locale', 'fr')->post(route('password.email'), ['email' => $user->email]);
+
+        expect(Mailbox::lastEmail()->getSubject())->toBe('Réinitialisez votre mot de passe');
+    });
 });

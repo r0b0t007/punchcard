@@ -153,3 +153,79 @@ function ucfirst(value: string): string {
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Split a translated message around `:placeholders` whose values are not
+ * strings (links, buttons...), so one whole-sentence key can embed them and
+ * each language keeps its own word order:
+ *
+ *   interpolate('Or, return to :link', { link: <TextLink /> })
+ *   // ['Or, return to ', <TextLink />]
+ */
+export function interpolate<T>(
+    message: string,
+    nodes: Record<string, T>,
+): Array<string | T> {
+    return split(message, Object.keys(nodes)).map((segment) =>
+        'text' in segment ? segment.text : nodes[segment.name],
+    );
+}
+
+/**
+ * translate() for messages that embed React elements. Picks the plural form
+ * and splits on the node placeholders of the *raw* translation first, then
+ * fills string replacements into the text around them, so a user-supplied
+ * value such as a passkey named ":button" stays text.
+ */
+export function translateNodes<T>(
+    translations: Translations,
+    locale: string,
+    key: string,
+    nodes: Record<string, T>,
+    replacements: Replacements = {},
+): Array<string | T> {
+    let message = translations[key] ?? key;
+
+    if (typeof replacements.count === 'number' && message.includes('|')) {
+        message = choose(message, replacements.count, locale);
+    }
+
+    return split(message, Object.keys(nodes)).map((segment) =>
+        'text' in segment
+            ? replace(segment.text, replacements)
+            : nodes[segment.name],
+    );
+}
+
+type Segment = { text: string } | { name: string };
+
+function split(message: string, names: string[]): Segment[] {
+    if (names.length === 0) {
+        return [{ text: message }];
+    }
+
+    const pattern = new RegExp(
+        `:(${[...names]
+            .sort((a, b) => b.length - a.length)
+            .map(escapeRegExp)
+            .join('|')})(?![A-Za-z0-9_])`,
+        'g',
+    );
+    const segments: Segment[] = [];
+    let last = 0;
+
+    for (const match of message.matchAll(pattern)) {
+        if (match.index > last) {
+            segments.push({ text: message.slice(last, match.index) });
+        }
+
+        segments.push({ name: match[1] });
+        last = match.index + match[0].length;
+    }
+
+    if (last < message.length) {
+        segments.push({ text: message.slice(last) });
+    }
+
+    return segments;
+}
