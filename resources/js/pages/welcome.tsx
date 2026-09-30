@@ -1,4 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
+import LanguageSwitcher from '@/components/language-switcher';
 import { dashboard, login } from '@/routes';
 import { register } from '@/routes';
 
@@ -382,6 +383,9 @@ export default function Welcome() {
                         </div>
                     </main>
                 </div>
+                <footer className="mt-6 flex w-full max-w-[335px] justify-center lg:max-w-4xl">
+                    <LanguageSwitcher />
+                </footer>
                 <div className="hidden h-14.5 lg:block"></div>
             </div>
         </>

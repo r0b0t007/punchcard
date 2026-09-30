@@ -67,6 +67,12 @@ jobs:
       - name: TypeScript
         run: npm run types:check
 
+      - name: JS unit tests (vite-plus / Vitest)
+        run: npm test
+        env:
+          # Vitest boots a Vite server; laravel-vite-plugin refuses that when CI is set.
+          LARAVEL_BYPASS_ENV_CHECK: 1
+
   tests:
     name: Tests (${{ matrix.db }})
     runs-on: ubuntu-latest

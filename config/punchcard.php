@@ -54,6 +54,14 @@ return [
         ],
     ],
 
-    'locales' => ['fr', 'en', 'ar'],
+    // Supported UI locales (code => native name, in switcher order). Morocco first,
+    // so French is the default when neither the user nor the browser picks one.
+    'locales' => [
+        'fr' => 'Français',
+        'en' => 'English',
+        'ar' => 'العربية',
+    ],
+    'default_locale' => 'fr',
+    'rtl_locales' => ['ar'],
 
 ];

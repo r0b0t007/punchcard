@@ -39,6 +39,10 @@ export default defineConfig({
             ],
         },
     },
+    test: {
+        // Unit tests live next to the code; tests/e2e is Playwright's.
+        include: ['resources/js/**/*.test.{ts,tsx}'],
+    },
     lint: {
         ignorePatterns: [
             'vendor/**',
