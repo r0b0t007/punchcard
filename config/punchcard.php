@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
 |--------------------------------------------------------------------------
 | punchcard domain configuration
@@ -9,7 +11,6 @@
 | Secrets come from the environment only. See docs/spec.md and docs/adr/.
 |
 */
-
 return [
 
     'tap' => [
