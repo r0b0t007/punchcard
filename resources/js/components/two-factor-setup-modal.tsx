@@ -31,7 +31,7 @@ function GridScanIcon() {
                     {Array.from({ length: 5 }, (_, i) => (
                         <div
                             key={`col-${i + 1}`}
-                            className="border-r border-border last:border-r-0"
+                            className="border-e border-border last:border-e-0"
                         />
                     ))}
                 </div>
@@ -124,7 +124,7 @@ function TwoFactorSetupStep({
                                     />
                                     <button
                                         onClick={() => copy(manualSetupKey)}
-                                        className="border-l border-border px-3 hover:bg-muted"
+                                        className="border-s border-border px-3 hover:bg-muted"
                                     >
                                         <IconComponent className="w-4" />
                                     </button>
