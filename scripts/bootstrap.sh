@@ -28,7 +28,7 @@ step "Publishing package config"
 php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --ansi
 php artisan filament:install --panels --no-interaction --ansi
 
-step "Local services (Postgres, Redis, Mailpit)"
+step "Local services (Postgres, Mailpit)"
 if command -v docker >/dev/null; then
   docker compose up -d --wait
 else

@@ -25,7 +25,7 @@ Filament admin · PostgreSQL · Pest · Larastan · Playwright · GitHub Actions
     ```
 
     It installs the Composer packages (Boost, Pest, Rector, Filament, permissions), creates `.env`, starts
-    Postgres/Redis/Mailpit if Docker is present (falls back to SQLite otherwise), runs migrations, installs npm
+    Postgres and Mailpit if Docker is present (falls back to SQLite otherwise), runs migrations, installs npm
     packages and Playwright, runs `boost:install` (pick **Claude Code**) and finishes with tests and a build.
 
 4. Commit what the bootstrap generated (`composer.lock`, Filament panel provider, Boost guidelines).
