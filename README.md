@@ -33,6 +33,13 @@ Filament admin · PostgreSQL · Pest · Larastan · Playwright · GitHub Actions
 
 macOS, Linux and WSL: `bash scripts/bootstrap.sh`.
 
+Troubleshooting:
+
+- `could not find driver`: your PHP lacks `pdo_pgsql`. Herd ships it; on XAMPP or a manual PHP install, enable
+  `extension=pdo_pgsql` and `extension=pgsql` in `php.ini`.
+- `password authentication failed for user "punchcard"`: another Postgres already listens on 5432. Set
+  `FORWARD_DB_PORT=5433` and `DB_PORT=5433` in `.env`, then `docker compose up -d`.
+
 ## Everyday commands
 
 | Task                           | Command                                                                    |
