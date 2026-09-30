@@ -10,16 +10,20 @@ use Symfony\Component\Finder\Finder;
  * Collects the translation keys the app uses, so tests can check lang/*.json.
  *
  * Keys are English source strings. They come from:
- * - t('…') calls in resources/js (single- or multi-line);
+ * - t('…') and tn('…') calls in resources/js (single- or multi-line);
  * - English strings kept in data and translated where rendered
  *   (`title:`, `description:`, `label:`, `buttonText:` in resources/js, and
  *   error messages handed to AlertError);
- * - __('…') / @lang('…') in app/ and resources/views;
+ * - __(), @lang(), trans(), trans_choice(), Lang::get()/choice() in app/ and
+ *   resources/views;
  * - strings that vendor code translates for our users (VENDOR_KEYS).
+ *
+ * Keys built at runtime (t(variable), t(`template`)) cannot be found statically:
+ * keep keys literal, or list them where they are defined as data.
  */
 final class TranslationKeys
 {
-    /** Fortify, passkeys and Laravel's auth notification emails. */
+    /** Fortify, passkeys (server and @laravel/passkeys client) and Laravel's auth emails. */
     public const array VENDOR_KEYS = [
         'The provided password was incorrect.',
         'The provided two factor authentication code was invalid.',
@@ -27,6 +31,9 @@ final class TranslationKeys
         'Invalid credential format.',
         'Passkey registration session expired. Please try again.',
         'Passkey verification session expired. Please try again.',
+        'An unknown error occurred.',
+        'The passkey operation was cancelled.',
+        'This device is already registered as a passkey.',
         'Reset your password',
         'You are receiving this email because we received a password reset request for your account.',
         'Reset Password',
@@ -71,7 +78,7 @@ final class TranslationKeys
             ->exclude(['actions', 'routes', 'wayfinder']);
 
         $patterns = [
-            '/\bt\(\s*'.self::STRING.'/s',
+            '/\btn?\(\s*'.self::STRING.'/s',
             '/\b(?:title|description|label|buttonText)\s*:\s*'.self::STRING.'/',
             '/\bsetErrors?\(\s*(?:\(?[^)]*\)?\s*=>\s*)?\[?[^\'"\]]*'.self::STRING.'/',
         ];
@@ -106,7 +113,7 @@ final class TranslationKeys
         $keys = [];
 
         foreach ($files as $file) {
-            preg_match_all('/(?:__|@lang|trans)\(\s*'.self::STRING.'/', $file->getContents(), $matches, PREG_SET_ORDER);
+            preg_match_all('/(?:(?<![\w>:$])(?:__|trans|trans_choice)|@lang|Lang::(?:get|choice))\(\s*'.self::STRING.'/', $file->getContents(), $matches, PREG_SET_ORDER);
 
             foreach ($matches as $match) {
                 $key = stripcslashes(self::quoted($match));

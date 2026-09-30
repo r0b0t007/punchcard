@@ -153,3 +153,44 @@ function ucfirst(value: string): string {
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Split a translated message around `:placeholders` whose values are not
+ * strings (links, buttons...), so one whole-sentence key can embed them and
+ * each language keeps its own word order:
+ *
+ *   interpolate('Or, return to :link', { link: <TextLink /> })
+ *   // ['Or, return to ', <TextLink />]
+ */
+export function interpolate<T>(
+    message: string,
+    nodes: Record<string, T>,
+): Array<string | T> {
+    const names = Object.keys(nodes).sort((a, b) => b.length - a.length);
+
+    if (names.length === 0) {
+        return [message];
+    }
+
+    const pattern = new RegExp(
+        `:(${names.map(escapeRegExp).join('|')})(?![A-Za-z0-9_])`,
+        'g',
+    );
+    const parts: Array<string | T> = [];
+    let last = 0;
+
+    for (const match of message.matchAll(pattern)) {
+        if (match.index > last) {
+            parts.push(message.slice(last, match.index));
+        }
+
+        parts.push(nodes[match[1]]);
+        last = match.index + match[0].length;
+    }
+
+    if (last < message.length) {
+        parts.push(message.slice(last));
+    }
+
+    return parts;
+}

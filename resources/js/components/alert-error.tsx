@@ -18,9 +18,7 @@ export default function AlertError({
             <AlertDescription>
                 <ul className="list-inside list-disc text-sm">
                     {Array.from(new Set(errors)).map((error, index) => (
-                        // Client-side messages (e.g. useTwoFactorAuth) are English keys;
-                        // server messages arrive translated and pass through unchanged.
-                        <li key={index}>{t(error)}</li>
+                        <li key={index}>{error}</li>
                     ))}
                 </ul>
             </AlertDescription>

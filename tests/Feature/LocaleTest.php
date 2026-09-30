@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Mail\Transport\ArrayTransport;
 use Inertia\Testing\AssertableInertia as Assert;
+use Symfony\Component\Mime\Email;
 
 describe('locale resolution', function (): void {
     it('defaults to French', function (): void {
@@ -116,32 +116,43 @@ describe('switching locale', function (): void {
     })->with(['de', '', 'ar-SA', null]);
 });
 
-describe('notifications', function (): void {
-    it('sends emails in the user\'s saved language', function (): void {
-        Notification::fake();
-        $user = User::factory()->create(['locale' => 'ar']);
-
-        $this->withCookie('locale', 'fr')
+describe('emails', function (): void {
+    /**
+     * Request a password reset and return the email that was actually sent
+     * through the test "array" mailer.
+     */
+    function sentResetEmail(User $user, string $requestLocale): Email
+    {
+        test()->withCookie('locale', $requestLocale)
             ->post(route('password.email'), ['email' => $user->email]);
 
-        Notification::assertSentTo(
-            $user,
-            ResetPassword::class,
-            fn (ResetPassword $notification, array $channels, User $notifiable, ?string $locale): bool => $locale === 'ar',
-        );
+        /** @var ArrayTransport $transport */
+        $transport = app('mail.manager')->mailer('array')->getSymfonyTransport();
+        $message = $transport->messages()->last()?->getOriginalMessage();
+
+        expect($message)->toBeInstanceOf(Email::class);
+
+        return $message;
+    }
+
+    it('sends emails in the user\'s saved language, laid out right to left for Arabic', function (): void {
+        $email = sentResetEmail(User::factory()->create(['locale' => 'ar']), requestLocale: 'fr');
+
+        expect($email->getSubject())->toBe('أعد تعيين كلمة المرور')
+            ->and($email->getHtmlBody())->toContain('lang="ar" dir="rtl"')
+            ->and($email->getHtmlBody())->not->toContain('text-align: left');
     });
 
     it('falls back to the request language when the user has not chosen one', function (): void {
-        Notification::fake();
-        $user = User::factory()->create(['locale' => null]);
+        $email = sentResetEmail(User::factory()->create(['locale' => null]), requestLocale: 'fr');
 
-        $this->withCookie('locale', 'fr')
-            ->post(route('password.email'), ['email' => $user->email]);
+        expect($email->getSubject())->toBe('Réinitialisez votre mot de passe')
+            ->and($email->getHtmlBody())->toContain('lang="fr" dir="ltr"');
+    });
 
-        Notification::assertSentTo(
-            $user,
-            ResetPassword::class,
-            fn (ResetPassword $notification, array $channels, User $notifiable, ?string $locale): bool => in_array($locale, [null, 'fr'], true),
-        );
+    it('ignores a saved locale that is no longer supported', function (): void {
+        $email = sentResetEmail(User::factory()->create(['locale' => 'de']), requestLocale: 'fr');
+
+        expect($email->getSubject())->toBe('Réinitialisez votre mot de passe');
     });
 });

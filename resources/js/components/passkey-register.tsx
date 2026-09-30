@@ -99,7 +99,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
                 </p>
             </div>
 
-            {error && <InputError message={error} />}
+            {error && <InputError message={t(error)} />}
 
             <div className="flex gap-2">
                 <Button type="submit" disabled={isLoading || !name.trim()}>

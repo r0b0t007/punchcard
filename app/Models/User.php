@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Locales;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Translation\HasLocalePreference;
@@ -58,6 +59,6 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
      */
     public function preferredLocale(): ?string
     {
-        return $this->locale;
+        return Locales::isSupported($this->locale) ? $this->locale : null;
     }
 }

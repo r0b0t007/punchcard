@@ -14,7 +14,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { store } from '@/routes/two-factor/login';
 
 export default function TwoFactorChallenge() {
-    const { t } = useTranslation();
+    const { t, tn } = useTranslation();
     const [showRecoveryInput, setShowRecoveryInput] = useState<boolean>(false);
     const [code, setCode] = useState<string>('');
 
@@ -113,20 +113,25 @@ export default function TwoFactorChallenge() {
                             </Button>
 
                             <div className="text-center text-sm text-muted-foreground">
-                                <span>{t('or you can')} </span>
-                                <button
-                                    type="button"
-                                    className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                    onClick={() =>
-                                        toggleRecoveryMode(clearErrors)
-                                    }
-                                >
-                                    {showRecoveryInput
-                                        ? t(
-                                              'login using an authentication code',
-                                          )
-                                        : t('login using a recovery code')}
-                                </button>
+                                {tn('or you can :action', {
+                                    action: (
+                                        <button
+                                            type="button"
+                                            className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                            onClick={() =>
+                                                toggleRecoveryMode(clearErrors)
+                                            }
+                                        >
+                                            {showRecoveryInput
+                                                ? t(
+                                                      'login using an authentication code',
+                                                  )
+                                                : t(
+                                                      'login using a recovery code',
+                                                  )}
+                                        </button>
+                                    ),
+                                })}
                             </div>
                         </>
                     )}

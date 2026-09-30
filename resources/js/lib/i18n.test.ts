@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { pluralIndex, translate } from '@/lib/i18n';
+import { interpolate, pluralIndex, translate } from '@/lib/i18n';
 
 describe('translate', () => {
     const fr = {
@@ -91,5 +91,44 @@ describe('pluralIndex', () => {
                 pluralIndex('ar', n),
             ),
         ).toEqual([0, 1, 2, 3, 3, 4, 4, 5, 5, 3, 4]);
+    });
+});
+
+describe('interpolate', () => {
+    const link = { type: 'link' };
+
+    it('splits a message around non-string placeholders, keeping word order', () => {
+        expect(interpolate('Or, return to :link', { link })).toEqual([
+            'Or, return to ',
+            link,
+        ]);
+        expect(interpolate('ارجع إلى :link الآن', { link })).toEqual([
+            'ارجع إلى ',
+            link,
+            ' الآن',
+        ]);
+    });
+
+    it('supports several placeholders and repeats', () => {
+        const a = { id: 'a' };
+        const b = { id: 'b' };
+        expect(interpolate(':b then :a then :b', { a, b })).toEqual([
+            b,
+            ' then ',
+            a,
+            ' then ',
+            b,
+        ]);
+    });
+
+    it('does not match a placeholder that is a prefix of a longer word', () => {
+        expect(interpolate(':linked and :link', { link })).toEqual([
+            ':linked and ',
+            link,
+        ]);
+    });
+
+    it('returns the message unchanged when there are no nodes', () => {
+        expect(interpolate('Plain text', {})).toEqual(['Plain text']);
     });
 });

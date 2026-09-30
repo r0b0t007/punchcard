@@ -1,5 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
-import AppDirectionProvider from '@/components/app-direction-provider';
+import I18nProvider from '@/components/i18n-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -24,14 +24,14 @@ void createInertiaApp({
         }
     },
     strictMode: true,
-    withApp(app) {
+    withApp(app, { page }) {
         return (
-            <AppDirectionProvider>
+            <I18nProvider initialProps={page.props}>
                 <TooltipProvider delayDuration={0}>
                     {app}
                     <Toaster />
                 </TooltipProvider>
-            </AppDirectionProvider>
+            </I18nProvider>
         );
     },
     progress: {

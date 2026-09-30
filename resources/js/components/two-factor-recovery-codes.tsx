@@ -24,7 +24,7 @@ export default function TwoFactorRecoveryCodes({
     fetchRecoveryCodes,
     errors,
 }: Props) {
-    const { t } = useTranslation();
+    const { t, tn } = useTranslation();
     const [codesAreVisible, setCodesAreVisible] = useState<boolean>(false);
     const codesSectionRef = useRef<HTMLDivElement | null>(null);
     const canRegenerateCodes = recoveryCodesList.length > 0 && codesAreVisible;
@@ -152,13 +152,16 @@ export default function TwoFactorRecoveryCodes({
 
                                 <div className="text-xs text-muted-foreground select-none">
                                     <p id="regenerate-warning">
-                                        {t(
-                                            'Each recovery code can be used once to access your account and will be removed after use. If you need more, click',
-                                        )}{' '}
-                                        <span className="font-bold">
-                                            {t('Regenerate codes')}
-                                        </span>{' '}
-                                        {t('above.')}
+                                        {tn(
+                                            'Each recovery code can be used once to access your account and will be removed after use. If you need more, click :button above.',
+                                            {
+                                                button: (
+                                                    <span className="font-bold">
+                                                        {t('Regenerate codes')}
+                                                    </span>
+                                                ),
+                                            },
+                                        )}
                                     </p>
                                 </div>
                             </>

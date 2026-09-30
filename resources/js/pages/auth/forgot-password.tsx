@@ -11,7 +11,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
-    const { t } = useTranslation();
+    const { t, tn } = useTranslation();
 
     return (
         <>
@@ -60,8 +60,9 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 </Form>
 
                 <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>{t('Or, return to')}</span>
-                    <TextLink href={login()}>{t('log in')}</TextLink>
+                    {tn('Or, return to :link', {
+                        link: <TextLink href={login()}>{t('log in')}</TextLink>,
+                    })}
                 </div>
             </div>
         </>
