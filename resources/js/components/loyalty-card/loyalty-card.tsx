@@ -1,5 +1,6 @@
 import { Gift } from 'lucide-react';
 import type { CSSProperties } from 'react';
+import { useState } from 'react';
 import {
     gridColumnsClass,
     progressFor,
@@ -7,7 +8,7 @@ import {
 import type { StampStyle } from '@/components/loyalty-card/stamp';
 import Stamp from '@/components/loyalty-card/stamp';
 import { useTranslation } from '@/hooks/use-translation';
-import { ESPRESSO, isHex, readableForeground, stampColor } from '@/lib/color';
+import { cardInks } from '@/lib/color';
 import { cn } from '@/lib/utils';
 
 export type LoyaltyCardProps = {
@@ -49,23 +50,21 @@ export default function LoyaltyCard({
         stampsRequired,
         stampsCollected,
     );
-    const validBrand = Boolean(brandColor && isHex(brandColor));
-    const brand = validBrand ? (brandColor as string) : ESPRESSO;
-    // A stored foreground only fits the colour it was computed for.
-    const foreground =
-        validBrand && brandForeground && isHex(brandForeground)
-            ? brandForeground
-            : readableForeground(brand);
+    const { brand, foreground, stamp } = cardInks(brandColor, brandForeground);
+    // A broken logo falls back to the monogram and plain stamps.
+    const [logoFailed, setLogoFailed] = useState(false);
+    const logo = logoUrl && !logoFailed ? logoUrl : null;
 
     // The one place runtime colours enter the UI: CSS variables scoped to this card.
     const brandVariables = {
         '--card-brand': brand,
         '--card-brand-foreground': foreground,
-        '--card-stamp': stampColor(brand, foreground),
+        '--card-stamp': stamp,
     } as CSSProperties;
 
     return (
-        <section
+        <div
+            role="group"
             aria-label={t(
                 ':business loyalty card, :collected of :required stamps',
                 {
@@ -82,10 +81,11 @@ export default function LoyaltyCard({
         >
             <header className="flex items-center gap-3">
                 <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-card-brand-foreground/10 ring-1 ring-card-brand-foreground/25">
-                    {logoUrl ? (
+                    {logo ? (
                         <img
-                            src={logoUrl}
+                            src={logo}
                             alt=""
+                            onError={() => setLogoFailed(true)}
                             className="size-full object-cover"
                         />
                     ) : (
@@ -120,18 +120,20 @@ export default function LoyaltyCard({
                             filled={index < filled}
                             index={index}
                             stampStyle={stampStyle}
-                            logoUrl={logoUrl}
+                            logoUrl={logo}
+                            onLogoError={() => setLogoFailed(true)}
                         />
                     </li>
                 ))}
             </ol>
 
-            <footer className="flex items-center gap-2 border-t border-card-brand-foreground/20 pt-3 text-sm">
-                <Gift aria-hidden="true" className="size-4 shrink-0" />
-                <p className="min-w-0 flex-1 truncate font-medium">
-                    {rewardText}
+            {/* Two lines so neither the reward nor the progress is clipped on a 320px phone. */}
+            <footer className="flex flex-col gap-1 border-t border-card-brand-foreground/20 pt-3 text-sm">
+                <p className="flex min-w-0 items-center gap-2 font-medium">
+                    <Gift aria-hidden="true" className="size-4 shrink-0" />
+                    <span className="min-w-0 truncate">{rewardText}</span>
                 </p>
-                <p className="shrink-0">
+                <p>
                     {remaining === 0
                         ? t('Reward ready')
                         : t(
@@ -140,6 +142,6 @@ export default function LoyaltyCard({
                           )}
                 </p>
             </footer>
-        </section>
+        </div>
     );
 }

@@ -78,3 +78,26 @@ function luminance(hex: string): number {
 
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+
+/**
+ * The three colours a loyalty card paints with, resolved once. An invalid brand
+ * colour falls back to the espresso card. A stored foreground is used only
+ * while it still reaches 4.5:1 on the brand colour (it may be stale, computed
+ * for an older colour); otherwise the card computes its own.
+ */
+export function cardInks(
+    brandColor?: string | null,
+    storedForeground?: string | null,
+): { brand: string; foreground: string; stamp: string } {
+    const brand = brandColor && isHex(brandColor) ? brandColor : ESPRESSO;
+    const stored =
+        brand === brandColor && storedForeground && isHex(storedForeground)
+            ? storedForeground
+            : null;
+    const foreground =
+        stored && contrastRatio(stored, brand) >= 4.5
+            ? stored
+            : readableForeground(brand);
+
+    return { brand, foreground, stamp: stampColor(brand, foreground) };
+}

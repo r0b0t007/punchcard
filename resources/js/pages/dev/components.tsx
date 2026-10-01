@@ -92,6 +92,18 @@ const CARDS: { caption: string; card: LoyaltyCardProps }[] = [
         },
     },
     {
+        caption: 'Broken logo URL, logo stamps, 12 to go',
+        card: {
+            businessName: 'Salon Yasmine',
+            logoUrl: '/missing-logo.png',
+            stampsRequired: 20,
+            stampsCollected: 8,
+            stampStyle: 'logo',
+            brandColor: '#E11D48',
+            rewardText: 'Brushing offert',
+        },
+    },
+    {
         caption: 'Arabic name, 5 stamps',
         card: {
             businessName: 'مقهى الياسمين',

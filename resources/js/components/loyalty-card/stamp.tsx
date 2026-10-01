@@ -17,29 +17,30 @@ const ICONS = { check: Check, heart: Heart, star: Star };
 
 /**
  * One slot of the stamp grid. Empty slots are dashed outlines; filled ones are
- * ink-stamp marks in the card's stamp colour, slightly rotated per position.
+ * ink-stamp marks in the card's stamp colour. Icon and logo stamps sit slightly
+ * askew, per position; round dots and rings would not show a rotation.
  */
 export default function Stamp({
     filled,
     index,
     stampStyle,
     logoUrl,
+    onLogoError,
 }: {
     filled: boolean;
     index: number;
     stampStyle: StampStyle;
     logoUrl?: string | null;
+    onLogoError?: () => void;
 }) {
     if (!filled) {
         return (
-            <span className="aspect-square rounded-full border-2 border-dashed border-card-brand-foreground/40" />
+            <span className="aspect-square rounded-full border-2 border-dashed border-card-brand-foreground/80" />
         );
     }
 
-    const mark = cn(
-        'grid aspect-square place-items-center rounded-full',
-        rotationClass(index),
-    );
+    const mark = 'grid aspect-square place-items-center rounded-full';
+    const askew = cn(mark, rotationClass(index));
 
     if (stampStyle === 'ring') {
         return <span className={cn(mark, 'border-4 border-card-stamp')} />;
@@ -47,10 +48,11 @@ export default function Stamp({
 
     if (stampStyle === 'logo' && logoUrl) {
         return (
-            <span className={cn(mark, 'overflow-hidden bg-card-stamp p-0.5')}>
+            <span className={cn(askew, 'overflow-hidden bg-card-stamp p-0.5')}>
                 <img
                     src={logoUrl}
                     alt=""
+                    onError={onLogoError}
                     className="size-full rounded-full object-cover"
                 />
             </span>
@@ -65,7 +67,7 @@ export default function Stamp({
         const Icon = ICONS[stampStyle];
 
         return (
-            <span className={cn(mark, 'bg-card-stamp text-card-brand')}>
+            <span className={cn(askew, 'bg-card-stamp text-card-brand')}>
                 <Icon
                     className="size-3/5"
                     strokeWidth={3}

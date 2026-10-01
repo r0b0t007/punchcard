@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { contrastRatio, readableForeground, stampColor } from '@/lib/color';
+import {
+    cardInks,
+    contrastRatio,
+    readableForeground,
+    stampColor,
+} from '@/lib/color';
 
 describe('contrastRatio', () => {
     it('matches the WCAG formula', () => {
@@ -57,5 +62,34 @@ describe('stampColor with a stored foreground', () => {
     it('falls back to the card text colour the server stored', () => {
         expect(stampColor('#F2A541', '#FFFFFF')).toBe('#FFFFFF');
         expect(stampColor('#3B2A20', '#FFFFFF')).toBe('#F2A541');
+    });
+});
+
+describe('cardInks', () => {
+    it('uses a stored foreground only while it still reads on the brand colour', () => {
+        expect(cardInks('#0F4C81', '#FBF6EE')).toEqual({
+            brand: '#0F4C81',
+            foreground: '#FBF6EE',
+            stamp: '#F2A541',
+        });
+        // stale: computed for another colour, cream on saffron is ~1.9:1
+        expect(cardInks('#F2A541', '#FBF6EE')).toEqual({
+            brand: '#F2A541',
+            foreground: '#241A13',
+            stamp: '#241A13',
+        });
+    });
+
+    it('ignores a stored foreground when the brand colour is invalid', () => {
+        expect(cardInks('rgb(255,230,200)', '#241A13')).toEqual({
+            brand: '#3B2A20',
+            foreground: '#FBF6EE',
+            stamp: '#F2A541',
+        });
+        expect(cardInks(null, null)).toEqual({
+            brand: '#3B2A20',
+            foreground: '#FBF6EE',
+            stamp: '#F2A541',
+        });
     });
 });

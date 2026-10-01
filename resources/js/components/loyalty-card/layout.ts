@@ -29,19 +29,9 @@ const ROTATIONS = [
     'rotate-1',
 ];
 
-export function clampStamps(
-    required: number,
-    collected: number,
-): { required: number; collected: number } {
-    const total = Math.min(
-        MAX_STAMPS,
-        Math.max(MIN_STAMPS, Math.round(required)),
-    );
-
-    return {
-        required: total,
-        collected: Math.min(total, Math.max(0, Math.round(collected))),
-    };
+/** The grid always draws 5 to 50 slots. */
+export function clampSlots(count: number): number {
+    return Math.min(MAX_STAMPS, Math.max(MIN_STAMPS, Math.round(count)));
 }
 
 /**
@@ -75,29 +65,41 @@ export type Progress = {
 
 /**
  * Card progress from the server's numbers. The grid is capped to 5..50 slots,
- * but completion always comes from the real values, so out-of-range data
- * never shows "Reward ready" or a full grid by accident.
+ * but completion always comes from the real values: out-of-range data never
+ * shows "Reward ready" or a full grid while stamps are owed, and shows at
+ * least one filled slot once a stamp is collected. Missing (non-finite)
+ * values fall back to an empty 5-stamp card.
  */
 export function progressFor(
     stampsRequired: number,
     stampsCollected: number,
 ): Progress {
-    const required = Math.max(1, Math.round(stampsRequired));
-    const collected = Math.min(
-        required,
-        Math.max(0, Math.round(stampsCollected)),
-    );
-    const slots = clampStamps(required, 0).required;
-    const filled =
-        slots === required
-            ? collected
-            : Math.min(slots, Math.round((collected / required) * slots));
+    const required = Number.isFinite(stampsRequired)
+        ? Math.max(1, Math.round(stampsRequired))
+        : MIN_STAMPS;
+    const collected = Number.isFinite(stampsCollected)
+        ? Math.min(required, Math.max(0, Math.round(stampsCollected)))
+        : 0;
+    const remaining = required - collected;
+    const slots = clampSlots(required);
 
-    return {
-        required,
-        collected,
-        remaining: required - collected,
-        slots,
-        filled,
-    };
+    let filled = collected;
+
+    if (slots !== required) {
+        filled = Math.floor((collected / required) * slots);
+
+        if (remaining > 0) {
+            filled = Math.min(filled, slots - 1);
+        }
+
+        if (collected > 0) {
+            filled = Math.max(filled, 1);
+        }
+
+        if (remaining === 0) {
+            filled = slots;
+        }
+    }
+
+    return { required, collected, remaining, slots, filled };
 }
