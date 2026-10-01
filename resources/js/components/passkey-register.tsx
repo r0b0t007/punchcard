@@ -91,7 +91,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={t('e.g., MacBook Pro, iPhone')}
-                    className="mt-1 block w-full border-foreground/20"
+                    className="mt-1 block w-full"
                     autoFocus
                 />
                 <p className="text-xs text-muted-foreground">

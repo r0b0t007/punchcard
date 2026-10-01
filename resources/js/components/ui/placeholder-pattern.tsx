@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { cn } from '@/lib/utils';
 
 interface PlaceholderPatternProps {
     className?: string;
@@ -8,7 +9,7 @@ export function PlaceholderPattern({ className }: PlaceholderPatternProps) {
     const patternId = useId();
 
     return (
-        <svg className={className} fill="none">
+        <svg className={cn('stroke-foreground/20', className)} fill="none">
             <defs>
                 <pattern id={patternId} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
                     <path d="M-3 13 15-5M-5 5l18-18M-1 21 17 3"></path>

@@ -39,7 +39,7 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                             {passkey.name}
                         </p>
                         {passkey.authenticator && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase ring-1 ring-border ring-inset">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium tracking-wide text-muted-foreground uppercase ring-1 ring-border ring-inset">
                                 {passkey.authenticator}
                             </span>
                         )}
@@ -62,11 +62,7 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
 
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    >
+                    <Button variant="ghost-destructive" size="sm">
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">{t('Remove')}</span>
                     </Button>
@@ -79,7 +75,7 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                             { name: passkey.name },
                         )}
                     </DialogDescription>
-                    <DialogFooter className="gap-2">
+                    <DialogFooter>
                         <DialogClose asChild>
                             <Button variant="secondary">{t('Cancel')}</Button>
                         </DialogClose>

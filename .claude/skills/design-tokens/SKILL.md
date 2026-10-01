@@ -37,10 +37,22 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 
 ## Components
 
-- `LoyaltyCard` (`resources/js/components/loyalty-card/`) is the signature component: logo, business name, stamp grid (5–50, balanced rows), stamp style (`dot`, `ring`, `check`, `heart`, `star`, `logo`), ink-stamp look with slight rotation for filled stamps, reward line, progress text. Props: `businessName`, `cardName?`, `logoUrl?`, `stampsRequired`, `stampsCollected`, `stampStyle?`, `brandColor?`, `brandForeground?` (stored by the server; computed with `readableForeground()` from `@/lib/color` when absent), `rewardText`. Reuse it in C2, C5, C6, the B6 preview and marketing screenshots.
+- `LoyaltyCard` (`resources/js/components/loyalty-card/`) is the signature component: logo, business name, stamp grid (5–50, balanced rows), stamp style (`dot`, `ring`, `check`, `heart`, `star`, `logo`), ink-stamp look with slight rotation for filled stamps, reward line, progress text. Props: `businessName`, `cardName?`, `logoUrl?`, `stampsRequired`, `stampsCollected`, `stampStyle?`, `brandColor?`, `brandForeground?` (stored by the server; used only while it still reaches 4.5:1 on the brand colour, otherwise `cardInks()` in `@/lib/color` computes one), `rewardText`. Reuse it in C2, C5, C6, the B6 preview and marketing screenshots.
 - Brand colours reach the card only as `--card-brand`, `--card-brand-foreground` and `--card-stamp` set on the card element; their Tailwind colours live in `@theme inline`, because a plain `@theme` entry resolves once on `:root` and ignores per-element overrides. Stamps are saffron when that reaches 3:1 on the brand colour (`stampColor()`), otherwise the foreground.
 - Preview components at `/dev/components` (registered only when `APP_ENV=local`).
 - Use existing shadcn/ui components in `resources/js/components/ui/` before creating new ones.
+
+## Lint (`@shadcn/lint`)
+
+`npm run check` runs six design-system rules as errors (configured in the `lint` block of `vite.config.ts`). Each error names the token, variant or size to use instead; apply it rather than disabling the rule.
+
+- `no-raw-colors`, `no-arbitrary-values`, `no-unknown-classes`: theme tokens and the Tailwind scale only (`rounded-card`, not `rounded-[20px]`; `bg-stamp`, not `bg-amber-500`).
+- `no-restyle`: on a `components/ui` component, only layout classes (margin, width, position) are allowed in `className`. For colour, shape or padding, use a variant or size, or add one to the component when the design asks for it. Contracts: `SidebarGroup` also takes spacing, `Input` also takes `ps-*`/`pe-*` (room for an adornment such as the password eye button).
+- `no-inline-styles`: no `style` properties, except CSS custom properties carrying runtime values, as `LoyaltyCard` does with `--card-brand`. A hardcoded colour in a custom property is still an error.
+- `require-static-classes`: no built class names like `` `bg-${color}` ``; map values to full class strings.
+- `components/ui/*` is ignored (shadcn source). `pages/welcome.tsx` skips the colour and arbitrary-value rules until the marketing home replaces it (CHW-62).
+- The plugin reads component files with `oxc-parser` when its native binary loads (CI on Linux) and falls back to `@typescript-eslint/parser` otherwise (a Windows Application Control policy blocks the binary on the main dev machine). The choice cannot be pinned in config, so **CI is authoritative**; if local and CI ever disagree, fix what CI reports.
+- Variants added for treatments the rules would otherwise reject: `Button` `ghost-destructive` (quiet delete actions in lists), `SidebarMenuButton` `trigger` (opens a menu, stays highlighted while open) and `muted` (secondary links). Utility `transition-size` animates width and height only.
 
 ## RTL and i18n
 

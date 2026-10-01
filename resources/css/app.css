@@ -83,6 +83,13 @@
  * inline: utilities read var(--card-brand) on the element itself, so LoyaltyCard can
  * override these per card. A plain @theme entry would resolve once on :root.
  */
+/* Animates size only (sidebar collapse), so theme changes don't fade. */
+@utility transition-size {
+    transition-property: width, height;
+    transition-timing-function: var(--default-transition-timing-function);
+    transition-duration: var(--default-transition-duration);
+}
+
 @theme inline {
     --color-card-brand: var(--card-brand);
     --color-card-brand-foreground: var(--card-brand-foreground);
