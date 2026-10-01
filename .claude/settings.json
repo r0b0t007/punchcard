@@ -29,15 +29,6 @@
             "Bash(git add *)",
             "Bash(git commit *)"
         ],
-        "ask": [
-            "Bash(composer require *)",
-            "Bash(composer remove *)",
-            "Bash(npm install *)",
-            "Bash(npm uninstall *)",
-            "Bash(php artisan migrate *)",
-            "Bash(php artisan migrate)",
-            "Bash(git push *)"
-        ],
         "deny": [
             "Read(./.env)",
             "Read(./.env.*)",
@@ -53,12 +44,21 @@
             "Bash(php artisan db:wipe *)",
             "Bash(php artisan db:wipe)",
             "Bash(php artisan db:seed --force *)",
-            "Bash(git push --force *)",
             "Bash(git push -f *)",
             "Bash(git reset --hard *)",
             "Bash(rm -rf *)"
+        ],
+        "ask": [
+            "Bash(composer require *)",
+            "Bash(composer remove *)",
+            "Bash(npm install *)",
+            "Bash(npm uninstall *)",
+            "Bash(php artisan migrate *)",
+            "Bash(php artisan migrate)",
+            "Bash(git push *)"
         ]
     },
+    "enableAllProjectMcpServers": true,
     "hooks": {
         "PostToolUse": [
             {
@@ -92,7 +92,20 @@
             }
         ]
     },
-    "enableAllProjectMcpServers": true,
+    "enabledPlugins": {
+        "laravel@laravel": true,
+        "superpowers@claude-plugins-official": true,
+        "context7@claude-plugins-official": true,
+        "playwright@claude-plugins-official": true,
+        "github@claude-plugins-official": true,
+        "linear@claude-plugins-official": true,
+        "frontend-design@claude-plugins-official": true,
+        "code-review@claude-plugins-official": true,
+        "pr-review-toolkit@claude-plugins-official": true,
+        "security-guidance@claude-plugins-official": true,
+        "php-lsp@claude-plugins-official": true,
+        "example-skills@anthropic-agent-skills": true
+    },
     "extraKnownMarketplaces": {
         "claude-plugins-official": {
             "source": {
@@ -112,19 +125,5 @@
                 "repo": "anthropics/skills"
             }
         }
-    },
-    "enabledPlugins": {
-        "laravel@laravel": true,
-        "superpowers@claude-plugins-official": true,
-        "context7@claude-plugins-official": true,
-        "playwright@claude-plugins-official": true,
-        "github@claude-plugins-official": true,
-        "linear@claude-plugins-official": true,
-        "frontend-design@claude-plugins-official": true,
-        "code-review@claude-plugins-official": true,
-        "pr-review-toolkit@claude-plugins-official": true,
-        "security-guidance@claude-plugins-official": true,
-        "php-lsp@claude-plugins-official": true,
-        "example-skills@anthropic-agent-skills": true
     }
 }
