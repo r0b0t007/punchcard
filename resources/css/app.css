@@ -79,6 +79,16 @@
     --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * inline: utilities read var(--card-brand) on the element itself, so LoyaltyCard can
+ * override these per card. A plain @theme entry would resolve once on :root.
+ */
+@theme inline {
+    --color-card-brand: var(--card-brand);
+    --color-card-brand-foreground: var(--card-brand-foreground);
+    --color-card-stamp: var(--card-stamp);
+}
+
 :root {
     --background: #fbf6ee;
     --foreground: #241a13;
@@ -96,6 +106,10 @@
     --accent-foreground: #3b2a20;
     --stamp: #f2a541;
     --stamp-foreground: #241a13;
+    /* Loyalty card defaults (espresso card, saffron stamps); LoyaltyCard overrides them per organization. */
+    --card-brand: #3b2a20;
+    --card-brand-foreground: #fbf6ee;
+    --card-stamp: #f2a541;
     --success: #2e7d4f;
     --warning: #9a5b0a;
     --destructive: #b42318;

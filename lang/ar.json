@@ -1,6 +1,8 @@
 {
     "2FA recovery codes": "رموز الاسترداد للمصادقة الثنائية",
     ":browser on :os": ":browser على :os",
+    ":business loyalty card, :collected of :required stamps": "بطاقة ولاء :business، :collected من :required",
+    ":count more stamp to your reward|:count more stamps to your reward": "لم يتبقَّ أي طابع على مكافأتك|تبقّى طابع واحد على مكافأتك|تبقّى طابعان على مكافأتك|تبقّت :count طوابع على مكافأتك|تبقّى :count طابعًا على مكافأتك|تبقّى :count طابع على مكافأتك",
     "A name helps you identify this passkey later.": "يساعدك الاسم على التعرّف على مفتاح المرور هذا لاحقًا.",
     "A new verification link has been sent to the email address you provided during registration.": "أُرسل رابط تحقق جديد إلى البريد الإلكتروني الذي أدخلته عند التسجيل.",
     "A new verification link has been sent to your email address.": "أُرسل رابط تحقق جديد إلى بريدك الإلكتروني.",
@@ -124,6 +126,7 @@
     "Reset Password": "إعادة تعيين كلمة المرور",
     "Reset password": "إعادة تعيين كلمة المرور",
     "Reset your password": "أعد تعيين كلمة المرور",
+    "Reward ready": "المكافأة جاهزة",
     "Save": "حفظ",
     "Search": "بحث",
     "Security": "الأمان",
