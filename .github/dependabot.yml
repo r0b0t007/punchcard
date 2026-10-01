@@ -31,6 +31,10 @@ updates:
     cooldown:
       default-days: 5
     groups:
+      # Vite+ pins its own Vite core and Vitest: bump them together, then
+      # align the `vitest` override in package.json to the version `vp --version` shows.
+      vite-plus:
+        patterns: ["vite-plus", "vite", "@voidzero-dev/*"]
       react:
         patterns: ["react", "react-dom", "@types/react*", "@inertiajs/*"]
       radix:
@@ -38,4 +42,8 @@ updates:
       tooling:
         dependency-type: "development"
         patterns: ["*"]
+    ignore:
+      # Types follow the Node version CI runs (22), not the newest release.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
