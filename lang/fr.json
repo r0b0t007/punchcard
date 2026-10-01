@@ -1,6 +1,8 @@
 {
     "2FA recovery codes": "Codes de récupération 2FA",
     ":browser on :os": ":browser sur :os",
+    ":business loyalty card, :collected of :required stamps": "Carte de fidélité :business, :collected tampons sur :required",
+    ":count more stamp to your reward|:count more stamps to your reward": "{1} Plus qu’un tampon avant votre récompense|[2,*] Plus que :count tampons avant votre récompense",
     "A name helps you identify this passkey later.": "Un nom vous aidera à reconnaître cette clé d’accès plus tard.",
     "A new verification link has been sent to the email address you provided during registration.": "Un nouveau lien de vérification a été envoyé à l’adresse e-mail indiquée lors de votre inscription.",
     "A new verification link has been sent to your email address.": "Un nouveau lien de vérification a été envoyé à votre adresse e-mail.",
@@ -124,6 +126,7 @@
     "Reset Password": "Réinitialiser le mot de passe",
     "Reset password": "Réinitialiser le mot de passe",
     "Reset your password": "Réinitialisez votre mot de passe",
+    "Reward ready": "Récompense prête",
     "Save": "Enregistrer",
     "Search": "Rechercher",
     "Security": "Sécurité",
