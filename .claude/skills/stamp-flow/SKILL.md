@@ -50,4 +50,4 @@ Enrollment has a `referral_code`. A new customer who signs up through it gets th
 - Progressive tiers crossing two tiers in one add.
 - Concurrency: two simultaneous adds do not exceed the cap (use DB locking, test with sequential calls asserting locks are taken).
 - Redemption twice returns the same result, one `redeemed` row.
-- Tenant isolation: staff of business A cannot stamp or redeem on business B.
+- Tenant isolation (ADR 0006): staff of organization A cannot stamp or redeem on organization B. Inside a franchise, staff of any participating business can stamp and redeem on the shared card, and the event records their `business_id` and `location_id`.

@@ -1,6 +1,7 @@
 # Local services for development. The app itself runs on your machine
 # (Laravel Herd on Windows/macOS, or php artisan serve).
 #   docker compose up -d
+# No Redis: cache, sessions and queues use the database driver (docs/adr/0005).
 services:
     postgres:
         image: postgis/postgis:17-3.5
@@ -18,11 +19,6 @@ services:
             interval: 5s
             timeout: 5s
             retries: 10
-
-    redis:
-        image: redis:7-alpine
-        ports:
-            - '6379:6379'
 
     mailpit:
         image: axllent/mailpit:latest

@@ -8,7 +8,7 @@ description: How to pick up, work on and close punchcard backlog items in Linear
 - Workspace team: **chioua** (key `CHW`). Projects: **punchcard · App** and **punchcard · Marketing website**.
 - Milestones follow the roadmap in `docs/spec.md`: Phase 0 hardware spike, Phase 1 MVP core, Phase 2 wallet + push, Phase 3 insights + retention, Phase 4 monetise + scale. Marketing site has its own milestones.
 - Labels: area (`backend`, `frontend`, `pwa`, `nfc`, `wallet`, `infra`, `design`, `marketing`, `security`), `spike` for time-boxed investigations, the workspace defaults (`Feature`, `Bug`, `Improvement`), and `side` on every punchcard issue (side-income work).
-- Issue numbers: Setup CHW-10..14, Phase 0 CHW-15..20, Phase 1 CHW-21..37 + CHW-58, Phase 2 CHW-38..43, Phase 3 CHW-44..50, Phase 4 CHW-51..57 + CHW-59, marketing site CHW-60..74. New issues continue the sequence.
+- Issue numbers: Setup CHW-10..14 + CHW-136, Phase 0 CHW-15..20, Phase 1 CHW-21..37 + CHW-58, 131, 132, Phase 2 CHW-38..42 + CHW-135, Phase 3 CHW-44..50, Phase 4 CHW-51..57 + CHW-43, 59, 133, 134, 137, marketing site CHW-60..74. New issues continue the sequence (check Linear for the latest number).
 
 ## Starting an issue
 

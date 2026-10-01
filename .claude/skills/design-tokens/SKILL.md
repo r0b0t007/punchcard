@@ -19,12 +19,12 @@ Source of truth for the look: the design system produced from the Claude Design 
 | `--success` / `--warning` / `--destructive` | green / amber / red at AA contrast | lighter variants | Status                           |
 | `--card-brand`                              | per business                       | per business     | Loyalty card background only     |
 
-Rules: a business brand colour may only change the **loyalty card** component (`--card-brand`, `--card-brand-foreground`), never the app chrome. Compute the foreground colour for contrast (WCAG AA 4.5:1) server-side when the owner saves the colour.
+Rules (ADR 0007): the organization's brand colour may only change the **loyalty card**, the tap screens (C1 to C4, cooldown) and the Wallet pass (`--card-brand`, `--card-brand-foreground`), never the app chrome. Compute the foreground colour for contrast (WCAG AA 4.5:1) server-side when the owner saves the colour. Exception: on an Enterprise white-label domain the request-time theme may also override `--primary`, `--accent` and `--background`, set as CSS variables from the organization's settings, never as hardcoded classes.
 
 ## Where tokens live
 
 - Tailwind 4 `@theme` + shadcn CSS variables in `resources/css/app.css` (`:root` and `.dark`). Do not hardcode hex values in components; use `bg-primary`, `text-accent`, etc.
-- Radius: cards 20px (`rounded-[20px]` via `--radius-card`), buttons 14px, chips full.
+- Radius: define `--radius-card: 20px` and `--radius-button: 14px` in `@theme` and use `rounded-card` / `rounded-button`; chips `rounded-full`. No arbitrary values like `rounded-[20px]` (they will fail `@shadcn/lint`).
 - Type: one rounded humanist sans for UI, one display face for card titles and reward moments (loaded through the `bunny()` fonts helper in `vite.config.ts`). Scale 12–40px.
 - Touch targets ≥ 44px; counter-mode buttons ≥ 72px.
 

@@ -16,7 +16,7 @@ Check each item and report only real problems, with file:line, a concrete failur
 4. **Idempotency**: QR/staff stamping uses an idempotency key; redemption twice returns one `redeemed` row.
 5. **Ledger**: `stamp_events` only ever inserted; enrollment counters derived consistently; corrections are new events.
 6. **Presence proof**: redemption and QR stamping require a verified tap or a fresh (≤ 30 s) signed member token.
-7. **Tenancy**: every query on tenant data is scoped to the acting user's business; policies cover staff vs owner; add or point to an isolation test.
+7. **Tenancy**: every query on tenant data is scoped to the acting user's organization (program data) or business (site data); franchisee A1 never sees A2's staff, stampers, stats or customers who only visited A2; policies cover staff, owner and org_admin; add or point to an isolation test for both boundaries.
 8. **Authorization**: staff cannot change card rules, billing or fraud settings; customers can only read their own enrollments.
 9. **Inputs**: qty bounded (1..max_per_tap), arming expires, dates in the location timezone for daily caps.
 10. **Tests**: boundaries (at cap, over cap), cyclic overflow, progressive multi-tier, tampered MAC, replayed counter, cross-tenant access.
