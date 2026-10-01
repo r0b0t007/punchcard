@@ -12,9 +12,18 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             refresh: true,
+            // Both faces cover Latin and Arabic (fr/en/ar). Readex Pro for UI,
+            // Baloo Bhaijaan 2 for card titles and reward moments.
             fonts: [
-                bunny('Instrument Sans', {
+                bunny('Readex Pro', {
                     weights: [400, 500, 600],
+                    subsets: ['latin', 'latin-ext', 'arabic'],
+                    preload: [{ weight: 400 }],
+                }),
+                bunny('Baloo Bhaijaan 2', {
+                    weights: [600, 700],
+                    subsets: ['latin', 'latin-ext', 'arabic'],
+                    preload: false,
                 }),
             ],
         }),
