@@ -6,7 +6,7 @@ declare(strict_types=1);
 return [
 
     'guidelines' => [
-        // Deploys go through Forge deploy hooks, not Laravel Cloud.
+        // Deploys go through Ploi deploy webhooks, not Laravel Cloud.
         'exclude' => ['deployments'],
     ],
 

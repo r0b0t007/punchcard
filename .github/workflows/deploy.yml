@@ -2,7 +2,8 @@ name: deploy
 
 # Staging deploys on every push to main; production deploys when a GitHub release is published
 # and the `production` environment reviewer approves. Disabled until the repository variable
-# DEPLOY_ENABLED is set to 'true' and the Forge (or Ploi) deploy hook secrets exist.
+# DEPLOY_ENABLED is set to 'true' and the Ploi deploy webhook secrets exist. Each Ploi site has
+# zero-downtime deployment on and "deploy on push" off, so only this workflow deploys, after CI passes.
 on:
   workflow_run:
     workflows: [ci]
@@ -36,7 +37,7 @@ jobs:
       url: ${{ vars.STAGING_URL }}
     steps:
       - name: Trigger zero-downtime deploy
-        run: curl -fsS -X POST "${{ secrets.FORGE_DEPLOY_HOOK_STAGING }}"
+        run: curl -fsS -X POST "${{ secrets.PLOI_DEPLOY_HOOK_STAGING }}"
       - name: Health check
         run: |
           for i in $(seq 1 30); do
@@ -56,7 +57,7 @@ jobs:
       url: ${{ vars.PRODUCTION_URL }}
     steps:
       - name: Trigger zero-downtime deploy
-        run: curl -fsS -X POST "${{ secrets.FORGE_DEPLOY_HOOK_PRODUCTION }}"
+        run: curl -fsS -X POST "${{ secrets.PLOI_DEPLOY_HOOK_PRODUCTION }}"
       - name: Health check
         run: |
           for i in $(seq 1 30); do
