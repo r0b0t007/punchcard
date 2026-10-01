@@ -81,6 +81,17 @@ const CARDS: { caption: string; card: LoyaltyCardProps }[] = [
         },
     },
     {
+        caption: 'Bad data: invalid colour with a stored foreground, 52 of 60',
+        card: {
+            businessName: '🍩 Donut Bar',
+            stampsRequired: 60,
+            stampsCollected: 52,
+            brandColor: 'rgb(255,230,200)',
+            brandForeground: '#241A13',
+            rewardText: 'Free donut',
+        },
+    },
+    {
         caption: 'Arabic name, 5 stamps',
         card: {
             businessName: 'مقهى الياسمين',

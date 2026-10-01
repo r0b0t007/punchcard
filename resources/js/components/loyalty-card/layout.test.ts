@@ -3,6 +3,7 @@ import {
     clampStamps,
     columnsFor,
     gridColumnsClass,
+    progressFor,
     rotationClass,
 } from '@/components/loyalty-card/layout';
 
@@ -36,5 +37,43 @@ describe('rotationClass', () => {
             new Set(Array.from({ length: 10 }, (_, i) => rotationClass(i)))
                 .size,
         ).toBeGreaterThan(4);
+    });
+});
+
+describe('progressFor', () => {
+    it('keeps the real numbers for text and the grid for display', () => {
+        expect(progressFor(10, 4)).toEqual({
+            required: 10,
+            collected: 4,
+            remaining: 6,
+            slots: 10,
+            filled: 4,
+        });
+    });
+
+    it('never claims a reward for out-of-range data', () => {
+        const progress = progressFor(60, 52);
+        expect(progress.remaining).toBe(8);
+        expect(progress.slots).toBe(50);
+        expect(progress.filled).toBe(43); // proportional, not a full grid
+    });
+
+    it('maps small and negative values sensibly', () => {
+        expect(progressFor(3, 3)).toMatchObject({
+            remaining: 0,
+            slots: 5,
+            filled: 5,
+        });
+        expect(progressFor(3, 1)).toMatchObject({
+            remaining: 2,
+            slots: 5,
+            filled: 2,
+        });
+        expect(progressFor(80, -2)).toMatchObject({
+            collected: 0,
+            remaining: 80,
+            slots: 50,
+            filled: 0,
+        });
     });
 });

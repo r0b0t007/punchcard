@@ -1,8 +1,8 @@
 import { Gift } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import {
-    clampStamps,
     gridColumnsClass,
+    progressFor,
 } from '@/components/loyalty-card/layout';
 import type { StampStyle } from '@/components/loyalty-card/stamp';
 import Stamp from '@/components/loyalty-card/stamp';
@@ -15,13 +15,13 @@ export type LoyaltyCardProps = {
     /** Optional card name under the business name, e.g. "Coffee card". */
     cardName?: string | null;
     logoUrl?: string | null;
-    /** 5 to 50; values outside are clamped. */
+    /** 5 to 50 is the supported range; the grid caps there, the text keeps the real numbers. */
     stampsRequired: number;
     stampsCollected: number;
     stampStyle?: StampStyle;
     /** The organization's brand colour (hex). Defaults to the espresso card. */
     brandColor?: string | null;
-    /** Text colour stored by the server for the brand colour; computed when absent. */
+    /** Text colour stored by the server for brandColor; ignored when brandColor is missing or invalid. */
     brandForeground?: string | null;
     rewardText: string;
     className?: string;
@@ -45,14 +45,15 @@ export default function LoyaltyCard({
     className,
 }: LoyaltyCardProps) {
     const { t } = useTranslation();
-    const { required, collected } = clampStamps(
+    const { required, collected, remaining, slots, filled } = progressFor(
         stampsRequired,
         stampsCollected,
     );
-    const remaining = required - collected;
-    const brand = brandColor && isHex(brandColor) ? brandColor : ESPRESSO;
+    const validBrand = Boolean(brandColor && isHex(brandColor));
+    const brand = validBrand ? (brandColor as string) : ESPRESSO;
+    // A stored foreground only fits the colour it was computed for.
     const foreground =
-        brandForeground && isHex(brandForeground)
+        validBrand && brandForeground && isHex(brandForeground)
             ? brandForeground
             : readableForeground(brand);
 
@@ -60,7 +61,7 @@ export default function LoyaltyCard({
     const brandVariables = {
         '--card-brand': brand,
         '--card-brand-foreground': foreground,
-        '--card-stamp': stampColor(brand),
+        '--card-stamp': stampColor(brand, foreground),
     } as CSSProperties;
 
     return (
@@ -89,7 +90,9 @@ export default function LoyaltyCard({
                         />
                     ) : (
                         <span className="font-display text-lg font-bold">
-                            {businessName.trim().charAt(0).toUpperCase()}
+                            {(
+                                Array.from(businessName.trim())[0] ?? ''
+                            ).toUpperCase()}
                         </span>
                     )}
                 </span>
@@ -109,12 +112,12 @@ export default function LoyaltyCard({
 
             <ol
                 aria-hidden="true"
-                className={cn('grid gap-2', gridColumnsClass(required))}
+                className={cn('grid gap-2', gridColumnsClass(slots))}
             >
-                {Array.from({ length: required }, (_, index) => (
+                {Array.from({ length: slots }, (_, index) => (
                     <li key={index} className="grid">
                         <Stamp
-                            filled={index < collected}
+                            filled={index < filled}
                             index={index}
                             stampStyle={stampStyle}
                             logoUrl={logoUrl}

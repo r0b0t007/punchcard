@@ -62,3 +62,42 @@ export function gridColumnsClass(count: number): string {
 export function rotationClass(index: number): string {
     return ROTATIONS[(index * 5) % ROTATIONS.length];
 }
+
+export type Progress = {
+    /** Real numbers, for the count, the progress text and the accessible name. */
+    required: number;
+    collected: number;
+    remaining: number;
+    /** What the grid draws: 5 to 50 slots, filled in proportion when they differ from required. */
+    slots: number;
+    filled: number;
+};
+
+/**
+ * Card progress from the server's numbers. The grid is capped to 5..50 slots,
+ * but completion always comes from the real values, so out-of-range data
+ * never shows "Reward ready" or a full grid by accident.
+ */
+export function progressFor(
+    stampsRequired: number,
+    stampsCollected: number,
+): Progress {
+    const required = Math.max(1, Math.round(stampsRequired));
+    const collected = Math.min(
+        required,
+        Math.max(0, Math.round(stampsCollected)),
+    );
+    const slots = clampStamps(required, 0).required;
+    const filled =
+        slots === required
+            ? collected
+            : Math.min(slots, Math.round((collected / required) * slots));
+
+    return {
+        required,
+        collected,
+        remaining: required - collected,
+        slots,
+        filled,
+    };
+}

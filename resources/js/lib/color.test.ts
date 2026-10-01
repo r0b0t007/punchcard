@@ -52,3 +52,10 @@ describe('stampColor', () => {
         expect(stampColor('#FFFFFF')).toBe('#241A13');
     });
 });
+
+describe('stampColor with a stored foreground', () => {
+    it('falls back to the card text colour the server stored', () => {
+        expect(stampColor('#F2A541', '#FFFFFF')).toBe('#FFFFFF');
+        expect(stampColor('#3B2A20', '#FFFFFF')).toBe('#F2A541');
+    });
+});

@@ -40,13 +40,18 @@ export function readableForeground(brand: string): string {
 
 /**
  * Filled stamps are saffron when that stands out from the card (3:1, the
- * non-text contrast rule), otherwise the card's readable foreground.
+ * non-text contrast rule), otherwise the card's own text colour: pass the
+ * foreground the card already uses so stamps and text never differ.
  */
-export function stampColor(brand: string): string {
+export function stampColor(brand: string, foreground?: string): string {
     const background = isHex(brand) ? brand : ESPRESSO;
 
-    return contrastRatio(SAFFRON, background) >= 3
-        ? SAFFRON
+    if (contrastRatio(SAFFRON, background) >= 3) {
+        return SAFFRON;
+    }
+
+    return foreground && isHex(foreground)
+        ? foreground
         : readableForeground(background);
 }
 
