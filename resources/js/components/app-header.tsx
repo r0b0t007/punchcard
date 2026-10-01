@@ -61,8 +61,7 @@ const rightNavItems: NavItem[] = [
     },
 ];
 
-const activeItemStyles =
-    'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
+const activeItemStyles = 'bg-accent text-accent-foreground';
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
@@ -82,7 +81,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="me-2 h-[34px] w-[34px]"
+                                    className="me-2"
                                 >
                                     <Menu className="h-5 w-5" />
                                     <span className="sr-only">
@@ -98,7 +97,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     {t('Navigation menu')}
                                 </SheetTitle>
                                 <SheetHeader className="flex justify-start text-start">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
+                                    <AppLogoIcon className="h-6 w-6 fill-current text-foreground" />
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
@@ -173,7 +172,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             {t(item.title)}
                                         </Link>
                                         {isCurrentUrl(item.href) && (
-                                            <div className="absolute start-0 bottom-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
+                                            <div className="absolute start-0 bottom-0 h-0.5 w-full translate-y-px bg-foreground"></div>
                                         )}
                                     </NavigationMenuItem>
                                 ))}
@@ -227,7 +226,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             src={auth.user?.avatar}
                                             alt={auth.user?.name}
                                         />
-                                        <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
+                                        <AvatarFallback className="rounded-lg bg-muted text-foreground">
                                             {getInitials(auth.user?.name ?? '')}
                                         </AvatarFallback>
                                     </Avatar>
@@ -244,7 +243,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
             </div>
             {breadcrumbs.length > 1 && (
                 <div className="flex w-full border-b border-sidebar-border/70">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl">
+                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-muted-foreground md:max-w-7xl">
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>
                 </div>
