@@ -51,7 +51,8 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - `no-inline-styles`: no `style` properties, except CSS custom properties carrying runtime values, as `LoyaltyCard` does with `--card-brand`. A hardcoded colour in a custom property is still an error.
 - `require-static-classes`: no built class names like `` `bg-${color}` ``; map values to full class strings.
 - `components/ui/*` is ignored (shadcn source). `pages/welcome.tsx` skips the colour and arbitrary-value rules until the marketing home replaces it (CHW-62).
-- Component files are read with `@typescript-eslint/parser` locally, because a Windows Application Control policy can block `oxc-parser`'s native binary; CI on Linux uses `oxc-parser`.
+- The plugin reads component files with `oxc-parser` when its native binary loads (CI on Linux) and falls back to `@typescript-eslint/parser` otherwise (a Windows Application Control policy blocks the binary on the main dev machine). The choice cannot be pinned in config, so **CI is authoritative**; if local and CI ever disagree, fix what CI reports.
+- Variants added for treatments the rules would otherwise reject: `Button` `ghost-destructive` (quiet delete actions in lists), `SidebarMenuButton` `trigger` (opens a menu, stays highlighted while open) and `muted` (secondary links). Utility `transition-size` animates width and height only.
 
 ## RTL and i18n
 

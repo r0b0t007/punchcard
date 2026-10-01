@@ -31,6 +31,7 @@ export function NavUser() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
+                            variant="trigger"
                             className="group"
                             data-test="sidebar-menu-button"
                         >

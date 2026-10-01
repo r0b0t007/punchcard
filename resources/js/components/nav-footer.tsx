@@ -28,7 +28,7 @@ export function NavFooter({
                 <SidebarMenu>
                     {items.map((item) => (
                         <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton asChild>
+                            <SidebarMenuButton asChild variant="muted">
                                 <a
                                     href={toUrl(item.href)}
                                     target="_blank"

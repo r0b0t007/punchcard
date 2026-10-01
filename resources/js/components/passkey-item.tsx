@@ -62,8 +62,8 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
 
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                    <Button variant="ghost-destructive" size="sm">
+                        <Trash2 className="h-4 w-4" />
                         <span className="sr-only">{t('Remove')}</span>
                     </Button>
                 </DialogTrigger>
