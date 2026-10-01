@@ -68,6 +68,48 @@ export default defineConfig({
             denyWarnings: true,
             typeAware: true,
         },
+        // Design-token rules (CHW-136): colours, radii and sizes come from the
+        // theme in resources/css/app.css, not raw or arbitrary values. The
+        // errors suggest the matching token, so agents fix drift themselves.
+        jsPlugins: ['@shadcn/lint'],
+        rules: {
+            'shadcn/no-raw-colors': 'error',
+            'shadcn/no-arbitrary-values': 'error',
+            'shadcn/no-restyle': [
+                'error',
+                {
+                    allow: ['layout'],
+                    contracts: [
+                        // Structural wrapper, not a styled control: callers set its padding.
+                        {
+                            pattern: '^SidebarGroup$',
+                            allow: ['layout', 'spacing'],
+                        },
+                        // Room for an adornment inside the field (password eye button).
+                        { pattern: '^Input$', allow: ['layout', 'ps', 'pe'] },
+                    ],
+                },
+            ],
+            'shadcn/no-inline-styles': 'error',
+            'shadcn/no-unknown-classes': 'error',
+            'shadcn/require-static-classes': 'error',
+        },
+        overrides: [
+            {
+                // The Laravel starter splash, replaced by the marketing home in
+                // CHW-62. Remove this override with it.
+                files: ['resources/js/pages/welcome.tsx'],
+                rules: {
+                    'shadcn/no-raw-colors': 'off',
+                    'shadcn/no-arbitrary-values': 'off',
+                },
+            },
+        ],
+        settings: {
+            shadcn: {
+                note: 'Tokens and rules: .claude/skills/design-tokens/SKILL.md.',
+            },
+        },
     },
     fmt: {
         printWidth: 80,

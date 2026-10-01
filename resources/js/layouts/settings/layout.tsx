@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useTranslation } from '@/hooks/use-translation';
-import { cn, toUrl } from '@/lib/utils';
+import { toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
@@ -50,11 +50,13 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                             <Button
                                 key={`${toUrl(item.href)}-${index}`}
                                 size="sm"
-                                variant="ghost"
+                                variant={
+                                    isCurrentOrParentUrl(item.href)
+                                        ? 'secondary'
+                                        : 'ghost'
+                                }
                                 asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
+                                className="w-full justify-start"
                             >
                                 <Link href={item.href}>
                                     {item.icon && (

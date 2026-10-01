@@ -91,7 +91,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                             </SheetTrigger>
                             <SheetContent
                                 side="left"
-                                className="flex h-full w-64 flex-col items-stretch justify-between bg-sidebar"
+                                className="flex h-full w-64 flex-col items-stretch justify-between"
                             >
                                 <SheetTitle className="sr-only">
                                     {t('Navigation menu')}
@@ -149,7 +149,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     {/* Desktop Navigation */}
                     <div className="ms-6 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
-                            <NavigationMenuList className="flex h-full items-stretch space-x-2">
+                            <NavigationMenuList className="flex h-full items-stretch">
                                 {mainNavItems.map((item, index) => (
                                     <NavigationMenuItem
                                         key={index}
@@ -217,16 +217,13 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    className="size-10 rounded-full p-1"
-                                >
-                                    <Avatar className="size-8 overflow-hidden rounded-full">
+                                <Button variant="ghost" size="icon">
+                                    <Avatar>
                                         <AvatarImage
                                             src={auth.user?.avatar}
                                             alt={auth.user?.name}
                                         />
-                                        <AvatarFallback className="rounded-lg bg-muted text-foreground">
+                                        <AvatarFallback>
                                             {getInitials(auth.user?.name ?? '')}
                                         </AvatarFallback>
                                     </Avatar>
