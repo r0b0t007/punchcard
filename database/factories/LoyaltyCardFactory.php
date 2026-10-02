@@ -11,7 +11,8 @@ use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * Create inside TenantContext::bypass() or as an org admin; attach the
+ * Makes its own organization unless given one: use ->for($organization),
+ * inside TenantContext::bypass() or as that organization's admin. Attach the
  * businesses that honour it with ->businesses()->attach().
  *
  * @extends Factory<LoyaltyCard>
@@ -30,7 +31,6 @@ class LoyaltyCardFactory extends Factory
             'mode' => CardMode::Cyclic,
             'reward_type' => RewardType::Item,
             'reward_text' => 'Free coffee',
-            'cooldown_min' => 0,
             'active' => true,
         ];
     }

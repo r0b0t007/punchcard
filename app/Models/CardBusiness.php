@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -34,15 +34,24 @@ use LogicException;
 #[UseEloquentBuilder(TenantBuilder::class)]
 class CardBusiness extends Pivot implements TenantModel
 {
-    use BelongsToOrganization {
-        assertTenantInsert as assertProgramDataInsert;
+    use ChangedOnlyByOrgAdmin {
+        assertTenantWrite as assertProgramWrite;
     }
     use GuardsTenantWrites;
 
-    /** organization_id is the card's, also in bypass() where there is no tenant to take it from. */
+    /**
+     * organization_id is the card's, also in bypass() where there is no tenant to
+     * take it from: the card attach() was called on, or one lookup without it.
+     */
     public function fillTenantColumns(): void
     {
         if ($this->getAttribute('organization_id') !== null || $this->getAttribute('card_id') === null) {
+            return;
+        }
+
+        if ($this->pivotParent instanceof LoyaltyCard && $this->pivotParent->getKey() === $this->getAttribute('card_id')) {
+            $this->setAttribute('organization_id', $this->pivotParent->organization_id);
+
             return;
         }
 
@@ -51,15 +60,6 @@ class CardBusiness extends Pivot implements TenantModel
         );
 
         $this->setAttribute('organization_id', $organizationId === null ? null : (int) $organizationId);
-    }
-
-    /**
-     * @param  array<string, mixed>  $values
-     */
-    public function assertTenantInsert(array $values): void
-    {
-        $this->assertProgramDataInsert($values);
-        $this->assertOrgAdminChangesProgram();
     }
 
     /**
@@ -72,6 +72,6 @@ class CardBusiness extends Pivot implements TenantModel
             throw new LogicException('A participation cannot move to another card: detach and attach instead.');
         }
 
-        $this->assertOrgAdminChangesProgram();
+        $this->assertProgramWrite($operation, $values);
     }
 }

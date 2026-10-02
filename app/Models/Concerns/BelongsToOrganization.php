@@ -76,18 +76,4 @@ trait BelongsToOrganization
     {
         return $this->belongsTo(Organization::class);
     }
-
-    /**
-     * The card program (cards and the businesses that honour them) is HQ's: only
-     * an org admin changes it, so a franchisee cannot change the card the others
-     * share. Billing and admin actions use bypass().
-     */
-    protected function assertOrgAdminChangesProgram(): void
-    {
-        $context = app(TenantContext::class);
-
-        if (! $context->isBypassed() && ! $context->isOrgAdmin()) {
-            throw new LogicException('Only an org admin changes the card program.');
-        }
-    }
 }

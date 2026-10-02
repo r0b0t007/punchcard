@@ -27,7 +27,7 @@ return new class extends Migration
                 ->references(['id', 'organization_id'])->on('businesses')
                 ->cascadeOnDelete();
             $table->unique(['card_id', 'business_id']);
-            $table->index(['card_id', 'organization_id']);
+            $table->index(['organization_id', 'card_id']);
             $table->index(['business_id', 'organization_id']);
         });
     }

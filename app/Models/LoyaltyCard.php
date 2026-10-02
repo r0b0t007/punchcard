@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Enums\CardMode;
 use App\Enums\RewardType;
-use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantModel;
@@ -50,31 +50,11 @@ use Illuminate\Support\Carbon;
 #[UseEloquentBuilder(TenantBuilder::class)]
 class LoyaltyCard extends Model implements TenantModel
 {
-    use BelongsToOrganization {
-        assertTenantInsert as assertProgramDataInsert;
-    }
+    use ChangedOnlyByOrgAdmin;
     use GuardsTenantWrites;
 
     /** @use HasFactory<LoyaltyCardFactory> */
     use HasFactory;
-
-    /**
-     * @param  array<string, mixed>  $values
-     */
-    public function assertTenantInsert(array $values): void
-    {
-        $this->assertProgramDataInsert($values);
-        $this->assertOrgAdminChangesProgram();
-    }
-
-    /**
-     * @param  'update'|'delete'  $operation
-     * @param  array<string, mixed>  $values
-     */
-    public function assertTenantWrite(string $operation, array $values): void
-    {
-        $this->assertOrgAdminChangesProgram();
-    }
 
     /**
      * The businesses that honour the card. Uses the guarded CardBusiness pivot,

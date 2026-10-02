@@ -107,6 +107,31 @@ describe('cards', function (): void {
         $this->tenants->cardA->update(['organization_id' => $this->tenants->orgB->id]);
     })->throws(LogicException::class);
 
+    it('starts a card with the spec\'s anti-fraud defaults', function (): void {
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        $card = LoyaltyCard::query()->create(['name' => 'Defaults', 'stamps_required' => 10, 'reward_text' => 'x'])->refresh();
+
+        expect($card->cooldown_min)->toBe(20)
+            ->and($card->daily_cap)->toBe(5);
+    });
+
+    it('lets Postgres refuse a card the stamp flow cannot work with', function (array $values): void {
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        expect(fn () => DB::transaction(fn () => LoyaltyCard::query()->create([
+            'name' => 'Broken', 'stamps_required' => 10, 'reward_text' => 'x', ...$values,
+        ])))->toThrow(QueryException::class);
+    })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only')->with([
+        'no stamps required' => [['stamps_required' => 0]],
+        'too many stamps' => [['stamps_required' => 51]],
+        'a negative cooldown' => [['cooldown_min' => -1]],
+        'a zero daily cap' => [['daily_cap' => 0]],
+        'a percent reward without a value' => [['reward_type' => 'percent', 'reward_value' => null]],
+        'more than 100 percent' => [['reward_type' => 'percent', 'reward_value' => 150]],
+        'a fixed reward of zero' => [['reward_type' => 'fixed', 'reward_value' => 0]],
+    ]);
+
     it('needs a tenant or bypass() to create a card', function (): void {
         LoyaltyCard::query()->create(['organization_id' => $this->tenants->orgA->id, 'name' => 'x', 'stamps_required' => 5, 'reward_text' => 'x']);
     })->throws(LogicException::class);
