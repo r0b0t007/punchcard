@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\Nfc\KeyDiversifier;
+use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,16 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->registerKeyDiversifier();
+        $this->registerTenantContext();
+    }
+
+    /**
+     * One TenantContext per request or job, empty until SetTenant (or the code
+     * itself) sets a tenant. Tenant scopes and bypass() must share this instance.
+     */
+    private function registerTenantContext(): void
+    {
+        $this->app->scoped(TenantContext::class);
     }
 
     /**
