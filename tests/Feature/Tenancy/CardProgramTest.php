@@ -46,6 +46,17 @@ describe('reads', function (): void {
             ->and(CardBusiness::query()->count())->toBe(0);
     });
 
+    it('shows a franchisee which sibling business ids honour the card, but not the sibling businesses', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1);
+
+        expect(CardBusiness::query()->orderBy('business_id')->pluck('business_id')->all())->toBe([$this->tenants->a1->id, $this->tenants->a2->id])
+            ->and($this->tenants->cardA->businesses()->pluck('businesses.id')->all())->toBe([$this->tenants->a1->id]);
+
+        $this->context->set($this->tenants->orgB, $this->tenants->b1);
+
+        expect(CardBusiness::query()->pluck('business_id')->all())->toBe([$this->tenants->b1->id]);
+    });
+
     it('lists the businesses that honour a shared card', function (): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
 
@@ -99,6 +110,43 @@ describe('cards', function (): void {
     it('needs a tenant or bypass() to create a card', function (): void {
         LoyaltyCard::query()->create(['organization_id' => $this->tenants->orgA->id, 'name' => 'x', 'stamps_required' => 5, 'reward_text' => 'x']);
     })->throws(LogicException::class);
+
+    it('refuses raw inserts and upserts outside bypass()', function (string $how): void {
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+        $row = ['organization_id' => $this->tenants->orgA->id, 'name' => 'x', 'stamps_required' => 5, 'reward_text' => 'x'];
+
+        match ($how) {
+            'card insert' => LoyaltyCard::query()->insert($row),
+            'card upsert' => LoyaltyCard::query()->upsert([$row], ['id']),
+            'participation insert' => CardBusiness::query()->insert(['organization_id' => $this->tenants->orgA->id, 'card_id' => $this->tenants->cardA->id, 'business_id' => $this->tenants->a1->id]),
+        };
+    })->throws(LogicException::class)->with(['card insert', 'card upsert', 'participation insert']);
+
+    it('does not let another organization\'s admin change or remove the card or who honours it', function (string $how): void {
+        $this->context->set($this->tenants->orgB, orgAdmin: true);
+
+        match ($how) {
+            'update the card' => $this->tenants->cardA->update(['name' => 'hijacked']),
+            'delete the card' => $this->tenants->cardA->delete(),
+            'detach' => $this->tenants->cardA->businesses()->detach([$this->tenants->a1->id]),
+            'update participation' => $this->tenants->cardA->businesses()->updateExistingPivot($this->tenants->a1->id, ['created_at' => now()->subDay()]),
+            'toggle' => $this->tenants->cardA->businesses()->toggle([$this->tenants->a1->id]),
+        };
+    })->throws(LogicException::class)->with(['update the card', 'delete the card', 'detach', 'update participation', 'toggle']);
+
+    it('limits another organization\'s bulk writes to its own cards', function (): void {
+        $this->context->set($this->tenants->orgB, orgAdmin: true);
+
+        LoyaltyCard::query()->update(['active' => false]);
+        CardBusiness::query()->delete();
+
+        $this->context->bypass(function (): void {
+            expect($this->tenants->cardA->refresh()->active)->toBeTrue()
+                ->and($this->tenants->cardB->refresh()->active)->toBeFalse()
+                ->and(CardBusiness::query()->where('card_id', $this->tenants->cardA->id)->count())->toBe(2)
+                ->and(CardBusiness::query()->where('card_id', $this->tenants->cardB->id)->count())->toBe(0);
+        });
+    });
 });
 
 describe('participating businesses', function (): void {
@@ -114,16 +162,61 @@ describe('participating businesses', function (): void {
             ->and(CardBusiness::query()->where('card_id', $card->id)->value('organization_id'))->toBe($this->tenants->orgA->id);
     });
 
-    it('does not let a franchisee change which businesses honour the shared card', function (string $how): void {
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+    it('does not let a franchisee change which businesses honour the shared card', function (string $role, string $how): void {
+        $newCard = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create());
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::from($role));
 
         match ($how) {
+            'attach itself to a card' => $newCard->businesses()->attach($this->tenants->a1),
             'detach a sibling' => $this->tenants->cardA->businesses()->detach([$this->tenants->a2->id]),
+            'detach everyone' => $this->tenants->cardA->businesses()->detach(),
+            'detach through wherePivot' => $this->tenants->cardA->businesses()->wherePivot('business_id', $this->tenants->a2->id)->detach(),
             'sync to itself' => $this->tenants->cardA->businesses()->sync([$this->tenants->a1->id]),
+            'toggle' => $this->tenants->cardA->businesses()->toggle([$this->tenants->a2->id]),
+            'update participation' => $this->tenants->cardA->businesses()->updateExistingPivot($this->tenants->a1->id, ['created_at' => now()->subDay()]),
+            'bulk update' => CardBusiness::query()->update(['updated_at' => now()]),
             'bulk delete' => CardBusiness::query()->delete(),
         };
     })->throws(LogicException::class, 'Only an org admin changes the card program.')
-        ->with(['detach a sibling', 'sync to itself', 'bulk delete']);
+        ->with(['owner', 'staff'])
+        ->with(['attach itself to a card', 'detach a sibling', 'detach everyone', 'detach through wherePivot', 'sync to itself', 'toggle', 'update participation', 'bulk update', 'bulk delete']);
+
+    it('never moves a participation to another card, even in bypass()', function (string $how): void {
+        $newCard = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create());
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        match ($how) {
+            'updateExistingPivot' => $this->tenants->cardA->businesses()->updateExistingPivot($this->tenants->a2->id, ['card_id' => $newCard->id]),
+            'bulk update in bypass' => $this->context->bypass(fn (): int => CardBusiness::query()->update(['card_id' => $newCard->id])),
+        };
+    })->throws(LogicException::class, 'A participation cannot move to another card')->with(['updateExistingPivot', 'bulk update in bypass']);
+
+    it('refuses an explicit organization other than the tenant\'s', function (): void {
+        $newCard = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create());
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        $newCard->businesses()->attach($this->tenants->a1, ['organization_id' => $this->tenants->orgB->id]);
+    })->throws(LogicException::class, 'Cannot write CardBusiness for another organization.');
+
+    it('lets the database refuse a mismatched organization in bypass()', function (): void {
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(
+            fn () => $this->tenants->cardB->businesses()->attach($this->tenants->a1, ['organization_id' => $this->tenants->orgA->id]),
+        )))->toThrow(QueryException::class);
+    });
+
+    it('removes participation with the card, the business or the organization', function (): void {
+        $this->context->bypass(function (): void {
+            $this->tenants->a1->delete();
+
+            expect(CardBusiness::query()->where('card_id', $this->tenants->cardA->id)->pluck('business_id')->all())->toBe([$this->tenants->a2->id]);
+
+            $this->tenants->cardA->delete();
+            $this->tenants->orgB->delete();
+
+            expect(CardBusiness::query()->count())->toBe(0)
+                ->and(LoyaltyCard::query()->count())->toBe(0);
+        });
+    });
 
     it('does not let another organization\'s admin add a business to the card', function (): void {
         $this->context->set($this->tenants->orgB, orgAdmin: true);

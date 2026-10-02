@@ -13,11 +13,15 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * A card_business row: a business that honours one of its organization's
  * cards. Program data, changed only by an org admin; LoyaltyCard::businesses()
  * uses this pivot so every attach, detach and sync goes through those checks.
+ * Every business of the organization reads these rows, so a franchisee sees
+ * which sibling business ids honour the card (not the businesses themselves,
+ * which stay behind their own scope): ADR 0006 does not hide participation.
  *
  * @property int $id
  * @property int $organization_id
@@ -64,6 +68,10 @@ class CardBusiness extends Pivot implements TenantModel
      */
     public function assertTenantWrite(string $operation, array $values): void
     {
+        if (array_key_exists('card_id', $values)) {
+            throw new LogicException('A participation cannot move to another card: detach and attach instead.');
+        }
+
         $this->assertOrgAdminChangesProgram();
     }
 }
