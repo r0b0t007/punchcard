@@ -2,12 +2,18 @@
 
 declare(strict_types=1);
 
+namespace Tests\Unit\Nfc;
+
 use App\Support\Nfc\AesCmac;
 use App\Support\Nfc\SunFailure;
 use App\Support\Nfc\SunMessage;
 use App\Support\Nfc\SunVerificationFailed;
 use App\Support\Nfc\SunVerifier;
 use App\Support\Nfc\VerifiedTap;
+use InvalidArgumentException;
+use ReflectionClass;
+use RuntimeException;
+use SunReference;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,12 +21,18 @@ use App\Support\Nfc\VerifiedTap;
 |--------------------------------------------------------------------------
 |
 | The AN12196 example uses all-zero keys: the encrypted PICCData decodes to
-| UID 04DE5F1EACC040 with read counter 61, and the CMAC verifies.
+| UID 04DE5F1EACC040 with read counter 61, and the CMAC verifies. Taps built
+| with other keys are also checked by the skill's independent reference.
 |
 */
 
+require_once __DIR__.'/../../../.claude/skills/sun-nfc-verification/reference.php';
+
 const AN12196_PICC_DATA = 'EF963FF7828658A599F3041510671E88';
 const AN12196_CMAC = '94EED9EE65337086';
+const META_KEY = 'METAKEY-01234567';
+const FILE_KEY = 'FILEKEY-89ABCDEF';
+const TEST_UID = '04A1B2C3D4E5F6';
 
 function zeroKey(): string
 {
@@ -39,8 +51,10 @@ function sunFailure(callable $call): SunVerificationFailed
 }
 
 /**
- * Builds the `e` and `c` a tag would emit, the way AN12196 describes it, so
- * tests can use distinct keys and chosen UIDs, counters and tag bytes.
+ * Builds the `e` and `c` a tag would emit (AN12196), so tests can use distinct
+ * keys and chosen UIDs, counters and tag bytes. A well-formed tap must also
+ * pass the skill's reference verifier, so this helper cannot drift together
+ * with SunVerifier.
  *
  * @return array{e: string, c: string}
  */
@@ -50,19 +64,22 @@ function sunTap(string $metaKey, string $fileKey, string $uid, int $counter, int
     $plain = chr($tagByte).hex2bin($uid).$counterLe.str_repeat("\xA5", 5);
     $e = (string) openssl_encrypt($plain, 'aes-128-cbc', $metaKey, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, str_repeat("\0", 16));
 
-    $sessionKey = AesCmac::compute($fileKey, "\x3C\xC3\x00\x01\x00\x80".hex2bin($uid).$counterLe);
-    $full = AesCmac::compute($sessionKey, '');
+    $full = AesCmac::compute(AesCmac::compute($fileKey, "\x3C\xC3\x00\x01\x00\x80".hex2bin($uid).$counterLe), '');
     $c = '';
 
     for ($i = 1; $i < 16; $i += 2) {
         $c .= $full[$i];
     }
 
-    return ['e' => strtoupper(bin2hex($e)), 'c' => strtoupper(bin2hex($c))];
-}
+    $tap = ['e' => strtoupper(bin2hex($e)), 'c' => strtoupper(bin2hex($c))];
 
-const META_KEY = 'METAKEY-01234567';
-const FILE_KEY = 'FILEKEY-89ABCDEF';
+    if ($tagByte === 0xC7) {
+        expect(SunReference::verify($tap['e'], $tap['c'], $metaKey, $fileKey))
+            ->toBe(['uid' => $uid, 'counter' => $counter]);
+    }
+
+    return $tap;
+}
 
 it('decodes the UID and read counter from the AN12196 example', function (): void {
     $message = (new SunVerifier)->decrypt(AN12196_PICC_DATA, zeroKey());
@@ -82,14 +99,17 @@ it('accepts the AN12196 CMAC and returns the verified tap', function (): void {
         ->and($tap->counter)->toBe(61);
 });
 
-it('accepts lowercase hex', function (): void {
+it('accepts lowercase hex and returns an uppercase UID', function (): void {
     $verifier = new SunVerifier;
     $message = $verifier->decrypt(strtolower(AN12196_PICC_DATA), zeroKey());
 
-    $verifier->verifyMac($message, strtolower(AN12196_CMAC), zeroKey());
-
-    expect($message->counter)->toBe(61);
+    expect($verifier->verifyMac($message, strtolower(AN12196_CMAC), zeroKey())->uid)
+        ->toBe('04DE5F1EACC040');
 });
+
+it('only lets the verifier create messages and verified taps', function (string $class): void {
+    expect((new ReflectionClass($class))->getConstructor()?->isPrivate())->toBeTrue();
+})->with([SunMessage::class, VerifiedTap::class]);
 
 it('rejects a tampered CMAC', function (): void {
     $verifier = new SunVerifier;
@@ -108,12 +128,18 @@ it('rejects a CMAC checked with the wrong file read key', function (): void {
         ->toBe(SunFailure::BadMac);
 });
 
-it('rejects a CMAC for another UID or counter', function (SunMessage $other): void {
-    expect(sunFailure(fn (): VerifiedTap => (new SunVerifier)->verifyMac($other, AN12196_CMAC, zeroKey()))->reason)
+it('rejects a CMAC taken from another tap', function (string $uid, int $counter): void {
+    $verifier = new SunVerifier;
+    $genuine = sunTap(META_KEY, FILE_KEY, TEST_UID, 61);
+    $other = sunTap(META_KEY, FILE_KEY, $uid, $counter);
+
+    $message = $verifier->decrypt($other['e'], META_KEY);
+
+    expect(sunFailure(fn (): VerifiedTap => $verifier->verifyMac($message, $genuine['c'], FILE_KEY))->reason)
         ->toBe(SunFailure::BadMac);
 })->with([
-    'next counter' => [fn (): SunMessage => new SunMessage('04DE5F1EACC040', 62)],
-    'other UID' => [fn (): SunMessage => new SunMessage('04DE5F1EACC041', 61)],
+    'next counter' => [TEST_UID, 62],
+    'other UID' => ['04A1B2C3D4E5F7', 61],
 ]);
 
 it('rejects PICCData decrypted with the wrong meta read key', function (): void {
@@ -145,17 +171,15 @@ it('rejects a malformed CMAC', function (string $cmac): void {
     'not hex' => ['94EED9EE6533708G'],
 ]);
 
-it('rejects keys that are not 16 bytes', function (): void {
+it('treats a meta read key that is not 16 bytes as a server error, not a bad tap', function (): void {
+    (new SunVerifier)->decrypt(AN12196_PICC_DATA, str_repeat("\0", 32));
+})->throws(InvalidArgumentException::class);
+
+it('treats a file read key that is not 16 bytes as a server error, not a bad tap', function (): void {
     $verifier = new SunVerifier;
 
-    expect(sunFailure(fn (): SunMessage => $verifier->decrypt(AN12196_PICC_DATA, str_repeat("\0", 32)))->reason)
-        ->toBe(SunFailure::Malformed);
-
-    $message = $verifier->decrypt(AN12196_PICC_DATA, zeroKey());
-
-    expect(sunFailure(fn (): VerifiedTap => $verifier->verifyMac($message, AN12196_CMAC, ''))->reason)
-        ->toBe(SunFailure::Malformed);
-});
+    $verifier->verifyMac($verifier->decrypt(AN12196_PICC_DATA, zeroKey()), AN12196_CMAC, '');
+})->throws(InvalidArgumentException::class);
 
 it('keeps tap data out of failure messages', function (): void {
     $verifier = new SunVerifier;
@@ -177,24 +201,15 @@ it('keeps tap data out of failure messages', function (): void {
     }
 });
 
-it('rejects a message with an invalid UID or counter', function (SunMessage $message): void {
-    expect(sunFailure(fn (): VerifiedTap => (new SunVerifier)->verifyMac($message, AN12196_CMAC, zeroKey()))->reason)
-        ->toBe(SunFailure::Malformed);
-})->with([
-    'UID not hex' => [fn (): SunMessage => new SunMessage('04DE5F1EACC04Z', 61)],
-    'UID too short' => [fn (): SunMessage => new SunMessage('04DE5F1EACC0', 61)],
-    'negative counter' => [fn (): SunMessage => new SunMessage('04DE5F1EACC040', -1)],
-    'counter above 24 bits' => [fn (): SunMessage => new SunMessage('04DE5F1EACC040', 0x1000000)],
-]);
-
 it('uses the meta read key to decrypt and the file read key to verify', function (): void {
     $verifier = new SunVerifier;
-    $tap = sunTap(META_KEY, FILE_KEY, '04A1B2C3D4E5F6', 1234);
+    $tap = sunTap(META_KEY, FILE_KEY, TEST_UID, 1234);
 
     $message = $verifier->decrypt($tap['e'], META_KEY);
+    $verified = $verifier->verifyMac($message, $tap['c'], FILE_KEY);
 
-    expect($verifier->verifyMac($message, $tap['c'], FILE_KEY))
-        ->toEqual(new VerifiedTap('04A1B2C3D4E5F6', 1234))
+    expect($verified->uid)->toBe(TEST_UID)
+        ->and($verified->counter)->toBe(1234)
         ->and(sunFailure(fn (): VerifiedTap => $verifier->verifyMac($message, $tap['c'], META_KEY))->reason)
         ->toBe(SunFailure::BadMac)
         ->and(sunFailure(fn (): SunMessage => $verifier->decrypt($tap['e'], FILE_KEY))->reason)
@@ -203,14 +218,14 @@ it('uses the meta read key to decrypt and the file read key to verify', function
 
 it('accepts the lowest and highest read counter', function (int $counter): void {
     $verifier = new SunVerifier;
-    $tap = sunTap(META_KEY, FILE_KEY, '04A1B2C3D4E5F6', $counter);
+    $tap = sunTap(META_KEY, FILE_KEY, TEST_UID, $counter);
 
     expect($verifier->verifyMac($verifier->decrypt($tap['e'], META_KEY), $tap['c'], FILE_KEY)->counter)
         ->toBe($counter);
 })->with([0, 0xFFFFFF]);
 
 it('rejects PICCData that does not mirror a 7-byte UID and the counter', function (int $tagByte): void {
-    $tap = sunTap(META_KEY, FILE_KEY, '04A1B2C3D4E5F6', 5, $tagByte);
+    $tap = sunTap(META_KEY, FILE_KEY, TEST_UID, 5, $tagByte);
 
     expect(sunFailure(fn (): SunMessage => (new SunVerifier)->decrypt($tap['e'], META_KEY))->reason)
         ->toBe(SunFailure::Malformed);
@@ -221,7 +236,7 @@ it('rejects PICCData that does not mirror a 7-byte UID and the counter', functio
 ]);
 
 it('rejects PICCData with a flipped byte', function (): void {
-    $tap = sunTap(META_KEY, FILE_KEY, '04A1B2C3D4E5F6', 5);
+    $tap = sunTap(META_KEY, FILE_KEY, TEST_UID, 5);
     $flipped = sprintf('%02X', hexdec(substr($tap['e'], 0, 2)) ^ 0x01).substr($tap['e'], 2);
 
     expect(sunFailure(fn (): SunMessage => (new SunVerifier)->decrypt($flipped, META_KEY))->reason)
@@ -233,7 +248,7 @@ it('keeps keys and tap data out of stack traces', function (): void {
 
     try {
         $verifier = new SunVerifier;
-        $tap = sunTap(META_KEY, FILE_KEY, '04A1B2C3D4E5F6', 5);
+        $tap = sunTap(META_KEY, FILE_KEY, TEST_UID, 5);
         $message = $verifier->decrypt($tap['e'], META_KEY);
 
         $traces = [

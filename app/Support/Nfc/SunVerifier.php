@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Nfc;
 
+use Closure;
+use InvalidArgumentException;
+
 /**
  * Verifies NTAG 424 DNA Secure Unique NFC URLs (NXP AN12196, AES-128,
  * encrypted PICCData, CMAC over an empty MAC input).
@@ -26,9 +29,6 @@ final class SunVerifier
 
     private const int UID_BYTES = 7;
 
-    /** SDMReadCtr is 3 bytes. */
-    private const int MAX_COUNTER = 0xFFFFFF;
-
     /** PICCDataTag: UID mirrored (bit 7), counter mirrored (bit 6), UID length 7 (low nibble). */
     private const int PICC_DATA_TAG = 0xC7;
 
@@ -40,6 +40,7 @@ final class SunVerifier
      * @param  string  $metaReadKey  16-byte binary SDMMetaReadKey
      *
      * @throws SunVerificationFailed with SunFailure::Malformed
+     * @throws InvalidArgumentException when the key is not 16 bytes (a server configuration error)
      */
     public function decrypt(
         #[\SensitiveParameter] string $piccData,
@@ -64,10 +65,7 @@ final class SunVerifier
         /** @var array{1: int} $counter */
         $counter = unpack('V', substr($plain, 1 + self::UID_BYTES, 3)."\0");
 
-        return new SunMessage(
-            uid: strtoupper(bin2hex(substr($plain, 1, self::UID_BYTES))),
-            counter: $counter[1],
-        );
+        return $this->message(strtoupper(bin2hex(substr($plain, 1, self::UID_BYTES))), $counter[1]);
     }
 
     /**
@@ -75,6 +73,7 @@ final class SunVerifier
      * @param  string  $fileReadKey  16-byte binary SDMFileReadKey of this tag
      *
      * @throws SunVerificationFailed with SunFailure::Malformed or SunFailure::BadMac
+     * @throws InvalidArgumentException when the key is not 16 bytes (a server configuration error)
      */
     public function verifyMac(
         SunMessage $message,
@@ -84,17 +83,12 @@ final class SunVerifier
         $this->assertKey($fileReadKey);
         $given = $this->decodeHex($cmac, self::CMAC_HEX);
 
-        $uid = $this->decodeHex($message->uid, self::UID_BYTES * 2);
+        // Only decrypt() creates a SunMessage, so the UID is 14 hex characters and the counter fits 3 bytes.
+        $sessionVector = self::SESSION_MAC_PREFIX
+            .hex2bin($message->uid)
+            .substr(pack('V', $message->counter), 0, 3);
 
-        if ($message->counter < 0 || $message->counter > self::MAX_COUNTER) {
-            throw new SunVerificationFailed(SunFailure::Malformed);
-        }
-
-        $counter = substr(pack('V', $message->counter), 0, 3);
-
-        $sessionKey = AesCmac::compute($fileReadKey, self::SESSION_MAC_PREFIX.$uid.$counter);
-        $full = AesCmac::compute($sessionKey, '');
-
+        $full = AesCmac::compute(AesCmac::compute($fileReadKey, $sessionVector), '');
         $truncated = '';
 
         for ($i = 1; $i < 16; $i += 2) {
@@ -105,13 +99,25 @@ final class SunVerifier
             throw new SunVerificationFailed(SunFailure::BadMac);
         }
 
-        return new VerifiedTap($message->uid, $message->counter);
+        return $this->verifiedTap($message->uid, $message->counter);
     }
 
+    /** SunMessage and VerifiedTap have private constructors; these closures run in their class scope. */
+    private function message(string $uid, int $counter): SunMessage
+    {
+        return Closure::bind(static fn (): SunMessage => new SunMessage($uid, $counter), null, SunMessage::class)();
+    }
+
+    private function verifiedTap(string $uid, int $counter): VerifiedTap
+    {
+        return Closure::bind(static fn (): VerifiedTap => new VerifiedTap($uid, $counter), null, VerifiedTap::class)();
+    }
+
+    /** A wrong key length is a server bug (configuration or key derivation), never a bad tap. */
     private function assertKey(#[\SensitiveParameter] string $key): void
     {
         if (strlen($key) !== self::KEY_BYTES) {
-            throw new SunVerificationFailed(SunFailure::Malformed);
+            throw new InvalidArgumentException('SUN keys must be 16 binary bytes.');
         }
     }
 

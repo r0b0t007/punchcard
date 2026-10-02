@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Tests\Unit\Nfc;
+
 use App\Support\Nfc\AesCmac;
+use InvalidArgumentException;
 
 /*
 |--------------------------------------------------------------------------

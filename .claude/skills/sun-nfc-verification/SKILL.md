@@ -38,14 +38,18 @@ with NXP AN10922 AES-128 key diversification, but not with the same input:
 - Start both diversification inputs with a fixed purpose byte (or the key number) so the two can never collide.
 
 Store only `key_version` on the stamper, never the derived keys; it diversifies the **file key only**.
-Re-provisioning one stamper bumps its `key_version`. Rotating the meta key means re-provisioning every tag; during
-that rollover, try each live meta version and keep the candidate whose **MAC verifies**, never the first one whose
-tag byte decodes (a wrong key passes that check about 1 time in 256).
+Re-provisioning one stamper bumps its `key_version`. Rotating the meta key means re-provisioning every tag. Config holds
+one meta version today, so changing `NFC_SUN_KEY_VERSION` is a hard cutover: tags not yet re-provisioned fail as
+`malformed`. A gradual rollover needs a list of live meta versions in config (decide in CHW-18); the verifier then
+tries each one and keeps the candidate whose **MAC verifies**, never the first one whose tag byte decodes (a wrong
+key passes that check about 1 time in 256).
 
 In code: `App\Support\Nfc\SunVerifier::decrypt($e, $metaReadKey)` returns a `SunMessage` (UID + counter, not yet
 trusted); derive the file key from its UID; then `verifyMac($message, $c, $fileReadKey)` returns a `VerifiedTap`.
-Only a `VerifiedTap` may reach the replay check and the stamp. Both throw `SunVerificationFailed` with a
-`SunFailure` reason (`malformed` or `bad_mac`). Keys, `e` and `c` parameters are `#[\SensitiveParameter]`, so
+Only a `VerifiedTap` may reach the replay check and the stamp; `SunMessage` and `VerifiedTap` have private
+constructors, so nothing else can create them. Both methods throw `SunVerificationFailed` with a `SunFailure` reason
+(`malformed` or `bad_mac`) for a bad tap, and `InvalidArgumentException` for a key that is not 16 bytes: that is a
+server bug, never a tap to record in the fraud view. Keys, `e` and `c` parameters are `#[\SensitiveParameter]`, so
 stack traces never carry them; keep that on any new function that takes them.
 
 ## Verified reference
