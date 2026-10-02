@@ -23,8 +23,8 @@ valid `c`. Authenticity rests on key 2, which is unique per tag.
 
 Generate a master key once per environment, for example `php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"`,
 and store it in the server's environment (Ploi site environment), never in the repository. Staging and
-production use different master keys. Check after each deploy that it resolves: a missing or malformed value
-only fails on the first tap, as a server error.
+production use different master keys. Run `php artisan punchcard:nfc:check` after each deploy: it fails on a missing or malformed key, a
+bad `NFC_SUN_KEY_VERSION` or a published test key, which would otherwise only show as a 500 on the first tap.
 
 **Open decision for CHW-16:** keys 0, 3 and 4 are only needed while provisioning, but today they come from the
 same master the web server holds, so a leak of the server environment also exposes key 0. With key 0, someone

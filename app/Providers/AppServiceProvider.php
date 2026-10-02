@@ -16,9 +16,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Resolved only where taps are verified or tags provisioned, so an app without
-        // NFC_SUN_MASTER_KEY (e.g. CI, local UI work) still boots.
-        $this->app->bind(function (): KeyDiversifier {
+        $this->registerKeyDiversifier();
+    }
+
+    /**
+     * One KeyDiversifier per request, built from NFC_SUN_MASTER_KEY when a tap is
+     * verified or a tag provisioned. It is lazy so an app without the key (CI, local
+     * UI work) still boots; `php artisan punchcard:nfc:check` validates it at deploy.
+     */
+    private function registerKeyDiversifier(): void
+    {
+        $this->app->singleton(function (): KeyDiversifier {
             $masterKey = config('punchcard.nfc.sun_master_key');
 
             return KeyDiversifier::fromHex(is_string($masterKey) ? $masterKey : null);

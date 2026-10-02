@@ -63,10 +63,10 @@ final readonly class KeyDiversifier
     }
 
     /**
-     * NXP AN10922 AES-128 diversification. D = 0x01 || input is always padded to
-     * 32 bytes (80 00 ..) with subkey K2, or used as-is with K1 when it is
-     * exactly 32 bytes, then CBC-MACed over both blocks. This is not plain CMAC:
-     * CMAC pads only to the next 16 bytes, which differs for inputs under 16 bytes.
+     * NXP AN10922 AES-128 diversification: the CMAC of D = 0x01 || input, with D
+     * always padded to 32 bytes (80 00 .., subkey K2) unless it already is 32
+     * bytes (K1). Plain CMAC pads only to the next 16 bytes, which gives a
+     * different key for inputs under 16 bytes, hence minBlocks 2.
      *
      * @param  string  $key  16-byte binary key
      * @param  string  $input  diversification input M, 1 to 31 bytes
@@ -78,22 +78,7 @@ final readonly class KeyDiversifier
             throw new InvalidArgumentException('AN10922 diversification input must be 1 to 31 bytes.');
         }
 
-        [$k1, $k2] = AesCmac::subkeys($key);
-        $data = self::AES128_CONSTANT.$input;
-        $padded = strlen($data) < 32;
-
-        if ($padded) {
-            $data = str_pad($data."\x80", 32, "\0");
-        }
-
-        $data = substr($data, 0, 16).(substr($data, 16) ^ ($padded ? $k2 : $k1));
-        $mac = openssl_encrypt($data, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, str_repeat("\0", 16));
-
-        if ($mac === false) {
-            throw new InvalidArgumentException('AES encryption failed.');
-        }
-
-        return substr($mac, 16, 16);
+        return AesCmac::compute($key, self::AES128_CONSTANT.$input, minBlocks: 2);
     }
 
     /** The system-wide SDMMetaReadKey for this meta key version. */

@@ -29,11 +29,12 @@ and was never used before. A copied URL, screenshot or shared link must fail.
 CMAC is RFC 4493 AES-CMAC. Both keys come from the master key in `config('punchcard.nfc.sun_master_key')`
 with NXP AN10922 AES-128 key diversification, but not with the same input:
 
-- **SDMMetaReadKey** is system-wide (input: key number + system identifier + the global meta-key version from
-  `config('punchcard.nfc.key_version')`, no UID). It has to be: the UID is inside the encrypted `e`, so the server
+- **SDMMetaReadKey** is system-wide (input: key number 1 || `punchcard` || the global meta-key version from
+  `config('punchcard.nfc.key_version')` as 2 bytes big-endian, no UID). It has to be: the UID is inside the encrypted `e`, so the server
   cannot know which tag tapped, or that tag's version, until it has decrypted it. Leaking it only lets someone read
   UIDs and counters (link taps); it cannot forge one.
-- **SDMFileReadKey** is per tag (input: UID + key number + system identifier + the stamper's own `key_version`). It
+- **SDMFileReadKey** is per tag (input: key number 2 || UID (7 bytes) || `punchcard` || the stamper's own
+  `key_version` as 2 bytes big-endian; keys 0, 3 and 4 use the same layout with their own number). It
   is the key that proves authenticity, so a key extracted from one tag cannot sign taps for another.
 - Every diversification input starts with the tag key number, so two keys can never collide.
 - AN10922 always pads `0x01 || input` to 32 bytes before its CBC-MAC. That is not plain CMAC, which pads only to
@@ -65,7 +66,7 @@ stack traces never carry them; keep that on any new function that takes them.
 
 Run `php .claude/skills/sun-nfc-verification/reference.php` → `OK`. The app's port lives in `app/Support/Nfc/`
 (pure classes, no Laravel), tested in `tests/Unit/Nfc/` with both vectors, all four RFC 4493 examples, and
-taps generated once with this reference under distinct meta and file keys, stored in `tests/Support/SunVectors.php`
+taps and keys generated with this reference by `tests/Support/generate-sun-vectors.php`, stored in `tests/Support/SunVectors.php`
 (each hex line marked `gitleaks:allow`; never put a real key there). The replayed-counter test belongs with the `/t` endpoint,
 because replay protection is the stamper row lock in the database.
 
