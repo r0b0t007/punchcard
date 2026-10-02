@@ -46,9 +46,10 @@ key passes that check about 1 time in 256).
 
 In code: `App\Support\Nfc\SunVerifier::decrypt($e, $metaReadKey)` returns a `SunMessage` (UID + counter, not yet
 trusted); derive the file key from its UID; then `verifyMac($message, $c, $fileReadKey)` returns a `VerifiedTap`.
-Only a `VerifiedTap` may reach the replay check and the stamp; `SunMessage` and `VerifiedTap` have private
-constructors, so nothing else can create them. Both methods throw `SunVerificationFailed` with a `SunFailure` reason
-(`malformed` or `bad_mac`) for a bad tap, and `InvalidArgumentException` for a key that is not 16 bytes: that is a
+Only a `VerifiedTap` may reach the replay check and the stamp. `SunMessage` and `VerifiedTap` have private
+constructors and refuse serialization, which prevents mistakes but is not a security boundary (reflection can still
+build one): never accept a `VerifiedTap` from outside the request that verified it. Both methods throw
+`SunVerificationFailed` with an `App\Enums\TapRejection` reason (`malformed` or `bad_mac`) for a bad tap, and `InvalidArgumentException` for a key that is not 16 bytes: that is a
 server bug, never a tap to record in the fraud view. Keys, `e` and `c` parameters are `#[\SensitiveParameter]`, so
 stack traces never carry them; keep that on any new function that takes them.
 
@@ -62,15 +63,16 @@ stack traces never carry them; keep that on any new function that takes them.
 | RFC 4493 example 1          | key `2b7e151628aed2a6abf7158809cf4f3c`, empty message      | `bb1d6929e95937287fa37d129b756746` |
 
 Run `php .claude/skills/sun-nfc-verification/reference.php` → `OK`. The app's port lives in `app/Support/Nfc/`
-(pure classes, no Laravel), tested in `tests/Unit/Nfc/` with both vectors plus all four RFC 4493 examples,
-tampered-MAC, wrong-key and malformed-input cases. The replayed-counter test belongs with the `/t` endpoint,
+(pure classes, no Laravel), tested in `tests/Unit/Nfc/` with both vectors, all four RFC 4493 examples, and
+taps generated once with this reference under distinct meta and file keys, stored in `tests/Support/SunVectors.php`
+(each hex line marked `gitleaks:allow`; never put a real key there). The replayed-counter test belongs with the `/t` endpoint,
 because replay protection is the stamper row lock in the database.
 
 ## Rules
 
 - Never log `e`, `c`, UIDs with keys, or derived keys. Log the stamper id and the rejection reason only.
-- Reject reasons are an enum: `malformed`, `unknown_tag`, `bad_mac`, `replay`, `stamper_disabled`, `cooldown`, `daily_cap`. Record each rejected tap for the owner's fraud view.
+- Reject reasons are the `App\Enums\TapRejection` enum: `malformed`, `unknown_tag`, `bad_mac`, `replay`, `stamper_disabled`, `cooldown`, `daily_cap`. Record each rejected tap for the owner's fraud view.
 - Rate limit `/t` per IP and per user (`RateLimiter::for('tap', ...)`).
-- The endpoint is a normal GET that renders an Inertia page (C1/C2/C3/cooldown). It must work logged out: keep the verified tap in the session, finish sign-in, then apply the stamp once.
+- The endpoint is a normal GET that renders an Inertia page (C1/C2/C3/cooldown). It must work logged out: keep the raw `e` and `c` in the session (never a `VerifiedTap`), finish sign-in, then verify again and apply the stamp once.
 - A disabled stamper (lost/stolen) rejects everything; re-provisioning bumps `key_version`.
 - Development without hardware: a `php artisan punchcard:fake-tap {stamper}` command (to build) generates valid URLs from test keys. Never enable it in production.

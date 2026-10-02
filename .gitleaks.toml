@@ -1,9 +1,0 @@
-# gitleaks reads this file from the repository root. Keep every default rule;
-# allowlist only files that hold published test vectors, never real secrets.
-
-[extend]
-useDefault = true
-
-[allowlist]
-description = "Published crypto test vectors (RFC 4493, NXP AN12196) and fake keys in the NFC unit tests"
-paths = ['''^tests/Unit/Nfc/[A-Za-z]+Test\.php$''']

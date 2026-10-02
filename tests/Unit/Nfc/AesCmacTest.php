@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Nfc;
-
 use App\Support\Nfc\AesCmac;
-use InvalidArgumentException;
+use Tests\Support\SunVectors;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,14 +15,10 @@ use InvalidArgumentException;
 |
 */
 
-const RFC4493_KEY = '2b7e151628aed2a6abf7158809cf4f3c';
-const RFC4493_MESSAGE = '6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51'
-    .'30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710';
-
 it('matches the RFC 4493 examples', function (int $length, string $expected): void {
-    $message = (string) hex2bin(substr(RFC4493_MESSAGE, 0, $length * 2));
+    $message = (string) hex2bin(substr(SunVectors::RFC4493_MESSAGE, 0, $length * 2));
 
-    expect(bin2hex(AesCmac::compute((string) hex2bin(RFC4493_KEY), $message)))->toBe($expected);
+    expect(bin2hex(AesCmac::compute((string) hex2bin(SunVectors::RFC4493_KEY), $message)))->toBe($expected);
 })->with([
     'empty message' => [0, 'bb1d6929e95937287fa37d129b756746'],
     'one block' => [16, '070a16b46b4d4144f79bdd9dd04a287c'],

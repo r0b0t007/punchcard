@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Nfc;
 
+use App\Enums\TapRejection;
 use Closure;
 use InvalidArgumentException;
 
@@ -39,7 +40,7 @@ final class SunVerifier
      * @param  string  $piccData  the `e` query value: 32 hex characters
      * @param  string  $metaReadKey  16-byte binary SDMMetaReadKey
      *
-     * @throws SunVerificationFailed with SunFailure::Malformed
+     * @throws SunVerificationFailed with TapRejection::Malformed
      * @throws InvalidArgumentException when the key is not 16 bytes (a server configuration error)
      */
     public function decrypt(
@@ -59,7 +60,7 @@ final class SunVerifier
 
         // A wrong key or forged data decrypts to noise, which almost never carries this tag byte.
         if ($plain === false || ord($plain[0]) !== self::PICC_DATA_TAG) {
-            throw new SunVerificationFailed(SunFailure::Malformed);
+            throw new SunVerificationFailed(TapRejection::Malformed);
         }
 
         /** @var array{1: int} $counter */
@@ -72,7 +73,7 @@ final class SunVerifier
      * @param  string  $cmac  the `c` query value: 16 hex characters
      * @param  string  $fileReadKey  16-byte binary SDMFileReadKey of this tag
      *
-     * @throws SunVerificationFailed with SunFailure::Malformed or SunFailure::BadMac
+     * @throws SunVerificationFailed with TapRejection::Malformed or TapRejection::BadMac
      * @throws InvalidArgumentException when the key is not 16 bytes (a server configuration error)
      */
     public function verifyMac(
@@ -96,7 +97,7 @@ final class SunVerifier
         }
 
         if (! hash_equals($truncated, $given)) {
-            throw new SunVerificationFailed(SunFailure::BadMac);
+            throw new SunVerificationFailed(TapRejection::BadMac);
         }
 
         return $this->verifiedTap($message->uid, $message->counter);
@@ -124,7 +125,7 @@ final class SunVerifier
     private function decodeHex(#[\SensitiveParameter] string $hex, int $length): string
     {
         if (strlen($hex) !== $length || ! ctype_xdigit($hex)) {
-            throw new SunVerificationFailed(SunFailure::Malformed);
+            throw new SunVerificationFailed(TapRejection::Malformed);
         }
 
         return (string) hex2bin($hex);
