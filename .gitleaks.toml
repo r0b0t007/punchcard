@@ -6,6 +6,4 @@ useDefault = true
 
 [allowlist]
 description = "Published crypto test vectors (RFC 4493, NXP AN12196) and fake keys in the NFC unit tests"
-paths = [
-    '''^tests/Unit/Nfc/[A-Za-z]+Test\.php$''',
-]
+paths = ['''^tests/Unit/Nfc/[A-Za-z]+Test\.php$''']
