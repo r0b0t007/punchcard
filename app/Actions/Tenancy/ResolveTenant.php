@@ -6,6 +6,7 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -25,6 +26,9 @@ use App\Support\Tenancy\TenantContext;
  * Memberships spread over several organizations always need a choice.
  * Customers have no memberships and get no tenant. A suspended business does
  * not resolve at all (fail closed); a pending one does, so its owner can set up.
+ * Neither does an independent or chain organization whose business is
+ * suspended: there the business is the account. Franchise HQ keeps working
+ * while a franchisee is suspended.
  *
  * The context also carries what the user may do there: org admin rights from
  * organization_user, the business role from business_user.
@@ -46,6 +50,9 @@ final readonly class ResolveTenant
                 ->get();
             $organizations = Organization::query()
                 ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->select('organization_id'))
+                ->where(fn ($query) => $query->where('type', OrganizationType::Franchise)
+                    ->orWhereDoesntHave('businesses')
+                    ->orWhereHas('businesses', fn ($businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)))
                 ->get();
 
             [$type, $id] = $this->parseChoice($choice);

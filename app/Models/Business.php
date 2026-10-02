@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -96,9 +97,9 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * A franchisee may update their own business, but not delete it, and
-     * status and plan change only through verification and billing actions
-     * (bypass()). An org admin may delete businesses of the organization.
+     * The owner (or an org admin) may update the business; staff may not. Only
+     * an org admin deletes one. Status and plan change only through verification
+     * and billing actions (bypass()).
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -113,6 +114,10 @@ class Business extends Model implements TenantModel
 
         if ($operation === 'delete' && ! $context->isOrgAdmin()) {
             throw new LogicException('Only an org admin can delete a business.');
+        }
+
+        if ($operation === 'update' && ! $context->isOrgAdmin() && $context->businessRole() !== BusinessRole::Owner) {
+            throw new LogicException('Only the owner or an org admin can change the business.');
         }
 
         if (array_intersect(array_keys($values), ['status', 'plan']) !== []) {

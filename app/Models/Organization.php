@@ -93,9 +93,9 @@ class Organization extends Model implements TenantModel
         }
 
         // The org admin changes the organization. The owner of its only business may too
-        // (a one-company chain); a franchisee cannot change the brand others share, and
-        // staff never can.
-        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || $this->businessCount() > 1)) {
+        // (an independent café or a one-company chain); a franchisee never can, not even
+        // the first one, since later franchisees share the brand. Staff never can.
+        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || ! $this->ownedByItsOnlyBusiness())) {
             throw new LogicException('Only an org admin can change the organization.');
         }
 
@@ -127,12 +127,16 @@ class Organization extends Model implements TenantModel
             ->withTimestamps();
     }
 
-    /** How many businesses the current organization has (bulk writes have no loaded model to ask). */
-    private function businessCount(): int
+    /**
+     * The current organization is not a franchise and has one business. Reads the
+     * stored type, in bypass(): bulk writes have no loaded model to ask.
+     */
+    private function ownedByItsOnlyBusiness(): bool
     {
         $context = app(TenantContext::class);
 
-        return $context->bypass(fn (): int => Business::query()->where('organization_id', $context->organizationId())->count());
+        return $context->bypass(fn (): bool => self::query()->whereKey($context->organizationId())->where('type', '!=', OrganizationType::Franchise)->exists()
+            && Business::query()->where('organization_id', $context->organizationId())->count() === 1);
     }
 
     /**

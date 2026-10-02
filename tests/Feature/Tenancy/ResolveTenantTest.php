@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Http\Middleware\SetTenant;
+use App\Models\Business;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -128,6 +130,23 @@ it('gives no tenant in a suspended business, but keeps a pending one', function 
     'suspended' => [BusinessStatus::Suspended, false],
     'pending' => [BusinessStatus::Pending, true],
 ]);
+
+it('gives the owner of a suspended independent café no tenant, even when they choose its organization', function (?string $choice): void {
+    $owner = User::factory()->create();
+    $business = app(CreateIndependentBusiness::class)->handle($owner, 'Café Hafa');
+    app(TenantContext::class)->bypass(fn (): bool => $business->forceFill(['status' => BusinessStatus::Suspended])->save());
+
+    $this->actingAs($owner)
+        ->withSession($choice === null ? [] : [SetTenant::SESSION_KEY => $choice.$business->organization_id])
+        ->get('/_tenant')->assertExactJson(Tenants::context(null));
+})->with(['no choice' => null, 'organization chosen' => 'org:']);
+
+it('keeps franchise HQ working while its franchisees are suspended', function (): void {
+    $user = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    app(TenantContext::class)->bypass(fn (): int => Business::query()->whereKey([$this->tenants->a1->id, $this->tenants->a2->id])->update(['status' => BusinessStatus::Suspended]));
+
+    $this->actingAs($user)->get('/_tenant')->assertExactJson(Tenants::context($this->tenants->orgA->id, orgAdmin: true));
+});
 
 it('resolves route model bindings inside the tenant', function (): void {
     $user = $this->tenants->member(User::factory()->create(), $this->tenants->a1);

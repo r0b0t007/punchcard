@@ -37,15 +37,15 @@ final class TenantContext
 
     /**
      * Sets the tenant and what the user may do in it. ResolveTenant passes both
-     * from the user's memberships. Without them, an organization context means an
-     * org admin and a business context means no membership rights (fail closed).
+     * from the user's memberships. Without them the context grants no rights
+     * (fail closed): reads work, owner and org admin writes throw.
      * Code acting for no user (jobs, the tap endpoint, white-label lookups) uses
      * bypass(), never set().
      *
-     * @param  bool|null  $orgAdmin  the user administers the organization (organization_user)
+     * @param  bool  $orgAdmin  the user administers the organization (organization_user)
      * @param  BusinessRole|null  $businessRole  the user's role in the business (business_user)
      */
-    public function set(Organization $organization, ?Business $business = null, ?bool $orgAdmin = null, ?BusinessRole $businessRole = null): void
+    public function set(Organization $organization, ?Business $business = null, bool $orgAdmin = false, ?BusinessRole $businessRole = null): void
     {
         if ($business instanceof Business && (int) $business->organization_id !== (int) $organization->id) {
             throw new LogicException('The business does not belong to the organization.');
@@ -53,7 +53,7 @@ final class TenantContext
 
         $this->organizationId = $organization->id;
         $this->businessId = $business?->id;
-        $this->orgAdmin = $orgAdmin ?? ! $business instanceof Business;
+        $this->orgAdmin = $orgAdmin;
         $this->businessRole = $business instanceof Business ? $businessRole : null;
     }
 

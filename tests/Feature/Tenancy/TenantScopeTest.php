@@ -55,7 +55,7 @@ describe('reads', function (): void {
     });
 
     it('lets an org admin see every business in the organization, and nothing outside it', function (): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         expect(Location::query()->orderBy('name')->pluck('name')->all())->toBe(['A1 site', 'A2 site'])
             ->and(Business::query()->orderBy('name')->pluck('name')->all())->toBe(['A1', 'A2'])
@@ -63,7 +63,7 @@ describe('reads', function (): void {
     });
 
     it('never shows another organization', function (?string $business): void {
-        $this->context->set($this->tenants->orgA, $business === null ? null : $this->tenants->{$business});
+        $this->context->set($this->tenants->orgA, $business === null ? null : $this->tenants->{$business}, orgAdmin: $business === null);
 
         expect(Organization::query()->pluck('id')->all())->toBe([$this->tenants->orgA->id])
             ->and(Organization::query()->find($this->tenants->orgB->id))->toBeNull();
@@ -108,7 +108,7 @@ describe('writes', function (): void {
     ]);
 
     it('refuses to create a business in another organization', function (): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         Business::query()->create(['name' => 'Rogue', 'slug' => 'rogue', 'organization_id' => $this->tenants->orgB->id]);
     })->throws(LogicException::class);
@@ -244,7 +244,7 @@ describe('escape routes', function (): void {
     });
 
     it('lets an org admin write site data for any business of the organization only', function (): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         $location = Location::query()->create(['name' => 'A2 terrace', 'business_id' => $this->tenants->a2->id]);
 
@@ -260,7 +260,7 @@ describe('escape routes', function (): void {
     })->throws(LogicException::class);
 
     it('lets an org admin create a business in their organization', function (): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         $business = Business::query()->create(['name' => 'A3', 'slug' => 'a3']);
 
@@ -318,7 +318,7 @@ describe('escape routes', function (): void {
     })->throws(LogicException::class)->with(['bulk rename', 'bulk delete', 'force delete', 'model save', 'delete a business']);
 
     it('keeps billing and verification fields for bypass()', function (string $how): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         match ($how) {
             'organization plan' => Organization::query()->update(['plan' => 'enterprise']),
@@ -336,7 +336,7 @@ describe('escape routes', function (): void {
     })->throws(LogicException::class);
 
     it('lets the org admin rename the organization', function (): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         $this->tenants->orgA->update(['name' => 'Renamed network']);
 
@@ -393,7 +393,7 @@ describe('escape routes', function (): void {
     });
 
     it('does not let an org admin create a verified or paid business', function (array $values): void {
-        $this->context->set($this->tenants->orgA);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         (new Business)->forceFill(['name' => 'A3', 'slug' => 'a3'] + $values)->save();
     })->throws(LogicException::class)->with([
@@ -461,4 +461,37 @@ describe('escape routes', function (): void {
 
         expect($chain->refresh()->brand_color)->toBe('#0F4C81');
     });
+
+    it('does not let the owner of a franchise\'s first franchisee change the shared brand', function (string $how): void {
+        [$franchise, $business] = $this->context->bypass(fn (): array => [
+            $organization = Organization::factory()->create(['type' => OrganizationType::Franchise]),
+            Business::factory()->for($organization)->create(),
+        ]);
+
+        $this->context->set($franchise, $business, businessRole: BusinessRole::Owner);
+
+        match ($how) {
+            'model' => $franchise->update(['brand_color' => '#0F4C81']),
+            'bulk' => Organization::query()->update(['brand_color' => '#0F4C81']),
+        };
+    })->throws(LogicException::class)->with(['model', 'bulk']);
+
+    it('grants no org admin rights when set() is not told so', function (): void {
+        $this->context->set($this->tenants->orgA);
+
+        expect($this->context->isOrgAdmin())->toBeFalse()
+            ->and($this->context->canManageMembers())->toBeFalse();
+
+        Business::query()->create(['name' => 'A3', 'slug' => 'a3']);
+    })->throws(LogicException::class, 'Only an org admin can create a business.');
+
+    it('lets the owner change their business, but not staff', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+        $this->tenants->a1->update(['name' => 'A1 renamed']);
+
+        expect($this->tenants->a1->refresh()->name)->toBe('A1 renamed');
+
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+        $this->tenants->a1->update(['name' => 'renamed by staff']);
+    })->throws(LogicException::class, 'Only the owner or an org admin can change the business.');
 });

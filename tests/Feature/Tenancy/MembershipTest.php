@@ -59,7 +59,7 @@ it('refuses changing or removing staff of another business', function (string $h
 })->throws(LogicException::class)->with(['promote', 'remove']);
 
 it('lets an org admin staff any business of the organization, not another one', function (): void {
-    $this->context->set($this->tenants->orgA);
+    $this->context->set($this->tenants->orgA, orgAdmin: true);
 
     $this->tenants->a2->members()->attach($this->user, ['role' => BusinessRole::Staff->value]);
 
@@ -76,7 +76,7 @@ it('keeps a staff location inside the business', function (): void {
 })->throws(QueryException::class);
 
 it('lets only an org admin of the organization manage org admins', function (?string $business): void {
-    $this->context->set($this->tenants->orgA, $business === null ? null : $this->tenants->{$business});
+    $this->context->set($this->tenants->orgA, $business === null ? null : $this->tenants->{$business}, orgAdmin: $business === null);
 
     $this->tenants->orgA->admins()->attach($this->user, ['role' => OrganizationRole::OrgAdmin->value]);
 
@@ -86,7 +86,7 @@ it('lets only an org admin of the organization manage org admins', function (?st
 it('refuses org admin changes from a franchisee or another organization', function (string $case): void {
     match ($case) {
         'franchisee A1' => $this->context->set($this->tenants->orgA, $this->tenants->a1),
-        'org admin of B' => $this->context->set($this->tenants->orgB),
+        'org admin of B' => $this->context->set($this->tenants->orgB, orgAdmin: true),
     };
 
     $this->tenants->orgA->admins()->attach($this->user, ['role' => OrganizationRole::OrgAdmin->value]);
@@ -132,7 +132,7 @@ it('refuses changing or removing org admins from a franchisee or another organiz
 
     match ($case) {
         'franchisee A1' => $this->context->set($this->tenants->orgA, $this->tenants->a1),
-        'org admin of B' => $this->context->set($this->tenants->orgB),
+        'org admin of B' => $this->context->set($this->tenants->orgB, orgAdmin: true),
     };
 
     match ($how) {
