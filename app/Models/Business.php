@@ -14,7 +14,9 @@ use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\TenantScope;
 use Database\Factories\BusinessFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -131,6 +133,18 @@ class Business extends Model implements TenantModel
         if (array_intersect(array_keys($values), ['status', 'plan']) !== []) {
             throw new LogicException('Business status and plan change through verification and billing actions, in TenantContext::bypass().');
         }
+    }
+
+    /**
+     * Businesses someone may work in, or run jobs for: not suspended. A pending
+     * one counts, so its owner can set up.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function notSuspended(Builder $query): void
+    {
+        $query->where('status', '!=', BusinessStatus::Suspended);
     }
 
     /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */

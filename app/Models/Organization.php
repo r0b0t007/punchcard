@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\BillingEntity;
 use App\Enums\BusinessRole;
-use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -110,16 +109,22 @@ class Organization extends Model implements TenantModel
     /**
      * Organizations someone may work in: a franchise always (HQ keeps working
      * while a franchisee is suspended), an independent café or chain unless its
-     * business is suspended, since there the business is the account.
+     * business is suspended, since there the business is the account. It reads
+     * every business of the organization, so it needs bypass(): inside a tenant
+     * the business scope would hide some of them and change the answer.
      *
      * @param  Builder<self>  $query
      */
     #[Scope]
     protected function notSuspended(Builder $query): void
     {
+        if (! app(TenantContext::class)->isBypassed()) {
+            throw new LogicException('Organization::notSuspended() reads every business of the organization: use it inside TenantContext::bypass().');
+        }
+
         $query->where(fn (Builder $query) => $query->where('type', OrganizationType::Franchise)
             ->orWhereDoesntHave('businesses')
-            ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)));
+            ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->notSuspended()));
     }
 
     /**

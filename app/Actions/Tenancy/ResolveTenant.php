@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
-use App\Enums\BusinessStatus;
 use App\Enums\OrganizationRole;
 use App\Models\Business;
 use App\Models\BusinessMember;
@@ -46,7 +45,7 @@ final readonly class ResolveTenant
             $roles = BusinessMember::query()->where('user_id', $user->id)->pluck('role', 'business_id');
             $businesses = Business::query()
                 ->whereIn('id', $roles->keys())
-                ->where('status', '!=', BusinessStatus::Suspended)
+                ->notSuspended()
                 ->with('organization')
                 ->get();
             $organizations = Organization::query()

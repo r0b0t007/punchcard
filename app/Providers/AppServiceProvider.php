@@ -8,10 +8,10 @@ use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Queue;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -39,7 +39,9 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Queued jobs run in the tenant they were dispatched from (QueuedTenant).
      * JobAttempted fires after every attempt, run or failed, on a worker and on
-     * the sync queue, so the context around the job always comes back.
+     * the sync queue, so the context around the job always comes back. The
+     * payload hook is static on the base Queue: the facade would open the
+     * default connection on every boot just to register it.
      */
     private function carryTenantIntoQueuedJobs(): void
     {

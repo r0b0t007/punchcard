@@ -31,6 +31,7 @@ use Tests\Support\Tenants;
 beforeEach(function (): void {
     $this->tenants = Tenants::make();
     TenantProbeJob::$seen = [];
+    TenantProbeJob::$restored = [];
 });
 
 describe('on a worker', function (): void {
@@ -137,21 +138,37 @@ describe('on a worker', function (): void {
         expect(TenantProbeJob::$seen[0]['organization'])->toBe($this->tenants->orgA->id);
     });
 
-    it('fails a job whose tenant in the payload is malformed instead of widening it', function (mixed $business): void {
+    it('fails a job whose tenant in the payload is malformed, once, instead of widening it', function (string $case): void {
         app(TenantContext::class)->set($this->tenants->orgA, $this->tenants->a1);
-        TenantProbeJob::dispatch()->onConnection('database');
+        TenantProbeJob::dispatch(tries: 3, backoff: 60)->onConnection('database');
         app(TenantContext::class)->clear();
 
         $row = DB::table('jobs')->sole();
         $payload = json_decode($row->payload, true);
-        $payload[QueuedTenant::PAYLOAD_KEY]['business'] = $business;
+        $payload[QueuedTenant::PAYLOAD_KEY]['business'] = match ($case) {
+            'a string' => 'abc',
+            'a numeric string' => '1',
+            'a list' => [1],
+            'another organization\'s business' => $this->tenants->b1->id,
+        };
         DB::table('jobs')->where('id', $row->id)->update(['payload' => json_encode($payload)]);
 
         TenantProbeJob::workDatabaseQueue();
 
         expect(TenantProbeJob::$seen)->toBe([])
-            ->and(DB::table('failed_jobs')->count())->toBe(1);
-    })->with(['a string' => 'abc', 'a numeric string' => '1', 'a list' => [[1]]]);
+            ->and(DB::table('failed_jobs')->count())->toBe(1)
+            ->and(DB::table('jobs')->count())->toBe(0);
+    })->with(['a string', 'a numeric string', 'a list', 'another organization\'s business']);
+
+    it('restores the job\'s models without a tenant, so the job can still use bypass()', function (): void {
+        $location = app(TenantContext::class)->bypass(fn () => $this->tenants->locationOf($this->tenants->a1));
+        TenantProbeJob::dispatch(location: $location)->onConnection('database');
+
+        TenantProbeJob::workDatabaseQueue();
+
+        expect(TenantProbeJob::$restored)->toBe(['A1 site'])
+            ->and(TenantProbeJob::$seen[0]['organization'])->toBeNull();
+    });
 });
 
 describe('on the sync queue', function (): void {

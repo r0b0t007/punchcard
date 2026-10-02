@@ -21,11 +21,14 @@ final class TenantProbeJob implements ShouldQueue
     /** @var list<array{organization: int|null, business: int|null, org_admin: bool, role: string|null, bypassed: bool, locations: list<string>}> */
     public static array $seen = [];
 
+    /** @var list<string|null> The name of the location the job carried, as restored. */
+    public static array $restored = [];
+
     /**
      * @param  int  $tries  attempts the worker may make
      * @param  int  $backoff  seconds before a released job is available again
      */
-    public function __construct(public bool $throw = false, public int $tries = 1, public int $backoff = 0) {}
+    public function __construct(public bool $throw = false, public int $tries = 1, public int $backoff = 0, public ?Location $location = null) {}
 
     /** Runs the database queue in-process until it is empty, like a worker would. */
     public static function workDatabaseQueue(): void
@@ -43,6 +46,10 @@ final class TenantProbeJob implements ShouldQueue
             'bypassed' => $context->isBypassed(),
             'locations' => Location::query()->orderBy('name')->pluck('name')->all(),
         ];
+
+        if ($this->location instanceof Location) {
+            self::$restored[] = $this->location->name;
+        }
 
         if ($this->throw) {
             throw new RuntimeException('Probe failed on purpose.');

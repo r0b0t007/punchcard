@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
-use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\Organization;
 use Illuminate\Contracts\Queue\Job;
@@ -25,6 +24,11 @@ use WeakMap;
  * context back, so tests on the sync queue behave like a worker. Event::fake()
  * without a list swallows JobProcessing and JobAttempted, so sync jobs would
  * then run in the caller's context: fake only the events a test asserts.
+ *
+ * Laravel restores a job's models without scopes (newQueryForRestoration), so
+ * a job dispatched without a tenant still gets them and can call bypass();
+ * relations eager-loaded on them are restored in the job's tenant, so they are
+ * empty without one. The job's failed() handler runs in that tenant too.
  *
  * The tenant is read when the payload is built. That is at dispatch for every
  * configured connection; a sync job marked afterCommit builds it at commit.
@@ -113,16 +117,27 @@ final class QueuedTenant
         }
 
         return $this->context()->bypass(function () use ($organizationId, $businessId): array {
-            $organization = Organization::query()->notSuspended()->find($organizationId);
-            $business = $businessId === null ? null : Business::query()
-                ->where('status', '!=', BusinessStatus::Suspended)
-                ->find($businessId);
+            if ($businessId === null) {
+                $organization = Organization::query()->notSuspended()->find($organizationId);
 
-            if (! $organization instanceof Organization || ($businessId !== null && ! $business instanceof Business)) {
+                return $organization instanceof Organization
+                    ? [$organization, null]
+                    : throw new TenantUnavailable('The tenant this job was queued for no longer exists or is suspended.');
+            }
+
+            // A business that is not suspended keeps its organization available, so
+            // two primary key lookups do, without the organization scope's subqueries.
+            $business = Business::query()->notSuspended()->with('organization')->find($businessId);
+
+            if (! $business instanceof Business) {
                 throw new TenantUnavailable('The tenant this job was queued for no longer exists or is suspended.');
             }
 
-            return [$organization, $business];
+            if ((int) $business->organization_id !== $organizationId) {
+                throw new TenantUnavailable('The job payload has a malformed tenant.');
+            }
+
+            return [$business->organization, $business];
         });
     }
 
