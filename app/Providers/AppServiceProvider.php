@@ -3,10 +3,15 @@
 namespace App\Providers;
 
 use App\Support\Nfc\KeyDiversifier;
+use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Queue\Events\JobAttempted;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -28,6 +33,19 @@ class AppServiceProvider extends ServiceProvider
     private function registerTenantContext(): void
     {
         $this->app->scoped(TenantContext::class);
+        $this->app->singleton(QueuedTenant::class);
+    }
+
+    /**
+     * Queued jobs run in the tenant they were dispatched from (QueuedTenant).
+     * JobAttempted fires after every attempt, run or failed, on a worker and on
+     * the sync queue, so the context around the job always comes back.
+     */
+    private function carryTenantIntoQueuedJobs(): void
+    {
+        Queue::createPayloadUsing(fn (): array => app(QueuedTenant::class)->payload());
+        Event::listen(JobProcessing::class, [QueuedTenant::class, 'enter']);
+        Event::listen(JobAttempted::class, [QueuedTenant::class, 'leave']);
     }
 
     /**
@@ -52,6 +70,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->carryTenantIntoQueuedJobs();
     }
 
     /**
