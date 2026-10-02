@@ -20,9 +20,13 @@ return [
     ],
 
     'nfc' => [
-        // Master key (hex, 32 chars) used to derive per-tag AES-128 keys
-        // (NXP AN12196 diversification). Never commit a real value.
+        // Master key (hex, 32 chars) for NXP AN10922 AES-128 key diversification:
+        // one system-wide SDMMetaReadKey, and a per-tag SDMFileReadKey from the
+        // tag UID. Never commit a real value.
         'sun_master_key' => env('NFC_SUN_MASTER_KEY'),
+        // Version of the system-wide meta read key. Changing it is a hard cutover
+        // until a list of live versions exists (CHW-18). Each stamper keeps its
+        // own key_version, which only feeds its file read key.
         'key_version' => (int) env('NFC_SUN_KEY_VERSION', 1),
     ],
 
