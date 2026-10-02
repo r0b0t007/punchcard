@@ -9,6 +9,7 @@ use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\Location;
+use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -17,7 +18,8 @@ use Illuminate\Support\Facades\Route;
 /**
  * Two tenant boundaries for isolation tests (ADR 0006): organization A is a
  * franchise with franchisees A1 and A2; organization B has one business B1.
- * Every business has one location. Built inside bypass(), like a seeder.
+ * Every business has one location. A runs one card that A1 and A2 both
+ * honour; B has its own card. Built inside bypass(), like a seeder.
  */
 final readonly class Tenants
 {
@@ -27,6 +29,8 @@ final readonly class Tenants
         public Business $a2,
         public Organization $orgB,
         public Business $b1,
+        public LoyaltyCard $cardA,
+        public LoyaltyCard $cardB,
     ) {}
 
     public static function make(): self
@@ -43,7 +47,12 @@ final readonly class Tenants
                 Location::factory()->for($business)->create(['name' => $business->name.' site']);
             }
 
-            return new self($orgA, $a1, $a2, $orgB, $b1);
+            $cardA = LoyaltyCard::factory()->for($orgA)->create(['name' => 'A card']);
+            $cardA->businesses()->attach([$a1->id, $a2->id]);
+            $cardB = LoyaltyCard::factory()->for($orgB)->create(['name' => 'B card']);
+            $cardB->businesses()->attach([$b1->id]);
+
+            return new self($orgA, $a1, $a2, $orgB, $b1, $cardA, $cardB);
         });
     }
 

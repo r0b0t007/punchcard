@@ -12,7 +12,7 @@ namespace Tests\Support;
 final class TenancyBoundary
 {
     /** Tables owned by tenant models. */
-    private const array TENANT_TABLES = ['organizations', 'businesses', 'locations', 'organization_user', 'business_user'];
+    private const array TENANT_TABLES = ['organizations', 'businesses', 'locations', 'organization_user', 'business_user', 'loyalty_cards', 'card_business'];
 
     /**
      * Files that may use a pattern, with the reason.
@@ -23,6 +23,7 @@ final class TenancyBoundary
         'app/Support/Tenancy/TenantBuilder.php' => 'defines the guarded forceDelete()/delete() through toBase(), and checks in bypass() whether a missed row still exists',
         'app/Models/Concerns/GuardsTenantWrites.php' => 'announces a model insert or save, which TenantBuilder then checks',
         'app/Models/Concerns/BelongsToBusiness.php' => 'registers the tenant scope of site data',
+        'app/Models/Concerns/BelongsToOrganization.php' => 'registers the tenant scope of program data',
         'app/Models/Business.php' => 'registers its own tenant scope',
         'app/Models/Organization.php' => 'registers its own tenant scope',
         'app/Models/OrganizationMember.php' => 'registers its own tenant scope',
