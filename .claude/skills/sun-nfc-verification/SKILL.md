@@ -35,14 +35,15 @@ with NXP AN10922 AES-128 key diversification, but not with the same input:
   UIDs and counters (link taps); it cannot forge one.
 - **SDMFileReadKey** is per tag (input: UID + key number + system identifier + the stamper's own `key_version`). It
   is the key that proves authenticity, so a key extracted from one tag cannot sign taps for another.
-- Start both diversification inputs with a fixed purpose byte (or the key number) so the two can never collide.
+- Every diversification input starts with the tag key number, so two keys can never collide.
+- AN10922 always pads `0x01 || input` to 32 bytes before its CBC-MAC. That is not plain CMAC, which pads only to
+  the next 16 bytes; the two disagree for inputs under 16 bytes, such as the meta key input.
 
-Store only `key_version` on the stamper, never the derived keys; it diversifies the **file key only**.
-Re-provisioning one stamper bumps its `key_version`. Rotating the meta key means re-provisioning every tag. Config holds
-one meta version today, so changing `NFC_SUN_KEY_VERSION` is a hard cutover: tags not yet re-provisioned fail as
-`malformed`. A gradual rollover needs a list of live meta versions in config (decide in CHW-18); the verifier then
-tries each one and keeps the candidate whose **MAC verifies**, never the first one whose tag byte decodes (a wrong
-key passes that check about 1 time in 256).
+Store only `key_version` on the stamper, never the derived keys; it diversifies the **per-tag keys** (0, 2, 3, 4), never the meta key.
+Re-provisioning one stamper bumps its `key_version`. Rotating the meta key is a hard cutover
+(decision 2026-10-02): every tag is re-provisioned, and tags not yet done fail as `malformed`. Derivation is
+`App\Support\Nfc\KeyDiversifier` (`metaReadKey($version)`, `fileReadKey($uid, $version)`, `tagKey()` for keys 0, 3
+and 4); key numbers, layout and rotation steps are in `docs/runbooks/stamper-keys.md`.
 
 In code: `App\Support\Nfc\SunVerifier::decrypt($e, $metaReadKey)` returns a `SunMessage` (UID + counter, not yet
 trusted); derive the file key from its UID; then `verifyMac($message, $c, $fileReadKey)` returns a `VerifiedTap`.

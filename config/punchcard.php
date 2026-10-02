@@ -24,9 +24,9 @@ return [
         // one system-wide SDMMetaReadKey, and a per-tag SDMFileReadKey from the
         // tag UID. Never commit a real value.
         'sun_master_key' => env('NFC_SUN_MASTER_KEY'),
-        // Version of the system-wide meta read key. Changing it is a hard cutover
-        // until a list of live versions exists (CHW-18). Each stamper keeps its
-        // own key_version, which only feeds its file read key.
+        // Version of the system-wide meta read key. Changing it is a hard cutover:
+        // every tag must be re-provisioned (docs/runbooks/stamper-keys.md). Each
+        // stamper keeps its own key_version, which only feeds its per-tag keys.
         'key_version' => (int) env('NFC_SUN_KEY_VERSION', 1),
     ],
 

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Nfc\KeyDiversifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Resolved only where taps are verified or tags provisioned, so an app without
+        // NFC_SUN_MASTER_KEY (e.g. CI, local UI work) still boots.
+        $this->app->bind(function (): KeyDiversifier {
+            $masterKey = config('punchcard.nfc.sun_master_key');
+
+            return KeyDiversifier::fromHex(is_string($masterKey) ? $masterKey : null);
+        });
     }
 
     /**
