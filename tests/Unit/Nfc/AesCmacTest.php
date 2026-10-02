@@ -29,3 +29,7 @@ it('matches the RFC 4493 examples', function (int $length, string $expected): vo
 it('rejects a key that is not 16 bytes', function (): void {
     AesCmac::compute(str_repeat("\0", 15), '');
 })->throws(InvalidArgumentException::class);
+
+it('rejects a minimum of fewer than one block', function (int $minBlocks): void {
+    AesCmac::compute(str_repeat("\0", 16), 'abc', $minBlocks);
+})->throws(InvalidArgumentException::class)->with([0, -1]);

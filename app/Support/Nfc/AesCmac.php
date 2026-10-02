@@ -30,11 +30,15 @@ final class AesCmac
             throw new InvalidArgumentException('AES-128 key must be 16 bytes.');
         }
 
+        if ($minBlocks < 1) {
+            throw new InvalidArgumentException('CMAC needs at least one block.');
+        }
+
         $k1 = self::double(self::encryptBlock($key, str_repeat("\0", self::BLOCK)));
         $k2 = self::double($k1);
 
         // A complete last block is XORed with K1; otherwise pad with 80 00.. (to $minBlocks at least) and use K2.
-        $padded = $message === '' || strlen($message) % self::BLOCK !== 0 || strlen($message) < $minBlocks * self::BLOCK;
+        $padded = strlen($message) % self::BLOCK !== 0 || strlen($message) < $minBlocks * self::BLOCK;
 
         if ($padded) {
             $message .= "\x80";

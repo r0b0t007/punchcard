@@ -58,6 +58,13 @@ jobs:
       - name: Rector (dry run)
         run: vendor/bin/rector process --dry-run --no-progress-bar
 
+      # The NFC reference must pass its published vectors, and every stored test vector must still
+      # match it, so a change to the app's crypto and its golden values together cannot slip through.
+      - name: NFC reference and test vectors
+        run: |
+          php .claude/skills/sun-nfc-verification/reference.php
+          php tests/Support/generate-sun-vectors.php
+
       - name: Lint and format (vite-plus)
         run: npm run check
 

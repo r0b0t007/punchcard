@@ -23,7 +23,7 @@ valid `c`. Authenticity rests on key 2, which is unique per tag.
 
 Generate a master key once per environment, for example `php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"`,
 and store it in the server's environment (Ploi site environment), never in the repository. Staging and
-production use different master keys. Run `php artisan punchcard:nfc:check` after each deploy: it fails on a missing or malformed key, a
+production use different master keys. Run `php artisan punchcard:nfc:check` in the Ploi deploy script, before the new release is activated (CHW-37): it fails on a missing or malformed key, a
 bad `NFC_SUN_KEY_VERSION` or a published test key, which would otherwise only show as a 500 on the first tap.
 
 **Open decision for CHW-16:** keys 0, 3 and 4 are only needed while provisioning, but today they come from the
@@ -73,7 +73,8 @@ A leaked master key exposes every tag key: someone near a tag can rewrite it or 
 forge taps. Generate a new master, but keep the old one available to the provisioning tool until every tag has
 been re-keyed. Swapping `NFC_SUN_MASTER_KEY` first would leave untouched tags with a key 0 nobody can derive,
 and those tags would have to be physically replaced. Re-provision every tag (all keys, key 0 last), then switch
-the server to the new master. Expect the same outage window as a meta key rotation.
+the server to the new master and restart queue workers and other long-running processes, which keep the old
+master until they restart. Expect the same outage window as a meta key rotation.
 
 ## Never
 

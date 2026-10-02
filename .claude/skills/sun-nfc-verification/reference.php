@@ -18,10 +18,14 @@ final class SunReference
         return openssl_encrypt($block, 'aes-128-ecb', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
     }
 
-    /** RFC 4493 AES-CMAC. */
-    public static function cmac(string $key, string $message): string
+    /**
+     * RFC 4493 subkeys K1 and K2: double L = AES(key, 0^128) in GF(2^128), then double again.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function subkeys(string $key): array
     {
-        $shiftLeft = static function (string $in): string {
+        $double = static function (string $in): string {
             $out = '';
             $carry = 0;
             for ($i = 15; $i >= 0; $i--) {
@@ -29,18 +33,21 @@ final class SunReference
                 $out = chr((($b << 1) & 0xFF) | $carry).$out;
                 $carry = ($b >> 7) & 1;
             }
+            if (ord($in[0]) & 0x80) {
+                $out[15] = chr(ord($out[15]) ^ 0x87);
+            }
 
             return $out;
         };
-        $l = self::aesEcb($key, str_repeat("\0", 16));
-        $k1 = $shiftLeft($l);
-        if (ord($l[0]) & 0x80) {
-            $k1[15] = chr(ord($k1[15]) ^ 0x87);
-        }
-        $k2 = $shiftLeft($k1);
-        if (ord($k1[0]) & 0x80) {
-            $k2[15] = chr(ord($k2[15]) ^ 0x87);
-        }
+        $k1 = $double(self::aesEcb($key, str_repeat("\0", 16)));
+
+        return [$k1, $double($k1)];
+    }
+
+    /** RFC 4493 AES-CMAC. */
+    public static function cmac(string $key, string $message): string
+    {
+        [$k1, $k2] = self::subkeys($key);
 
         $n = max(1, (int) ceil(strlen($message) / 16));
         $complete = strlen($message) > 0 && strlen($message) % 16 === 0;
@@ -63,22 +70,10 @@ final class SunReference
      */
     public static function an10922(string $key, string $m): string
     {
-        $double = static function (string $in): string {
-            $out = '';
-            $carry = 0;
-            for ($i = 15; $i >= 0; $i--) {
-                $b = ord($in[$i]);
-                $out = chr((($b << 1) & 0xFF) | $carry).$out;
-                $carry = ($b >> 7) & 1;
-            }
-            if (ord($in[0]) & 0x80) {
-                $out[15] = chr(ord($out[15]) ^ 0x87);
-            }
-
-            return $out;
-        };
-        $k1 = $double(self::aesEcb($key, str_repeat("\0", 16)));
-        $k2 = $double($k1);
+        if ($m === '' || strlen($m) > 31) {
+            throw new InvalidArgumentException('AN10922 input M must be 1 to 31 bytes');
+        }
+        [$k1, $k2] = self::subkeys($key);
 
         $d = "\x01".$m;
         $padded = strlen($d) < 32;

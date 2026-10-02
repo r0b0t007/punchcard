@@ -118,12 +118,19 @@ it('keeps the master key and derived keys out of stack traces', function (): voi
 
     try {
         $master = (string) hex2bin(V::AN10922_MASTER_KEY);
-        $traces = [];
+        $metaKey = V::diversifier()->metaReadKey(1);
+        $fileKey = V::diversifier()->fileReadKey(V::UID, 1);
+        $verifier = new SunVerifier;
+        $message = $verifier->decrypt(V::PROVISIONED_TAP['e'], $metaKey);
+
+        $traces = [
+            V::failure(fn (): SunMessage => $verifier->decrypt('ZZ', $metaKey))->getTraceAsString(),
+            V::failure(fn (): VerifiedTap => $verifier->verifyMac($message, '0000000000000000', $fileKey))->getTraceAsString(),
+        ];
 
         foreach ([
             fn (): string => KeyDiversifier::diversify($master, ''),
             fn (): KeyDiversifier => KeyDiversifier::fromHex(substr(V::AN10922_MASTER_KEY, 0, 30)),
-            fn (): string => V::diversifier()->tagKey(9, V::UID, 1),
         ] as $call) {
             try {
                 $call();
@@ -135,13 +142,15 @@ it('keeps the master key and derived keys out of stack traces', function (): voi
         ini_set('zend.exception_ignore_args', (string) $previous);
     }
 
-    expect($traces)->toHaveCount(3);
+    expect($traces)->toHaveCount(4);
 
     foreach ($traces as $trace) {
-        expect($trace)
-            ->not->toContain(substr($master, 0, 6))
-            ->not->toContain(substr(V::AN10922_MASTER_KEY, 0, 12))
-            ->not->toContain(strtolower(substr(V::AN10922_MASTER_KEY, 0, 12)));
+        foreach ([$master, $metaKey, $fileKey] as $key) {
+            expect($trace)
+                ->not->toContain(substr($key, 0, 6))
+                ->not->toContain(substr(bin2hex($key), 0, 12))
+                ->not->toContain(substr(strtoupper(bin2hex($key)), 0, 12));
+        }
     }
 });
 

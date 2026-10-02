@@ -48,6 +48,8 @@ and 4); key numbers, layout and rotation steps are in `docs/runbooks/stamper-key
 
 In code: `App\Support\Nfc\SunVerifier::decrypt($e, $metaReadKey)` returns a `SunMessage` (UID + counter, not yet
 trusted); derive the file key from its UID; then `verifyMac($message, $c, $fileReadKey)` returns a `VerifiedTap`.
+The meta key always uses the global version (`metaReadKey(config('punchcard.nfc.key_version'))`), never
+`$stamper->key_version`, which only feeds `fileReadKey($uid, $stamper->key_version)`.
 Only a `VerifiedTap` may reach the replay check and the stamp. `SunMessage` and `VerifiedTap` have private
 constructors and refuse serialization, which prevents mistakes but is not a security boundary (reflection can still
 build one): never accept a `VerifiedTap` from outside the request that verified it. Both methods throw
