@@ -75,21 +75,9 @@ return [
             'after_commit' => false,
         ],
 
-        'deferred' => [
-            'driver' => 'deferred',
-        ],
-
-        'background' => [
-            'driver' => 'background',
-        ],
-
-        'failover' => [
-            'driver' => 'failover',
-            'connections' => [
-                'database',
-                'deferred',
-            ],
-        ],
+        // No "deferred", "background" or "failover" (which falls back to deferred):
+        // they build the job payload after dispatch or in another process, so a
+        // job would carry the wrong tenant or none (App\Support\Tenancy\QueuedTenant).
 
     ],
 

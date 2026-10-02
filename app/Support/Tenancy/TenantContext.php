@@ -21,7 +21,9 @@ use LogicException;
  * current tenant" checks are off; consistency (a location's organization is
  * its business's, tenant ids never change) is still enforced.
  *
- * Bound as a scoped service: a fresh, empty context per request or job.
+ * Bound as a scoped service: a fresh, empty context per request or job. A
+ * queued job runs in the tenant it was dispatched from, without the user's
+ * rights or bypass() (QueuedTenant).
  */
 final class TenantContext
 {
@@ -41,8 +43,9 @@ final class TenantContext
      * (fail closed): reads work, while writes to the tenant structure (the
      * organization, its businesses, memberships) that need an owner or org admin
      * throw. Operational site data (locations, stampers) is authorized by policies.
-     * Code acting for no user (jobs, the tap endpoint, white-label lookups) uses
-     * bypass(), never set().
+     * Code acting for no user sets the tenant without rights (queued jobs get the
+     * dispatching tenant this way, through QueuedTenant), or uses bypass() when
+     * it spans tenants.
      *
      * @param  bool  $orgAdmin  the user administers the organization (organization_user)
      * @param  BusinessRole|null  $businessRole  the user's role in the business (business_user)
@@ -117,5 +120,24 @@ final class TenantContext
     public function isBypassed(): bool
     {
         return $this->bypassDepth > 0;
+    }
+
+    /**
+     * A copy of the whole state (tenant, rights, bypass depth), for code that
+     * runs something in another tenant and must put this one back (QueuedTenant).
+     */
+    public function snapshot(): self
+    {
+        return clone $this;
+    }
+
+    /** Puts back a snapshot(); `new TenantContext` restores the empty context. */
+    public function restore(self $snapshot): void
+    {
+        $this->organizationId = $snapshot->organizationId;
+        $this->businessId = $snapshot->businessId;
+        $this->orgAdmin = $snapshot->orgAdmin;
+        $this->businessRole = $snapshot->businessRole;
+        $this->bypassDepth = $snapshot->bypassDepth;
     }
 }

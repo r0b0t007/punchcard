@@ -14,7 +14,9 @@ use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\TenantScope;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -102,6 +104,27 @@ class Organization extends Model implements TenantModel
         if (array_intersect(array_keys($values), ['type', 'plan', 'billing_entity', 'white_label']) !== []) {
             throw new LogicException('Organization type, plan and billing change through billing and admin actions, in TenantContext::bypass().');
         }
+    }
+
+    /**
+     * Organizations someone may work in: a franchise always (HQ keeps working
+     * while a franchisee is suspended), an independent café or chain unless its
+     * business is suspended, since there the business is the account. It reads
+     * every business of the organization, so it needs bypass(): inside a tenant
+     * the business scope would hide some of them and change the answer.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function notSuspended(Builder $query): void
+    {
+        if (! app(TenantContext::class)->isBypassed()) {
+            throw new LogicException('Organization::notSuspended() reads every business of the organization: use it inside TenantContext::bypass().');
+        }
+
+        $query->where(fn (Builder $query) => $query->where('type', OrganizationType::Franchise)
+            ->orWhereDoesntHave('businesses')
+            ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->notSuspended()));
     }
 
     /**
