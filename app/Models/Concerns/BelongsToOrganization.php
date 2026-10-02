@@ -30,7 +30,17 @@ trait BelongsToOrganization
 {
     public static function bootBelongsToOrganization(): void
     {
-        static::addGlobalScope(new TenantScope);
+        static::addGlobalScope(static::tenantScope());
+    }
+
+    /**
+     * The scope this model is filtered by; customer data overrides it (HoldsCustomerData).
+     *
+     * @return TenantScope<Model>
+     */
+    protected static function tenantScope(): TenantScope
+    {
+        return new TenantScope;
     }
 
     public function fillTenantColumns(): void
@@ -75,5 +85,25 @@ trait BelongsToOrganization
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Fills a missing organization_id from the parent row (the card of an
+     * enrollment, the enrollment of a reward), looked up in bypass() so it works
+     * without a tenant too. assertTenantInsert() then checks it against the tenant.
+     *
+     * @param  class-string<Model>  $parent
+     */
+    protected function fillOrganizationFrom(string $parent, string $foreignKey): void
+    {
+        if ($this->getAttribute('organization_id') !== null || $this->getAttribute($foreignKey) === null) {
+            return;
+        }
+
+        $organizationId = app(TenantContext::class)->bypass(
+            fn (): mixed => $parent::query()->whereKey($this->getAttribute($foreignKey))->value('organization_id'),
+        );
+
+        $this->setAttribute('organization_id', $organizationId === null ? null : (int) $organizationId);
     }
 }
