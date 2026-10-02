@@ -9,6 +9,7 @@ use App\Models\OrganizationMember;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\Tenants;
 
 /*
@@ -147,7 +148,8 @@ it('deletes a business or organization with staff at a location, but not the loc
     $b1Location = $this->tenants->locationOf($this->tenants->b1);
     $this->context->bypass(fn () => $this->tenants->b1->members()->attach($b1Staff, ['role' => 'staff', 'location_id' => $b1Location->id]));
 
-    expect(fn () => $this->context->bypass(fn (): ?bool => $a1Location->delete()))->toThrow(QueryException::class);
+    // In a savepoint: on Postgres a failed statement aborts the surrounding transaction.
+    expect(fn () => DB::transaction(fn () => $this->context->bypass(fn (): ?bool => $a1Location->delete())))->toThrow(QueryException::class);
 
     $this->context->bypass(function (): void {
         $this->tenants->a1->delete();
