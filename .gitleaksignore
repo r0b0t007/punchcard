@@ -1,0 +1,9 @@
+# Published RFC 4493 / fake NFC test values in the first commit of PR #20, before
+# each line carried a gitleaks:allow marker. Fingerprints are tied to that commit,
+# so nothing else is exempt.
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/AesCmacTest.php:generic-api-key:17
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:192
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:206
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:213
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:224
+c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:236
