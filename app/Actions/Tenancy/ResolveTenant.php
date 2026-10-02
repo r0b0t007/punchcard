@@ -7,7 +7,6 @@ namespace App\Actions\Tenancy;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationRole;
-use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -52,9 +51,7 @@ final readonly class ResolveTenant
                 ->get();
             $organizations = Organization::query()
                 ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->where('role', OrganizationRole::OrgAdmin)->select('organization_id'))
-                ->where(fn ($query) => $query->where('type', OrganizationType::Franchise)
-                    ->orWhereDoesntHave('businesses')
-                    ->orWhereHas('businesses', fn ($businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)))
+                ->notSuspended()
                 ->get();
 
             [$type, $id] = $this->parseChoice($choice);

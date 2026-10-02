@@ -3,7 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
+use App\Enums\OrganizationType;
+use App\Models\Business;
+use App\Models\Organization;
+use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantUnavailable;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\TenantProbeJob;
 use Tests\Support\Tenants;
@@ -92,18 +98,60 @@ describe('on a worker', function (): void {
             ->and(TenantProbeJob::$seen[0]['locations'])->toBe(['A1 site']);
     });
 
-    it('fails a job whose business is gone instead of running it without a tenant', function (): void {
-        app(TenantContext::class)->set($this->tenants->orgA, $this->tenants->a2);
-        TenantProbeJob::dispatch()->onConnection('database');
-        app(TenantContext::class)->clear();
-        app(TenantContext::class)->bypass(fn () => $this->tenants->a2->delete());
+    it('fails a job whose tenant is gone or suspended, once, without running it', function (string $case): void {
+        $context = app(TenantContext::class);
+        $independent = $context->bypass(fn (): Business => Business::factory()->for(Organization::factory()->create(['type' => OrganizationType::Independent]))->create()->load('organization'));
+
+        match ($case) {
+            'business deleted', 'business suspended' => $context->set($this->tenants->orgA, $this->tenants->a2),
+            'organization deleted' => $context->set($this->tenants->orgB, orgAdmin: true),
+            'independent café suspended' => $context->set($independent->organization, orgAdmin: true),
+        };
+
+        // A job that would be retried: the tenant must fail it at once, not release it.
+        TenantProbeJob::dispatch(tries: 3, backoff: 60)->onConnection('database');
+        $context->clear();
+
+        $context->bypass(fn () => match ($case) {
+            'business deleted' => $this->tenants->a2->delete(),
+            'business suspended' => $this->tenants->a2->forceFill(['status' => BusinessStatus::Suspended])->save(),
+            'organization deleted' => $this->tenants->orgB->delete(),
+            'independent café suspended' => $independent->forceFill(['status' => BusinessStatus::Suspended])->save(),
+        });
 
         TenantProbeJob::workDatabaseQueue();
 
         expect(TenantProbeJob::$seen)->toBe([])
             ->and(DB::table('failed_jobs')->count())->toBe(1)
             ->and(DB::table('jobs')->count())->toBe(0);
+    })->with(['business deleted', 'business suspended', 'organization deleted', 'independent café suspended']);
+
+    it('keeps running franchise HQ jobs while a franchisee is suspended', function (): void {
+        app(TenantContext::class)->set($this->tenants->orgA, orgAdmin: true);
+        TenantProbeJob::dispatch()->onConnection('database');
+        app(TenantContext::class)->clear();
+        app(TenantContext::class)->bypass(fn (): bool => $this->tenants->a2->forceFill(['status' => BusinessStatus::Suspended])->save());
+
+        TenantProbeJob::workDatabaseQueue();
+
+        expect(TenantProbeJob::$seen[0]['organization'])->toBe($this->tenants->orgA->id);
     });
+
+    it('fails a job whose tenant in the payload is malformed instead of widening it', function (mixed $business): void {
+        app(TenantContext::class)->set($this->tenants->orgA, $this->tenants->a1);
+        TenantProbeJob::dispatch()->onConnection('database');
+        app(TenantContext::class)->clear();
+
+        $row = DB::table('jobs')->sole();
+        $payload = json_decode($row->payload, true);
+        $payload[QueuedTenant::PAYLOAD_KEY]['business'] = $business;
+        DB::table('jobs')->where('id', $row->id)->update(['payload' => json_encode($payload)]);
+
+        TenantProbeJob::workDatabaseQueue();
+
+        expect(TenantProbeJob::$seen)->toBe([])
+            ->and(DB::table('failed_jobs')->count())->toBe(1);
+    })->with(['a string' => 'abc', 'a numeric string' => '1', 'a list' => [[1]]]);
 });
 
 describe('on the sync queue', function (): void {
@@ -132,6 +180,17 @@ describe('on the sync queue', function (): void {
         expect(TenantProbeJob::$seen[0]['bypassed'])->toBeFalse()
             ->and($stillBypassed)->toBeTrue()
             ->and($context->isBypassed())->toBeFalse();
+    });
+
+    it('refuses a job for a tenant that is gone, and gives the caller its context back', function (): void {
+        $context = app(TenantContext::class);
+        $context->set($this->tenants->orgA, $this->tenants->a2, businessRole: BusinessRole::Owner);
+        $context->bypass(fn () => $this->tenants->a2->delete());
+
+        expect(fn () => TenantProbeJob::dispatchSync())->toThrow(TenantUnavailable::class)
+            ->and(TenantProbeJob::$seen)->toBe([])
+            ->and($context->businessId())->toBe($this->tenants->a2->id)
+            ->and($context->businessRole())->toBe(BusinessRole::Owner);
     });
 
     it('gives the caller its context back when the job throws', function (): void {

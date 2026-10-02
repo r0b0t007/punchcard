@@ -21,7 +21,11 @@ final class TenantProbeJob implements ShouldQueue
     /** @var list<array{organization: int|null, business: int|null, org_admin: bool, role: string|null, bypassed: bool, locations: list<string>}> */
     public static array $seen = [];
 
-    public function __construct(public bool $throw = false) {}
+    /**
+     * @param  int  $tries  attempts the worker may make
+     * @param  int  $backoff  seconds before a released job is available again
+     */
+    public function __construct(public bool $throw = false, public int $tries = 1, public int $backoff = 0) {}
 
     /** Runs the database queue in-process until it is empty, like a worker would. */
     public static function workDatabaseQueue(): void
