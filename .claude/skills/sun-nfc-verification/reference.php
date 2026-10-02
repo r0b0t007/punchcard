@@ -7,7 +7,8 @@
  * no framework, so it can be run directly: php reference.php
  *
  * Production code belongs in app/Actions/Stamps and app/Support/Nfc with Pest tests;
- * port this, do not include this file.
+ * port this, never include this file from app code. tests/Support/generate-sun-vectors.php
+ * uses it to produce the stored test vectors independently of the app.
  */
 final class SunReference
 {
@@ -17,10 +18,14 @@ final class SunReference
         return openssl_encrypt($block, 'aes-128-ecb', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
     }
 
-    /** RFC 4493 AES-CMAC. */
-    public static function cmac(string $key, string $message): string
+    /**
+     * RFC 4493 subkeys K1 and K2: double L = AES(key, 0^128) in GF(2^128), then double again.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function subkeys(string $key): array
     {
-        $shiftLeft = static function (string $in): string {
+        $double = static function (string $in): string {
             $out = '';
             $carry = 0;
             for ($i = 15; $i >= 0; $i--) {
@@ -28,18 +33,21 @@ final class SunReference
                 $out = chr((($b << 1) & 0xFF) | $carry).$out;
                 $carry = ($b >> 7) & 1;
             }
+            if (ord($in[0]) & 0x80) {
+                $out[15] = chr(ord($out[15]) ^ 0x87);
+            }
 
             return $out;
         };
-        $l = self::aesEcb($key, str_repeat("\0", 16));
-        $k1 = $shiftLeft($l);
-        if (ord($l[0]) & 0x80) {
-            $k1[15] = chr(ord($k1[15]) ^ 0x87);
-        }
-        $k2 = $shiftLeft($k1);
-        if (ord($k1[0]) & 0x80) {
-            $k2[15] = chr(ord($k2[15]) ^ 0x87);
-        }
+        $k1 = $double(self::aesEcb($key, str_repeat("\0", 16)));
+
+        return [$k1, $double($k1)];
+    }
+
+    /** RFC 4493 AES-CMAC. */
+    public static function cmac(string $key, string $message): string
+    {
+        [$k1, $k2] = self::subkeys($key);
 
         $n = max(1, (int) ceil(strlen($message) / 16));
         $complete = strlen($message) > 0 && strlen($message) % 16 === 0;
@@ -52,6 +60,29 @@ final class SunReference
         }
 
         return self::aesEcb($key, $x ^ $last);
+    }
+
+    /**
+     * NXP AN10922 AES-128 key diversification, written out literally:
+     * D = 0x01 || M (M is 1..31 bytes), padded with 80 00.. to 32 bytes and the
+     * second block XORed with K2 (K1 if D is already 32 bytes), then AES-CBC-MAC
+     * with a zero IV; the last block is the diversified key.
+     */
+    public static function an10922(string $key, string $m): string
+    {
+        if ($m === '' || strlen($m) > 31) {
+            throw new InvalidArgumentException('AN10922 input M must be 1 to 31 bytes');
+        }
+        [$k1, $k2] = self::subkeys($key);
+
+        $d = "\x01".$m;
+        $padded = strlen($d) < 32;
+        if ($padded) {
+            $d = str_pad($d."\x80", 32, "\0");
+        }
+        $d = substr($d, 0, 16).(substr($d, 16) ^ ($padded ? $k2 : $k1));
+
+        return substr(openssl_encrypt($d, 'aes-128-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, str_repeat("\0", 16)), 16);
     }
 
     /**
@@ -96,6 +127,9 @@ if (PHP_SAPI === 'cli' && realpath($_SERVER['argv'][0] ?? '') === __FILE__) {
     // RFC 4493 example 1: empty message
     $rfc = bin2hex(SunReference::cmac(hex2bin('2b7e151628aed2a6abf7158809cf4f3c'), ''));
     $ok = $ok && $rfc === 'bb1d6929e95937287fa37d129b756746';
-    echo json_encode($r), ' rfc4493=', $rfc, PHP_EOL, $ok ? 'OK' : 'FAIL', PHP_EOL;
+    // NXP AN10922 AES-128 example: master key, M = UID || AID || system identifier
+    $div = strtoupper(bin2hex(SunReference::an10922(hex2bin('00112233445566778899AABBCCDDEEFF'), hex2bin('04782E21801D803042F54E585020416275'))));
+    $ok = $ok && $div === 'A8DD63A3B89D54B37CA802473FDA9175';
+    echo json_encode($r), ' rfc4493=', $rfc, ' an10922=', $div, PHP_EOL, $ok ? 'OK' : 'FAIL', PHP_EOL;
     exit($ok ? 0 : 1);
 }

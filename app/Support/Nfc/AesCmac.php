@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Nfc;
 
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * AES-128 CMAC as specified in RFC 4493.
@@ -19,36 +20,43 @@ final class AesCmac
     /**
      * @param  string  $key  16-byte binary key
      * @param  string  $message  binary message, may be empty
+     * @param  int  $minBlocks  pad the message to at least this many blocks. 1 is RFC 4493; NXP AN10922 key
+     *                          diversification is the same MAC over at least 2 blocks (32 bytes).
      * @return string 16-byte binary MAC
      */
-    public static function compute(#[\SensitiveParameter] string $key, string $message): string
+    public static function compute(#[\SensitiveParameter] string $key, string $message, int $minBlocks = 1): string
     {
         if (strlen($key) !== self::BLOCK) {
             throw new InvalidArgumentException('AES-128 key must be 16 bytes.');
         }
 
-        $l = self::encryptBlock($key, str_repeat("\0", self::BLOCK));
-        $k1 = self::subkey($l);
-        $k2 = self::subkey($k1);
+        if ($minBlocks < 1) {
+            throw new InvalidArgumentException('CMAC needs at least one block.');
+        }
 
-        $blocks = max(1, (int) ceil(strlen($message) / self::BLOCK));
-        $lastIsComplete = $message !== '' && strlen($message) % self::BLOCK === 0;
-        $last = substr($message, ($blocks - 1) * self::BLOCK);
-        $last = $lastIsComplete
-            ? $last ^ $k1
-            : str_pad($last."\x80", self::BLOCK, "\0") ^ $k2;
+        $k1 = self::double(self::encryptBlock($key, str_repeat("\0", self::BLOCK)));
+        $k2 = self::double($k1);
 
+        // A complete last block is XORed with K1; otherwise pad with 80 00.. (to $minBlocks at least) and use K2.
+        $padded = strlen($message) % self::BLOCK !== 0 || strlen($message) < $minBlocks * self::BLOCK;
+
+        if ($padded) {
+            $message .= "\x80";
+            $message = str_pad($message, max($minBlocks, (int) ceil(strlen($message) / self::BLOCK)) * self::BLOCK, "\0");
+        }
+
+        $blocks = intdiv(strlen($message), self::BLOCK);
         $x = str_repeat("\0", self::BLOCK);
 
         for ($i = 0; $i < $blocks - 1; $i++) {
             $x = self::encryptBlock($key, $x ^ substr($message, $i * self::BLOCK, self::BLOCK));
         }
 
-        return self::encryptBlock($key, $x ^ $last);
+        return self::encryptBlock($key, $x ^ substr($message, -self::BLOCK) ^ ($padded ? $k2 : $k1));
     }
 
-    /** Doubles a block in GF(2^128): shift left one bit, XOR Rb when the top bit was set. */
-    private static function subkey(#[\SensitiveParameter] string $block): string
+    /** Doubles a block in GF(2^128) to derive K1 and K2: shift left one bit, XOR Rb when the top bit was set. */
+    private static function double(#[\SensitiveParameter] string $block): string
     {
         $shifted = '';
         $carry = 0;
@@ -71,7 +79,7 @@ final class AesCmac
         $encrypted = openssl_encrypt($block, 'aes-128-ecb', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
 
         if ($encrypted === false) {
-            throw new InvalidArgumentException('AES block encryption failed.');
+            throw new RuntimeException('AES block encryption failed.');
         }
 
         return $encrypted;
