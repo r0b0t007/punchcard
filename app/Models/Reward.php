@@ -27,7 +27,9 @@ use LogicException;
  * one, told apart by mode), with a copy of what was earned. It is unlocked
  * available; redemption, an update by the redeem Action with forceFill(),
  * records who, when, and at which business and location (ADR 0006
- * attribution). Customer data of the organization (HoldsCustomerData).
+ * attribution). A database trigger makes a redeemed or expired reward final
+ * and keeps a redemption's when and where. Customer data of the organization
+ * (HoldsCustomerData).
  *
  * @property int $id
  * @property int $organization_id
@@ -63,6 +65,9 @@ class Reward extends Model implements TenantModel
         assertTenantInsert as assertCustomerDataInsert;
     }
 
+    /** @var array{0: mixed, 1: mixed}|null The enrollment id and its card, looked up once by fillTenantColumns(). */
+    private ?array $enrollmentCard = null;
+
     /** Redemption fields a new reward cannot have outside bypass(). */
     private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id'];
 
@@ -81,18 +86,32 @@ class Reward extends Model implements TenantModel
             return;
         }
 
-        $status = $values['status'] ?? RewardStatus::Available;
+        // TenantBuilder passes stored values: enum casts are their strings by now.
+        $status = RewardStatus::tryFrom((string) ($values['status'] ?? RewardStatus::Available->value));
         $redeemed = array_filter(array_intersect_key($values, array_flip(self::REDEMPTION_COLUMNS)), fn (mixed $value): bool => $value !== null);
 
-        if (($status instanceof RewardStatus ? $status : RewardStatus::tryFrom((string) $status)) !== RewardStatus::Available || $redeemed !== []) {
+        if ($status !== RewardStatus::Available || $redeemed !== []) {
             throw new LogicException('A reward is unlocked available; redeeming it is an update by the redeem Action.');
         }
     }
 
-    /** organization_id is the enrollment's, also in bypass(). */
+    /** organization_id is the enrollment's, also in bypass(); its card is kept for cardIdFor(). */
     public function fillTenantColumns(): void
     {
-        $this->fillOrganizationFrom(CardEnrollment::class, 'enrollment_id');
+        $enrollmentId = $this->getAttribute('enrollment_id');
+
+        if ($enrollmentId === null) {
+            return;
+        }
+
+        $enrollment = app(TenantContext::class)->bypass(
+            fn (): ?array => CardEnrollment::query()->whereKey($enrollmentId)->first(['organization_id', 'card_id'])?->only(['organization_id', 'card_id']),
+        );
+        $this->enrollmentCard = [$enrollmentId, $enrollment['card_id'] ?? null];
+
+        if ($this->getAttribute('organization_id') === null && $enrollment !== null) {
+            $this->setAttribute('organization_id', $enrollment['organization_id']);
+        }
     }
 
     /**
@@ -149,8 +168,14 @@ class Reward extends Model implements TenantModel
      */
     protected function cardIdFor(array $values): mixed
     {
+        $enrollmentId = $values['enrollment_id'] ?? null;
+
+        if ($this->enrollmentCard !== null && $this->enrollmentCard[0] === $enrollmentId) {
+            return $this->enrollmentCard[1];
+        }
+
         return app(TenantContext::class)->bypass(
-            fn (): mixed => CardEnrollment::query()->whereKey($values['enrollment_id'] ?? null)->value('card_id'),
+            fn (): mixed => CardEnrollment::query()->whereKey($enrollmentId)->value('card_id'),
         );
     }
 

@@ -12,12 +12,13 @@ use LogicException;
 
 /**
  * The customer data of a card program (enrollments, rewards): program data
- * of the organization, with the TenantScope's customerData rule (hidden
- * inside a business until PR C). Anyone in the tenant may create and update
- * it (the stamp and redeem Actions and their policies decide who), but a
- * business only on a card it honours (card_business). The columns that tie a
- * row to its customer, card or milestone never change, and deleting it is an
- * erasure done by admin actions in bypass().
+ * of the organization, with the TenantScope's customerData rule: the org
+ * admin works with all of it; inside a business, without org admin rights,
+ * it is hidden and cannot be created until PR C (the stamp Action finds and
+ * enrolls the present customer in bypass()). Writes from a business are on a
+ * card it honours (card_business). The columns that tie a row to its
+ * customer, card or milestone never change, and deleting it is an erasure
+ * done by admin actions in bypass().
  *
  * @phpstan-require-extends Model
  */
@@ -39,6 +40,11 @@ trait HoldsCustomerData
 
         if ($context->isBypassed() || $businessId === null) {
             return;
+        }
+
+        // Symmetric with the scope: what a business cannot read, it does not create.
+        if (! $context->isOrgAdmin()) {
+            throw new LogicException('Inside a business, '.class_basename($this).' is created by the stamp Action in TenantContext::bypass(), until the business can see who stamped there.');
         }
 
         $cardId = $this->cardIdFor($values);

@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Schema;
  * The composite foreign key keeps organization_id equal to the card's; a card
  * with members cannot be deleted (deactivate it instead), while deleting the
  * organization still removes everything. A referrer is on the same card, and
- * on Postgres never the enrollment itself.
+ * on Postgres never the enrollment itself; counts are never negative there
+ * (Laravel's unsigned columns are plain integers on Postgres).
  */
 return new class extends Migration
 {
@@ -48,10 +49,18 @@ return new class extends Migration
                 ->noActionOnDelete();
             $table->index(['organization_id', 'card_id']);
             $table->index('user_id');
+            // Erasing a referrer looks up the members they referred.
+            $table->index(['referred_by', 'card_id']);
         });
 
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement('alter table card_enrollments add constraint card_enrollments_referral_check check (referred_by <> id)');
+            DB::statement(<<<'SQL'
+                alter table card_enrollments
+                    add constraint card_enrollments_referral_check check (referred_by <> id),
+                    add constraint card_enrollments_counts_check check (
+                        current_stamps >= 0 and lifetime_stamps >= 0 and completed_count >= 0
+                    )
+                SQL);
         }
     }
 

@@ -96,8 +96,9 @@ final class TenantBuilder extends Builder
             $columns[is_int($key) ? (string) $value : $key] = null;
         }
 
-        // The update half of an upsert follows the same rules as update().
-        $this->guardWrite('update', $columns);
+        // The update half of an upsert follows the same rules as update(); the conflict
+        // columns only ever get their own values back, so they are not a change.
+        $this->guardWrite('update', array_diff_key($columns, array_flip((array) $uniqueBy)));
 
         return parent::upsert($values, $uniqueBy, $update);
     }

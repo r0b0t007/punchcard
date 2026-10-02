@@ -21,10 +21,11 @@ use Tests\Support\Tenants;
 |--------------------------------------------------------------------------
 |
 | Enrollments and rewards are program data of the organization, and the
-| customer data inside it. The org admin sees every member of the program.
-| Inside a business they stay hidden for now: a franchisee may only list
-| customers who stamped there, and that rule needs stamp_events (CHW-21
-| PR C), so until then a business sees none rather than every member.
+| customer data inside it. The org admin works with every member of the
+| program, wherever they work (HQ, an independent café's owner). Inside a
+| business without those rights they stay hidden for now: a franchisee may
+| only list customers who stamped there, and that rule needs stamp_events
+| (CHW-21 PR C), so until then a franchisee sees and creates none.
 |
 */
 
@@ -50,12 +51,23 @@ describe('reads', function (): void {
             ->and(Reward::query()->count())->toBe(0);
     });
 
-    it('shows a business no customers until it can tell who stamped there (PR C)', function (string $business): void {
-        $this->context->set($business === 'b1' ? $this->tenants->orgB : $this->tenants->orgA, $this->tenants->{$business}, orgAdmin: true, businessRole: BusinessRole::Owner);
+    it('shows a franchisee no customers until it can tell who stamped there (PR C)', function (string $role): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::from($role));
 
         expect(CardEnrollment::query()->count())->toBe(0)
             ->and(Reward::query()->count())->toBe(0);
-    })->with(['a1', 'a2', 'b1']);
+    })->with(['owner', 'staff']);
+
+    it('shows the org admin the whole program from inside a business too (an independent café\'s owner, HQ at its own site)', function (): void {
+        $this->context->set($this->tenants->orgB, $this->tenants->b1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        expect(CardEnrollment::query()->pluck('id')->all())->toBe([$this->enrollmentB->id]);
+
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        expect(CardEnrollment::query()->pluck('id')->all())->toBe([$this->enrollmentA->id])
+            ->and(Reward::query()->pluck('id')->all())->toBe([$this->rewardA->id]);
+    });
 
     it('shows nothing without a tenant', function (): void {
         expect(CardEnrollment::query()->count())->toBe(0)
@@ -64,13 +76,24 @@ describe('reads', function (): void {
 });
 
 describe('writes', function (): void {
-    it('lets a franchisee enroll a customer on a card it honours, in its organization', function (): void {
+    it('lets an independent café\'s owner enroll a customer and record progress from inside the business', function (): void {
+        $this->context->set($this->tenants->orgB, $this->tenants->b1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        $enrollment = CardEnrollment::query()->create(['card_id' => $this->tenants->cardB->id, 'user_id' => User::factory()->create()->id]);
+        $enrollment->forceFill(['current_stamps' => 1, 'lifetime_stamps' => 1, 'last_stamp_at' => now()])->save();
+
+        expect($enrollment->refresh()->organization_id)->toBe($this->tenants->orgB->id)
+            ->and($enrollment->current_stamps)->toBe(1);
+    });
+
+    it('does not let a franchisee create customer data it could not read back (until PR C)', function (string $how): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
-        $enrollment = CardEnrollment::query()->create(['card_id' => $this->tenants->cardA->id, 'user_id' => User::factory()->create()->id]);
-
-        expect($enrollment->organization_id)->toBe($this->tenants->orgA->id);
-    });
+        match ($how) {
+            'enrollment' => CardEnrollment::query()->create(['card_id' => $this->tenants->cardA->id, 'user_id' => User::factory()->create()->id]),
+            'reward' => Reward::query()->create(['enrollment_id' => $this->enrollmentA->id, 'mode' => CardMode::Cyclic, 'milestone' => 2, 'reward_type' => RewardType::Item, 'reward_text' => 'x', 'unlocked_at' => now()]),
+        };
+    })->throws(LogicException::class, 'is created by the stamp Action in TenantContext::bypass()')->with(['enrollment', 'reward']);
 
     it('refuses a franchisee an enrollment or reward on a card it does not honour', function (string $how): void {
         $a2Only = $this->context->bypass(function (): LoyaltyCard {
@@ -80,7 +103,8 @@ describe('writes', function (): void {
             return $card;
         });
         $a2Member = $this->tenants->enroll(User::factory()->create(), $a2Only);
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+        // HQ working at its own site A1: org admin, but A1 does not honour that card.
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
 
         match ($how) {
             'enrollment' => CardEnrollment::query()->create(['card_id' => $a2Only->id, 'user_id' => User::factory()->create()->id]),
@@ -89,7 +113,7 @@ describe('writes', function (): void {
     })->throws(LogicException::class, 'is on a card this business does not honour')->with(['enrollment', 'reward']);
 
     it('refuses a reward created already redeemed or credited to a business', function (array $values): void {
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
         (new Reward)->forceFill([
             'enrollment_id' => $this->enrollmentA->id, 'mode' => CardMode::Cyclic, 'milestone' => 9, 'reward_type' => RewardType::Item, 'reward_text' => 'x', 'unlocked_at' => now(),
@@ -125,7 +149,7 @@ describe('writes', function (): void {
     it('does not let a request mass-assign progress or a redemption', function (): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
 
-        $this->enrollmentA->fill(['current_stamps' => 99, 'completed_count' => 9, 'referred_by' => $this->enrollmentB->id]);
+        $this->enrollmentA->fill(['current_stamps' => 99, 'completed_count' => 9, 'referred_by' => $this->enrollmentB->id, 'referral_code' => 'VANITY']);
         $this->rewardA->fill(['status' => 'redeemed', 'redeemed_business_id' => $this->tenants->a1->id]);
 
         expect($this->enrollmentA->isDirty())->toBeFalse()
@@ -142,8 +166,8 @@ describe('writes', function (): void {
             ->and($this->rewardA->refresh()->status)->toBe(RewardStatus::Redeemed);
     });
 
-    it('keeps a business from changing customer data it cannot see yet', function (string $how): void {
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+    it('keeps a franchisee from changing customer data it cannot see yet', function (string $how): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
         match ($how) {
             'save an enrollment' => $this->enrollmentA->forceFill(['current_stamps' => 5])->save(),
@@ -179,6 +203,7 @@ describe('writes', function (): void {
             'reward type' => $this->rewardA->update(['reward_type' => RewardType::Percent]),
             'reward value' => $this->rewardA->update(['reward_value' => 1]),
             'unlock time' => $this->rewardA->update(['unlocked_at' => now()->subYear()]),
+            'referrer' => $this->enrollmentA->forceFill(['referred_by' => $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA)->id])->save(),
             'bulk' => CardEnrollment::query()->update(['user_id' => $this->customer->id]),
             'upsert' => Reward::query()->upsert(
                 [['enrollment_id' => $this->enrollmentA->id, 'mode' => 'cyclic', 'milestone' => 1, 'reward_type' => 'item', 'reward_text' => 'x', 'unlocked_at' => now(), 'organization_id' => $this->tenants->orgA->id]],
@@ -190,9 +215,19 @@ describe('writes', function (): void {
         });
     })->throws(LogicException::class)->with([
         'enrollment to another customer', 'enrollment to another card', 'reward to another enrollment',
-        'reward milestone', 'reward mode', 'reward text', 'reward type', 'reward value', 'unlock time',
+        'reward milestone', 'reward mode', 'reward text', 'reward type', 'reward value', 'unlock time', 'referrer',
         'bulk', 'upsert', 'updateOrInsert', 'updateFrom',
     ]);
+
+    it('lets a bypass() upsert name its own conflict columns', function (): void {
+        $this->context->bypass(fn (): int => CardEnrollment::query()->upsert(
+            [['organization_id' => $this->tenants->orgA->id, 'card_id' => $this->tenants->cardA->id, 'user_id' => $this->customer->id, 'current_stamps' => 7]],
+            ['card_id', 'user_id'],
+            ['card_id', 'user_id', 'current_stamps'],
+        ));
+
+        expect($this->context->bypass(fn (): int => $this->enrollmentA->refresh()->current_stamps))->toBe(7);
+    });
 
     it('deletes customer data only in bypass()', function (string $how): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
@@ -261,6 +296,22 @@ describe('integrity', function (): void {
         });
     });
 
+    it('keeps a redeemed or expired reward final, whatever writes it', function (string $how): void {
+        $this->context->bypass(fn () => $this->rewardA->forceFill([
+            'status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id,
+        ])->save());
+        $expired = $this->context->bypass(fn (): Reward => Reward::factory()->for($this->enrollmentA, 'enrollment')->create(['milestone' => 2, 'status' => RewardStatus::Expired]));
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        expect(fn () => DB::transaction(fn () => match ($how) {
+            'un-redeem as the org admin' => $this->rewardA->forceFill(['status' => RewardStatus::Available, 'redeemed_at' => null, 'redeemed_business_id' => null])->save(),
+            'credit it to a sibling' => $this->rewardA->forceFill(['redeemed_business_id' => $this->tenants->a2->id])->save(),
+            'move the redemption time' => $this->rewardA->forceFill(['redeemed_at' => now()->subDay()])->save(),
+            'expire it in a bulk update' => Reward::query()->update(['status' => RewardStatus::Expired->value]),
+            'un-expire in bypass()' => $this->context->bypass(fn () => $expired->forceFill(['status' => RewardStatus::Available])->save()),
+        }))->toThrow(QueryException::class, 'rewards_outcome_final');
+    })->with(['un-redeem as the org admin', 'credit it to a sibling', 'move the redemption time', 'expire it in a bulk update', 'un-expire in bypass()']);
+
     it('keeps a card with members from being deleted', function (): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
 
@@ -311,15 +362,26 @@ describe('integrity', function (): void {
         $a1Location = $this->tenants->locationOf($this->tenants->a1);
 
         expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => match ($case) {
-            'a location without its business' => $this->rewardA->forceFill(['redeemed_location_id' => $a1Location->id])->save(),
-            'redeemed without a business' => $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now()])->save(),
+            'redemption fields on an available reward' => $this->rewardA->forceFill(['redeemed_business_id' => $this->tenants->a1->id, 'redeemed_location_id' => $a1Location->id])->save(),
+            'redeemed at a location without its business' => $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_location_id' => $a1Location->id])->save(),
             'redeemed without a time' => $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_business_id' => $this->tenants->a1->id])->save(),
-            'a referrer that is itself' => $this->enrollmentA->forceFill(['referred_by' => $this->enrollmentA->id])->save(),
+            // The model already refuses changing these; raw inserts reach the database.
+            'a negative reward value' => Reward::query()->insert([
+                'organization_id' => $this->tenants->orgA->id, 'enrollment_id' => $this->enrollmentA->id, 'mode' => 'cyclic', 'milestone' => 3,
+                'reward_type' => 'fixed', 'reward_value' => -5, 'reward_text' => 'x', 'status' => 'available', 'unlocked_at' => now(),
+            ]),
+            'a referrer that is itself' => CardEnrollment::query()->insert([
+                'id' => 999_999, 'organization_id' => $this->tenants->orgA->id, 'card_id' => $this->tenants->cardA->id,
+                'user_id' => User::factory()->create()->id, 'referred_by' => 999_999,
+            ]),
+            'negative stamps' => $this->enrollmentA->forceFill(['current_stamps' => -2])->save(),
         })))->toThrow(QueryException::class, $constraint);
     })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only')->with([
-        'a location without its business' => ['a location without its business', 'rewards_location_business_check'],
-        'redeemed without a business' => ['redeemed without a business', 'rewards_redeemed_check'],
+        'redemption fields on an available reward' => ['redemption fields on an available reward', 'rewards_unredeemed_check'],
+        'redeemed at a location without its business' => ['redeemed at a location without its business', 'rewards_redeemed_check'],
         'redeemed without a time' => ['redeemed without a time', 'rewards_redeemed_check'],
+        'a negative reward value' => ['a negative reward value', 'rewards_value_check'],
         'a referrer that is itself' => ['a referrer that is itself', 'card_enrollments_referral_check'],
+        'negative stamps' => ['negative stamps', 'card_enrollments_counts_check'],
     ]);
 });

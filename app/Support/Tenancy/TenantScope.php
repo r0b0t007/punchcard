@@ -17,9 +17,10 @@ use Illuminate\Database\Eloquent\Scope;
  * the organization for an org admin. No tenant: no rows.
  *
  * Customer data of the program (enrollments, rewards) is organization-level
- * for the org admin, but a franchisee may only see customers who stamped
- * there (ADR 0006). Until stamp_events can tell (CHW-21 PR C), a business
- * context sees none of it.
+ * for the org admin, wherever they work (franchise HQ, an independent café's
+ * owner), but a franchisee may only see customers who stamped there
+ * (ADR 0006). Until stamp_events can tell (CHW-21 PR C), a business context
+ * without org admin rights sees none of it.
  *
  * @template TModel of Model
  *
@@ -59,7 +60,7 @@ final readonly class TenantScope implements Scope
             return;
         }
 
-        if ($this->customerData && $businessId !== null) {
+        if ($this->customerData && $businessId !== null && ! $context->isOrgAdmin()) {
             $builder->whereRaw('1 = 0');
 
             return;
