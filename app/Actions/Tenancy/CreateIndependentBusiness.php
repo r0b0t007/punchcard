@@ -28,6 +28,9 @@ final readonly class CreateIndependentBusiness
     /** Attempts per slug before giving up: a readable one, then random suffixes. */
     private const int SLUG_ATTEMPTS = 3;
 
+    /** Leaves room for "-" and a suffix in the varchar(255) slug column. */
+    private const int SLUG_BASE_LENGTH = 200;
+
     public function __construct(private TenantContext $context) {}
 
     public function handle(User $owner, string $name, ?string $category = null): Business
@@ -50,7 +53,8 @@ final readonly class CreateIndependentBusiness
             $organization->admins()->attach($owner, ['role' => OrganizationRole::OrgAdmin->value]);
             $business->members()->attach($owner, ['role' => BusinessRole::Owner->value]);
 
-            return $business;
+            // Callers outside bypass() could not lazy-load it through the tenant scope.
+            return $business->setRelation('organization', $organization);
         }));
     }
 
@@ -68,7 +72,8 @@ final readonly class CreateIndependentBusiness
      */
     private function createWithUniqueSlug(Model $model, string $name, callable $fill): Model
     {
-        $base = Str::slug($name) ?: 'business';
+        // Room for a suffix in varchar(255): a long or transliterated name must not overflow.
+        $base = rtrim(Str::substr(Str::slug($name) ?: 'business', 0, self::SLUG_BASE_LENGTH), '-');
         $slug = $this->firstFreeSlug($model, $base);
 
         for ($attempt = 1; ; $attempt++) {
@@ -90,14 +95,24 @@ final readonly class CreateIndependentBusiness
         }
     }
 
+    /** "cafe" if free, else the lowest free "cafe-N" (N >= 2), found with one query. */
     private function firstFreeSlug(Model $model, string $base): string
     {
-        $slug = $base;
+        $taken = $model->newQuery()
+            ->where(fn ($query) => $query->where('slug', $base)->orWhere('slug', 'like', $base.'-%'))
+            ->pluck('slug')
+            ->flip();
 
-        for ($suffix = 2; $model->newQuery()->where('slug', $slug)->exists(); $suffix++) {
-            $slug = $base.'-'.$suffix;
+        if (! $taken->has($base)) {
+            return $base;
         }
 
-        return $slug;
+        $suffix = 2;
+
+        while ($taken->has($base.'-'.$suffix)) {
+            $suffix++;
+        }
+
+        return $base.'-'.$suffix;
     }
 }

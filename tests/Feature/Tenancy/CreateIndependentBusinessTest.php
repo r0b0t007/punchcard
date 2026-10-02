@@ -3,15 +3,16 @@
 declare(strict_types=1);
 
 use App\Actions\Tenancy\CreateIndependentBusiness;
+use App\Actions\Tenancy\ResolveTenant;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
+use App\Models\Business;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 use Tests\Support\Tenants;
 
 /*
@@ -48,13 +49,50 @@ it('lands the new owner in their business', function (): void {
     $owner = User::factory()->create();
     $business = app(CreateIndependentBusiness::class)->handle($owner, 'Barbier Nour');
 
-    $this->actingAs($owner);
-    Route::middleware(['web', 'tenant'])->get('/_tenant', fn (TenantContext $context): array => [
-        'organization' => $context->organizationId(),
-        'business' => $context->businessId(),
-    ]);
+    Tenants::probeRoute();
 
-    $this->get('/_tenant')->assertExactJson(Tenants::context($business->organization_id, $business->id));
+    $this->actingAs($owner)->get('/_tenant')
+        ->assertExactJson(Tenants::context($business->organization_id, $business->id, true, BusinessRole::Owner));
+});
+
+it('returns the business with its organization usable outside bypass()', function (): void {
+    $business = app(CreateIndependentBusiness::class)->handle(User::factory()->create(), 'Café Nejma');
+
+    expect($business->organization->name)->toBe('Café Nejma');
+});
+
+it('keeps long names inside the slug column', function (): void {
+    // Fits the name column (254 characters), but transliterates to a 305-character slug.
+    $name = trim(str_repeat('Maße ', 51));
+
+    $first = app(CreateIndependentBusiness::class)->handle(User::factory()->create(), $name);
+    $second = app(CreateIndependentBusiness::class)->handle(User::factory()->create(), $name);
+
+    expect(strlen($first->slug))->toBeLessThanOrEqual(255)
+        ->and(strlen($second->slug))->toBeLessThanOrEqual(255)
+        ->and($second->slug)->toEndWith('-2');
+});
+
+it('takes the lowest free numbered slug', function (): void {
+    app(TenantContext::class)->bypass(function (): void {
+        foreach (['cafe-atlas', 'cafe-atlas-2', 'cafe-atlas-4'] as $slug) {
+            Business::factory()->create(['slug' => $slug]);
+        }
+    });
+
+    expect(app(CreateIndependentBusiness::class)->handle(User::factory()->create(), 'Café Atlas')->slug)->toBe('cafe-atlas-3');
+});
+
+it('lets the new owner manage org admins from their business', function (): void {
+    $owner = User::factory()->create();
+    $business = app(CreateIndependentBusiness::class)->handle($owner, 'Salon Amal');
+    app(ResolveTenant::class)->handle($owner);
+    $partner = User::factory()->create();
+
+    $business->organization->admins()->attach($partner, ['role' => OrganizationRole::OrgAdmin->value]);
+
+    expect(app(TenantContext::class)->isOrgAdmin())->toBeTrue()
+        ->and($business->organization->admins()->whereKey($partner->id)->exists())->toBeTrue();
 });
 
 it('gives two businesses with the same name distinct slugs', function (): void {

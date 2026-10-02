@@ -62,7 +62,7 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * Only an org admin (organization context, no business) or bypass() creates
+     * Only an org admin (TenantContext::isOrgAdmin()) or bypass() creates
      * a business, and only in their own organization: a franchisee cannot add
      * a sibling business.
      *
@@ -80,7 +80,7 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if ($context->businessId() !== null) {
+        if (! $context->isOrgAdmin()) {
             throw new LogicException('Only an org admin can create a business.');
         }
 
@@ -111,7 +111,7 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if ($operation === 'delete' && $context->businessId() !== null) {
+        if ($operation === 'delete' && ! $context->isOrgAdmin()) {
             throw new LogicException('Only an org admin can delete a business.');
         }
 

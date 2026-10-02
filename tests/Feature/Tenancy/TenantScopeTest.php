@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\BusinessRole;
 use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\Location;
@@ -416,7 +417,7 @@ describe('escape routes', function (): void {
             Business::factory()->for($organization)->create(),
         ]);
 
-        $this->context->set(...$independent);
+        $this->context->set($independent[0], $independent[1], businessRole: BusinessRole::Owner);
         $independent[0]->update(['name' => 'Café rebranded']);
 
         expect($independent[0]->refresh()->name)->toBe('Café rebranded');
@@ -455,7 +456,7 @@ describe('escape routes', function (): void {
             Business::factory()->for($organization)->create(),
         ]);
 
-        $this->context->set($chain, $business);
+        $this->context->set($chain, $business, businessRole: BusinessRole::Owner);
         $chain->update(['brand_color' => '#0F4C81']);
 
         expect($chain->refresh()->brand_color)->toBe('#0F4C81');

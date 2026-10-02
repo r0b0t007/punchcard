@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BillingEntity;
+use App\Enums\BusinessRole;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -91,10 +92,10 @@ class Organization extends Model implements TenantModel
             throw new LogicException('Organizations are deleted by admin actions, in TenantContext::bypass().');
         }
 
-        // A franchisee cannot change the brand the other businesses share. With a single
-        // business (an independent café, a one-company chain), business context covers it.
-        // Whether that user is the owner or staff is a policy question (CHW-22).
-        if ($context->businessId() !== null && $this->businessCount() > 1) {
+        // The org admin changes the organization. The owner of its only business may too
+        // (a one-company chain); a franchisee cannot change the brand others share, and
+        // staff never can.
+        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || $this->businessCount() > 1)) {
             throw new LogicException('Only an org admin can change the organization.');
         }
 

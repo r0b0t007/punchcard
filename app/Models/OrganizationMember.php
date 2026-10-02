@@ -19,9 +19,8 @@ use LogicException;
 /**
  * An organization_user row: an org admin (franchise HQ, or the owner of an
  * independent café). Scoped to the current organization; only an org admin
- * (organization context, no business) or bypass() adds, changes or removes
- * org admins. That relies on the TenantContext invariant that an organization
- * context without a business means an org admin (see TenantContext::set()).
+ * of it (TenantContext::isOrgAdmin()) or bypass() adds, changes or removes
+ * org admins.
  * Organization::admins() uses this pivot so its writes are guarded.
  *
  * @property int $id
@@ -90,7 +89,7 @@ class OrganizationMember extends Pivot implements TenantModel
             return;
         }
 
-        if ($context->businessId() !== null || $context->organizationId() === null || $organizationId !== $context->organizationId()) {
+        if (! $context->isOrgAdmin() || $context->organizationId() === null || $organizationId !== $context->organizationId()) {
             throw new LogicException('Only an org admin of the organization manages its org admins.');
         }
     }

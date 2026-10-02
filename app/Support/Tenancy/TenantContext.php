@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use App\Enums\BusinessRole;
 use App\Models\Business;
 use App\Models\Organization;
 use Closure;
@@ -28,15 +29,23 @@ final class TenantContext
 
     private ?int $businessId = null;
 
+    private bool $orgAdmin = false;
+
+    private ?BusinessRole $businessRole = null;
+
     private int $bypassDepth = 0;
 
     /**
-     * Invariant: an organization without a business means the user is an org
-     * admin of it (OrganizationMember and Business rely on that shape). Only
-     * ResolveTenant sets it for users; code acting for anyone else (jobs, the
-     * tap endpoint, white-label lookups) must use bypass(), never set($org).
+     * Sets the tenant and what the user may do in it. ResolveTenant passes both
+     * from the user's memberships. Without them, an organization context means an
+     * org admin and a business context means no membership rights (fail closed).
+     * Code acting for no user (jobs, the tap endpoint, white-label lookups) uses
+     * bypass(), never set().
+     *
+     * @param  bool|null  $orgAdmin  the user administers the organization (organization_user)
+     * @param  BusinessRole|null  $businessRole  the user's role in the business (business_user)
      */
-    public function set(Organization $organization, ?Business $business = null): void
+    public function set(Organization $organization, ?Business $business = null, ?bool $orgAdmin = null, ?BusinessRole $businessRole = null): void
     {
         if ($business instanceof Business && (int) $business->organization_id !== (int) $organization->id) {
             throw new LogicException('The business does not belong to the organization.');
@@ -44,12 +53,34 @@ final class TenantContext
 
         $this->organizationId = $organization->id;
         $this->businessId = $business?->id;
+        $this->orgAdmin = $orgAdmin ?? ! $business instanceof Business;
+        $this->businessRole = $business instanceof Business ? $businessRole : null;
     }
 
     public function clear(): void
     {
         $this->organizationId = null;
         $this->businessId = null;
+        $this->orgAdmin = false;
+        $this->businessRole = null;
+    }
+
+    /** The user administers the current organization (franchise HQ, or an independent café's owner). */
+    public function isOrgAdmin(): bool
+    {
+        return $this->orgAdmin;
+    }
+
+    /** The user's role in the current business, if any. */
+    public function businessRole(): ?BusinessRole
+    {
+        return $this->businessRole;
+    }
+
+    /** Owners and org admins manage staff; staff do not, not even their own row. */
+    public function canManageMembers(): bool
+    {
+        return $this->orgAdmin || $this->businessRole === BusinessRole::Owner;
     }
 
     public function organizationId(): ?int

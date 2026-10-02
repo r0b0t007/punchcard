@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenancy;
 
+use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -21,7 +23,11 @@ use App\Support\Tenancy\TenantContext;
  * - org admin of it: the organization (every business in it);
  * - anything else: no tenant (fail closed) until the user picks.
  * Memberships spread over several organizations always need a choice.
- * Customers have no memberships and get no tenant.
+ * Customers have no memberships and get no tenant. A suspended business does
+ * not resolve at all (fail closed); a pending one does, so its owner can set up.
+ *
+ * The context also carries what the user may do there: org admin rights from
+ * organization_user, the business role from business_user.
  */
 final readonly class ResolveTenant
 {
@@ -32,8 +38,10 @@ final readonly class ResolveTenant
         $this->context->clear();
 
         $this->context->bypass(function () use ($user, $choice): void {
+            $roles = BusinessMember::query()->where('user_id', $user->id)->pluck('role', 'business_id');
             $businesses = Business::query()
-                ->whereIn('id', BusinessMember::query()->where('user_id', $user->id)->select('business_id'))
+                ->whereIn('id', $roles->keys())
+                ->where('status', '!=', BusinessStatus::Suspended)
                 ->with('organization')
                 ->get();
             $organizations = Organization::query()
@@ -42,14 +50,25 @@ final readonly class ResolveTenant
 
             [$type, $id] = $this->parseChoice($choice);
 
+            $enter = function (Business $business) use ($roles, $organizations): void {
+                $role = $roles->get($business->id);
+
+                $this->context->set(
+                    $business->organization,
+                    $business,
+                    orgAdmin: $organizations->contains('id', $business->organization_id),
+                    businessRole: $role instanceof BusinessRole ? $role : BusinessRole::tryFrom((string) $role),
+                );
+            };
+
             if ($type === 'business' && ($business = $businesses->firstWhere('id', $id)) instanceof Business) {
-                $this->context->set($business->organization, $business);
+                $enter($business);
 
                 return;
             }
 
             if ($type === 'org' && ($organization = $organizations->firstWhere('id', $id)) instanceof Organization) {
-                $this->context->set($organization);
+                $this->context->set($organization, orgAdmin: true);
 
                 return;
             }
@@ -61,14 +80,13 @@ final readonly class ResolveTenant
             }
 
             if ($businesses->count() === 1) {
-                $business = $businesses->firstOrFail();
-                $this->context->set($business->organization, $business);
+                $enter($businesses->first());
 
                 return;
             }
 
             if ($organizations->count() === 1) {
-                $this->context->set($organizations->firstOrFail());
+                $this->context->set($organizations->first(), orgAdmin: true);
             }
         });
     }

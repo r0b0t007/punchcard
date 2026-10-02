@@ -31,7 +31,7 @@ beforeEach(function (): void {
 });
 
 it('lets an owner add staff to their own business', function (): void {
-    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
     $this->tenants->a1->members()->attach($this->user, ['role' => BusinessRole::Staff->value]);
 
@@ -70,7 +70,7 @@ it('lets an org admin staff any business of the organization, not another one', 
 
 it('keeps a staff location inside the business', function (): void {
     $b1Location = $this->tenants->locationOf($this->tenants->b1);
-    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
     $this->tenants->a1->members()->attach($this->user, ['role' => BusinessRole::Staff->value, 'location_id' => $b1Location->id]);
 })->throws(QueryException::class);
@@ -121,7 +121,7 @@ it('guards every pivot write path of a business in another tenant', function (st
 
 it('never moves a membership to another user', function (): void {
     $this->tenants->member($this->user, $this->tenants->a1);
-    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
     BusinessMember::query()->where('user_id', $this->user->id)->firstOrFail()
         ->forceFill(['user_id' => User::factory()->create()->id])->save();
@@ -157,4 +157,27 @@ it('deletes a business or organization with staff at a location, but not the loc
     });
 
     expect($this->context->bypass(fn (): int => BusinessMember::query()->count()))->toBe(0);
+});
+
+it('does not let staff change memberships, not even their own', function (string $how): void {
+    $this->tenants->member($this->user, $this->tenants->a1, BusinessRole::Owner);
+    $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
+    $location = $this->tenants->locationOf($this->tenants->a1);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+    match ($how) {
+        'promote themselves' => $this->tenants->a1->members()->updateExistingPivot($staff->id, ['role' => BusinessRole::Owner->value]),
+        'add an owner' => $this->tenants->a1->members()->attach(User::factory()->create(), ['role' => BusinessRole::Owner->value]),
+        'remove the owner' => $this->tenants->a1->members()->detach([$this->user->id]),
+        'move their own location limit' => $this->tenants->a1->members()->updateExistingPivot($staff->id, ['location_id' => $location->id]),
+    };
+})->throws(LogicException::class)->with(['promote themselves', 'add an owner', 'remove the owner', 'move their own location limit']);
+
+it('lets an owner promote staff', function (): void {
+    $staff = $this->tenants->member($this->user, $this->tenants->a1);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+
+    $this->tenants->a1->members()->updateExistingPivot($staff->id, ['role' => BusinessRole::Owner->value]);
+
+    expect(BusinessMember::query()->where('user_id', $staff->id)->firstOrFail()->role)->toBe(BusinessRole::Owner);
 });
