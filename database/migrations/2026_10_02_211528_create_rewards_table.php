@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Schema;
 /**
  * A reward a customer unlocked: one per milestone of an enrollment (the
  * completion number of a cyclic card, the tier threshold of a progressive
- * one), so the database enforces "a completed card creates exactly one
- * reward". It keeps a copy of what was earned, so changing the card later
- * does not change it. Redemption records the business and location
+ * one; mode tells them apart if the card's mode changes), so the database
+ * enforces "a completed card creates exactly one reward". It keeps a copy
+ * of what was earned, so changing the card later does not change it.
+ * Redemption records the business and location
  * (ADR 0006): composite foreign keys keep them in the reward's organization
  * and the location in the business, and a business or location with
  * redemptions cannot be hard-deleted.
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
             $table->foreignId('enrollment_id');
+            $table->string('mode');
             $table->unsignedInteger('milestone');
             $table->string('reward_type');
             $table->unsignedInteger('reward_value')->nullable();
@@ -49,7 +51,7 @@ return new class extends Migration
             $table->foreign(['redeemed_location_id', 'redeemed_business_id'])
                 ->references(['id', 'business_id'])->on('locations')
                 ->noActionOnDelete();
-            $table->unique(['enrollment_id', 'milestone']);
+            $table->unique(['enrollment_id', 'mode', 'milestone']);
             $table->index(['organization_id', 'status']);
             $table->index(['redeemed_business_id', 'organization_id']);
             $table->index(['redeemed_location_id', 'redeemed_business_id']);

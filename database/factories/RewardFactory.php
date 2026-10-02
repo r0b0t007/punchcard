@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\CardMode;
 use App\Enums\RewardStatus;
 use App\Enums\RewardType;
 use App\Models\CardEnrollment;
@@ -26,6 +27,7 @@ class RewardFactory extends Factory
     {
         return [
             'enrollment_id' => CardEnrollment::factory(),
+            'mode' => CardMode::Cyclic,
             'milestone' => 1,
             'reward_type' => RewardType::Item,
             'reward_text' => 'Free coffee',

@@ -21,7 +21,8 @@ use Illuminate\Support\Carbon;
  * A customer's copy of a loyalty card, shared by every business that honours
  * it. Customer data of the organization (HoldsCustomerData): the org admin
  * sees every member; a business sees none until PR C. The counts are a cache
- * of stamp_events.
+ * of stamp_events: only the stamp Actions set them (and the referrer), with
+ * forceFill(), so a request can never mass-assign progress.
  *
  * @property int $id
  * @property int $organization_id
@@ -36,10 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable([
-    'organization_id', 'card_id', 'user_id', 'referral_code', 'referred_by',
-    'current_stamps', 'lifetime_stamps', 'completed_count', 'last_stamp_at',
-])]
+#[Fillable(['organization_id', 'card_id', 'user_id', 'referral_code'])]
 #[UseEloquentBuilder(TenantBuilder::class)]
 class CardEnrollment extends Model implements TenantModel
 {
@@ -99,6 +97,14 @@ class CardEnrollment extends Model implements TenantModel
             'completed_count' => 'integer',
             'last_stamp_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    protected function cardIdFor(array $values): mixed
+    {
+        return $values['card_id'] ?? null;
     }
 
     /** An enrollment stays the same customer's copy of the same card. */

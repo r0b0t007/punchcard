@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -9,7 +10,8 @@ use Illuminate\Support\Facades\Schema;
  * honours it (ADR 0006). The counts are a cache of stamp_events (CHW-21 PR C).
  * The composite foreign key keeps organization_id equal to the card's; a card
  * with members cannot be deleted (deactivate it instead), while deleting the
- * organization still removes everything.
+ * organization still removes everything. A referrer is on the same card, and
+ * on Postgres never the enrollment itself.
  */
 return new class extends Migration
 {
@@ -22,7 +24,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('referral_code')->nullable()->unique();
             // The referral survives as "referred" when the referrer's enrollment is erased.
-            // The referral Action checks the referrer is on the same card.
             $table->foreignId('referred_by')->nullable()->constrained('card_enrollments')->nullOnDelete();
             $table->unsignedInteger('current_stamps')->default(0);
             $table->unsignedInteger('lifetime_stamps')->default(0);
@@ -36,11 +37,22 @@ return new class extends Migration
                 ->references(['id', 'organization_id'])->on('loyalty_cards')
                 ->noActionOnDelete();
             $table->unique(['card_id', 'user_id']);
-            // Target of the composite foreign key that keeps a reward in its enrollment's organization.
+            // Targets of the composite foreign keys that keep a reward in its enrollment's
+            // organization and a referrer on the same card.
             $table->unique(['id', 'organization_id']);
+            $table->unique(['id', 'card_id']);
+            // NO ACTION: when the referrer is erased, the key above sets referred_by to
+            // null first, and a null column skips this check.
+            $table->foreign(['referred_by', 'card_id'])
+                ->references(['id', 'card_id'])->on('card_enrollments')
+                ->noActionOnDelete();
             $table->index(['organization_id', 'card_id']);
             $table->index('user_id');
         });
+
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('alter table card_enrollments add constraint card_enrollments_referral_check check (referred_by <> id)');
+        }
     }
 
     public function down(): void

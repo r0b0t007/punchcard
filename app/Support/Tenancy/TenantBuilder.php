@@ -96,7 +96,8 @@ final class TenantBuilder extends Builder
             $columns[is_int($key) ? (string) $value : $key] = null;
         }
 
-        $this->guardTenantColumns($columns);
+        // The update half of an upsert follows the same rules as update().
+        $this->guardWrite('update', $columns);
 
         return parent::upsert($values, $uniqueBy, $update);
     }
@@ -236,8 +237,11 @@ final class TenantBuilder extends Builder
         } elseif (in_array($name, self::UNGUARDED_WRITES, true)) {
             $this->guardRawWrite($method);
 
+            // Their update half follows the same rules as update(), also in bypass().
             if ($name === 'updateorinsert' && is_array($parameters[1] ?? null)) {
-                $this->guardTenantColumns($parameters[1]);
+                $this->guardWrite('update', $parameters[1]);
+            } elseif ($name === 'updatefrom' && is_array($parameters[0] ?? null)) {
+                $this->guardWrite('update', $parameters[0]);
             }
         }
 
