@@ -76,6 +76,9 @@ it('flags each way around the tenant guards', function (string $code): void {
     'Location::truncate();',
     'Location::addGlobalScope(new TenantScope());',
     'Location::query()->withGlobalScope(TenantScope::class, new TenantScope());',
+    '$business->members()->newPivotQuery()->update(["role" => "owner"]);',
+    '$business->members()->newPivotStatement()->delete();',
+    '$business->members()->newPivotStatementForId(1)->delete();',
 ]);
 
 it('lets ordinary scoped code through', function (string $code): void {

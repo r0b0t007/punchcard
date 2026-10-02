@@ -25,6 +25,7 @@ final class TenancyBoundary
         'app/Models/Concerns/BelongsToBusiness.php' => 'registers the tenant scope of site data',
         'app/Models/Business.php' => 'registers its own tenant scope',
         'app/Models/Organization.php' => 'registers its own tenant scope',
+        'app/Models/OrganizationMember.php' => 'registers its own tenant scope',
     ];
 
     /**
@@ -40,6 +41,7 @@ final class TenancyBoundary
             '/(with|add)GlobalScope\(\s*(TenantScope::class|new\s+TenantScope)/' => 'replaces the tenant scope',
             '/(->|::)(getQuery|getBaseQuery|toBase)\s*\(/' => 'base query builder: unscoped, or without the write guards',
             '/(->|::)(rawUpdate|fromQuery)\s*\(/' => 'write or read around the scope',
+            '/->(newPivotStatement|newPivotStatementForId|newPivotQuery)\s*\(/' => 'raw pivot query: skips the membership guards',
             '/app\(\s*[\'"]db[\'"]\s*\)/' => 'raw connection',
             '/(->|::)(newQueryWithoutScopes|newModelQuery|newQueryForRestoration)\s*\(/' => 'unscoped model query',
             '/->getConnection\s*\(\s*\)/' => 'raw connection',

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -16,6 +18,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -61,9 +64,11 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * Only an org admin (organization context, no business) or bypass() creates
-     * a business, and only in their own organization: a franchisee cannot add
-     * a sibling business.
+     * Only franchise HQ adds a business: an org admin working across the
+     * organization (no business selected), in their own franchise. A franchisee
+     * cannot add a sibling, and an independent café or chain has exactly one
+     * business (OrganizationType); becoming a franchise is an admin action, in
+     * bypass().
      *
      * @param  array<string, mixed>  $values
      */
@@ -79,8 +84,8 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if ($context->businessId() !== null) {
-            throw new LogicException('Only an org admin can create a business.');
+        if (! $context->isOrgAdmin() || $context->businessId() !== null) {
+            throw new LogicException('Only an org admin, working across the organization, can create a business.');
         }
 
         $status = $values['status'] ?? BusinessStatus::Pending->value;
@@ -92,12 +97,17 @@ class Business extends Model implements TenantModel
         if ($context->organizationId() === null || (int) $values['organization_id'] !== $context->organizationId()) {
             throw new LogicException('Cannot create a business in another organization.');
         }
+
+        if (! $this->isFranchise($context->organizationId())) {
+            throw new LogicException('Only a franchise has more than one business.');
+        }
     }
 
     /**
-     * A franchisee may update their own business, but not delete it, and
-     * status and plan change only through verification and billing actions
-     * (bypass()). An org admin may delete businesses of the organization.
+     * The owner (or an org admin) may update the business; staff may not. Only
+     * franchise HQ (org admin, across the organization) removes a franchisee;
+     * closing an independent café or chain is an admin action, in bypass().
+     * Status and plan change only through verification and billing actions.
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -110,13 +120,26 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if ($operation === 'delete' && $context->businessId() !== null) {
-            throw new LogicException('Only an org admin can delete a business.');
+        if ($operation === 'delete' && (! $context->isOrgAdmin() || $context->businessId() !== null || ! $this->isFranchise($context->organizationId()))) {
+            throw new LogicException('Only franchise HQ, working across the organization, can delete a business.');
+        }
+
+        if ($operation === 'update' && ! $context->isOrgAdmin() && $context->businessRole() !== BusinessRole::Owner) {
+            throw new LogicException('Only the owner or an org admin can change the business.');
         }
 
         if (array_intersect(array_keys($values), ['status', 'plan']) !== []) {
             throw new LogicException('Business status and plan change through verification and billing actions, in TenantContext::bypass().');
         }
+    }
+
+    /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */
+    private function isFranchise(?int $organizationId): bool
+    {
+        return app(TenantContext::class)->bypass(fn (): bool => Organization::query()
+            ->whereKey($organizationId)
+            ->where('type', OrganizationType::Franchise)
+            ->exists());
     }
 
     /**
@@ -125,6 +148,22 @@ class Business extends Model implements TenantModel
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Owners and staff (business_user). Uses the guarded BusinessMember pivot, so
+     * attach(), detach(), sync(), toggle() and updateExistingPivot() all go through
+     * model saves (MembershipTest pins this). Never use newPivotQuery() or
+     * newPivotStatement(): they skip the guards.
+     *
+     * @return BelongsToMany<User, $this, BusinessMember>
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->using(BusinessMember::class)
+            ->withPivot('id', 'role', 'location_id', 'organization_id')
+            ->withTimestamps();
     }
 
     /**

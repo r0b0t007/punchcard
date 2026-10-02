@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BillingEntity;
+use App\Enums\BusinessRole;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -90,10 +92,10 @@ class Organization extends Model implements TenantModel
             throw new LogicException('Organizations are deleted by admin actions, in TenantContext::bypass().');
         }
 
-        // A franchisee cannot change the brand the other businesses share. With a single
-        // business (an independent café, a one-company chain), business context covers it.
-        // Whether that user is the owner or staff is a policy question (CHW-22).
-        if ($context->businessId() !== null && $this->businessCount() > 1) {
+        // The org admin changes the organization. The owner of its only business may too
+        // (an independent café or a one-company chain); a franchisee never can, not even
+        // the first one, since later franchisees share the brand. Staff never can.
+        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || ! $this->ownedByItsOnlyBusiness())) {
             throw new LogicException('Only an org admin can change the organization.');
         }
 
@@ -110,12 +112,33 @@ class Organization extends Model implements TenantModel
         return $this->hasMany(Business::class);
     }
 
-    /** How many businesses the current organization has (bulk writes have no loaded model to ask). */
-    private function businessCount(): int
+    /**
+     * Org admins (organization_user). Uses the guarded OrganizationMember pivot, so
+     * attach(), detach(), sync(), toggle() and updateExistingPivot() go through model
+     * saves. Never use newPivotQuery() or newPivotStatement(): they skip the guards.
+     *
+     * @return BelongsToMany<User, $this, OrganizationMember>
+     */
+    public function admins(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->using(OrganizationMember::class)
+            ->withPivot('id', 'role')
+            ->withTimestamps();
+    }
+
+    /**
+     * The current organization is not a franchise and has one business. Reads the
+     * stored type, in bypass(): bulk writes have no loaded model to ask.
+     */
+    private function ownedByItsOnlyBusiness(): bool
     {
         $context = app(TenantContext::class);
 
-        return $context->bypass(fn (): int => Business::query()->where('organization_id', $context->organizationId())->count());
+        return $context->bypass(fn (): bool => Business::query()
+            ->where('organization_id', $context->organizationId())
+            ->whereHas('organization', fn ($organization) => $organization->where('type', '!=', OrganizationType::Franchise))
+            ->count() === 1);
     }
 
     /**
