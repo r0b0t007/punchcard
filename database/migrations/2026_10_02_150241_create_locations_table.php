@@ -28,7 +28,10 @@ return new class extends Migration
             $table->foreign(['business_id', 'organization_id'])
                 ->references(['id', 'organization_id'])->on('businesses')
                 ->cascadeOnDelete();
+            // The org-admin scope filters on organization_id, the business scope and the
+            // composite foreign key on business_id.
             $table->index(['organization_id', 'business_id']);
+            $table->index(['business_id', 'organization_id']);
             // Target for staff and stamp rows that must stay within one business.
             $table->unique(['id', 'business_id']);
         });

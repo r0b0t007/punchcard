@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\Organization;
@@ -423,4 +424,40 @@ describe('escape routes', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1);
         $this->tenants->orgA->update(['name' => 'hijacked']);
     })->throws(LogicException::class);
+
+    it('refuses a different TenantScope in place of the registered one', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1);
+
+        Location::query()->withGlobalScope(TenantScope::class, new TenantScope)->get();
+    })->throws(LogicException::class);
+
+    it('checks tenant columns in a mixed upsert update list, even in bypass()', function (): void {
+        $a1Location = $this->tenants->locationOf($this->tenants->a1);
+
+        $this->context->bypass(fn (): int => Location::query()->upsert(
+            [['id' => $a1Location->id, 'name' => 'x', 'business_id' => $this->tenants->b1->id, 'organization_id' => $this->tenants->orgB->id, 'timezone' => 'UTC']],
+            ['id'],
+            ['organization_id', 'updated_at' => now()],
+        ));
+    })->throws(LogicException::class);
+
+    it('accepts a business whose organization id is a string', function (): void {
+        $business = (new Business)->forceFill(['id' => $this->tenants->a1->id, 'organization_id' => (string) $this->tenants->orgA->id]);
+
+        $this->context->set($this->tenants->orgA, $business);
+
+        expect($this->context->businessId())->toBe($this->tenants->a1->id);
+    });
+
+    it('lets the business of a single-business chain edit its brand', function (): void {
+        [$chain, $business] = $this->context->bypass(fn (): array => [
+            $organization = Organization::factory()->create(['type' => OrganizationType::Chain]),
+            Business::factory()->for($organization)->create(),
+        ]);
+
+        $this->context->set($chain, $business);
+        $chain->update(['brand_color' => '#0F4C81']);
+
+        expect($chain->refresh()->brand_color)->toBe('#0F4C81');
+    });
 });

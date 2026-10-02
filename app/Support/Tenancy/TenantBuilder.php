@@ -89,7 +89,14 @@ final class TenantBuilder extends Builder
 
         $firstRow = reset($values);
         $updated = $update ?? (is_array($firstRow) ? array_keys($firstRow) : array_keys($values));
-        $this->guardTenantColumns(array_is_list($updated) ? array_fill_keys($updated, null) : $updated);
+        $columns = [];
+
+        // $update mixes column names (list values) and column => expression pairs.
+        foreach ($updated as $key => $value) {
+            $columns[is_int($key) ? (string) $value : $key] = null;
+        }
+
+        $this->guardTenantColumns($columns);
 
         return parent::upsert($values, $uniqueBy, $update);
     }
@@ -194,7 +201,10 @@ final class TenantBuilder extends Builder
      */
     public function withGlobalScope($identifier, $scope): static
     {
-        if ($identifier === TenantScope::class && ! $scope instanceof TenantScope && ! app(TenantContext::class)->isBypassed()) {
+        // Only the model's own tenant scope may be (re)applied, e.g. by GuardsTenantWrites.
+        if ($identifier === TenantScope::class
+            && $scope !== ($this->model->getGlobalScopes()[TenantScope::class] ?? null)
+            && ! app(TenantContext::class)->isBypassed()) {
             throw new LogicException('The tenant scope of '.class_basename($this->model).' cannot be replaced.');
         }
 

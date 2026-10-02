@@ -22,6 +22,9 @@ final class TenancyBoundary
     public const array ALLOWLIST = [
         'app/Support/Tenancy/TenantBuilder.php' => 'defines the guarded forceDelete()/delete() through toBase(), and checks in bypass() whether a missed row still exists',
         'app/Models/Concerns/GuardsTenantWrites.php' => 'announces a model insert or save, which TenantBuilder then checks',
+        'app/Models/Concerns/BelongsToBusiness.php' => 'registers the tenant scope of site data',
+        'app/Models/Business.php' => 'registers its own tenant scope',
+        'app/Models/Organization.php' => 'registers its own tenant scope',
     ];
 
     /**
@@ -34,14 +37,14 @@ final class TenancyBoundary
 
         return [
             '/withoutGlobalScope(s|sExcept)?\s*\(/' => 'drops global scopes',
-            '/(with|add)GlobalScope\(\s*TenantScope::class/' => 'replaces the tenant scope',
-            '/->(getQuery|getBaseQuery|toBase)\s*\(/' => 'base query builder: unscoped, or without the write guards',
+            '/(with|add)GlobalScope\(\s*(TenantScope::class|new\s+TenantScope)/' => 'replaces the tenant scope',
+            '/(->|::)(getQuery|getBaseQuery|toBase)\s*\(/' => 'base query builder: unscoped, or without the write guards',
             '/(->|::)(rawUpdate|fromQuery)\s*\(/' => 'write or read around the scope',
             '/app\(\s*[\'"]db[\'"]\s*\)/' => 'raw connection',
-            '/->(newQueryWithoutScopes|newModelQuery|newQueryForRestoration)\s*\(/' => 'unscoped model query',
+            '/(->|::)(newQueryWithoutScopes|newModelQuery|newQueryForRestoration)\s*\(/' => 'unscoped model query',
             '/->getConnection\s*\(\s*\)/' => 'raw connection',
             '/DB::connection\s*\(/' => 'raw connection',
-            '/->(forceDelete|truncate|updateFrom)\s*\(/' => 'write that skips the scope',
+            '/(->|::)(forceDelete|truncate|updateFrom)\s*\(/' => 'write that skips the scope',
             '/->(expectModelInsert|expectModelWrite)\s*\(/' => 'announces a model write',
             '/->(fromSub|fromRaw)\s*\(/' => 'raw FROM',
             "/DB::table\\(\\s*{$table}/" => 'raw query on a tenant table',

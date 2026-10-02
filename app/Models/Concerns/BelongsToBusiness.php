@@ -29,6 +29,9 @@ use LogicException;
  */
 trait BelongsToBusiness
 {
+    /** @var array<string, int|null> business id => organization id, see organizationOfBusiness() */
+    private array $tenantOrganizationLookups = [];
+
     public static function bootBelongsToBusiness(): void
     {
         static::addGlobalScope(new TenantScope('business_id'));
@@ -103,12 +106,22 @@ trait BelongsToBusiness
         return $this->belongsTo(Organization::class);
     }
 
+    /**
+     * The business's organization, looked up once per business id for this model
+     * (fillTenantColumns() and assertTenantInsert() both need it).
+     */
     private function organizationOfBusiness(mixed $businessId): ?int
     {
-        $organizationId = app(TenantContext::class)->bypass(
-            fn (): mixed => Business::query()->whereKey($businessId)->value('organization_id'),
-        );
+        $key = (string) $businessId;
 
-        return $organizationId === null ? null : (int) $organizationId;
+        if (! array_key_exists($key, $this->tenantOrganizationLookups)) {
+            $organizationId = app(TenantContext::class)->bypass(
+                fn (): mixed => Business::query()->whereKey($businessId)->value('organization_id'),
+            );
+
+            $this->tenantOrganizationLookups[$key] = $organizationId === null ? null : (int) $organizationId;
+        }
+
+        return $this->tenantOrganizationLookups[$key];
     }
 }

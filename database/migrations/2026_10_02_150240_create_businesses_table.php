@@ -26,6 +26,8 @@ return new class extends Migration
             // Target of composite foreign keys that keep site data's organization_id
             // equal to its business's organization.
             $table->unique(['id', 'organization_id']);
+            // The org-admin scope and organization deletes filter on it.
+            $table->index('organization_id');
         });
     }
 

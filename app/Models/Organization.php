@@ -90,9 +90,10 @@ class Organization extends Model implements TenantModel
             throw new LogicException('Organizations are deleted by admin actions, in TenantContext::bypass().');
         }
 
-        // A franchisee cannot change the brand the other franchisees share. An independent
-        // organization has one business, so its owner's business context covers it.
-        if ($context->businessId() !== null && $this->currentType() !== OrganizationType::Independent) {
+        // A franchisee cannot change the brand the other businesses share. With a single
+        // business (an independent café, a one-company chain), business context covers it.
+        // Whether that user is the owner or staff is a policy question (CHW-22).
+        if ($context->businessId() !== null && $this->businessCount() > 1) {
             throw new LogicException('Only an org admin can change the organization.');
         }
 
@@ -109,18 +110,17 @@ class Organization extends Model implements TenantModel
         return $this->hasMany(Business::class);
     }
 
+    /** How many businesses the current organization has (bulk writes have no loaded model to ask). */
+    private function businessCount(): int
+    {
+        $context = app(TenantContext::class);
+
+        return $context->bypass(fn (): int => Business::query()->where('organization_id', $context->organizationId())->count());
+    }
+
     /**
      * @return array<string, string>
      */
-    /** The current organization's type (bulk writes have no loaded model to ask). */
-    private function currentType(): ?OrganizationType
-    {
-        $context = app(TenantContext::class);
-        $type = $context->bypass(fn (): mixed => self::query()->whereKey($context->organizationId())->value('type'));
-
-        return $type instanceof OrganizationType ? $type : OrganizationType::tryFrom((string) $type);
-    }
-
     protected function casts(): array
     {
         return [

@@ -32,7 +32,7 @@ final class TenantContext
 
     public function set(Organization $organization, ?Business $business = null): void
     {
-        if ($business instanceof Business && $business->organization_id !== $organization->id) {
+        if ($business instanceof Business && (int) $business->organization_id !== (int) $organization->id) {
             throw new LogicException('The business does not belong to the organization.');
         }
 

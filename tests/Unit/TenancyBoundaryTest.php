@@ -70,6 +70,12 @@ it('flags each way around the tenant guards', function (string $code): void {
     'Location::query()->update(["name" => DB::raw("(select name from organizations limit 1)")]);',
     'DB::table((new Location)->getTable())->get();',
     'app("db")->select("select 1");',
+    'Location::getQuery()->get();',
+    'Location::toBase()->update([]);',
+    'Location::newModelQuery()->get();',
+    'Location::truncate();',
+    'Location::addGlobalScope(new TenantScope());',
+    'Location::query()->withGlobalScope(TenantScope::class, new TenantScope());',
 ]);
 
 it('lets ordinary scoped code through', function (string $code): void {
