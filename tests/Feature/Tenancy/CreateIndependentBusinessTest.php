@@ -83,6 +83,16 @@ it('takes the lowest free numbered slug', function (): void {
     expect(app(CreateIndependentBusiness::class)->handle(User::factory()->create(), 'Café Atlas')->slug)->toBe('cafe-atlas-3');
 });
 
+it('falls back to a random suffix once the numbered slugs are taken', function (): void {
+    app(TenantContext::class)->bypass(function (): void {
+        foreach (['cafe-atlas', ...array_map(fn (int $n): string => 'cafe-atlas-'.$n, range(2, 10))] as $slug) {
+            Business::factory()->create(['slug' => $slug]);
+        }
+    });
+
+    expect(app(CreateIndependentBusiness::class)->handle(User::factory()->create(), 'Café Atlas')->slug)->toMatch('/^cafe-atlas-[a-z0-9]{5}$/');
+});
+
 it('lets the new owner manage org admins from their business', function (): void {
     $owner = User::factory()->create();
     $business = app(CreateIndependentBusiness::class)->handle($owner, 'Salon Amal');

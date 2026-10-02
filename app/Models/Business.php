@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -63,9 +64,11 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * Only an org admin (TenantContext::isOrgAdmin()) or bypass() creates
-     * a business, and only in their own organization: a franchisee cannot add
-     * a sibling business.
+     * Only franchise HQ adds a business: an org admin working across the
+     * organization (no business selected), in their own franchise. A franchisee
+     * cannot add a sibling, and an independent café or chain has exactly one
+     * business (OrganizationType); becoming a franchise is an admin action, in
+     * bypass().
      *
      * @param  array<string, mixed>  $values
      */
@@ -81,8 +84,8 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if (! $context->isOrgAdmin()) {
-            throw new LogicException('Only an org admin can create a business.');
+        if (! $context->isOrgAdmin() || $context->businessId() !== null) {
+            throw new LogicException('Only an org admin, working across the organization, can create a business.');
         }
 
         $status = $values['status'] ?? BusinessStatus::Pending->value;
@@ -94,12 +97,17 @@ class Business extends Model implements TenantModel
         if ($context->organizationId() === null || (int) $values['organization_id'] !== $context->organizationId()) {
             throw new LogicException('Cannot create a business in another organization.');
         }
+
+        if (! $this->isFranchise($context->organizationId())) {
+            throw new LogicException('Only a franchise has more than one business.');
+        }
     }
 
     /**
      * The owner (or an org admin) may update the business; staff may not. Only
-     * an org admin deletes one. Status and plan change only through verification
-     * and billing actions (bypass()).
+     * franchise HQ (org admin, across the organization) removes a franchisee;
+     * closing an independent café or chain is an admin action, in bypass().
+     * Status and plan change only through verification and billing actions.
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -112,8 +120,8 @@ class Business extends Model implements TenantModel
             return;
         }
 
-        if ($operation === 'delete' && ! $context->isOrgAdmin()) {
-            throw new LogicException('Only an org admin can delete a business.');
+        if ($operation === 'delete' && (! $context->isOrgAdmin() || $context->businessId() !== null || ! $this->isFranchise($context->organizationId()))) {
+            throw new LogicException('Only franchise HQ, working across the organization, can delete a business.');
         }
 
         if ($operation === 'update' && ! $context->isOrgAdmin() && $context->businessRole() !== BusinessRole::Owner) {
@@ -123,6 +131,15 @@ class Business extends Model implements TenantModel
         if (array_intersect(array_keys($values), ['status', 'plan']) !== []) {
             throw new LogicException('Business status and plan change through verification and billing actions, in TenantContext::bypass().');
         }
+    }
+
+    /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */
+    private function isFranchise(?int $organizationId): bool
+    {
+        return app(TenantContext::class)->bypass(fn (): bool => Organization::query()
+            ->whereKey($organizationId)
+            ->where('type', OrganizationType::Franchise)
+            ->exists());
     }
 
     /**

@@ -31,6 +31,9 @@ final readonly class CreateIndependentBusiness
     /** Leaves room for "-" and a suffix in the varchar(255) slug column. */
     private const int SLUG_BASE_LENGTH = 200;
 
+    /** Readable slugs to try ("cafe", "cafe-2" ... "cafe-10") before a random suffix. */
+    private const int SLUG_NUMBERED = 10;
+
     public function __construct(private TenantContext $context) {}
 
     public function handle(User $owner, string $name, ?string $category = null): Business
@@ -95,24 +98,15 @@ final readonly class CreateIndependentBusiness
         }
     }
 
-    /** "cafe" if free, else the lowest free "cafe-N" (N >= 2), found with one query. */
+    /**
+     * "cafe" if free, else the lowest free "cafe-N" up to SLUG_NUMBERED, found with
+     * one bounded query; a popular name past that gets a random suffix.
+     */
     private function firstFreeSlug(Model $model, string $base): string
     {
-        $taken = $model->newQuery()
-            ->where(fn ($query) => $query->where('slug', $base)->orWhere('slug', 'like', $base.'-%'))
-            ->pluck('slug')
-            ->flip();
+        $candidates = [$base, ...array_map(fn (int $n): string => $base.'-'.$n, range(2, self::SLUG_NUMBERED))];
+        $taken = $model->newQuery()->whereIn('slug', $candidates)->pluck('slug')->all();
 
-        if (! $taken->has($base)) {
-            return $base;
-        }
-
-        $suffix = 2;
-
-        while ($taken->has($base.'-'.$suffix)) {
-            $suffix++;
-        }
-
-        return $base.'-'.$suffix;
+        return array_values(array_diff($candidates, $taken))[0] ?? $base.'-'.Str::lower(Str::random(5));
     }
 }

@@ -135,8 +135,10 @@ class Organization extends Model implements TenantModel
     {
         $context = app(TenantContext::class);
 
-        return $context->bypass(fn (): bool => self::query()->whereKey($context->organizationId())->where('type', '!=', OrganizationType::Franchise)->exists()
-            && Business::query()->where('organization_id', $context->organizationId())->count() === 1);
+        return $context->bypass(fn (): bool => Business::query()
+            ->where('organization_id', $context->organizationId())
+            ->whereHas('organization', fn ($organization) => $organization->where('type', '!=', OrganizationType::Franchise))
+            ->count() === 1);
     }
 
     /**

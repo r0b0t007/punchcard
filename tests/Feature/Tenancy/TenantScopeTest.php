@@ -483,7 +483,31 @@ describe('escape routes', function (): void {
             ->and($this->context->canManageMembers())->toBeFalse();
 
         Business::query()->create(['name' => 'A3', 'slug' => 'a3']);
-    })->throws(LogicException::class, 'Only an org admin can create a business.');
+    })->throws(LogicException::class, 'Only an org admin, working across the organization, can create a business.');
+
+    it('keeps an independent café or chain to one business, even for its org admin', function (string $type, string $how): void {
+        [$organization, $business] = $this->context->bypass(fn (): array => [
+            $organization = Organization::factory()->create(['type' => $type]),
+            Business::factory()->for($organization)->create(),
+        ]);
+
+        match ($how) {
+            'create in the business' => [$this->context->set($organization, $business, orgAdmin: true, businessRole: BusinessRole::Owner), Business::query()->create(['name' => 'Second', 'slug' => 'second'])],
+            'create across the organization' => [$this->context->set($organization, orgAdmin: true), Business::query()->create(['name' => 'Second', 'slug' => 'second'])],
+            'delete from the business' => [$this->context->set($organization, $business, orgAdmin: true, businessRole: BusinessRole::Owner), $business->delete()],
+            'delete across the organization' => [$this->context->set($organization, orgAdmin: true), $business->delete()],
+        };
+    })->throws(LogicException::class)->with(['independent', 'chain'])->with(['create in the business', 'create across the organization', 'delete from the business', 'delete across the organization']);
+
+    it('lets franchise HQ remove a franchisee across the organization, but not from inside a site', function (): void {
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+        $this->tenants->a2->delete();
+
+        expect($this->context->bypass(fn (): bool => Business::query()->whereKey($this->tenants->a2->id)->exists()))->toBeFalse();
+
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+        $this->tenants->a1->delete();
+    })->throws(LogicException::class, 'Only franchise HQ, working across the organization, can delete a business.');
 
     it('lets the owner change their business, but not staff', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);

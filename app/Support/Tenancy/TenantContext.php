@@ -38,7 +38,9 @@ final class TenantContext
     /**
      * Sets the tenant and what the user may do in it. ResolveTenant passes both
      * from the user's memberships. Without them the context grants no rights
-     * (fail closed): reads work, owner and org admin writes throw.
+     * (fail closed): reads work, while writes to the tenant structure (the
+     * organization, its businesses, memberships) that need an owner or org admin
+     * throw. Operational site data (locations, stampers) is authorized by policies.
      * Code acting for no user (jobs, the tap endpoint, white-label lookups) uses
      * bypass(), never set().
      *

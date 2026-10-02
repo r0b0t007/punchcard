@@ -6,6 +6,7 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessMember;
@@ -31,7 +32,8 @@ use App\Support\Tenancy\TenantContext;
  * while a franchisee is suspended.
  *
  * The context also carries what the user may do there: org admin rights from
- * organization_user, the business role from business_user.
+ * an org_admin row in organization_user, the business role from business_user
+ * (the role cast makes an unknown value fail closed).
  */
 final readonly class ResolveTenant
 {
@@ -49,7 +51,7 @@ final readonly class ResolveTenant
                 ->with('organization')
                 ->get();
             $organizations = Organization::query()
-                ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->select('organization_id'))
+                ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->where('role', OrganizationRole::OrgAdmin)->select('organization_id'))
                 ->where(fn ($query) => $query->where('type', OrganizationType::Franchise)
                     ->orWhereDoesntHave('businesses')
                     ->orWhereHas('businesses', fn ($businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)))
@@ -64,7 +66,7 @@ final readonly class ResolveTenant
                     $business->organization,
                     $business,
                     orgAdmin: $organizations->contains('id', $business->organization_id),
-                    businessRole: $role instanceof BusinessRole ? $role : BusinessRole::tryFrom((string) $role),
+                    businessRole: $role instanceof BusinessRole ? $role : null,
                 );
             };
 

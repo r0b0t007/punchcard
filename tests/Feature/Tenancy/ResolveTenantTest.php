@@ -10,6 +10,7 @@ use App\Models\Business;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Tests\Support\Tenants;
 
@@ -146,6 +147,16 @@ it('keeps franchise HQ working while its franchisees are suspended', function ()
     app(TenantContext::class)->bypass(fn (): int => Business::query()->whereKey([$this->tenants->a1->id, $this->tenants->a2->id])->update(['status' => BusinessStatus::Suspended]));
 
     $this->actingAs($user)->get('/_tenant')->assertExactJson(Tenants::context($this->tenants->orgA->id, orgAdmin: true));
+});
+
+it('gives org admin rights only for an org_admin row', function (): void {
+    $user = User::factory()->create();
+    app(TenantContext::class)->bypass(fn (): bool => DB::table('organization_user')->insert([
+        'organization_id' => $this->tenants->orgA->id, 'user_id' => $user->id, 'role' => 'viewer', 'created_at' => now(), 'updated_at' => now(),
+    ]));
+
+    $this->actingAs($user)->withSession([SetTenant::SESSION_KEY => 'org:'.$this->tenants->orgA->id])->get('/_tenant')
+        ->assertExactJson(Tenants::context(null));
 });
 
 it('resolves route model bindings inside the tenant', function (): void {
