@@ -12,7 +12,7 @@ namespace Tests\Support;
 final class TenancyBoundary
 {
     /** Tables owned by tenant models. */
-    private const array TENANT_TABLES = ['organizations', 'businesses', 'locations', 'organization_user', 'business_user', 'loyalty_cards', 'card_business'];
+    private const array TENANT_TABLES = ['organizations', 'businesses', 'locations', 'organization_user', 'business_user', 'loyalty_cards', 'card_business', 'card_enrollments', 'rewards'];
 
     /**
      * Files that may use a pattern, with the reason.

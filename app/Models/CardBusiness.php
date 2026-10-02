@@ -7,7 +7,6 @@ namespace App\Models;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
-use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
@@ -55,11 +54,7 @@ class CardBusiness extends Pivot implements TenantModel
             return;
         }
 
-        $organizationId = app(TenantContext::class)->bypass(
-            fn (): mixed => LoyaltyCard::query()->whereKey($this->getAttribute('card_id'))->value('organization_id'),
-        );
-
-        $this->setAttribute('organization_id', $organizationId === null ? null : (int) $organizationId);
+        $this->fillOrganizationFrom(LoyaltyCard::class, 'card_id');
     }
 
     /**

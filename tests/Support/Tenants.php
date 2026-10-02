@@ -8,9 +8,11 @@ use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
 use App\Models\Business;
+use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Models\Reward;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +72,18 @@ final readonly class Tenants
         app(TenantContext::class)->bypass(fn () => $organization->admins()->attach($user, ['role' => OrganizationRole::OrgAdmin->value]));
 
         return $user;
+    }
+
+    /** Enrolls the customer on the card, inside bypass(). */
+    public function enroll(User $customer, LoyaltyCard $card): CardEnrollment
+    {
+        return app(TenantContext::class)->bypass(fn (): CardEnrollment => CardEnrollment::factory()->for($card, 'card')->for($customer)->create());
+    }
+
+    /** Unlocks the enrollment's first reward (milestone 1), inside bypass(). */
+    public function reward(CardEnrollment $enrollment): Reward
+    {
+        return app(TenantContext::class)->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create());
     }
 
     /** Registers /_tenant, which returns the TenantContext the `tenant` middleware set. */
