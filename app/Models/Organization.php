@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -108,6 +109,21 @@ class Organization extends Model implements TenantModel
     public function businesses(): HasMany
     {
         return $this->hasMany(Business::class);
+    }
+
+    /**
+     * Org admins (organization_user). Uses the guarded OrganizationMember pivot, so
+     * attach(), detach(), sync(), toggle() and updateExistingPivot() go through model
+     * saves. Never use newPivotQuery() or newPivotStatement(): they skip the guards.
+     *
+     * @return BelongsToMany<User, $this, OrganizationMember>
+     */
+    public function admins(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->using(OrganizationMember::class)
+            ->withPivot('id', 'role')
+            ->withTimestamps();
     }
 
     /** How many businesses the current organization has (bulk writes have no loaded model to ask). */

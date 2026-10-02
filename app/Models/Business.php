@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -125,6 +126,22 @@ class Business extends Model implements TenantModel
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Owners and staff (business_user). Uses the guarded BusinessMember pivot, so
+     * attach(), detach(), sync(), toggle() and updateExistingPivot() all go through
+     * model saves (MembershipTest pins this). Never use newPivotQuery() or
+     * newPivotStatement(): they skip the guards.
+     *
+     * @return BelongsToMany<User, $this, BusinessMember>
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->using(BusinessMember::class)
+            ->withPivot('id', 'role', 'location_id', 'organization_id')
+            ->withTimestamps();
     }
 
     /**

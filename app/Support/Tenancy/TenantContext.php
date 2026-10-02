@@ -30,6 +30,12 @@ final class TenantContext
 
     private int $bypassDepth = 0;
 
+    /**
+     * Invariant: an organization without a business means the user is an org
+     * admin of it (OrganizationMember and Business rely on that shape). Only
+     * ResolveTenant sets it for users; code acting for anyone else (jobs, the
+     * tap endpoint, white-label lookups) must use bypass(), never set($org).
+     */
     public function set(Organization $organization, ?Business $business = null): void
     {
         if ($business instanceof Business && (int) $business->organization_id !== (int) $organization->id) {
