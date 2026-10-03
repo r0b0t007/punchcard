@@ -8,6 +8,7 @@ use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -83,6 +84,8 @@ class Business extends Model implements TenantModel
             throw new LogicException('Creating a business needs a tenant, or TenantContext::bypass().');
         }
 
+        ArchivedSites::assertOrganizationOpen($values['organization_id'], 'A business', lock: true);
+
         if ($context->isBypassed()) {
             return;
         }
@@ -138,15 +141,18 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * Businesses someone may work in, or run jobs for: neither suspended nor
-     * archived. A pending one counts, so its owner can set up.
+     * Businesses someone may work in, or run jobs for: not suspended, and
+     * neither it nor its organization archived. A pending one counts, so its
+     * owner can set up.
      *
      * @param  Builder<self>  $query
      */
     #[Scope]
     protected function operating(Builder $query): void
     {
-        $query->where('status', '!=', BusinessStatus::Suspended)->whereNull('archived_at');
+        $query->where('status', '!=', BusinessStatus::Suspended)
+            ->whereNull('archived_at')
+            ->whereHas('organization', fn (Builder $organization) => $organization->whereNull('archived_at'));
     }
 
     /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */

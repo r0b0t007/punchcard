@@ -7,6 +7,7 @@ namespace App\Actions\Tenancy;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\Organization;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -32,13 +33,15 @@ final readonly class RestoreArchived
         }
 
         DB::transaction(function () use ($archived): void {
-            $parentArchived = match (true) {
-                $archived instanceof Business => Organization::query()->whereKey($archived->organization_id)->whereNotNull('archived_at')->exists(),
-                $archived instanceof Location => Business::query()->whereKey($archived->business_id)->whereNotNull('archived_at')->exists(),
-                default => false,
+            // Locked, so an archive of the parent running now either comes first
+            // (and this refuses) or archives the restored child again after it.
+            $parentOpen = match (true) {
+                $archived instanceof Business => ArchivedSites::isOrganizationOpen($archived->organization_id, lock: true),
+                $archived instanceof Location => ArchivedSites::isOpen($archived->business_id, null, lock: true),
+                default => true,
             };
 
-            if ($parentArchived) {
+            if (! $parentOpen) {
                 throw new LogicException('Restore the archived organization or business it belongs to first.');
             }
 

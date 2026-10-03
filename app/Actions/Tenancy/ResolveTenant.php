@@ -47,7 +47,6 @@ final readonly class ResolveTenant
             $businesses = Business::query()
                 ->whereIn('id', $roles->keys())
                 ->operating()
-                ->whereHas('organization', fn ($organization) => $organization->whereNull('archived_at'))
                 ->with('organization')
                 ->get();
             $organizations = Organization::query()

@@ -92,7 +92,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
         $this->assertCustomerDataWrite($operation, $values);
 
         if (isset($values['redeemed_business_id']) || isset($values['redeemed_location_id'])) {
-            ArchivedSites::assertOpen($values['redeemed_business_id'] ?? null, $values['redeemed_location_id'] ?? null, 'A redemption');
+            ArchivedSites::assertOpen($values['redeemed_business_id'] ?? null, $values['redeemed_location_id'] ?? null, 'A redemption', lock: true);
         }
 
         if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::OUTCOME_COLUMNS) !== []) {

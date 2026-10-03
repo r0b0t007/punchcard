@@ -64,7 +64,9 @@ class StampEvent extends Model implements TenantModel
      * Only the stamp Actions record stamps, after proof of presence (a tap, a
      * staff scan), in bypass(): a business recording one directly could stamp a
      * customer it cannot see, and make them "stamped here". The business must
-     * honour the enrollment's card: visibility alone is not enough.
+     * honour the enrollment's card: visibility alone is not enough. Nothing
+     * but a correction is recorded at an archived business or location
+     * (ArchivedSites): the ledger stays fixable where the stamps were given.
      *
      * @param  array<string, mixed>  $values
      */
@@ -75,7 +77,10 @@ class StampEvent extends Model implements TenantModel
         }
 
         $this->assertSiteDataInsert($values);
-        ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp');
+
+        if (! $this->isCorrection($values['source'] ?? null)) {
+            ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp');
+        }
 
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()
             ->where('business_id', $values['business_id'] ?? null)
@@ -85,6 +90,11 @@ class StampEvent extends Model implements TenantModel
         if (! $honoured) {
             throw new LogicException('A stamp is recorded at a business that honours the card.');
         }
+    }
+
+    private function isCorrection(mixed $source): bool
+    {
+        return $source === StampSource::Correction || $source === StampSource::Correction->value;
     }
 
     /**

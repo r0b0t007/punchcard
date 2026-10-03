@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\StampSource;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Models\Concerns\HoldsCustomerData;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -72,6 +73,7 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     public function assertTenantInsert(array $values): void
     {
         $this->assertCustomerDataInsert($values);
+        ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'An enrollment');
 
         if (app(TenantContext::class)->isBypassed()) {
             return;

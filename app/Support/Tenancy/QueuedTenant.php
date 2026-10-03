@@ -125,11 +125,11 @@ final class QueuedTenant
                     : throw new TenantUnavailable('The tenant this job was queued for no longer exists, or is suspended or archived.');
             }
 
-            // An operating business keeps its organization available unless that is
-            // archived, so this needs no organization scope subqueries.
+            // An operating business keeps its organization available, so this needs
+            // no organization scope subqueries.
             $business = Business::query()->operating()->with('organization')->find($businessId);
 
-            if (! $business instanceof Business || $business->organization->archived_at !== null) {
+            if (! $business instanceof Business) {
                 throw new TenantUnavailable('The tenant this job was queued for no longer exists, or is suspended or archived.');
             }
 
