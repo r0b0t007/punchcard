@@ -22,9 +22,11 @@ and was never used before. A copied URL, screenshot or shared link must fail.
 3. Session MAC key: `KSes = CMAC(SDMFileReadKey, 3C C3 00 01 00 80 || UID || SDMReadCtr(LE))` (16 bytes).
 4. `full = CMAC(KSes, "")` (MAC input is empty when SDMMACInputOffset == SDMMACOffset, which is our tag config).
 5. Truncate: take bytes at odd indexes 1,3,5,…,15 of `full` → 8 bytes. Compare with `c` using `hash_equals`.
-6. Look up the stamper by UID. Require `counter > stampers.last_counter`, then set `last_counter = counter`
-   inside the same DB transaction, with `lockForUpdate()` on the stamper row. Also keep a unique index on
-   `(stamper_id, counter)` in `stamp_events` as a second guard.
+6. Look up the tag by UID (`nfc_tags`, platform state) and its active stamper (`stampers`, the tag's assignment
+   to a business and location; at most one active per tag). Reject a retired tag or a disabled stamper.
+   Require `counter > nfc_tags.last_counter`, then set `last_counter = counter` inside the same DB transaction,
+   with `lockForUpdate()` on the tag row. Also keep a unique index on `(nfc_tag_id, counter)` in `stamp_events`
+   as a second guard. The tag outlives its stampers: removing or moving a stamper never resets the counter.
 
 CMAC is RFC 4493 AES-CMAC. Both keys come from the master key in `config('punchcard.nfc.sun_master_key')`
 with NXP AN10922 AES-128 key diversification, but not with the same input:
@@ -40,8 +42,8 @@ with NXP AN10922 AES-128 key diversification, but not with the same input:
 - AN10922 always pads `0x01 || input` to 32 bytes before its CBC-MAC. That is not plain CMAC, which pads only to
   the next 16 bytes; the two disagree for inputs under 16 bytes, such as the meta key input.
 
-Store only `key_version` on the stamper, never the derived keys; it diversifies the **per-tag keys** (0, 2, 3, 4), never the meta key.
-Re-provisioning one stamper bumps its `key_version`. Rotating the meta key is a hard cutover
+Store only `key_version` on the tag (`nfc_tags`), never the derived keys; it diversifies the **per-tag keys** (0, 2, 3, 4), never the meta key.
+Re-provisioning one tag bumps its `key_version` (database triggers keep it, and `last_counter`, moving forward only). Rotating the meta key is a hard cutover
 (decision 2026-10-02): every tag is re-provisioned, and tags not yet done fail as `malformed`. Derivation is
 `App\Support\Nfc\KeyDiversifier` (`metaReadKey($version)`, `fileReadKey($uid, $version)`, `tagKey()` for keys 0, 3
 and 4); key numbers, layout and rotation steps are in `docs/runbooks/stamper-keys.md`.
@@ -78,5 +80,6 @@ because replay protection is the stamper row lock in the database.
 - Reject reasons are the `App\Enums\TapRejection` enum: `malformed`, `unknown_tag`, `bad_mac`, `replay`, `stamper_disabled`, `cooldown`, `daily_cap`. Record each rejected tap for the owner's fraud view.
 - Rate limit `/t` per IP and per user (`RateLimiter::for('tap', ...)`).
 - The endpoint is a normal GET that renders an Inertia page (C1/C2/C3/cooldown). It must work logged out: keep the raw `e` and `c` in the session (never a `VerifiedTap`), finish sign-in, then verify again and apply the stamp once.
-- A disabled stamper (lost/stolen) rejects everything; re-provisioning bumps `key_version`.
+- A disabled stamper (paused by the business) rejects everything. A lost or stolen tag is retired
+  (`nfc_tags.retired_at`, one-way, platform only) and rejects everything; re-provisioning bumps `key_version`.
 - Development without hardware: a `php artisan punchcard:fake-tap {stamper}` command (to build) generates valid URLs from test keys. Never enable it in production.

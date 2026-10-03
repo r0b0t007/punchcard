@@ -42,19 +42,27 @@ tool loads. Never send key 0 to a browser.
 
 ## Rotating one stamper's keys
 
-Do this when a stamper is suspected copied, or moves to another business.
+Do this when a tag is suspected copied.
 
-1. Disable the stamper (`status`), so it rejects every tap while you work.
+The tag's uid, `key_version` and `last_counter` live on `nfc_tags` (platform state); a stamper only assigns
+the tag to a business and location. Database triggers keep a tag from being deleted and its counter and key
+version from going back.
+
+1. Disable the tag's stamper (`status`), so it rejects every tap while you work.
 2. Re-provision the tag: keys 2, 3 and 4, then key 0, all derived from `key_version + 1`, authenticating with
    the current version's key 0.
-3. Only after every key has changed, bump the stamper's `key_version`. Keep `last_counter` as it is: the tag's
+3. Only after every key has changed, bump the tag's `key_version`. Keep `last_counter` as it is: the tag's
    read counter keeps counting, and the old value still blocks replays.
 4. Re-enable the stamper and test one tap.
 
 Every URL the tag produced before step 2 now fails as `bad_mac`, because its `c` was signed with the old key 2.
 The meta key is unchanged, so those URLs still decrypt.
 
-A **lost or stolen** stamper cannot be re-provisioned: disable it for good and register a replacement tag.
+**Moving a tag to another business or location** needs no new keys: disable its stamper and assign the tag
+again (a new stamper). The tag keeps its counter, so URLs from the old site stay replays.
+
+A **lost or stolen** tag cannot be re-provisioned: retire it (`nfc_tags.retired_at`, one-way) and assign a
+replacement tag.
 
 ## Rotating the meta key (hard cutover)
 

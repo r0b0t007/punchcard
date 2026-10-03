@@ -20,21 +20,20 @@ use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
- * An NFC stamper at a location: site data, so a franchisee sees its own and
- * the org admin the organization's. Its identity and replay state belong to
- * the platform: an admin registers it and re-provisions it (key_version), the
- * tap endpoint advances last_counter under a row lock, all in bypass(); the
- * uid never changes and a database trigger keeps last_counter from going
- * back. Status, label, location and arming are operational (CHW-22 policies).
+ * A stamper: an NFC tag assigned to a location of a business. Site data, so a
+ * franchisee sees its own and the org admin the organization's. The tag's
+ * uid, keys and replay counter live on NfcTag, which outlives the assignment.
+ * An admin assigns a tag and removes an assignment, in bypass(); the tag of
+ * an assignment never changes (move a tag by disabling this assignment and
+ * adding one). Status, label, location and arming are operational (CHW-22
+ * policies).
  *
  * @property int $id
  * @property int $organization_id
  * @property int $business_id
  * @property int $location_id
- * @property string $uid
+ * @property int $nfc_tag_id
  * @property string|null $label
- * @property int $key_version
- * @property int $last_counter
  * @property StamperStatus $status
  * @property int|null $armed_qty
  * @property Carbon|null $armed_until
@@ -53,12 +52,8 @@ class Stamper extends Model implements TenantModel
     /** @use HasFactory<StamperFactory> */
     use HasFactory;
 
-    /** Columns only the platform changes, in bypass(): the keys and the replay guard. */
-    private const array PLATFORM_COLUMNS = ['key_version', 'last_counter'];
-
     /**
-     * Stampers are registered by an admin action (CHW-138), which holds the
-     * tag's keys, in bypass().
+     * An admin action assigns tags (CHW-138), in bypass().
      *
      * @param  array<string, mixed>  $values
      */
@@ -67,7 +62,7 @@ class Stamper extends Model implements TenantModel
         $this->assertSiteDataInsert($values);
 
         if (! app(TenantContext::class)->isBypassed()) {
-            throw new LogicException('Stampers are registered by an admin action, in TenantContext::bypass().');
+            throw new LogicException('A tag is assigned by an admin action, in TenantContext::bypass().');
         }
     }
 
@@ -77,21 +72,21 @@ class Stamper extends Model implements TenantModel
      */
     public function assertTenantWrite(string $operation, array $values): void
     {
-        if (array_key_exists('uid', $values)) {
-            throw new LogicException('A stamper uid cannot change: replace the stamper instead.');
+        if (array_key_exists('nfc_tag_id', $values)) {
+            throw new LogicException('A stamper\'s tag cannot change: disable it and assign the tag again.');
         }
 
-        if (app(TenantContext::class)->isBypassed()) {
-            return;
-        }
-
-        if ($operation === 'delete') {
+        if ($operation === 'delete' && ! app(TenantContext::class)->isBypassed()) {
             throw new LogicException('A stamper is disabled, not deleted; admin actions delete in TenantContext::bypass().');
         }
+    }
 
-        if (array_intersect(array_keys($values), self::PLATFORM_COLUMNS) !== []) {
-            throw new LogicException('Stamper keys and counter change only in the tap endpoint and re-provisioning, in TenantContext::bypass().');
-        }
+    /**
+     * @return BelongsTo<NfcTag, $this>
+     */
+    public function tag(): BelongsTo
+    {
+        return $this->belongsTo(NfcTag::class, 'nfc_tag_id');
     }
 
     /**
@@ -108,8 +103,6 @@ class Stamper extends Model implements TenantModel
     protected function casts(): array
     {
         return [
-            'key_version' => 'integer',
-            'last_counter' => 'integer',
             'status' => StamperStatus::class,
             'armed_qty' => 'integer',
             'armed_until' => 'datetime',

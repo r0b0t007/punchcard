@@ -10,7 +10,7 @@ from home or redeem twice gives away free product. Read `.claude/skills/stamp-fl
 
 Check each item and report only real problems, with file:line, a concrete failure scenario, and the fix:
 
-1. **Replay**: SUN counter compared with `>` against `stampers.last_counter` and updated in the same transaction under `lockForUpdate()`; unique index on `(stamper_id, counter)`.
+1. **Replay**: SUN counter compared with `>` against `nfc_tags.last_counter` and updated in the same transaction under `lockForUpdate()` on the tag row; unique index on `(nfc_tag_id, counter)`; nothing deletes a tag or resets its counter.
 2. **MAC**: constant-time comparison (`hash_equals`), correct odd-byte truncation, keys from config, never logged.
 3. **Race conditions**: cooldown, daily cap, reward creation and redemption all run inside a transaction with row locks; no read-then-write outside the lock.
 4. **Idempotency**: QR/staff stamping uses an idempotency key; redemption twice returns one `redeemed` row.
