@@ -53,7 +53,7 @@ export default function DeleteUser() {
                         </DialogTitle>
                         <DialogDescription>
                             {t(
-                                'Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.',
+                                "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Please enter your password to confirm.",
                             )}
                         </DialogDescription>
 
@@ -85,6 +85,7 @@ export default function DeleteUser() {
                                         />
 
                                         <InputError message={errors.password} />
+                                        <InputError message={errors.account} />
                                     </div>
 
                                     <DialogFooter>
