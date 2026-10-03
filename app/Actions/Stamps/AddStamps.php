@@ -38,8 +38,8 @@ use LogicException;
  * 1. staff must work at the business; a retried request (same idempotency
  *    key at the business) returns the earlier stamp if it is the same stamp
  *    by the same person, or is refused;
- * 2. the card must be active and honoured by the business, the site open
- *    (a correction may still take stamps back) and, for a tap, the stamper
+ * 2. the card must be active and honoured by the business and the site open
+ *    (a correction may still take stamps back where they were given) and, for a tap, the stamper
  *    current and active;
  * 3. stamps that prove presence (tap, scan, manual) keep to the cooldown (per
  *    customer per card) and the daily cap (per customer per card per
@@ -106,11 +106,13 @@ final readonly class AddStamps
             }
 
             $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
+            $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists()
+                || ($request->takesStampsBack() && StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->exists());
             $location = Location::query()->findOrFail($request->locationId);
             $now = now();
             $qty = $request->qty;
 
-            $this->assertAllowed($card, $location, $stamper, $request);
+            $this->assertAllowed($card, $honoured, $location, $stamper, $request);
 
             if ($request->provesPresence()) {
                 $this->assertCooldown($enrollment, $card, $now);
@@ -137,7 +139,7 @@ final readonly class AddStamps
             ]);
             $event->save();
 
-            $rewards = $this->progress($enrollment, $card, $request, $qty, $now);
+            $rewards = $this->progress($enrollment, $card, $event, $request, $qty, $now);
 
             return new StampResult($event, $enrollment, $rewards, replayed: false);
         }));
@@ -157,7 +159,9 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::IdempotencyConflict);
         }
 
-        return new StampResult($earlier, $enrollment, [], replayed: true);
+        $rewards = Reward::query()->where('stamp_event_id', $earlier->id)->orderBy('milestone')->get()->all();
+
+        return new StampResult($earlier, $enrollment, array_values($rewards), replayed: true);
     }
 
     /** Staff stamp where they work: a member of the business (at their location, if limited to one), or an org admin of its organization. */
@@ -184,21 +188,24 @@ final readonly class AddStamps
     }
 
     /**
-     * The open-site check locks like the ledger's own (ArchivedSites): the site
+     * Taking stamps back stays possible where they were given, so the ledger
+     * stays fixable: on a card switched off, at a business that no longer
+     * honours the card, at an archived site. The open-site check locks like
+     * the ledger's own (ArchivedSites): the site
      * rows for a stamp without a stamper, the stamper (locked above) for a tap,
      * so a racing archive is a clean SiteClosed or StamperUnavailable.
      */
-    private function assertAllowed(LoyaltyCard $card, Location $location, ?Stamper $stamper, StampRequest $request): void
+    private function assertAllowed(LoyaltyCard $card, bool $honoured, Location $location, ?Stamper $stamper, StampRequest $request): void
     {
         if ((int) $location->business_id !== $request->businessId) {
             throw new LogicException('A stamp\'s location belongs to its business.');
         }
 
-        if (! $card->active) {
+        if (! $card->active && ! $request->takesStampsBack()) {
             throw new StampRejected(StampRejection::CardInactive);
         }
 
-        if (! CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists()) {
+        if (! $honoured) {
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
@@ -262,11 +269,12 @@ final readonly class AddStamps
 
     /**
      * Moves the progress cache with the ledger and unlocks the rewards earned:
-     * only stamps that add do, so a correction never pays out.
+     * only stamps that add do (a correction restoring missed stamps can
+     * complete a card; one taking stamps back never pays out).
      *
      * @return list<Reward>
      */
-    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, StampRequest $request, int $qty, CarbonInterface $now): array
+    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, StampEvent $event, StampRequest $request, int $qty, CarbonInterface $now): array
     {
         $before = $enrollment->lifetime_stamps;
         $current = $enrollment->current_stamps + $qty;
@@ -278,17 +286,19 @@ final readonly class AddStamps
             while ($current >= $card->stamps_required) {
                 $current -= $card->stamps_required;
                 $completed++;
-                $rewards[] = $this->unlock($enrollment, $card, $completed, $card->reward_text, $now);
+                $rewards[] = $this->unlock($enrollment, $card, $event, $completed, $card->reward_text, $now);
             }
         }
 
         if ($qty > 0 && $card->mode === CardMode::Progressive) {
+            $unlocked = Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->pluck('milestone')->all();
+
             foreach (ProgressiveTiers::parse($card->tiers) as $tier) {
                 $crossed = $tier['stamps'] > $before && $tier['stamps'] <= $lifetime;
 
-                if ($crossed && ! Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->where('milestone', $tier['stamps'])->exists()) {
+                if ($crossed && ! in_array($tier['stamps'], $unlocked, true)) {
                     $completed++;
-                    $rewards[] = $this->unlock($enrollment, $card, $tier['stamps'], $tier['reward'], $now);
+                    $rewards[] = $this->unlock($enrollment, $card, $event, $tier['stamps'], $tier['reward'], $now);
                 }
             }
         }
@@ -304,11 +314,12 @@ final readonly class AddStamps
     }
 
     /** A reward is a snapshot of what was earned, so a later card edit does not change it. No expiry yet. */
-    private function unlock(CardEnrollment $enrollment, LoyaltyCard $card, int $milestone, string $text, CarbonInterface $now): Reward
+    private function unlock(CardEnrollment $enrollment, LoyaltyCard $card, StampEvent $event, int $milestone, string $text, CarbonInterface $now): Reward
     {
         $cyclic = $card->mode === CardMode::Cyclic;
         $reward = (new Reward)->forceFill([
             'enrollment_id' => $enrollment->id,
+            'stamp_event_id' => $event->id,
             'mode' => $card->mode,
             'milestone' => $milestone,
             'reward_type' => $cyclic ? $card->reward_type : RewardType::Item,

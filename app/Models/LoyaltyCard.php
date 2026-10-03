@@ -83,6 +83,10 @@ class LoyaltyCard extends Model implements TenantModel
             }
         }
 
+        if (array_key_exists('tiers', $values) && ! $this->exists) {
+            throw new LogicException('A card\'s tiers change one card at a time, where its mode is known: not in a bulk update.');
+        }
+
         if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
             $this->assertTiers(
                 $values['mode'] ?? ($this->exists ? $this->getRawOriginal('mode') : null),
@@ -92,15 +96,13 @@ class LoyaltyCard extends Model implements TenantModel
     }
 
     /**
-     * Tiers are checked when the card is saved, also in bypass(): a progressive
-     * card needs well-formed tiers, and any tiers given must be well-formed, so
-     * one bad edit cannot stop every stamp on the card.
+     * A progressive card's tiers are checked when it is saved, also in
+     * bypass(), so one bad edit cannot stop every stamp on the card. A cyclic
+     * card ignores its tiers.
      */
     private function assertTiers(mixed $mode, mixed $tiers): void
     {
-        $progressive = $mode === CardMode::Progressive || $mode === CardMode::Progressive->value;
-
-        if ($progressive || $tiers !== null) {
+        if ($mode === CardMode::Progressive || $mode === CardMode::Progressive->value) {
             ProgressiveTiers::parse($tiers);
         }
     }

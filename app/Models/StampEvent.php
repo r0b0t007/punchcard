@@ -87,10 +87,14 @@ class StampEvent extends Model implements TenantModel
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()
             ->where('business_id', $values['business_id'] ?? null)
             ->whereIn('card_id', CardEnrollment::query()->whereKey($values['enrollment_id'] ?? null)->select('card_id'))
-            ->exists());
+            ->exists()
+            || ($this->takesStampsBack($values) && self::query()
+                ->where('enrollment_id', $values['enrollment_id'] ?? null)
+                ->where('business_id', $values['business_id'] ?? null)
+                ->exists()));
 
         if (! $honoured) {
-            throw new LogicException('A stamp is recorded at a business that honours the card.');
+            throw new LogicException('A stamp is recorded at a business that honours the card (a correction taking stamps back: where they were given).');
         }
     }
 

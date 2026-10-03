@@ -233,7 +233,13 @@ describe('cyclic cards', function (): void {
             ->and($result->rewards)->toHaveCount(1);
     });
 
-    it('never pays out on a correction, even after the card was made shorter', function (): void {
+    it('completes a card when a correction restores missed stamps', function (): void {
+        ($this->add)(($this->qr)(8));
+
+        expect(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Missed stamps', 2))->rewards)->toHaveCount(1);
+    });
+
+    it('never pays out on a correction that takes stamps back, even after the card was made shorter', function (): void {
         ($this->add)(($this->qr)(8));
         ($this->card)(['stamps_required' => 5]);
 
@@ -300,6 +306,16 @@ describe('progressive cards', function (): void {
 });
 
 describe('card mode', function (): void {
+    it('lets a cyclic card keep an empty tiers list', function (): void {
+        $card = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create(['tiers' => []]));
+
+        expect($card->exists)->toBeTrue();
+    });
+
+    it('changes no tiers in a bulk update, where a card\'s mode is unknown', function (): void {
+        $this->context->bypass(fn () => LoyaltyCard::query()->whereKey($this->tenants->cardB->id)->update(['tiers' => null]));
+    })->throws(LogicException::class, 'tiers');
+
     it('needs well-formed tiers on a progressive card when it is saved', function (array $tiers): void {
         $this->context->bypass(fn () => LoyaltyCard::factory()->for($this->tenants->orgA)->create(['mode' => CardMode::Progressive, ...$tiers]));
     })->throws(LogicException::class, 'tiers')->with([
@@ -322,6 +338,23 @@ describe('card mode', function (): void {
 });
 
 describe('corrections', function (): void {
+    it('takes stamps back where they were given, even on a card switched off or no longer honoured there', function (string $change): void {
+        ($this->add)(($this->qr)(3));
+        $this->context->bypass(fn () => $change === 'switched off'
+            ? $this->tenants->cardA->forceFill(['active' => false])->save()
+            : $this->tenants->cardA->businesses()->detach($this->tenants->a1->id));
+
+        expect(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Fraud', -3))->enrollment->current_stamps)->toBe(0);
+    })->with(['switched off', 'no longer honoured']);
+
+    it('takes no stamps back where none were given', function (): void {
+        ($this->add)(($this->qr)(3));
+        $this->context->bypass(fn () => $this->tenants->cardA->businesses()->detach($this->tenants->a2->id));
+
+        expect(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a2Location, $this->a2Staff, (string) Str::uuid(), 'Fraud', -1))))->toBe(StampRejection::NotHonoured)
+            ->and(fn () => $this->tenants->stamp($this->enrollment, $this->tenants->a2, ['source' => StampSource::Correction, 'qty' => -1, 'reason' => 'Fraud']))->toThrow(LogicException::class, 'honours');
+    });
+
     it('takes stamps back, never below zero', function (): void {
         ($this->add)(($this->qr)(3));
         $result = ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Wrong customer', -2));
@@ -341,6 +374,16 @@ describe('corrections', function (): void {
 });
 
 describe('idempotency', function (): void {
+    it('returns the rewards a retried stamp unlocked', function (): void {
+        ($this->card)(['cooldown_min' => 0, 'daily_cap' => null]);
+        $first = ($this->add)(($this->qr)(10, 'scan-full'));
+        $retry = ($this->add)(($this->qr)(10, 'scan-full'));
+
+        expect($retry->replayed)->toBeTrue()
+            ->and(array_map(fn (Reward $reward): int => $reward->id, $retry->rewards))->toBe([$first->rewards[0]->id])
+            ->and($first->rewards[0]->stamp_event_id)->toBe($first->event->id);
+    });
+
     it('applies a retried stamp once', function (): void {
         $first = ($this->add)(($this->qr)(2, 'scan-1'));
         $retry = ($this->add)(($this->qr)(2, 'scan-1'));
@@ -452,6 +495,7 @@ describe('refusals', function (): void {
         'a scan of 51' => fn (): StampRequest => ($this->qr)(51),
         'a blank key' => fn (): StampRequest => ($this->qr)(1, ' '),
         'a manual stamp without a reason' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, 'k', ' ', 1),
+        'a reason over 255 characters' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, 'k', str_repeat('a', 256), 1),
         'a correction of 0' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, 'k', 'Fix', 0),
         'a system stamp as a scan' => fn (): StampRequest => StampRequest::system(StampSource::Qr, $this->a1Location, 1),
     ]);

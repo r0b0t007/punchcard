@@ -117,8 +117,8 @@ final readonly class StampRequest
 
     private static function reason(string $reason): string
     {
-        if (trim($reason) === '') {
-            throw new InvalidArgumentException('Manual stamps and corrections need a reason.');
+        if (trim($reason) === '' || mb_strlen(trim($reason)) > 255) {
+            throw new InvalidArgumentException('Manual stamps and corrections need a reason of up to 255 characters.');
         }
 
         return trim($reason);
