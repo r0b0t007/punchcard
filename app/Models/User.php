@@ -10,6 +10,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -29,6 +31,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
+ * @property Carbon|null $anonymised_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -50,7 +53,32 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'anonymised_at' => 'datetime',
         ];
+    }
+
+    /** The account was deleted but its stamp history kept (DeleteAccount): no person behind it any more. */
+    public function isAnonymised(): bool
+    {
+        return $this->anonymised_at !== null;
+    }
+
+    /**
+     * People still behind their account: what campaigns, exports and other
+     * fan-outs to users start from.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function notAnonymised(Builder $query): void
+    {
+        $query->whereNull('anonymised_at');
+    }
+
+    /** No mail to an anonymised account: there is nobody to receive it. */
+    public function routeNotificationForMail(): ?string
+    {
+        return $this->isAnonymised() ? null : $this->email;
     }
 
     /**

@@ -2,13 +2,17 @@
 
 namespace App\Providers;
 
+use App\Support\Auth\ActiveUserProvider;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Queue;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -73,6 +77,16 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->carryTenantIntoQueuedJobs();
+        $this->registerUserProvider();
+    }
+
+    /**
+     * The "active-eloquent" user provider (config/auth.php): never authenticates
+     * an anonymised account (ActiveUserProvider, CHW-139).
+     */
+    private function registerUserProvider(): void
+    {
+        Auth::provider('active-eloquent', fn (Application $app, array $config): ActiveUserProvider => new ActiveUserProvider($app->make(Hasher::class), $config['model']));
     }
 
     /**
