@@ -7,10 +7,10 @@ description: Domain rules for stamps, rewards, redemption, cooldowns, caps, prog
 
 ## Entities (see docs/spec.md "Data model")
 
-- `loyalty_cards`: template per business. `mode` = `cyclic` (reset after reward) or `progressive` (lifetime stamps, `tiers` JSON of `{stamps, reward}`), `stamps_required` 5..50, `cooldown_min`, `daily_cap`, reward fields, design fields.
-- `card_enrollments`: a customer's copy. `current_stamps`, `lifetime_stamps`, `completed_count`, `last_stamp_at`, `referral_code`, `referred_by`.
-- `stamp_events`: append-only ledger. `qty`, `source` (`nfc`, `qr`, `manual`, `bonus`, `birthday`, `referral`, `correction`), `stamper_id`, `staff_id`, `location_id`. Counts on enrollments are a cache of this ledger.
-- `rewards`: `available` → `redeemed` | `expired`. One row per unlocked reward.
+- `loyalty_cards`: the organization's card, honoured by the businesses in `card_business` (ADR 0006). `mode` = `cyclic` (reset after reward) or `progressive` (lifetime stamps, `tiers` JSON of `{stamps, reward}`), `stamps_required` 5..50, `cooldown_min`, `daily_cap`, reward fields, design fields.
+- `card_enrollments` (`CardEnrollment`): a customer's copy. `current_stamps`, `lifetime_stamps`, `completed_count`, `last_stamp_at`, `referral_code`, `referred_by`.
+- `stamp_events`: append-only ledger. `qty`, `source` (`nfc`, `qr`, `manual`, `bonus`, `birthday`, `referral`, `correction`), `business_id`, `location_id`, `stamper_id` + `nfc_tag_id` + `counter` (nfc), `staff_id` + `idempotency_key` (qr, manual, correction), `reason` (manual, correction). Counts on enrollments are a cache of this ledger.
+- `rewards`: `available` → `redeemed` | `expired`. One row per unlocked reward, a snapshot of what was earned. No expiry is set yet (no card setting).
 
 ## Sources of a stamp
 
@@ -25,15 +25,16 @@ Staff can **arm** a stamper: the next verified tap within 60 s on that stamper g
 
 ## Adding stamps: one Action, one transaction
 
-`App\Actions\Stamps\AddStamps::handle(Enrollment, int $qty, StampSource, context)`:
+`App\Actions\Stamps\AddStamps::handle(CardEnrollment, StampRequest): StampResult`. Build the request with `StampRequest::nfc()`, `qr()`, `manual()`, `correction()` or `system()`, which check its shape like the Postgres CHECKs. A refusal is a `StampRejected` carrying a `StampRejection` and writes nothing.
 
-1. Lock the enrollment row (`lockForUpdate`).
-2. Check card active, stamper active (if any), cooldown (`last_stamp_at + cooldown_min`), daily cap (sum of today's qty in the location timezone). `manual`/`correction` bypass cooldown but are audited.
-3. Insert `stamp_events`, update enrollment counters.
-4. Cyclic: while `current_stamps >= stamps_required` → create reward, subtract `stamps_required`, `completed_count++` (overflow stamps carry over). Progressive: create a reward for each newly crossed tier; never reset.
-5. After commit: dispatch `EnrollmentChanged` (wallet pass update, live feed) as queued listeners.
+1. Lock the enrollment row (`lockForUpdate`). A known idempotency key returns the earlier stamp (`replayed`), or `IdempotencyConflict` if it was used for another stamp.
+2. Check: the card is active, the business honours it, the site is open (`ArchivedSites`; corrections are still allowed), and for a tap the stamper is current, active and at that location. Staff must work at the business; outside `bypass()` the caller's business must be the stamp's.
+3. Taps and scans only: the cooldown per customer per card (`last_stamp_at + cooldown_min`) and the daily cap per customer per card **per business** (today's nfc and qr qty there, the day starting at midnight in the location's timezone; a null cap means none). Manual stamps and corrections are deliberate staff acts with a reason; system stamps follow their own rules.
+4. Insert `stamp_events`, then update the enrollment counters. `last_stamp_at` moves for presence sources only. A correction never takes `current_stamps` below 0.
+5. Cyclic: while `current_stamps >= stamps_required` → create reward, subtract `stamps_required`, `completed_count++` (overflow stamps carry over). Progressive: create a reward (type `item`, the tier's text, milestone = the tier's stamps) for each newly crossed tier, once even if crossed again after a correction; never reset. Malformed tiers throw.
+6. After commit: `EnrollmentChanged` (ids only, `ShouldDispatchAfterCommit`) for queued listeners (wallet pass update, live feed).
 
-Idempotency: the NFC path is protected by the SUN counter; QR and staff paths take a client-generated `idempotency_key` stored on the event with a unique index.
+Idempotency: the NFC path is protected by the SUN counter (`unique(nfc_tag_id, counter)`); QR and staff paths take a client-generated `idempotency_key`, unique per business.
 
 ## Redemption
 

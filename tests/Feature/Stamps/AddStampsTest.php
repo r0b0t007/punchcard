@@ -1,0 +1,399 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Actions\Stamps\AddStamps;
+use App\Actions\Stamps\StampRejected;
+use App\Actions\Stamps\StampRequest;
+use App\Actions\Stamps\StampResult;
+use App\Actions\Tenancy\ArchiveBusiness;
+use App\Actions\Tenancy\ArchiveLocation;
+use App\Enums\BusinessRole;
+use App\Enums\CardMode;
+use App\Enums\RewardStatus;
+use App\Enums\StamperStatus;
+use App\Enums\StampRejection;
+use App\Enums\StampSource;
+use App\Events\EnrollmentChanged;
+use App\Models\CardEnrollment;
+use App\Models\Location;
+use App\Models\Reward;
+use App\Models\StampEvent;
+use App\Models\User;
+use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
+use Tests\Support\Tenants;
+
+/*
+|--------------------------------------------------------------------------
+| AddStamps (CHW-24)
+|--------------------------------------------------------------------------
+|
+| The single entry point for every stamp: rules (card, site, stamper,
+| cooldown per customer per card, daily cap per customer per business in the
+| location's timezone), the append-only ledger, the progress cache, rewards
+| (cyclic with carry-over, progressive tiers), idempotency and the
+| EnrollmentChanged event after commit.
+|
+*/
+
+beforeEach(function (): void {
+    Carbon::setTestNow('2026-10-05 10:00:00');
+
+    $this->tenants = Tenants::make();
+    $this->context = app(TenantContext::class);
+    $this->enrollment = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
+    $this->a1Staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
+    $this->a2Staff = $this->tenants->member(User::factory()->create(), $this->tenants->a2);
+    $this->a1Location = $this->tenants->locationOf($this->tenants->a1);
+    $this->a2Location = $this->tenants->locationOf($this->tenants->a2);
+
+    $this->card = function (array $settings): void {
+        $this->context->bypass(fn () => $this->tenants->cardA->forceFill($settings)->save());
+    };
+    $this->qr = fn (int $qty = 1, ?string $key = null, ?Location $at = null, ?User $staff = null): StampRequest => StampRequest::qr(
+        $at ?? $this->a1Location,
+        $staff ?? $this->a1Staff,
+        $key ?? (string) Str::uuid(),
+        $qty,
+    );
+    $this->add = fn (StampRequest $request, ?CardEnrollment $enrollment = null): StampResult => $this->context->bypass(
+        fn (): StampResult => app(AddStamps::class)->handle($enrollment ?? $this->enrollment, $request),
+    );
+    $this->rejection = function (Closure $stamp): ?StampRejection {
+        try {
+            $stamp();
+        } catch (StampRejected $rejected) {
+            return $rejected->rejection;
+        }
+
+        return null;
+    };
+});
+
+afterEach(function (): void {
+    Carbon::setTestNow();
+});
+
+describe('cooldown, per customer per card', function (): void {
+    it('refuses a second stamp inside the cooldown, and says when the next one is possible', function (): void {
+        ($this->add)(($this->qr)());
+        $this->travel(20)->minutes();
+        $this->travel(-1)->seconds();
+
+        try {
+            ($this->add)(($this->qr)());
+            $this->fail('The cooldown let a stamp through.');
+        } catch (StampRejected $rejected) {
+            expect($rejected->rejection)->toBe(StampRejection::Cooldown)
+                ->and($rejected->availableAt?->toDateTimeString())->toBe('2026-10-05 10:20:00');
+        }
+
+        $this->travel(1)->seconds();
+
+        expect(($this->add)(($this->qr)())->enrollment->lifetime_stamps)->toBe(2);
+    });
+
+    it('spans the businesses of a franchise card', function (): void {
+        ($this->add)(($this->qr)());
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)(at: $this->a2Location, staff: $this->a2Staff))))->toBe(StampRejection::Cooldown);
+    });
+
+    it('does not hold back manual, correction or system stamps', function (Closure $request): void {
+        ($this->add)(($this->qr)(2));
+
+        expect(($this->add)($request->call($this))->event->exists)->toBeTrue();
+    })->with([
+        'manual' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Card forgotten', 1),
+        'correction' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Double stamp', -1),
+        'bonus' => fn (): StampRequest => StampRequest::system(StampSource::Bonus, $this->a1Location, 1),
+    ]);
+});
+
+describe('daily cap, per customer per business', function (): void {
+    beforeEach(fn () => ($this->card)(['cooldown_min' => 0, 'daily_cap' => 5]));
+
+    it('allows exactly the cap, then refuses', function (): void {
+        ($this->add)(($this->qr)(3));
+        ($this->add)(($this->qr)(2));
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::DailyCap);
+    });
+
+    it('refuses a stamp that would go over the cap, even if some room is left', function (): void {
+        ($this->add)(($this->qr)(4));
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)(2))))->toBe(StampRejection::DailyCap);
+    });
+
+    it('counts each business of the card separately', function (): void {
+        ($this->add)(($this->qr)(5));
+
+        expect(($this->add)(($this->qr)(at: $this->a2Location, staff: $this->a2Staff))->enrollment->lifetime_stamps)->toBe(6);
+    });
+
+    it('starts a new day at midnight where the stamp is given', function (): void {
+        $this->context->bypass(fn () => $this->a1Location->forceFill(['timezone' => 'Asia/Tokyo'])->save());
+        Carbon::setTestNow('2026-10-05 14:30:00');
+        ($this->add)(($this->qr)(5));
+
+        Carbon::setTestNow('2026-10-05 14:59:59');
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::DailyCap);
+
+        Carbon::setTestNow('2026-10-05 15:00:00');
+        expect(($this->add)(($this->qr)())->enrollment->lifetime_stamps)->toBe(6);
+    });
+
+    it('has no cap when the card sets none', function (): void {
+        ($this->card)(['daily_cap' => null]);
+        ($this->add)(($this->qr)(40));
+
+        expect(($this->add)(($this->qr)(10))->enrollment->lifetime_stamps)->toBe(50);
+    });
+
+    it('does not count manual and system stamps against the cap', function (): void {
+        ($this->add)(StampRequest::manual($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Birthday party', 10));
+
+        expect(($this->add)(($this->qr)(5))->enrollment->lifetime_stamps)->toBe(15);
+    });
+});
+
+describe('cyclic cards', function (): void {
+    beforeEach(fn () => ($this->card)(['cooldown_min' => 0, 'daily_cap' => null, 'reward_text' => 'Free latte']));
+
+    it('unlocks a reward when the card fills, and carries the extra stamps over', function (): void {
+        ($this->add)(($this->qr)(9));
+        $result = ($this->add)(($this->qr)(3));
+
+        expect($result->enrollment->only(['current_stamps', 'lifetime_stamps', 'completed_count']))->toBe(['current_stamps' => 2, 'lifetime_stamps' => 12, 'completed_count' => 1])
+            ->and($result->rewards)->toHaveCount(1)
+            ->and($result->rewards[0]->only(['mode', 'milestone', 'reward_text', 'status', 'expires_at']))->toBe([
+                'mode' => CardMode::Cyclic,
+                'milestone' => 1,
+                'reward_text' => 'Free latte',
+                'status' => RewardStatus::Available,
+                'expires_at' => null,
+            ]);
+    });
+
+    it('unlocks one reward per full card in a single add', function (): void {
+        $result = ($this->add)(($this->qr)(21));
+
+        expect($result->enrollment->current_stamps)->toBe(1)
+            ->and(array_map(fn (Reward $reward): int => $reward->milestone, $result->rewards))->toBe([1, 2]);
+    });
+});
+
+describe('progressive cards', function (): void {
+    beforeEach(fn () => ($this->card)([
+        'mode' => CardMode::Progressive,
+        'cooldown_min' => 0,
+        'daily_cap' => null,
+        'tiers' => [['stamps' => 10, 'reward' => 'Free item'], ['stamps' => 5, 'reward' => '10% off'], ['stamps' => 20, 'reward' => 'VIP']],
+    ]));
+
+    it('unlocks every tier crossed in one add, and never resets', function (): void {
+        ($this->add)(($this->qr)(3));
+        $result = ($this->add)(($this->qr)(8));
+
+        expect($result->enrollment->only(['current_stamps', 'lifetime_stamps', 'completed_count']))->toBe(['current_stamps' => 11, 'lifetime_stamps' => 11, 'completed_count' => 2])
+            ->and(array_map(fn (Reward $reward): array => [$reward->milestone, $reward->reward_text], $result->rewards))->toBe([[5, '10% off'], [10, 'Free item']]);
+    });
+
+    it('never unlocks a tier twice, even crossed again after a correction', function (): void {
+        ($this->add)(($this->qr)(6));
+        ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Double stamp', -2));
+        $result = ($this->add)(($this->qr)(2));
+
+        expect($result->rewards)->toBe([])
+            ->and($this->context->bypass(fn (): int => Reward::query()->where('enrollment_id', $this->enrollment->id)->count()))->toBe(1);
+    });
+
+    it('refuses a card whose tiers are malformed', function (mixed $tiers): void {
+        ($this->card)(['tiers' => $tiers]);
+
+        ($this->add)(($this->qr)());
+    })->throws(LogicException::class, 'tiers')->with([
+        'none' => [null],
+        'empty' => [[]],
+        'zero stamps' => [[['stamps' => 0, 'reward' => 'Free']]],
+        'no reward' => [[['stamps' => 5]]],
+        'a blank reward' => [[['stamps' => 5, 'reward' => ' ']]],
+    ]);
+});
+
+describe('corrections', function (): void {
+    it('takes stamps back, never below zero', function (): void {
+        ($this->add)(($this->qr)(3));
+        $result = ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Wrong customer', -2));
+
+        expect($result->enrollment->only(['current_stamps', 'lifetime_stamps']))->toBe(['current_stamps' => 1, 'lifetime_stamps' => 1])
+            ->and(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Again', -2))))->toBe(StampRejection::CorrectionBelowZero);
+    });
+
+    it('still corrects at an archived location, where nothing else is stamped', function (): void {
+        ($this->add)(($this->qr)(2));
+        $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::SiteClosed)
+            ->and(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Fraud', -2))->enrollment->current_stamps)->toBe(0);
+    });
+});
+
+describe('idempotency', function (): void {
+    it('applies a retried stamp once', function (): void {
+        $first = ($this->add)(($this->qr)(2, 'scan-1'));
+        $retry = ($this->add)(($this->qr)(2, 'scan-1'));
+
+        expect($retry->replayed)->toBeTrue()
+            ->and($retry->event->id)->toBe($first->event->id)
+            ->and($retry->enrollment->lifetime_stamps)->toBe(2)
+            ->and($this->context->bypass(fn (): int => StampEvent::query()->count()))->toBe(1);
+    });
+
+    it('refuses the same key for a different stamp', function (string $change): void {
+        ($this->add)(($this->qr)(2, 'scan-1'));
+        $other = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
+
+        expect(($this->rejection)(fn () => match ($change) {
+            'another quantity' => ($this->add)(($this->qr)(3, 'scan-1')),
+            'another customer' => ($this->add)(($this->qr)(2, 'scan-1'), $other),
+        }))->toBe(StampRejection::IdempotencyConflict);
+    })->with(['another quantity', 'another customer']);
+
+    it('scopes keys to the business', function (): void {
+        ($this->add)(($this->qr)(1, 'scan-1'));
+        $this->travel(21)->minutes();
+
+        expect(($this->add)(($this->qr)(1, 'scan-1', $this->a2Location, $this->a2Staff))->replayed)->toBeFalse();
+    });
+});
+
+describe('refusals', function (): void {
+    it('refuses an inactive card', function (): void {
+        ($this->card)(['active' => false]);
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::CardInactive);
+    });
+
+    it('refuses a card the business does not honour', function (): void {
+        $b1Staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1);
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)(at: $this->tenants->locationOf($this->tenants->b1), staff: $b1Staff))))->toBe(StampRejection::NotHonoured);
+    });
+
+    it('refuses a closed business', function (): void {
+        $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->tenants->a1));
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::SiteClosed);
+    });
+
+    it('stamps on a tap at a working stamper, with its tag and counter', function (): void {
+        $stamper = $this->tenants->stamper($this->tenants->a1);
+
+        $event = ($this->add)(StampRequest::nfc($stamper, 7, 3))->event;
+
+        expect($event->only(['source', 'qty', 'stamper_id', 'nfc_tag_id', 'counter', 'location_id']))->toBe([
+            'source' => StampSource::Nfc,
+            'qty' => 3,
+            'stamper_id' => $stamper->id,
+            'nfc_tag_id' => $stamper->nfc_tag_id,
+            'counter' => 7,
+            'location_id' => $this->a1Location->id,
+        ]);
+    });
+
+    it('refuses a tap on a paused or ended stamper', function (string $state): void {
+        $stamper = $this->tenants->stamper($this->tenants->a1);
+        $this->context->bypass(fn () => $stamper->forceFill($state === 'paused' ? ['status' => StamperStatus::Disabled] : ['unassigned_at' => now()])->save());
+
+        expect(($this->rejection)(fn () => ($this->add)(StampRequest::nfc($stamper, 7))))->toBe(StampRejection::StamperUnavailable);
+    })->with(['paused', 'ended']);
+
+    it('checks the request shape before anything else', function (Closure $request): void {
+        $request->call($this);
+    })->throws(InvalidArgumentException::class)->with([
+        'a tap of 11' => fn (): StampRequest => StampRequest::nfc($this->tenants->stamper($this->tenants->a1), 7, 11),
+        'a scan of 0' => fn (): StampRequest => ($this->qr)(0),
+        'a scan of 51' => fn (): StampRequest => ($this->qr)(51),
+        'a blank key' => fn (): StampRequest => ($this->qr)(1, ' '),
+        'a manual stamp without a reason' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, 'k', ' ', 1),
+        'a correction of 0' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, 'k', 'Fix', 0),
+        'a system stamp as a scan' => fn (): StampRequest => StampRequest::system(StampSource::Qr, $this->a1Location, 1),
+    ]);
+});
+
+describe('callers', function (): void {
+    it('lets staff stamp at their own business, from their tenant', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+        expect(app(AddStamps::class)->handle($this->enrollment, ($this->qr)())->enrollment->lifetime_stamps)->toBe(1);
+    });
+
+    it('refuses a caller from another business or organization', function (string $caller): void {
+        match ($caller) {
+            'a sibling franchisee' => $this->context->set($this->tenants->orgA, $this->tenants->a2, businessRole: BusinessRole::Staff),
+            'HQ without a business' => $this->context->set($this->tenants->orgA, orgAdmin: true),
+            'another organization' => $this->context->set($this->tenants->orgB, $this->tenants->b1, businessRole: BusinessRole::Owner),
+        };
+
+        app(AddStamps::class)->handle($this->enrollment, ($this->qr)());
+    })->throws(LogicException::class)->with(['a sibling franchisee', 'HQ without a business', 'another organization']);
+
+    it('refuses staff who do not work at the business', function (): void {
+        ($this->add)(($this->qr)(staff: $this->a2Staff));
+    })->throws(LogicException::class, 'staff');
+});
+
+describe('locks and events', function (): void {
+    it('locks the enrollment row', function (): void {
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        ($this->add)(($this->qr)());
+
+        expect(collect($queries)->contains(fn (string $sql): bool => str_contains($sql, '"card_enrollments"') && str_contains($sql, 'for update')))->toBeTrue();
+    })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
+
+    it('announces the change once the stamp is committed', function (): void {
+        $seen = [];
+        Event::listen(EnrollmentChanged::class, function (EnrollmentChanged $event) use (&$seen): void {
+            $seen[] = $event;
+        });
+        ($this->card)(['cooldown_min' => 0, 'daily_cap' => null]);
+
+        $result = ($this->add)(($this->qr)(10));
+        ($this->add)(($this->qr)(1, 'scan-1'));
+        ($this->add)(($this->qr)(1, 'scan-1'));
+
+        expect($seen)->toHaveCount(2)
+            ->and($seen[0]->enrollmentId)->toBe($this->enrollment->id)
+            ->and($seen[0]->businessId)->toBe($this->tenants->a1->id)
+            ->and($seen[0]->rewardIds)->toBe([$result->rewards[0]->id]);
+    });
+
+    it('announces nothing when the surrounding transaction rolls back', function (): void {
+        $seen = 0;
+        Event::listen(EnrollmentChanged::class, function () use (&$seen): void {
+            $seen++;
+        });
+
+        try {
+            DB::transaction(function (): void {
+                ($this->add)(($this->qr)());
+
+                throw new RuntimeException('rolled back');
+            });
+        } catch (RuntimeException) {
+        }
+
+        expect($seen)->toBe(0)
+            ->and($this->context->bypass(fn (): int => StampEvent::query()->count()))->toBe(0);
+    });
+});

@@ -29,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property int $stamps_required
  * @property CardMode $mode
- * @property list<array{stamps: int, reward: string}>|null $tiers
+ * @property array<array-key, mixed>|null $tiers progressive tiers, meant as list<array{stamps: int, reward: string}>; unvalidated JSON, which AddStamps checks when it reads them
  * @property string|null $stamp_style
  * @property string|null $banner_path
  * @property RewardType $reward_type

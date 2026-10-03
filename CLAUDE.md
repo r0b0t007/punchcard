@@ -44,7 +44,7 @@ Full product spec, feature inventory, data model, screen IDs (C1..C14, B1..B16, 
 
 - `stamp_events` is append-only. Never update or delete rows; corrections are new events with a `source` of `manual`/`correction`.
 - `/t` verifies the SUN CMAC, then requires `counter > nfc_tags.last_counter` inside one DB transaction with a row lock on the tag. Replayed or copied URLs must fail. A tag (uid, keys, counter) is never deleted; stampers only assign it to a business.
-- Cooldown and daily cap are checked per customer per card before any stamp is written.
+- Cooldown (per customer per card) and daily cap (per customer per card per business, in the location's timezone) are checked before any tap or scan stamp is written, in `AddStamps`.
 - A completed card creates exactly one `rewards` row; redemption needs presence proof (tap or staff scan) and is idempotent.
 - Tenant isolation: a user of organization A can never read or change organization B data, and franchisee A1 can never see A2's staff, stampers, stats or customers who only visited A2. Every new tenant model gets an isolation test for both boundaries.
 - Secrets (tag master key, Apple certificates, Google service account) come from env/paths outside the repo. Never log key material or raw SUN parameters.

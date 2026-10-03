@@ -28,6 +28,6 @@ enum TapRejection: string
     /** The customer was stamped on this card too recently. */
     case Cooldown = 'cooldown';
 
-    /** The customer reached today's stamp limit on this card. */
+    /** The customer reached today's stamp limit on this card at this business. */
     case DailyCap = 'daily_cap';
 }
