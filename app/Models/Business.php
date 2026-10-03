@@ -136,15 +136,15 @@ class Business extends Model implements TenantModel
     }
 
     /**
-     * Businesses someone may work in, or run jobs for: not suspended. A pending
-     * one counts, so its owner can set up.
+     * Businesses someone may work in, or run jobs for: neither suspended nor
+     * archived. A pending one counts, so its owner can set up.
      *
      * @param  Builder<self>  $query
      */
     #[Scope]
-    protected function notSuspended(Builder $query): void
+    protected function operating(Builder $query): void
     {
-        $query->where('status', '!=', BusinessStatus::Suspended);
+        $query->whereNotIn('status', [BusinessStatus::Suspended, BusinessStatus::Archived]);
     }
 
     /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */

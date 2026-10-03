@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantModel;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -34,8 +35,21 @@ use LogicException;
 class CardBusiness extends Pivot implements TenantModel
 {
     use ChangedOnlyByOrgAdmin {
+        assertTenantInsert as assertProgramInsert;
         assertTenantWrite as assertProgramWrite;
     }
+
+    /**
+     * An archived business honours no card, also in bypass().
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantInsert(array $values): void
+    {
+        $this->assertProgramInsert($values);
+        ArchivedSites::assertOpen($values['business_id'] ?? null, null, 'A card participation');
+    }
+
     use GuardsTenantWrites;
 
     /**

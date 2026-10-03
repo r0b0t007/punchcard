@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\StampSource;
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -74,6 +75,7 @@ class StampEvent extends Model implements TenantModel
         }
 
         $this->assertSiteDataInsert($values);
+        ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp');
 
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()
             ->where('business_id', $values['business_id'] ?? null)
