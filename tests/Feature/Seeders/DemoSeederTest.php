@@ -100,6 +100,16 @@ describe('the demo', function (): void {
         });
     });
 
+    it('creates the businesses, cards, tags and accounts before any stamp', function (): void {
+        $this->context->bypass(function (): void {
+            $firstStamp = StampEvent::query()->min('created_at');
+
+            foreach ([Business::class, Location::class, LoyaltyCard::class, Stamper::class, NfcTag::class, User::class] as $model) {
+                expect($model::query()->max('created_at'))->toBeLessThan($firstStamp);
+            }
+        });
+    });
+
     it('redeems the earlier rewards at a business of the program, after unlocking, and keeps the latest available', function (): void {
         $this->context->bypass(function (): void {
             $statuses = Reward::query()->pluck('status')->unique()->sortBy(fn (RewardStatus $status): string => $status->value)->values()->all();

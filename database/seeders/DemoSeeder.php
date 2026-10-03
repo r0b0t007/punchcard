@@ -24,12 +24,14 @@ use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonInterface;
 use Faker\Factory as FakerFactory;
 use Faker\Generator;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 use RuntimeException;
 
 /**
@@ -38,15 +40,16 @@ use RuntimeException;
  * franchise (1 organization, 2 franchisee businesses sharing 1 card), with
  * customers who stamped at one franchisee, the other, or both.
  *
- * It follows the product's rules, as the stamp Actions would have: writes go
- * through bypass(); each member stamps at most once a day (so within the
- * cooldown and daily cap), never in the future, and at every place listed
- * for them; tag counters rise with time; each enrollment's counters and
- * rewards come from its stamp events, and redeemed rewards name a business
- * and location of the program. Logins (password "password"):
- * owner@cafe.demo.test, staff@cafe.demo.test, hq@franchise.demo.test,
- * owner@a1.demo.test (Tangier), owner@a2.demo.test (Tétouan) and
- * customer@demo.test, a member of both programs.
+ * It follows the product's rules, as the stamp Actions would have (until it
+ * can seed through them, once they exist): writes go through bypass(); the
+ * businesses, cards, tags and accounts exist 90 days before any stamp; each
+ * member stamps at most once a day (within the cooldown and daily cap),
+ * never in the future, and at every place listed for them; tag counters rise
+ * with time; each enrollment's counters and rewards come from its stamp
+ * events, and redeemed rewards name a business and location of the program.
+ * Logins (password "password"): owner@cafe.demo.test, staff@cafe.demo.test,
+ * hq@franchise.demo.test, owner@a1.demo.test (Tangier), owner@a2.demo.test
+ * (Tétouan) and customer@demo.test, a member of both programs.
  *
  * Known passwords and rows nothing can delete (the ledger, the tags): it runs
  * only in the local and testing environments, in one transaction.
@@ -56,7 +59,10 @@ final class DemoSeeder extends Seeder
     /** The only environments the demo may be seeded in. */
     public const array ENVIRONMENTS = ['local', 'testing'];
 
-    /** Its own generator, so seeding is repeatable without reseeding everyone's fake(). */
+    /** How long the businesses, cards, tags and accounts exist before the first stamp. */
+    private const int SETUP_DAYS_AGO = 90;
+
+    /** Repeatable values; seeded only while run() works, then reseeded randomly (Faker seeds mt_rand, which fake() shares). */
     private readonly Generator $faker;
 
     /** @var array<int, int> Each tag's last SUN counter, by tag id. */
@@ -67,7 +73,6 @@ final class DemoSeeder extends Seeder
         private readonly CreateIndependentBusiness $createIndependentBusiness,
     ) {
         $this->faker = FakerFactory::create();
-        $this->faker->seed(2026);
     }
 
     /** Refuses every environment but local and testing: demo accounts have a known password. */
@@ -82,15 +87,51 @@ final class DemoSeeder extends Seeder
     {
         self::assertDemoEnvironment();
 
-        DB::transaction(fn () => $this->context->bypass(function (): void {
-            $customer = $this->user('Salma Bennani', 'customer@demo.test');
+        $this->faker->seed(2026);
 
-            $this->seedCafe($customer);
-            $this->seedFranchise($customer);
-        }));
+        try {
+            DB::transaction(fn () => $this->context->bypass(function (): void {
+                [$cafe, $franchise] = $this->setUp();
+
+                $this->program(...$cafe);
+                $this->program(...$franchise);
+
+                foreach ($this->tagCounters as $tagId => $counter) {
+                    NfcTag::query()->whereKey($tagId)->update(['last_counter' => $counter]);
+                }
+            }));
+        } finally {
+            $this->faker->seed();
+        }
     }
 
-    private function seedCafe(User $customer): void
+    /**
+     * Creates both programs' businesses, cards, tags and accounts as they were
+     * SETUP_DAYS_AGO days ago, before any stamp.
+     *
+     * @return array{0: array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>}, 1: array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>}}
+     */
+    private function setUp(): array
+    {
+        $realTestNow = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now()->subDays(self::SETUP_DAYS_AGO));
+
+        try {
+            $customer = $this->user('Salma Bennani', 'customer@demo.test');
+
+            return [$this->setUpCafe($customer), $this->setUpFranchise($customer)];
+        } finally {
+            Carbon::setTestNow($realTestNow);
+        }
+    }
+
+    /**
+     * Café Hafa, signed up like any café. Each customer uses one to three of
+     * its stampers, served by the owner or the staff member.
+     *
+     * @return array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>}
+     */
+    private function setUpCafe(User $customer): array
     {
         $owner = $this->user('Yasmine Alaoui', 'owner@cafe.demo.test');
         $staff = $this->user('Karim Idrissi', 'staff@cafe.demo.test');
@@ -108,7 +149,6 @@ final class DemoSeeder extends Seeder
             $this->stamper($business, $kasbah, 'Kasbah counter'),
         ];
 
-        // Each customer uses one to three of the stampers, served by the owner or the staff member.
         $members = [];
 
         foreach ([$customer, ...$this->users(19)] as $member) {
@@ -122,10 +162,16 @@ final class DemoSeeder extends Seeder
             $members[] = [$member, $visitedAt];
         }
 
-        $this->program($card, $members);
+        return [$card, $members];
     }
 
-    private function seedFranchise(User $customer): void
+    /**
+     * Atlas Coffee: HQ, two franchisees sharing one card, six customers of each
+     * franchisee only and four of both, the demo customer among them.
+     *
+     * @return array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>}
+     */
+    private function setUpFranchise(User $customer): array
     {
         $hq = $this->user('Omar Tazi', 'hq@franchise.demo.test');
 
@@ -135,25 +181,24 @@ final class DemoSeeder extends Seeder
         ])->save();
         $franchise->admins()->attach($hq, ['role' => OrganizationRole::OrgAdmin->value]);
 
-        [$tangier, $tangierOwner, $tangierStamper] = $this->franchisee($franchise, 'Tangier', 'owner@a1.demo.test', 'Nadia Chraibi');
-        [$tetouan, $tetouanOwner, $tetouanStamper] = $this->franchisee($franchise, 'Tétouan', 'owner@a2.demo.test', 'Hamza Benjelloun');
-        $card = $this->card($franchise->id, 'Atlas card', 'Free espresso', [$tangier, $tetouan]);
+        $atTangier = $this->franchisee($franchise, 'Tangier', 'owner@a1.demo.test', 'Nadia Chraibi');
+        $atTetouan = $this->franchisee($franchise, 'Tétouan', 'owner@a2.demo.test', 'Hamza Benjelloun');
+        $card = $this->card($franchise->id, 'Atlas card', 'Free espresso', [$atTangier[0], $atTetouan[0]]);
 
-        $atTangier = [$tangier, $tangierStamper, $tangierOwner];
-        $atTetouan = [$tetouan, $tetouanStamper, $tetouanOwner];
-
-        // Six customers of each franchisee only, and four of both, the demo customer among them.
-        $this->program($card, [
+        return [$card, [
             ...array_map(fn (User $member): array => [$member, [$atTangier]], $this->users(6)),
             ...array_map(fn (User $member): array => [$member, [$atTetouan]], $this->users(6)),
             ...array_map(fn (User $member): array => [$member, [$atTangier, $atTetouan]], [$customer, ...$this->users(3)]),
-        ]);
+        ]];
     }
 
     /**
      * Enrolls the members and records their visits as stamp events, in time
      * order across the whole program so tag counters rise with time, then
-     * sets the counters and rewards those events give, as the stamp Action would.
+     * sets the counters and rewards those events give. A member stamps at
+     * most once a day, from yesterday back (within the cooldown and daily
+     * cap); their first visits go once to every place listed for them, the
+     * rest anywhere among them.
      *
      * @param  list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>  $members  each member and the places they stamp: business, stamper, served by
      */
@@ -162,21 +207,18 @@ final class DemoSeeder extends Seeder
         $visits = [];
 
         foreach ($members as [$member, $visitedAt]) {
-            // At most one stamp a day (within the cooldown and daily cap), from yesterday back.
             $days = $this->faker->randomElements(range(1, 60), $this->faker->numberBetween(count($visitedAt), 25));
             rsort($days);
-            $times = array_map(fn (mixed $day): Carbon => Carbon::now()->subDays((int) $day)
+            $times = array_map(fn (mixed $day): CarbonInterface => Carbon::now()->subDays((int) $day)
                 ->setTime($this->faker->numberBetween(8, 21), $this->faker->numberBetween(0, 59)), $days);
 
-            $enrollment = (new CardEnrollment)->forceFill([
+            $enrollment = CardEnrollment::factory()->create([
                 'card_id' => $card->id,
                 'user_id' => $member->id,
                 'referral_code' => strtoupper($this->faker->unique()->bothify('????####')),
                 'created_at' => $times[0],
             ]);
-            $enrollment->save();
 
-            // The first visits go once to every place listed for the member, the rest anywhere among them.
             foreach ($times as $index => $at) {
                 $visits[] = [$enrollment, $visitedAt[$index] ?? $visitedAt[$this->faker->numberBetween(0, count($visitedAt) - 1)], $at];
             }
@@ -200,11 +242,16 @@ final class DemoSeeder extends Seeder
     /**
      * Sets the enrollment's counters from its events and creates one reward per
      * completed card; all but the latest were redeemed two hours after unlocking.
+     * Cyclic cards only: a progressive demo card needs tier milestones.
      *
      * @param  list<array{0: StampEvent, 1: array{0: Business, 1: Stamper, 2: User}}>  $events  in time order
      */
     private function settle(LoyaltyCard $card, CardEnrollment $enrollment, array $events): void
     {
+        if ($card->mode !== CardMode::Cyclic) {
+            throw new LogicException('The demo seeder settles cyclic cards only.');
+        }
+
         $lifetime = count($events);
         $completed = intdiv($lifetime, $card->stamps_required);
 
@@ -222,14 +269,14 @@ final class DemoSeeder extends Seeder
 
             (new Reward)->forceFill([
                 'enrollment_id' => $enrollment->id,
-                'mode' => CardMode::Cyclic,
+                'mode' => $card->mode,
                 'milestone' => $milestone,
                 'reward_type' => $card->reward_type,
                 'reward_value' => $card->reward_value,
                 'reward_text' => $card->reward_text,
                 'unlocked_at' => $unlockedAt,
                 'status' => $redeemed ? RewardStatus::Redeemed : RewardStatus::Available,
-                'redeemed_at' => $redeemed ? $unlockedAt->addHours(2) : null,
+                'redeemed_at' => $redeemed ? $unlockedAt->copy()->addHours(2) : null,
                 'redeemed_by' => $redeemed ? $staff->id : null,
                 'redeemed_business_id' => $redeemed ? $business->id : null,
                 'redeemed_location_id' => $redeemed ? $stamper->location_id : null,
@@ -239,15 +286,15 @@ final class DemoSeeder extends Seeder
     }
 
     /** One stamp: a tap on the stamper (its tag's next counter) or a staff scan of the member QR. */
-    private function stamp(CardEnrollment $enrollment, Business $business, Stamper $stamper, User $staff, Carbon $at): StampEvent
+    private function stamp(CardEnrollment $enrollment, Business $business, Stamper $stamper, User $staff, CarbonInterface $at): StampEvent
     {
         $tap = $this->faker->boolean(70);
-        $event = (new StampEvent)->forceFill([
+
+        return StampEvent::factory()->create([
             'enrollment_id' => $enrollment->id,
             'business_id' => $business->id,
             'location_id' => $stamper->location_id,
             'source' => $tap ? StampSource::Nfc : StampSource::Qr,
-            'qty' => 1,
             'stamper_id' => $tap ? $stamper->id : null,
             'nfc_tag_id' => $tap ? $stamper->nfc_tag_id : null,
             'counter' => $tap ? $this->nextCounter($stamper->nfc_tag_id) : null,
@@ -255,13 +302,6 @@ final class DemoSeeder extends Seeder
             'idempotency_key' => $tap ? null : (string) Str::uuid(),
             'created_at' => $at,
         ]);
-        $event->save();
-
-        if ($tap) {
-            NfcTag::query()->whereKey($stamper->nfc_tag_id)->update(['last_counter' => $this->tagCounters[$stamper->nfc_tag_id]]);
-        }
-
-        return $event;
     }
 
     /** Taps skip a few counter values (test taps, rejected ones), as real tags do. */
@@ -273,7 +313,9 @@ final class DemoSeeder extends Seeder
     }
 
     /**
-     * @return array{0: Business, 1: User, 2: Stamper}
+     * A franchisee: its business, owner, one location and one stamper.
+     *
+     * @return array{0: Business, 1: Stamper, 2: User}
      */
     private function franchisee(Organization $franchise, string $city, string $email, string $ownerName): array
     {
@@ -288,7 +330,7 @@ final class DemoSeeder extends Seeder
 
         $location = $this->location($business, "Atlas {$city}", "Boulevard Mohammed V, {$city}");
 
-        return [$business, $owner, $this->stamper($business, $location, 'Counter')];
+        return [$business, $this->stamper($business, $location, 'Counter'), $owner];
     }
 
     /**
@@ -296,7 +338,7 @@ final class DemoSeeder extends Seeder
      */
     private function card(int $organizationId, string $name, string $reward, array $honouredBy): LoyaltyCard
     {
-        $card = LoyaltyCard::query()->create([
+        $card = LoyaltyCard::factory()->create([
             'organization_id' => $organizationId,
             'name' => $name,
             'stamps_required' => 10,
@@ -311,7 +353,7 @@ final class DemoSeeder extends Seeder
 
     private function location(Business $business, string $name, string $address): Location
     {
-        return Location::query()->create([
+        return Location::factory()->create([
             'business_id' => $business->id,
             'name' => $name,
             'address' => $address,
@@ -322,18 +364,12 @@ final class DemoSeeder extends Seeder
     /** Registers a new tag and assigns it, as the admin action does. */
     private function stamper(Business $business, Location $location, string $label): Stamper
     {
-        $tag = (new NfcTag)->forceFill(['uid' => '04'.strtoupper($this->faker->unique()->regexify('[0-9A-F]{12}'))]);
-        $tag->save();
-
-        $stamper = (new Stamper)->forceFill([
+        return Stamper::factory()->create([
             'business_id' => $business->id,
             'location_id' => $location->id,
-            'nfc_tag_id' => $tag->id,
+            'nfc_tag_id' => NfcTag::factory()->create(['uid' => '04'.strtoupper($this->faker->unique()->regexify('[0-9A-F]{12}'))])->id,
             'label' => $label,
         ]);
-        $stamper->save();
-
-        return $stamper;
     }
 
     private function user(string $name, string $email): User
