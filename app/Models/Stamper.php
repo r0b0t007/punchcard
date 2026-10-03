@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\StamperStatus;
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -67,6 +68,7 @@ class Stamper extends Model implements TenantModel
     public function assertTenantInsert(array $values): void
     {
         $this->assertSiteDataInsert($values);
+        ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamper', lock: true);
 
         if (! app(TenantContext::class)->isBypassed()) {
             throw new LogicException('A tag is assigned by an admin action, in TenantContext::bypass().');
@@ -81,6 +83,10 @@ class Stamper extends Model implements TenantModel
     {
         if (array_key_exists('nfc_tag_id', $values)) {
             throw new LogicException('A stamper\'s tag cannot change: end this assignment and assign the tag again.');
+        }
+
+        if (array_key_exists('location_id', $values)) {
+            ArchivedSites::assertOpen(null, $values['location_id'], 'A stamper', lock: true);
         }
 
         if (app(TenantContext::class)->isBypassed()) {

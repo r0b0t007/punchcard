@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\BusinessRole;
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -41,13 +42,15 @@ class BusinessMember extends Pivot implements TenantModel
     use GuardsTenantWrites;
 
     /**
-     * Only an owner or org admin adds staff or owners (staff cannot add anyone).
+     * Only an owner or org admin adds staff or owners (staff cannot add anyone),
+     * and nobody joins an archived business or location, also in bypass().
      *
      * @param  array<string, mixed>  $values
      */
     public function assertTenantInsert(array $values): void
     {
         $this->assertSiteDataInsert($values);
+        ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A membership', lock: true);
         $this->assertCanManageMembers();
     }
 

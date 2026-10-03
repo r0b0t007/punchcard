@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -23,7 +24,10 @@ use LogicException;
  * - forceDelete() stays inside the scope;
  * - a loaded model's save or delete that matches no row in the tenant throws;
  * - raw inserts, upserts, updateOrInsert, updateFrom and truncate, which
- *   skip the model or the scope, need TenantContext::bypass().
+ *   skip the model or the scope, need TenantContext::bypass();
+ * - a model insert, an update or a delete runs with its checks in one
+ *   transaction (opened only when none is), so a lock a check takes, like
+ *   ArchivedSites', holds until the write commits.
  *
  * The tenant scope cannot be dropped or replaced outside bypass(), which also
  * covers relation rawUpdate()/touch(). getQuery() and getBaseQuery() return the
@@ -65,18 +69,22 @@ final class TenantBuilder extends Builder
      */
     public function update(array $values): int
     {
-        $this->guardWrite('update', $values);
+        return $this->atomically(function () use ($values): int {
+            $this->guardWrite('update', $values);
 
-        return $this->checkModelWrite(parent::update($values));
+            return $this->checkModelWrite(parent::update($values));
+        });
     }
 
     public function delete(): mixed
     {
-        $this->guardWrite('delete', []);
+        return $this->atomically(function (): mixed {
+            $this->guardWrite('delete', []);
 
-        $deleted = parent::delete();
+            $deleted = parent::delete();
 
-        return is_int($deleted) ? $this->checkModelWrite($deleted) : $deleted;
+            return is_int($deleted) ? $this->checkModelWrite($deleted) : $deleted;
+        });
     }
 
     /**
@@ -200,7 +208,7 @@ final class TenantBuilder extends Builder
 
     /**
      * @param  string  $identifier
-     * @param  Scope<TModel>|\Closure  $scope
+     * @param  Scope<TModel>|Closure  $scope
      */
     public function withGlobalScope($identifier, $scope): static
     {
@@ -235,8 +243,15 @@ final class TenantBuilder extends Builder
 
         if ($this->expectingModelInsert && in_array($name, self::MODEL_INSERTS, true)) {
             $this->expectingModelInsert = false;
-            $this->assertModelInsert($parameters[0] ?? []);
-        } elseif (in_array($name, self::UNGUARDED_WRITES, true)) {
+
+            return $this->atomically(function () use ($method, $parameters): mixed {
+                $this->assertModelInsert($parameters[0] ?? []);
+
+                return parent::__call($method, $parameters);
+            });
+        }
+
+        if (in_array($name, self::UNGUARDED_WRITES, true)) {
             $this->guardRawWrite($method);
 
             // Their update half follows the same rules as update(), also in bypass().
@@ -248,6 +263,22 @@ final class TenantBuilder extends Builder
         }
 
         return parent::__call($method, $parameters);
+    }
+
+    /**
+     * Runs a guarded write and its checks in one transaction, opening one only
+     * when none is open: inside the stamp and archive Actions it adds nothing.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $write
+     * @return TResult
+     */
+    private function atomically(Closure $write): mixed
+    {
+        $connection = $this->model->getConnection();
+
+        return $connection->transactionLevel() > 0 ? $write() : $connection->transaction($write);
     }
 
     private function assertModelInsert(mixed $values): void

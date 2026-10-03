@@ -519,9 +519,9 @@ describe('escape routes', function (): void {
         $this->tenants->a1->update(['name' => 'renamed by staff']);
     })->throws(LogicException::class, 'Only the owner or an org admin can change the business.');
 
-    it('needs bypass() for Organization::notSuspended(), whose answer depends on every business', function (): void {
+    it('needs bypass() for Organization::operating(), whose answer depends on every business', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1);
 
-        Organization::query()->notSuspended()->get();
+        Organization::query()->operating()->get();
     })->throws(LogicException::class, 'use it inside TenantContext::bypass()');
 });

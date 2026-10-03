@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\BillingEntity;
 use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -42,6 +43,7 @@ use LogicException;
  * @property BillingEntity $billing_entity
  * @property string|null $plan
  * @property bool $white_label
+ * @property Carbon|null $archived_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -101,30 +103,33 @@ class Organization extends Model implements TenantModel
             throw new LogicException('Only an org admin can change the organization.');
         }
 
-        if (array_intersect(array_keys($values), ['type', 'plan', 'billing_entity', 'white_label']) !== []) {
-            throw new LogicException('Organization type, plan and billing change through billing and admin actions, in TenantContext::bypass().');
+        if (array_intersect(array_keys($values), ['type', 'plan', 'billing_entity', 'white_label', 'archived_at']) !== []) {
+            throw new LogicException('Organization type, plan, billing and archiving change through billing and admin actions, in TenantContext::bypass().');
         }
     }
 
     /**
-     * Organizations someone may work in: a franchise always (HQ keeps working
-     * while a franchisee is suspended), an independent café or chain unless its
-     * business is suspended, since there the business is the account. It reads
-     * every business of the organization, so it needs bypass(): inside a tenant
-     * the business scope would hide some of them and change the answer.
+     * Organizations someone may work in: never an archived one; a franchise
+     * otherwise always (HQ keeps working while a franchisee is suspended or
+     * archived), an independent café or chain only while its business
+     * operates, since there the business is the account. It reads every
+     * business of the organization, so it needs bypass(): inside a tenant the
+     * business scope would hide some of them and change the answer.
      *
      * @param  Builder<self>  $query
      */
     #[Scope]
-    protected function notSuspended(Builder $query): void
+    protected function operating(Builder $query): void
     {
         if (! app(TenantContext::class)->isBypassed()) {
-            throw new LogicException('Organization::notSuspended() reads every business of the organization: use it inside TenantContext::bypass().');
+            throw new LogicException('Organization::operating() reads every business of the organization: use it inside TenantContext::bypass().');
         }
 
-        $query->where(fn (Builder $query) => $query->where('type', OrganizationType::Franchise)
-            ->orWhereDoesntHave('businesses')
-            ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->notSuspended()));
+        $query->whereNull('archived_at')
+            ->where(fn (Builder $query) => $query->where('type', OrganizationType::Franchise)
+                ->orWhereDoesntHave('businesses')
+                // Business::operating() without its organization check: this one is it.
+                ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)->whereNull('archived_at')));
     }
 
     /**
@@ -173,6 +178,7 @@ class Organization extends Model implements TenantModel
             'type' => OrganizationType::class,
             'billing_entity' => BillingEntity::class,
             'white_label' => 'boolean',
+            'archived_at' => 'datetime',
         ];
     }
 }

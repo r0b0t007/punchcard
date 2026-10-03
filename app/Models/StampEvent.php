@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\StampSource;
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -63,7 +64,9 @@ class StampEvent extends Model implements TenantModel
      * Only the stamp Actions record stamps, after proof of presence (a tap, a
      * staff scan), in bypass(): a business recording one directly could stamp a
      * customer it cannot see, and make them "stamped here". The business must
-     * honour the enrollment's card: visibility alone is not enough.
+     * honour the enrollment's card: visibility alone is not enough. Nothing
+     * but a correction is recorded at an archived business or location
+     * (ArchivedSites): the ledger stays fixable where the stamps were given.
      *
      * @param  array<string, mixed>  $values
      */
@@ -75,6 +78,12 @@ class StampEvent extends Model implements TenantModel
 
         $this->assertSiteDataInsert($values);
 
+        // A tap holds its stamper's lock, which the archive waits for (CloseSites);
+        // a stamp without a stamper (QR, manual, system) locks the site rows instead.
+        if (! $this->isCorrection($values['source'] ?? null)) {
+            ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp', lock: ($values['stamper_id'] ?? null) === null);
+        }
+
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()
             ->where('business_id', $values['business_id'] ?? null)
             ->whereIn('card_id', CardEnrollment::query()->whereKey($values['enrollment_id'] ?? null)->select('card_id'))
@@ -83,6 +92,11 @@ class StampEvent extends Model implements TenantModel
         if (! $honoured) {
             throw new LogicException('A stamp is recorded at a business that honours the card.');
         }
+    }
+
+    private function isCorrection(mixed $source): bool
+    {
+        return $source === StampSource::Correction || $source === StampSource::Correction->value;
     }
 
     /**

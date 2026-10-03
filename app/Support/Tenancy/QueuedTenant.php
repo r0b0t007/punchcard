@@ -17,7 +17,7 @@ use WeakMap;
  * It carries no user rights (a job acts for no user, and a delayed job must
  * not keep rights revoked since) and no bypass() (code that spans tenants
  * calls it itself, so every such place stays searchable). A job whose tenant
- * is gone or suspended by the time it runs fails, once, like ResolveTenant
+ * is gone, suspended or archived by the time it runs fails, once, like ResolveTenant
  * refuses a user there.
  *
  * Sync jobs get the same treatment, then the dispatching code gets its own
@@ -65,7 +65,7 @@ final class QueuedTenant
 
     /**
      * Before a job runs: saves the current context and enters the job's tenant.
-     * A tenant that is gone, suspended or malformed fails the job without
+     * A tenant that is gone, suspended, archived or malformed fails the job without
      * retries (it will not come back) rather than running it in a wider or
      * empty scope.
      */
@@ -118,19 +118,19 @@ final class QueuedTenant
 
         return $this->context()->bypass(function () use ($organizationId, $businessId): array {
             if ($businessId === null) {
-                $organization = Organization::query()->notSuspended()->find($organizationId);
+                $organization = Organization::query()->operating()->find($organizationId);
 
                 return $organization instanceof Organization
                     ? [$organization, null]
-                    : throw new TenantUnavailable('The tenant this job was queued for no longer exists or is suspended.');
+                    : throw new TenantUnavailable('The tenant this job was queued for no longer exists, or is suspended or archived.');
             }
 
-            // A business that is not suspended keeps its organization available, so
-            // two primary key lookups do, without the organization scope's subqueries.
-            $business = Business::query()->notSuspended()->with('organization')->find($businessId);
+            // An operating business (its organization not archived) makes the
+            // organization available: no need for Organization::operating() too.
+            $business = Business::query()->operating()->with('organization')->find($businessId);
 
             if (! $business instanceof Business) {
-                throw new TenantUnavailable('The tenant this job was queued for no longer exists or is suspended.');
+                throw new TenantUnavailable('The tenant this job was queued for no longer exists, or is suspended or archived.');
             }
 
             if ((int) $business->organization_id !== $organizationId) {

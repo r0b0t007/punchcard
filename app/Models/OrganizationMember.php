@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\OrganizationRole;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -55,6 +56,7 @@ class OrganizationMember extends Pivot implements TenantModel
             throw new LogicException('An org admin membership needs an organization.');
         }
 
+        ArchivedSites::assertOrganizationOpen($values['organization_id'], 'A membership', lock: true);
         $this->assertOrgAdminContext((int) $values['organization_id']);
     }
 

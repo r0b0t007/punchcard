@@ -23,11 +23,12 @@ use App\Support\Tenancy\TenantContext;
  * - org admin of it: the organization (every business in it);
  * - anything else: no tenant (fail closed) until the user picks.
  * Memberships spread over several organizations always need a choice.
- * Customers have no memberships and get no tenant. A suspended business does
- * not resolve at all (fail closed); a pending one does, so its owner can set up.
- * Neither does an independent or chain organization whose business is
- * suspended: there the business is the account. Franchise HQ keeps working
- * while a franchisee is suspended.
+ * Customers have no memberships and get no tenant. A suspended or archived
+ * business does not resolve at all (fail closed), nor does any business of an
+ * archived organization; a pending one does, so its owner can set up.
+ * Neither does an archived organization, or an independent or chain one whose
+ * business is suspended or archived: there the business is the account.
+ * Franchise HQ keeps working while a franchisee is suspended or archived.
  *
  * The context also carries what the user may do there: org admin rights from
  * an org_admin row in organization_user, the business role from business_user
@@ -45,12 +46,12 @@ final readonly class ResolveTenant
             $roles = BusinessMember::query()->where('user_id', $user->id)->pluck('role', 'business_id');
             $businesses = Business::query()
                 ->whereIn('id', $roles->keys())
-                ->notSuspended()
+                ->operating()
                 ->with('organization')
                 ->get();
             $organizations = Organization::query()
                 ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->where('role', OrganizationRole::OrgAdmin)->select('organization_id'))
-                ->notSuspended()
+                ->operating()
                 ->get();
 
             [$type, $id] = $this->parseChoice($choice);

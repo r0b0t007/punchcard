@@ -8,6 +8,7 @@ use App\Enums\CardMode;
 use App\Enums\RewardType;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\LoyaltyCardFactory;
@@ -50,11 +51,24 @@ use Illuminate\Support\Carbon;
 #[UseEloquentBuilder(TenantBuilder::class)]
 class LoyaltyCard extends Model implements TenantModel
 {
-    use ChangedOnlyByOrgAdmin;
+    use ChangedOnlyByOrgAdmin {
+        assertTenantInsert as assertProgramInsert;
+    }
     use GuardsTenantWrites;
 
     /** @use HasFactory<LoyaltyCardFactory> */
     use HasFactory;
+
+    /**
+     * No new card in an archived organization, also in bypass().
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantInsert(array $values): void
+    {
+        $this->assertProgramInsert($values);
+        ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'A card', lock: true);
+    }
 
     /**
      * The businesses that honour the card. Uses the guarded CardBusiness pivot,
