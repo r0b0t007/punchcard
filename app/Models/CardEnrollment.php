@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\StampSource;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Models\Concerns\HoldsCustomerData;
 use App\Support\Tenancy\TenantBuilder;
+use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\CardEnrollmentFactory;
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * A customer's copy of a loyalty card, shared by every business that honours
@@ -49,7 +52,28 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     /** @use HasFactory<CardEnrollmentFactory> */
     use HasFactory;
 
-    use HoldsCustomerData;
+    use HoldsCustomerData {
+        assertTenantWrite as assertCustomerDataWrite;
+    }
+
+    /** Progress, a cache of the stamp ledger: only the stamp Actions change it, in bypass(). */
+    private const array LEDGER_COLUMNS = ['current_stamps', 'lifetime_stamps', 'completed_count', 'last_stamp_at'];
+
+    /**
+     * Progress changes only with the ledger, so a counter never moves without
+     * a stamp event behind it (a franchisee setting it would mint rewards).
+     *
+     * @param  'update'|'delete'  $operation
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantWrite(string $operation, array $values): void
+    {
+        $this->assertCustomerDataWrite($operation, $values);
+
+        if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::LEDGER_COLUMNS) !== []) {
+            throw new LogicException('Progress is a cache of the stamp ledger: the stamp Actions update it, in TenantContext::bypass().');
+        }
+    }
 
     /** organization_id is the card's, also in bypass(). */
     public function fillTenantColumns(): void
@@ -82,13 +106,17 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
-     * A franchisee sees the members who stamped there (ADR 0006).
+     * A franchisee sees the members who were there: a stamp proving presence
+     * (StampSource::presenceValues()) at this business (ADR 0006). A bonus,
+     * birthday or referral stamp recorded at a business does not count.
      *
      * @param  Builder<covariant Model>  $query
      */
     public function constrainToBusiness(Builder $query, int $businessId): void
     {
-        $query->whereHas('stampEvents', fn (Builder $events) => $events->where('business_id', $businessId));
+        $query->whereHas('stampEvents', fn (Builder $events) => $events
+            ->where('business_id', $businessId)
+            ->whereIn('source', StampSource::presenceValues()));
     }
 
     /**

@@ -17,13 +17,16 @@ use Illuminate\Support\Facades\Schema;
  * Composite foreign keys keep an event in its enrollment's organization, at
  * a location of its business, on a stamper of that business, and with that
  * stamper's tag. unique(nfc_tag_id, counter) is the second replay guard,
- * keyed on the tag so a reassigned tag cannot slip past it.
+ * keyed on the tag so a reassigned tag cannot slip past it. The request's IP
+ * and user agent are personal data and belong to the tap log, which can be
+ * purged; this table never changes, so it holds none.
  *
  * On every driver, triggers refuse any UPDATE or DELETE (and TRUNCATE on
  * Postgres), whatever writes it. On Postgres (production), CHECK constraints
- * also keep qty between -50 and 50 and not 0, negative only for a
- * correction, a reason on manual stamps and corrections, a tag, stamper and
- * counter on taps, and a known source.
+ * also keep qty between -50 and 50 and not 0 (1..10 on a tap, the arming
+ * cap), negative only for a correction, a non-empty reason on manual stamps
+ * and corrections, a staff member and an idempotency key on staff stamps, a
+ * tag, stamper and counter on taps and only on taps, and a known source.
  */
 return new class extends Migration
 {
@@ -46,10 +49,8 @@ return new class extends Migration
             $table->string('source');
             $table->smallInteger('qty');
             $table->unsignedInteger('counter')->nullable();
-            $table->string('idempotency_key', 64)->nullable()->unique();
+            $table->string('idempotency_key', 64)->nullable();
             $table->string('reason')->nullable();
-            $table->string('ip', 45)->nullable();
-            $table->string('user_agent')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
             $table->foreign(['enrollment_id', 'organization_id'])
@@ -68,8 +69,12 @@ return new class extends Migration
                 ->references(['id', 'nfc_tag_id'])->on('stampers')
                 ->noActionOnDelete();
             $table->unique(['nfc_tag_id', 'counter']);
-            // The "stamped here" rule: EXISTS (an event for this enrollment at this business).
-            $table->index(['enrollment_id', 'business_id']);
+            // A staff scan or manual stamp is applied once per business; scoped, so another
+            // organization's key can neither block nor reveal one here.
+            $table->unique(['business_id', 'idempotency_key']);
+            // The "stamped here" rule (EXISTS an event for this enrollment at this business)
+            // and the daily cap (this customer's stamps here today).
+            $table->index(['enrollment_id', 'business_id', 'created_at']);
             $table->index(['business_id', 'created_at']);
             $table->index(['organization_id', 'created_at']);
             $table->index(['location_id', 'business_id']);
@@ -82,13 +87,17 @@ return new class extends Migration
                 alter table stamp_events
                     add constraint stamp_events_qty_check check (qty <> 0 and qty between -50 and 50),
                     add constraint stamp_events_negative_check check (qty > 0 or source = 'correction'),
+                    add constraint stamp_events_tap_qty_check check (source <> 'nfc' or qty between 1 and 10),
                     add constraint stamp_events_reason_check check (
-                        source not in ('manual', 'correction') or reason is not null
+                        source not in ('manual', 'correction') or (reason is not null and reason <> '')
+                    ),
+                    add constraint stamp_events_staff_check check (
+                        source not in ('qr', 'manual', 'correction') or (staff_id is not null and idempotency_key is not null)
                     ),
                     add constraint stamp_events_nfc_check check (
-                        source <> 'nfc' or (nfc_tag_id is not null and stamper_id is not null and counter is not null)
+                        (source = 'nfc') = (nfc_tag_id is not null and stamper_id is not null and counter is not null)
+                        and (source = 'nfc' or (nfc_tag_id is null and stamper_id is null and counter is null))
                     ),
-                    add constraint stamp_events_counter_check check (counter is null or nfc_tag_id is not null),
                     add constraint stamp_events_source_check check (
                         source in ('nfc', 'qr', 'manual', 'bonus', 'birthday', 'referral', 'correction')
                     )

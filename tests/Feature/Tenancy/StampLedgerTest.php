@@ -114,48 +114,73 @@ describe('who sees what', function (): void {
             ->and(Reward::query()->pluck('id')->all())->toBe([$bobReward->id]);
     });
 
-    it('lets a franchisee update its customers\' progress, never another franchisee\'s', function (): void {
+    it('limits a franchisee\'s bulk updates to the customers who stamped there', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
-        $this->carol->forceFill(['current_stamps' => 2])->save();
+        expect(CardEnrollment::query()->update(['updated_at' => now()]))->toBe(2);
+    });
 
-        expect($this->carol->refresh()->current_stamps)->toBe(2);
+    it('does not let a franchisee change progress, even of its own customers', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
-        $this->bob->forceFill(['current_stamps' => 2])->save();
-    })->throws(LogicException::class);
+        $this->carol->forceFill(['current_stamps' => 50])->save();
+    })->throws(LogicException::class, 'cache of the stamp ledger');
+
+    it('makes nobody "stamped here" through a bonus, birthday or referral stamp', function (StampSource $source): void {
+        $this->tenants->stamp($this->bob, $this->tenants->a1, ['source' => $source]);
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+        expect(CardEnrollment::query()->whereKey($this->bob->id)->exists())->toBeFalse();
+    })->with([StampSource::Bonus, StampSource::Birthday, StampSource::Referral]);
+
+    it('shows a reward redeemed here without the customer behind it', function (): void {
+        $bobReward = $this->tenants->reward($this->bob);
+        $this->context->bypass(fn () => $bobReward->forceFill([
+            'status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id,
+        ])->save());
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+        $reward = Reward::query()->with('enrollment')->findOrFail($bobReward->id);
+
+        expect($reward->enrollment)->toBeNull();
+    });
 });
 
 describe('writes', function (): void {
-    it('lets staff record a stamp at their own business, on a card it honours', function (): void {
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+    it('records stamps only through the stamp Actions, in bypass(): not even the org admin directly', function (string $tenant): void {
+        match ($tenant) {
+            'franchisee staff' => $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff),
+            'an owner who is org admin' => $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner),
+            'HQ' => $this->context->set($this->tenants->orgA, orgAdmin: true),
+        };
 
-        $event = (new StampEvent)->forceFill([
+        // Bob only stamped at A2: a direct insert would stamp him without proof and make him "stamped here".
+        (new StampEvent)->forceFill([
             'enrollment_id' => $this->bob->id, 'business_id' => $this->tenants->a1->id,
             'location_id' => $this->tenants->locationOf($this->tenants->a1)->id, 'source' => StampSource::Qr, 'qty' => 1,
-        ]);
-        $event->save();
+        ])->save();
+    })->throws(LogicException::class, 'stamp Actions')->with(['franchisee staff', 'an owner who is org admin', 'HQ']);
 
-        expect($event->organization_id)->toBe($this->tenants->orgA->id)
-            ->and(CardEnrollment::query()->whereKey($this->bob->id)->exists())->toBeTrue();
-    });
-
-    it('refuses a stamp at another business or on a card the business does not honour', function (string $how): void {
+    it('records a stamp only at a business that honours the card, even in bypass()', function (string $how): void {
         $a2Only = $this->context->bypass(function (): LoyaltyCard {
             $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create();
             $card->businesses()->attach($this->tenants->a2);
 
             return $card;
         });
-        $a2Member = $this->tenants->enroll(User::factory()->create(), $a2Only);
-        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
-        $values = match ($how) {
-            'at A2' => ['enrollment_id' => $this->carol->id, 'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id],
-            'on a card A1 does not honour' => ['enrollment_id' => $a2Member->id, 'business_id' => $this->tenants->a1->id, 'location_id' => $this->tenants->locationOf($this->tenants->a1)->id],
+        match ($how) {
+            'an A2-only card at A1' => $this->tenants->stamp($this->tenants->enroll(User::factory()->create(), $a2Only), $this->tenants->a1),
+            'another organization\'s card' => $this->tenants->stamp($this->dave, $this->tenants->a1),
         };
+    })->throws(LogicException::class, 'honours the card')->with(['an A2-only card at A1', 'another organization\'s card']);
 
-        (new StampEvent)->forceFill([...$values, 'source' => StampSource::Qr, 'qty' => 1])->save();
-    })->throws(LogicException::class)->with(['at A2', 'on a card A1 does not honour']);
+    it('never rewrites the ledger through upserts, even in bypass()', function (string $how): void {
+        $this->context->bypass(fn () => match ($how) {
+            'upsert' => StampEvent::query()->upsert([['id' => $this->aliceAtA1->id, 'qty' => 9]], ['id'], ['qty']),
+            'updateOrInsert' => StampEvent::query()->updateOrInsert(['id' => $this->aliceAtA1->id], ['qty' => 9]),
+        });
+    })->throws(LogicException::class, 'append-only')->with(['upsert', 'updateOrInsert']);
 });
 
 describe('integrity', function (): void {
@@ -167,12 +192,18 @@ describe('integrity', function (): void {
         ])))->toThrow(QueryException::class);
     });
 
-    it('accepts each idempotency key once', function (): void {
+    it('accepts each idempotency key once per business', function (): void {
         $this->tenants->stamp($this->alice, $this->tenants->a1, ['idempotency_key' => 'scan-1']);
+        $this->tenants->stamp($this->carol, $this->tenants->a2, ['idempotency_key' => 'scan-1']);
 
         expect(fn () => DB::transaction(fn () => $this->tenants->stamp($this->alice, $this->tenants->a1, ['idempotency_key' => 'scan-1'])))
             ->toThrow(QueryException::class);
     });
+
+    it('lets Postgres refuse truncating the ledger through a cascade', function (): void {
+        expect(fn () => DB::transaction(fn () => DB::statement('truncate table card_enrollments cascade')))
+            ->toThrow(QueryException::class, 'stamp_events_append_only');
+    })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'TRUNCATE CASCADE is Postgres only');
 
     it('lets the database refuse an event inconsistent with its stamper, tag or location, even in bypass()', function (string $how): void {
         $a2Stamper = $this->tenants->stamper($this->tenants->a2);
@@ -208,6 +239,10 @@ describe('integrity', function (): void {
         'a negative qty outside a correction' => [['qty' => -1, 'source' => StampSource::Manual, 'reason' => 'x'], 'stamp_events_negative_check'],
         'a manual stamp without a reason' => [['source' => StampSource::Manual], 'stamp_events_reason_check'],
         'a tap without its tag and counter' => [['source' => StampSource::Nfc], 'stamp_events_nfc_check'],
+        'a counter on a QR stamp' => [['counter' => 5], 'stamp_events_nfc_check'],
         'an unknown source' => [['source' => 'magic'], 'stamp_events_source_check'],
+        'a QR stamp without staff' => [['staff_id' => null], 'stamp_events_staff_check'],
+        'a manual stamp without an idempotency key' => [['source' => StampSource::Manual, 'reason' => 'x', 'idempotency_key' => null], 'stamp_events_staff_check'],
+        'an empty reason' => [['source' => StampSource::Manual, 'reason' => ''], 'stamp_events_reason_check'],
     ]);
 });

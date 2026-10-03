@@ -19,6 +19,7 @@ use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 /**
  * Two tenant boundaries for isolation tests (ADR 0006): organization A is a
@@ -102,8 +103,10 @@ final readonly class Tenants
 
     /**
      * Records a stamp (one QR stamp unless overridden) for the enrollment at the
-     * business's location, inside bypass(). source is set raw, so a test can
-     * also try a value the enum does not know.
+     * business's location, inside bypass(), as the stamp Actions do. Staff
+     * sources get a staff member and an idempotency key unless given (null
+     * included). source is set raw, so a test can also try a value the enum
+     * does not know.
      *
      * @param  array<string, mixed>  $overrides
      */
@@ -114,6 +117,10 @@ final readonly class Tenants
         return app(TenantContext::class)->bypass(function () use ($enrollment, $business, $location, $overrides): StampEvent {
             $source = $overrides['source'] ?? StampSource::Qr;
             unset($overrides['source']);
+
+            if (in_array($source, [StampSource::Qr, StampSource::Manual, StampSource::Correction], true)) {
+                $overrides += ['staff_id' => User::factory()->create()->id, 'idempotency_key' => (string) Str::uuid()];
+            }
 
             $event = (new StampEvent)->forceFill([
                 'enrollment_id' => $enrollment->id,
