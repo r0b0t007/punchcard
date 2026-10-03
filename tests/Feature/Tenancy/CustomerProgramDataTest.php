@@ -22,10 +22,10 @@ use Tests\Support\Tenants;
 |
 | Enrollments and rewards are program data of the organization, and the
 | customer data inside it. The org admin works with every member of the
-| program, wherever they work (HQ, an independent café's owner). Inside a
-| business without those rights they stay hidden for now: a franchisee may
-| only list customers who stamped there, and that rule needs stamp_events
-| (CHW-21 PR C), so until then a franchisee sees and creates none.
+| program, wherever they work (HQ, an independent café's owner). A
+| franchisee only sees customers who stamped there (StampLedgerTest covers
+| that rule); nobody here has stamped, so a franchisee sees none, and it
+| never creates customer data itself: the stamp Action does, in bypass().
 |
 */
 
@@ -51,7 +51,7 @@ describe('reads', function (): void {
             ->and(Reward::query()->count())->toBe(0);
     });
 
-    it('shows a franchisee no customers until it can tell who stamped there (PR C)', function (string $role): void {
+    it('shows a franchisee no customers who have not stamped there', function (string $role): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::from($role));
 
         expect(CardEnrollment::query()->count())->toBe(0)
@@ -86,7 +86,7 @@ describe('writes', function (): void {
             ->and($enrollment->current_stamps)->toBe(1);
     });
 
-    it('does not let a franchisee create customer data it could not read back (until PR C)', function (string $how): void {
+    it('does not let a franchisee create customer data itself', function (string $how): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
         match ($how) {
@@ -166,7 +166,7 @@ describe('writes', function (): void {
             ->and($this->rewardA->refresh()->status)->toBe(RewardStatus::Redeemed);
     });
 
-    it('keeps a franchisee from changing customer data it cannot see yet', function (string $how): void {
+    it('keeps a franchisee from changing customer data it cannot see', function (string $how): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
         match ($how) {
@@ -176,7 +176,7 @@ describe('writes', function (): void {
         };
     })->throws(LogicException::class)->with(['save an enrollment', 'increment an enrollment', 'redeem a reward']);
 
-    it('limits a business\'s bulk updates to the customer data it can see (none yet)', function (): void {
+    it('limits a business\'s bulk updates to the customer data it can see (none here)', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
         expect(CardEnrollment::query()->update(['current_stamps' => 9]))->toBe(0)

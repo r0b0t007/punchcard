@@ -8,9 +8,11 @@ use App\Models\Concerns\GuardsTenantWrites;
 use App\Models\Concerns\HoldsCustomerData;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantModel;
+use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\CardEnrollmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,8 +22,8 @@ use Illuminate\Support\Carbon;
 /**
  * A customer's copy of a loyalty card, shared by every business that honours
  * it. Customer data of the organization (HoldsCustomerData): the org admin
- * sees every member; a business sees none until PR C. The counts are a cache
- * of stamp_events: only the stamp Actions set them, and the enrollment Action
+ * sees every member; a franchisee sees the members who stamped there. The
+ * counts are a cache of stamp_events: only the stamp Actions set them, and the enrollment Action
  * the referral code and referrer, with forceFill(), so a request can never
  * mass-assign them. The referrer never changes once set.
  *
@@ -40,7 +42,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable(['organization_id', 'card_id', 'user_id'])]
 #[UseEloquentBuilder(TenantBuilder::class)]
-class CardEnrollment extends Model implements TenantModel
+class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
 {
     use GuardsTenantWrites;
 
@@ -77,6 +79,24 @@ class CardEnrollment extends Model implements TenantModel
     public function referrer(): BelongsTo
     {
         return $this->belongsTo(self::class, 'referred_by');
+    }
+
+    /**
+     * A franchisee sees the members who stamped there (ADR 0006).
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function constrainToBusiness(Builder $query, int $businessId): void
+    {
+        $query->whereHas('stampEvents', fn (Builder $events) => $events->where('business_id', $businessId));
+    }
+
+    /**
+     * @return HasMany<StampEvent, $this>
+     */
+    public function stampEvents(): HasMany
+    {
+        return $this->hasMany(StampEvent::class, 'enrollment_id');
     }
 
     /**

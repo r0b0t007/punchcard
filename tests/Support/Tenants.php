@@ -7,6 +7,7 @@ namespace Tests\Support;
 use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
+use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\Location;
@@ -14,6 +15,7 @@ use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\Stamper;
+use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +98,35 @@ final readonly class Tenants
             'business_id' => $business->id,
             'location_id' => $location->id,
         ]));
+    }
+
+    /**
+     * Records a stamp (one QR stamp unless overridden) for the enrollment at the
+     * business's location, inside bypass(). source is set raw, so a test can
+     * also try a value the enum does not know.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    public function stamp(CardEnrollment $enrollment, Business $business, array $overrides = []): StampEvent
+    {
+        $location = $this->locationOf($business);
+
+        return app(TenantContext::class)->bypass(function () use ($enrollment, $business, $location, $overrides): StampEvent {
+            $source = $overrides['source'] ?? StampSource::Qr;
+            unset($overrides['source']);
+
+            $event = (new StampEvent)->forceFill([
+                'enrollment_id' => $enrollment->id,
+                'business_id' => $business->id,
+                'location_id' => $location->id,
+                'qty' => 1,
+                ...$overrides,
+            ]);
+            $event->setRawAttributes([...$event->getAttributes(), 'source' => $source instanceof StampSource ? $source->value : $source]);
+            $event->save();
+
+            return $event;
+        });
     }
 
     /** Registers /_tenant, which returns the TenantContext the `tenant` middleware set. */

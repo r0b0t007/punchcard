@@ -12,9 +12,11 @@ use App\Models\Concerns\HoldsCustomerData;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\RewardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,7 +56,7 @@ use LogicException;
     'unlocked_at', 'expires_at',
 ])]
 #[UseEloquentBuilder(TenantBuilder::class)]
-class Reward extends Model implements TenantModel
+class Reward extends Model implements TenantModel, VisibleToBusiness
 {
     use GuardsTenantWrites;
 
@@ -112,6 +114,18 @@ class Reward extends Model implements TenantModel
         if ($this->getAttribute('organization_id') === null && $enrollment !== null) {
             $this->setAttribute('organization_id', $enrollment['organization_id']);
         }
+    }
+
+    /**
+     * A franchisee sees the rewards of the members who stamped there (the
+     * enrollment's own scope decides) and those redeemed there, for its
+     * "redeemed here" report (ADR 0006).
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function constrainToBusiness(Builder $query, int $businessId): void
+    {
+        $query->where(fn (Builder $visible) => $visible->whereHas('enrollment')->orWhere('redeemed_business_id', $businessId));
     }
 
     /**
