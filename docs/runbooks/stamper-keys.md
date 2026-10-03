@@ -58,8 +58,9 @@ version from going back.
 Every URL the tag produced before step 2 now fails as `bad_mac`, because its `c` was signed with the old key 2.
 The meta key is unchanged, so those URLs still decrypt.
 
-**Moving a tag to another business or location** needs no new keys: disable its stamper and assign the tag
-again (a new stamper). The tag keeps its counter, so URLs from the old site stay replays.
+**Moving a tag to another business or location** needs no new keys: end its stamper's assignment
+(`unassigned_at`, admin only, one-way) and assign the tag again (a new stamper). The tag keeps its counter, so
+URLs from the old site stay replays, and the old business can never reclaim the tag by re-enabling its stamper.
 
 A **lost or stolen** tag cannot be re-provisioned: retire it (`nfc_tags.retired_at`, one-way) and assign a
 replacement tag.

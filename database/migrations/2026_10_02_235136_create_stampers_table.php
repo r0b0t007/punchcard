@@ -9,10 +9,12 @@ use Illuminate\Support\Facades\Schema;
  * A stamper: an NFC tag assigned to a location of a business (site data,
  * ADR 0006). The tag's uid, keys and replay counter live on nfc_tags, which
  * outlives any assignment: removing a stamper, or the business, never resets
- * them. A tag has at most one active stamper; moving it means disabling the
- * old assignment and adding a new one. Composite foreign keys keep a stamper
- * in its business's organization and at a location of that business; a
- * location with stampers cannot be deleted (move them first).
+ * them. A tag has at most one current stamper: ending an assignment
+ * (unassigned_at, set by an admin, one-way by trigger) frees the tag for a
+ * new one, while a business pausing its stamper (status) keeps its claim, so
+ * an old holder can never take a moved tag back. Composite foreign keys keep
+ * a stamper in its business's organization and at a location of that
+ * business; a location with stampers cannot be deleted (move them first).
  *
  * On Postgres (production), CHECK constraints also refuse an unknown status
  * (so the tap endpoint never fails on the enum cast) and arming outside 1..10
@@ -32,6 +34,7 @@ return new class extends Migration
             $table->string('status')->default('active');
             $table->unsignedTinyInteger('armed_qty')->nullable();
             $table->timestamp('armed_until')->nullable();
+            $table->timestamp('unassigned_at')->nullable();
             $table->timestamps();
 
             $table->foreign(['business_id', 'organization_id'])
@@ -49,8 +52,8 @@ return new class extends Migration
             $table->index('nfc_tag_id');
         });
 
-        // One active assignment per tag; disabled ones stay for history.
-        DB::statement("create unique index stampers_one_active_per_tag on stampers (nfc_tag_id) where status = 'active'");
+        // One current assignment per tag, paused or not; ended ones stay for history.
+        DB::statement('create unique index stampers_one_current_per_tag on stampers (nfc_tag_id) where unassigned_at is null');
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(<<<'SQL'
@@ -61,11 +64,40 @@ return new class extends Migration
                         or (armed_qty between 1 and 10 and armed_until is not null)
                     )
                 SQL);
+
+            DB::unprepared(<<<'SQL'
+                create function stampers_assignment_ended() returns trigger language plpgsql as $$
+                begin
+                    if old.unassigned_at is not null and new.unassigned_at is distinct from old.unassigned_at then
+                        raise exception 'stampers_assignment_ended: an ended assignment stays ended';
+                    end if;
+
+                    return new;
+                end
+                $$;
+
+                create trigger stampers_assignment_ended before update on stampers
+                    for each row execute function stampers_assignment_ended();
+                SQL);
+
+            return;
         }
+
+        DB::unprepared(<<<'SQL'
+            create trigger stampers_assignment_ended before update on stampers
+            when old.unassigned_at is not null and new.unassigned_at is not old.unassigned_at
+            begin
+                select raise(abort, 'stampers_assignment_ended: an ended assignment stays ended');
+            end;
+            SQL);
     }
 
     public function down(): void
     {
         Schema::dropIfExists('stampers');
+
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('drop function if exists stampers_assignment_ended()');
+        }
     }
 };

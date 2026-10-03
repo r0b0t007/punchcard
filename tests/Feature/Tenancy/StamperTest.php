@@ -22,7 +22,7 @@ use Tests\Support\Tenants;
 | is a tag's assignment to a location of a business: site data, so a
 | franchisee sees its own and the org admin the organization's. Removing or
 | moving an assignment never resets the tag, so an old tap URL can never
-| become valid again.
+| become valid again; an ended assignment never claims the tag back.
 |
 */
 
@@ -104,7 +104,47 @@ describe('stampers', function (): void {
         $this->context->bypass(fn () => $this->a1Stamper->forceFill(['nfc_tag_id' => $this->a2Stamper->nfc_tag_id])->save());
     })->throws(LogicException::class, 'tag cannot change');
 
-    it('keeps one active assignment per tag', function (): void {
+    it('never lets an old holder take a moved tag back', function (): void {
+        $moved = $this->context->bypass(function (): Stamper {
+            $this->a1Stamper->forceFill(['unassigned_at' => now()])->save();
+            $stamper = (new Stamper)->forceFill([
+                'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id, 'nfc_tag_id' => $this->a1Tag->id,
+            ]);
+            $stamper->save();
+
+            return $stamper;
+        });
+
+        // A2 pauses the tag for the day; A1 re-enables its old assignment.
+        $this->context->set($this->tenants->orgA, $this->tenants->a2, businessRole: BusinessRole::Owner);
+        $moved->forceFill(['status' => StamperStatus::Disabled])->save();
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+        $this->a1Stamper->forceFill(['status' => StamperStatus::Active])->save();
+
+        // The tag still belongs to A2, which resumes it.
+        $this->context->set($this->tenants->orgA, $this->tenants->a2, businessRole: BusinessRole::Owner);
+        $moved->forceFill(['status' => StamperStatus::Active])->save();
+
+        expect($this->context->bypass(fn (): array => Stamper::query()->current()->where('nfc_tag_id', $this->a1Tag->id)->pluck('id')->all()))
+            ->toBe([$moved->id]);
+    });
+
+    it('does not let a business end or resume an assignment itself', function (): void {
+        $this->context->bypass(fn () => $this->a1Stamper->forceFill(['unassigned_at' => now()])->save());
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        $this->a1Stamper->forceFill(['unassigned_at' => null])->save();
+    })->throws(LogicException::class, 'admin action');
+
+    it('keeps an ended assignment ended, even in bypass()', function (): void {
+        $this->context->bypass(fn () => $this->a1Stamper->forceFill(['unassigned_at' => now()])->save());
+
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(
+            fn () => $this->a1Stamper->forceFill(['unassigned_at' => null])->save(),
+        )))->toThrow(QueryException::class, 'stampers_assignment_ended');
+    });
+
+    it('keeps one current assignment per tag', function (): void {
         expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => (new Stamper)->forceFill([
             'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id, 'nfc_tag_id' => $this->a1Tag->id,
         ])->save())))->toThrow(QueryException::class);
@@ -142,12 +182,20 @@ describe('tags', function (): void {
             ->toBe(['last_counter' => 61, 'key_version' => 2]);
     })->with(['the stamper is removed', 'HQ removes the franchisee']);
 
+    it('reads no tag outside bypass(), not even through an old assignment', function (): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        expect(NfcTag::query()->count())->toBe(0)
+            ->and($this->a1Stamper->tag)->toBeNull();
+    });
+
     it('never deletes a tag, whatever deletes it', function (string $how): void {
         expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => match ($how) {
             'model' => $this->a1Tag->delete(),
             'raw query' => DB::table('nfc_tags')->where('id', $this->a1Tag->id)->delete(),
+            'truncate' => DB::table('nfc_tags')->truncate(),
         })))->toThrow(QueryException::class, 'nfc_tags_never_deleted');
-    })->with(['model', 'raw query']);
+    })->with(['model', 'raw query', 'truncate']);
 
     it('only moves a tag\'s counter and key version forward, keeps its uid and its retirement, whatever writes it', function (string $how): void {
         $this->context->bypass(fn () => $this->a1Tag->forceFill(['last_counter' => 61, 'key_version' => 2, 'retired_at' => now()])->save());
@@ -167,8 +215,14 @@ describe('tags', function (): void {
         match ($how) {
             'register' => NfcTag::factory()->create(),
             'advance the counter' => $this->a1Tag->forceFill(['last_counter' => 99])->save(),
+            'max the counter through a stamper' => $this->a1Stamper->tag()->update(['last_counter' => 16_777_215]),
+            'bump every key version' => NfcTag::query()->increment('key_version'),
+            'retire every tag' => NfcTag::query()->update(['retired_at' => now()]),
+            'raw insert' => NfcTag::query()->insert(['uid' => '04A1B2C3D4E5F6']),
         };
-    })->throws(LogicException::class, 'platform state')->with(['register', 'advance the counter']);
+    })->throws(LogicException::class, 'platform state')->with([
+        'register', 'advance the counter', 'max the counter through a stamper', 'bump every key version', 'retire every tag', 'raw insert',
+    ]);
 
     it('lets Postgres refuse an impossible tag or stamper', function (string $case, string $constraint): void {
         expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => match ($case) {

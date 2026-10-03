@@ -24,6 +24,7 @@ final class TenancyBoundary
         'app/Models/Concerns/GuardsTenantWrites.php' => 'announces a model insert or save, which TenantBuilder then checks',
         'app/Models/Concerns/BelongsToBusiness.php' => 'registers the tenant scope of site data',
         'app/Models/Concerns/BelongsToOrganization.php' => 'registers the tenant scope of program data',
+        'app/Support/Nfc/NfcTagBuilder.php' => 'guards forceDelete() and truncate() on NFC tags, which need bypass()',
         'app/Models/Business.php' => 'registers its own tenant scope',
         'app/Models/Organization.php' => 'registers its own tenant scope',
         'app/Models/OrganizationMember.php' => 'registers its own tenant scope',
