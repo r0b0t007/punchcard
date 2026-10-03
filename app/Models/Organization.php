@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\BillingEntity;
 use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
@@ -127,7 +128,8 @@ class Organization extends Model implements TenantModel
         $query->whereNull('archived_at')
             ->where(fn (Builder $query) => $query->where('type', OrganizationType::Franchise)
                 ->orWhereDoesntHave('businesses')
-                ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->operating()));
+                // Business::operating() without its organization check: this one is it.
+                ->orWhereHas('businesses', fn (Builder $businesses) => $businesses->where('status', '!=', BusinessStatus::Suspended)->whereNull('archived_at')));
     }
 
     /**

@@ -150,8 +150,19 @@ class Business extends Model implements TenantModel
     #[Scope]
     protected function operating(Builder $query): void
     {
-        $query->where('status', '!=', BusinessStatus::Suspended)
-            ->whereNull('archived_at')
+        $query->where('status', '!=', BusinessStatus::Suspended)->unarchived();
+    }
+
+    /**
+     * Businesses not closed: neither it nor its organization archived
+     * (ArchivedSites is the same rule for writes).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function unarchived(Builder $query): void
+    {
+        $query->whereNull('archived_at')
             ->whereHas('organization', fn (Builder $organization) => $organization->whereNull('archived_at'));
     }
 

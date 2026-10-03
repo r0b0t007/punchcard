@@ -38,9 +38,10 @@ class CardBusiness extends Pivot implements TenantModel
         assertTenantInsert as assertProgramInsert;
         assertTenantWrite as assertProgramWrite;
     }
+    use GuardsTenantWrites;
 
     /**
-     * An archived business honours no card, also in bypass().
+     * An archived business starts honouring no card, also in bypass().
      *
      * @param  array<string, mixed>  $values
      */
@@ -49,8 +50,6 @@ class CardBusiness extends Pivot implements TenantModel
         $this->assertProgramInsert($values);
         ArchivedSites::assertOpen($values['business_id'] ?? null, null, 'A card participation', lock: true);
     }
-
-    use GuardsTenantWrites;
 
     /**
      * organization_id is the card's, also in bypass() where there is no tenant to

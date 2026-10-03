@@ -37,8 +37,7 @@ final readonly class ArchiveBusiness
         }
 
         DB::transaction(fn () => $this->context->bypass(function () use ($business): void {
-            Business::query()->whereKey($business->id)->whereNull('archived_at')->update(['archived_at' => now()]);
-            $this->closeSites->handle('business_id', $business->id);
+            $this->closeSites->handle('business_id', $business->id, Business::query()->whereKey($business->id));
             $business->refresh();
         }));
     }

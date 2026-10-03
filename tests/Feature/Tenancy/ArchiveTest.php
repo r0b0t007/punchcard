@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Account\MustHandOverBusiness;
 use App\Actions\Tenancy\ArchiveBusiness;
 use App\Actions\Tenancy\ArchiveLocation;
 use App\Actions\Tenancy\ArchiveOrganization;
@@ -17,6 +18,7 @@ use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\User;
@@ -212,8 +214,15 @@ describe('businesses', function (): void {
                 'redeemed_business_id' => $this->tenants->a2->id,
                 'redeemed_location_id' => $a2Location->id,
             ])->save()),
+            'an imported redemption' => $this->context->bypass(fn () => Reward::factory()->for($this->customer, 'enrollment')->create([
+                'status' => RewardStatus::Redeemed,
+                'redeemed_at' => now(),
+                'redeemed_business_id' => $this->tenants->a2->id,
+                'redeemed_location_id' => $a2Location->id,
+            ])),
+            'a staff member' => $this->tenants->member(User::factory()->create(), $this->tenants->a2),
         };
-    })->throws(LogicException::class, 'archived')->with(['a stamp', 'a card', 'a stamper', 'a location', 'a redemption']);
+    })->throws(LogicException::class, 'archived')->with(['a stamp', 'a card', 'a stamper', 'a location', 'a redemption', 'an imported redemption', 'a staff member']);
 
     it('keeps the status a business had through an archive and a restore', function (BusinessStatus $status): void {
         $this->context->bypass(function () use ($status): void {
@@ -264,8 +273,10 @@ describe('organizations', function (): void {
             'an enrollment' => $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA),
             'a stamper moved there' => $this->a1Stamper->update(['location_id' => $otherLocation->id]),
             'a restored location' => app(RestoreArchived::class)->handle($this->a1Location),
+            'a card' => LoyaltyCard::factory()->for($this->tenants->orgA)->create(),
+            'an org admin' => $this->tenants->admin(User::factory()->create(), $this->tenants->orgA),
         });
-    })->throws(LogicException::class, 'archived')->with(['a business', 'an enrollment', 'a stamper moved there', 'a restored location']);
+    })->throws(LogicException::class, 'archived')->with(['a business', 'an enrollment', 'a stamper moved there', 'a restored location', 'a card', 'an org admin']);
 
     it('closes the businesses of an archived organization, even one not archived itself', function (): void {
         $a1Owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
@@ -276,6 +287,24 @@ describe('organizations', function (): void {
         expect($this->context->organizationId())->toBeNull()
             ->and(fn () => $this->tenants->stamp($this->customer, $this->tenants->a1))->toThrow(LogicException::class, 'archived');
     });
+});
+
+describe('accounts', function (): void {
+    it('lets the owner or org admin of a closed business delete their account', function (string $who): void {
+        $user = match ($who) {
+            'the owner of an archived franchisee' => $this->tenants->member(User::factory()->create(), $this->tenants->a2, BusinessRole::Owner),
+            'the owner of a café in an archived organization' => $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner),
+            'the org admin of an archived organization' => $this->tenants->admin(User::factory()->create(), $this->tenants->orgB),
+        };
+        $mustHandOver = app(MustHandOverBusiness::class)->handle($user);
+
+        $this->context->bypass(fn () => $who === 'the owner of an archived franchisee'
+            ? app(ArchiveBusiness::class)->handle($this->tenants->a2)
+            : $this->tenants->orgB->forceFill(['archived_at' => now()])->save());
+
+        expect($mustHandOver)->toBeTrue()
+            ->and(app(MustHandOverBusiness::class)->handle($user))->toBeFalse();
+    })->with(['the owner of an archived franchisee', 'the owner of a café in an archived organization', 'the org admin of an archived organization']);
 });
 
 describe('restoring', function (): void {

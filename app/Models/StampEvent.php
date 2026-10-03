@@ -78,8 +78,10 @@ class StampEvent extends Model implements TenantModel
 
         $this->assertSiteDataInsert($values);
 
+        // A tap holds its stamper's lock, which the archive waits for (CloseSites);
+        // a stamp without a stamper (QR, manual, system) locks the site rows instead.
         if (! $this->isCorrection($values['source'] ?? null)) {
-            ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp');
+            ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp', lock: ($values['stamper_id'] ?? null) === null);
         }
 
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()

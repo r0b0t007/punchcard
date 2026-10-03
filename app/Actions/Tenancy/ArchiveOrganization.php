@@ -12,7 +12,7 @@ use LogicException;
 
 /**
  * Closes an organization (CHW-139): it is archived, every business and
- * location with it, and every stamper assignment ends, in four statements
+ * location with it, and every stamper assignment ends, in five statements
  * whatever its size. Nobody resolves into it and nothing new happens there
  * (ArchivedSites); its cards and history stay as they were. A platform admin
  * action only, in bypass(); RestoreArchived undoes it, one level at a time.
@@ -31,9 +31,12 @@ final readonly class ArchiveOrganization
         }
 
         DB::transaction(function () use ($organization): void {
-            Organization::query()->whereKey($organization->id)->whereNull('archived_at')->update(['archived_at' => now()]);
-            Business::query()->where('organization_id', $organization->id)->whereNull('archived_at')->update(['archived_at' => now()]);
-            $this->closeSites->handle('organization_id', $organization->id);
+            $this->closeSites->handle(
+                'organization_id',
+                $organization->id,
+                Organization::query()->whereKey($organization->id),
+                Business::query()->where('organization_id', $organization->id),
+            );
             $organization->refresh();
         });
     }

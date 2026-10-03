@@ -12,22 +12,23 @@ use LogicException;
 
 /**
  * Nothing new happens at an archived business or location, or in an archived
- * organization (CHW-139): no business or location opened, no stamper assigned
- * or moved there, no stamp or redemption recorded there (a correction still
- * is: the ledger must stay fixable), no card honoured there, no customer
- * enrolled. Its history stays; the archive Actions and RestoreArchived change
- * the state. One rule for every caller: a location is closed when it, its
- * business or its organization is archived.
+ * organization (CHW-139): no business, location, card or membership created,
+ * no stamper assigned or moved there, no stamp or redemption recorded there
+ * (a correction still is: the ledger must stay fixable), no card honoured
+ * there, no customer enrolled. Its history stays; the archive Actions and
+ * RestoreArchived change the state. One rule for every caller: a location is
+ * closed when it, its business or its organization is archived.
  *
  * Model inserts and the updates that move a stamper or record a redemption
  * check it, also in bypass(); raw inserts only pass
  * TenantBuilder::guardRawWrite(). Writes that must not race an archive pass
- * $lock and run inside a transaction: they read the business, then the
- * location, with a shared lock, the order the archive Actions write them
- * (archived_at first, then stampers), so such a write either sees the archive
- * or is ended by it, and the two cannot deadlock. The tap path reads committed
- * state in one query; the archive's stamper update serializes with its
- * stamper lock (CHW-25).
+ * $lock: inside a transaction (TenantBuilder opens one around every guarded
+ * write), they share-lock the organization, the business, then the location,
+ * the order CloseSites archives them after ending the stampers, so such a
+ * write either commits first or sees the archive, and the two cannot
+ * deadlock. A tap's stamp reads committed state in one query without
+ * locking: the tap holds its stamper's lock, which the archive waits for
+ * before it writes anything else (CHW-25).
  */
 final class ArchivedSites
 {

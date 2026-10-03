@@ -73,7 +73,7 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     public function assertTenantInsert(array $values): void
     {
         $this->assertCustomerDataInsert($values);
-        ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'An enrollment');
+        ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'An enrollment', lock: true);
 
         if (app(TenantContext::class)->isBypassed()) {
             return;

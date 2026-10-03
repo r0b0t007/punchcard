@@ -17,9 +17,10 @@ use LogicException;
  * platform admin action only, in bypass(); tenants never un-archive. Only
  * archived_at is cleared: a business keeps the status it had (suspended,
  * pending, verified). Top down: a business stays closed while its
- * organization is archived, a location while its business is. Nothing else
- * is reattached: the admin assigns tags again and re-adds the business to its
- * cards explicitly, and restoring an organization leaves its businesses
+ * organization is archived, a location while its business is. Archiving
+ * kept the cards and the businesses that honour them, so those come back as
+ * they were; stamper assignments ended for good, so the admin assigns the
+ * tags again. Restoring an organization leaves its businesses and locations
  * archived until each is restored.
  */
 final readonly class RestoreArchived
