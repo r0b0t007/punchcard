@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\StampSource;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Models\Concerns\HoldsCustomerData;
 use App\Support\Tenancy\TenantBuilder;
+use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\CardEnrollmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * A customer's copy of a loyalty card, shared by every business that honours
  * it. Customer data of the organization (HoldsCustomerData): the org admin
- * sees every member; a business sees none until PR C. The counts are a cache
- * of stamp_events: only the stamp Actions set them, and the enrollment Action
+ * sees every member; a franchisee sees the members who stamped there. The
+ * counts are a cache of stamp_events: only the stamp Actions set them, and the enrollment Action
  * the referral code and referrer, with forceFill(), so a request can never
  * mass-assign them. The referrer never changes once set.
  *
@@ -40,14 +45,63 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable(['organization_id', 'card_id', 'user_id'])]
 #[UseEloquentBuilder(TenantBuilder::class)]
-class CardEnrollment extends Model implements TenantModel
+class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
 {
     use GuardsTenantWrites;
 
     /** @use HasFactory<CardEnrollmentFactory> */
     use HasFactory;
 
-    use HoldsCustomerData;
+    use HoldsCustomerData {
+        assertTenantInsert as assertCustomerDataInsert;
+        assertTenantWrite as assertCustomerDataWrite;
+    }
+
+    /** Progress, a cache of the stamp ledger: only the stamp Actions change it, in bypass(). */
+    private const array LEDGER_COLUMNS = ['current_stamps', 'lifetime_stamps', 'completed_count', 'last_stamp_at'];
+
+    /** Columns only the stamp and enrollment Actions change, in bypass(). */
+    private const array ACTION_COLUMNS = [...self::LEDGER_COLUMNS, 'referral_code'];
+
+    /**
+     * Outside bypass() a new enrollment starts with no progress: stamps come
+     * with ledger entries, from the stamp Actions.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantInsert(array $values): void
+    {
+        $this->assertCustomerDataInsert($values);
+
+        if (app(TenantContext::class)->isBypassed()) {
+            return;
+        }
+
+        $progress = array_filter(
+            array_intersect_key($values, array_flip(self::LEDGER_COLUMNS)),
+            fn (mixed $value): bool => ! in_array($value, [null, 0, '0'], true),
+        );
+
+        if ($progress !== []) {
+            throw new LogicException('A new enrollment starts with no progress: the stamp Actions add stamps, in TenantContext::bypass().');
+        }
+    }
+
+    /**
+     * Progress changes only with the ledger, so a counter never moves without
+     * a stamp event behind it (a franchisee setting it would mint rewards).
+     *
+     * @param  'update'|'delete'  $operation
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantWrite(string $operation, array $values): void
+    {
+        $this->assertCustomerDataWrite($operation, $values);
+
+        if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::ACTION_COLUMNS) !== []) {
+            throw new LogicException('Progress is a cache of the stamp ledger, and the referral code the enrollment Action\'s: they change in TenantContext::bypass().');
+        }
+    }
 
     /** organization_id is the card's, also in bypass(). */
     public function fillTenantColumns(): void
@@ -77,6 +131,28 @@ class CardEnrollment extends Model implements TenantModel
     public function referrer(): BelongsTo
     {
         return $this->belongsTo(self::class, 'referred_by');
+    }
+
+    /**
+     * A franchisee sees the members who were there: a stamp proving presence
+     * (StampSource::presenceValues()) at this business (ADR 0006). A bonus,
+     * birthday or referral stamp recorded at a business does not count.
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function constrainToBusiness(Builder $query, int $businessId): void
+    {
+        $query->whereHas('stampEvents', fn (Builder $events) => $events
+            ->where('business_id', $businessId)
+            ->whereIn('source', StampSource::presenceValues()));
+    }
+
+    /**
+     * @return HasMany<StampEvent, $this>
+     */
+    public function stampEvents(): HasMany
+    {
+        return $this->hasMany(StampEvent::class, 'enrollment_id');
     }
 
     /**

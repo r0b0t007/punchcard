@@ -12,9 +12,11 @@ use App\Models\Concerns\HoldsCustomerData;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\RewardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,7 +56,7 @@ use LogicException;
     'unlocked_at', 'expires_at',
 ])]
 #[UseEloquentBuilder(TenantBuilder::class)]
-class Reward extends Model implements TenantModel
+class Reward extends Model implements TenantModel, VisibleToBusiness
 {
     use GuardsTenantWrites;
 
@@ -63,6 +65,7 @@ class Reward extends Model implements TenantModel
 
     use HoldsCustomerData {
         assertTenantInsert as assertCustomerDataInsert;
+        assertTenantWrite as assertCustomerDataWrite;
     }
 
     /** @var array{0: mixed, 1: mixed}|null The enrollment id and its card, looked up once by fillTenantColumns(). */
@@ -70,6 +73,26 @@ class Reward extends Model implements TenantModel
 
     /** Redemption fields a new reward cannot have outside bypass(). */
     private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id'];
+
+    /** A reward's outcome: only the redeem Action (after proof of presence) and the expiry job change it, in bypass(). */
+    private const array OUTCOME_COLUMNS = ['status', 'expires_at', ...self::REDEMPTION_COLUMNS];
+
+    /**
+     * Seeing a reward does not let a business redeem, expire or re-credit it:
+     * the redeem Action does, after proof of presence, and the expiry job, both
+     * in bypass(). Database triggers then keep the outcome final.
+     *
+     * @param  'update'|'delete'  $operation
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantWrite(string $operation, array $values): void
+    {
+        $this->assertCustomerDataWrite($operation, $values);
+
+        if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::OUTCOME_COLUMNS) !== []) {
+            throw new LogicException('A reward is redeemed or expired by the redeem Action or the expiry job, in TenantContext::bypass().');
+        }
+    }
 
     /**
      * A reward is unlocked available: creating one already redeemed, or
@@ -112,6 +135,18 @@ class Reward extends Model implements TenantModel
         if ($this->getAttribute('organization_id') === null && $enrollment !== null) {
             $this->setAttribute('organization_id', $enrollment['organization_id']);
         }
+    }
+
+    /**
+     * A franchisee sees the rewards of the members who stamped there (the
+     * enrollment's own scope decides) and those redeemed there, for its
+     * "redeemed here" report (ADR 0006).
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function constrainToBusiness(Builder $query, int $businessId): void
+    {
+        $query->where(fn (Builder $visible) => $visible->whereHas('enrollment')->orWhere('redeemed_business_id', $businessId));
     }
 
     /**
