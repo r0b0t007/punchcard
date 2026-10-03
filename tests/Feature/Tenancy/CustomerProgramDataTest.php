@@ -154,13 +154,31 @@ describe('writes', function (): void {
             ->and($this->rewardA->isDirty())->toBeFalse();
     });
 
-    it('lets the org admin redeem a reward', function (): void {
+    it('redeems or expires a reward only through the redeem Action or the expiry job, in bypass()', function (string $how): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
 
-        $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a2->id])->save();
+        match ($how) {
+            'redeem' => $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a2->id])->save(),
+            'expire' => $this->rewardA->forceFill(['status' => RewardStatus::Expired])->save(),
+            'move the deadline' => $this->rewardA->forceFill(['expires_at' => now()->addYear()])->save(),
+            'bulk' => Reward::query()->update(['status' => RewardStatus::Expired->value]),
+        };
+    })->throws(LogicException::class, 'redeem Action')->with(['redeem', 'expire', 'move the deadline', 'bulk']);
 
-        expect($this->rewardA->refresh()->status)->toBe(RewardStatus::Redeemed);
+    it('lets the redeem Action redeem a reward in bypass()', function (): void {
+        $this->context->bypass(fn () => $this->rewardA->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a2->id])->save());
+
+        expect($this->context->bypass(fn (): RewardStatus => $this->rewardA->refresh()->status))->toBe(RewardStatus::Redeemed);
     });
+
+    it('starts a new enrollment with no progress, and leaves its referral code to the Action, outside bypass()', function (string $how): void {
+        $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+        match ($how) {
+            'stamps on creation' => (new CardEnrollment)->forceFill(['card_id' => $this->tenants->cardA->id, 'user_id' => User::factory()->create()->id, 'current_stamps' => 9, 'completed_count' => 5])->save(),
+            'a new referral code' => $this->enrollmentA->forceFill(['referral_code' => 'VANITY'])->save(),
+        };
+    })->throws(LogicException::class)->with(['stamps on creation', 'a new referral code']);
 
     it('leaves progress to the stamp Actions: nobody changes it outside bypass()', function (string $how): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);
@@ -192,7 +210,7 @@ describe('writes', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
         expect(CardEnrollment::query()->update(['updated_at' => now()]))->toBe(0)
-            ->and(Reward::query()->update(['expires_at' => now()]))->toBe(0);
+            ->and(Reward::query()->update(['updated_at' => now()]))->toBe(0);
     });
 
     it('does not let another organization change A\'s customer data', function (string $how): void {
@@ -313,16 +331,16 @@ describe('integrity', function (): void {
             'status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id,
         ])->save());
         $expired = $this->context->bypass(fn (): Reward => Reward::factory()->for($this->enrollmentA, 'enrollment')->create(['milestone' => 2, 'status' => RewardStatus::Expired]));
-        $this->context->set($this->tenants->orgA, orgAdmin: true);
 
-        expect(fn () => DB::transaction(fn () => match ($how) {
-            'un-redeem as the org admin' => $this->rewardA->forceFill(['status' => RewardStatus::Available, 'redeemed_at' => null, 'redeemed_business_id' => null])->save(),
+        // Outside bypass() the model already refuses these; bypass() reaches the trigger.
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => match ($how) {
+            'un-redeem' => $this->rewardA->forceFill(['status' => RewardStatus::Available, 'redeemed_at' => null, 'redeemed_business_id' => null])->save(),
             'credit it to a sibling' => $this->rewardA->forceFill(['redeemed_business_id' => $this->tenants->a2->id])->save(),
             'move the redemption time' => $this->rewardA->forceFill(['redeemed_at' => now()->subDay()])->save(),
             'expire it in a bulk update' => Reward::query()->update(['status' => RewardStatus::Expired->value]),
-            'un-expire in bypass()' => $this->context->bypass(fn () => $expired->forceFill(['status' => RewardStatus::Available])->save()),
-        }))->toThrow(QueryException::class, 'rewards_outcome_final');
-    })->with(['un-redeem as the org admin', 'credit it to a sibling', 'move the redemption time', 'expire it in a bulk update', 'un-expire in bypass()']);
+            'un-expire' => $expired->forceFill(['status' => RewardStatus::Available])->save(),
+        })))->toThrow(QueryException::class, 'rewards_outcome_final');
+    })->with(['un-redeem', 'credit it to a sibling', 'move the redemption time', 'expire it in a bulk update', 'un-expire']);
 
     it('keeps a card with members from being deleted', function (): void {
         $this->context->set($this->tenants->orgA, orgAdmin: true);

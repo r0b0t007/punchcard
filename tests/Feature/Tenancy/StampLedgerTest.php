@@ -8,6 +8,7 @@ use App\Enums\StampSource;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\Reward;
+use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -126,12 +127,34 @@ describe('who sees what', function (): void {
         $this->carol->forceFill(['current_stamps' => 50])->save();
     })->throws(LogicException::class, 'cache of the stamp ledger');
 
-    it('makes nobody "stamped here" through a bonus, birthday or referral stamp', function (StampSource $source): void {
-        $this->tenants->stamp($this->bob, $this->tenants->a1, ['source' => $source]);
+    it('makes nobody "stamped here" through a bonus, birthday, referral or correction', function (StampSource $source): void {
+        $this->tenants->stamp($this->bob, $this->tenants->a1, ['source' => $source, 'reason' => 'HQ fix']);
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
         expect(CardEnrollment::query()->whereKey($this->bob->id)->exists())->toBeFalse();
-    })->with([StampSource::Bonus, StampSource::Birthday, StampSource::Referral]);
+    })->with([StampSource::Bonus, StampSource::Birthday, StampSource::Referral, StampSource::Correction]);
+
+    it('applies "stamped here" to a referrer too', function (): void {
+        [$referredByBob, $referredByAlice] = $this->context->bypass(fn (): array => array_map(function (CardEnrollment $referrer): CardEnrollment {
+            $enrollment = (new CardEnrollment)->forceFill(['card_id' => $this->tenants->cardA->id, 'user_id' => User::factory()->create()->id, 'referred_by' => $referrer->id]);
+            $enrollment->save();
+
+            return $enrollment;
+        }, [$this->bob, $this->alice]));
+        $this->tenants->stamp($referredByBob, $this->tenants->a1);
+        $this->tenants->stamp($referredByAlice, $this->tenants->a1);
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+        // Both stamped at A1; only Alice's referral is visible there, Bob only stamped at A2.
+        expect(CardEnrollment::query()->whereHas('referrer')->pluck('id')->all())->toBe([$referredByAlice->id]);
+    });
+
+    it('does not let a franchisee redeem a reward it can see', function (): void {
+        $aliceReward = $this->tenants->reward($this->alice);
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+
+        $aliceReward->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a2->id])->save();
+    })->throws(LogicException::class, 'redeem Action');
 
     it('shows a reward redeemed here without the customer behind it', function (): void {
         $bobReward = $this->tenants->reward($this->bob);
@@ -184,11 +207,20 @@ describe('writes', function (): void {
 });
 
 describe('integrity', function (): void {
-    it('accepts each tag counter once, even across stampers', function (): void {
+    it('accepts each tag counter once, even after the tag moves to another stamper', function (): void {
         $this->tenants->stamp($this->alice, $this->tenants->a1, ['stamper_id' => $this->a1Stamper->id, 'nfc_tag_id' => $this->a1Stamper->nfc_tag_id, 'source' => StampSource::Nfc, 'counter' => 61]);
+        $moved = $this->context->bypass(function (): Stamper {
+            $this->a1Stamper->forceFill(['unassigned_at' => now()])->save();
+            $stamper = (new Stamper)->forceFill([
+                'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id, 'nfc_tag_id' => $this->a1Stamper->nfc_tag_id,
+            ]);
+            $stamper->save();
 
-        expect(fn () => DB::transaction(fn () => $this->tenants->stamp($this->carol, $this->tenants->a1, [
-            'stamper_id' => $this->a1Stamper->id, 'nfc_tag_id' => $this->a1Stamper->nfc_tag_id, 'source' => StampSource::Nfc, 'counter' => 61,
+            return $stamper;
+        });
+
+        expect(fn () => DB::transaction(fn () => $this->tenants->stamp($this->carol, $this->tenants->a2, [
+            'stamper_id' => $moved->id, 'nfc_tag_id' => $moved->nfc_tag_id, 'source' => StampSource::Nfc, 'counter' => 61,
         ])))->toThrow(QueryException::class);
     });
 

@@ -53,11 +53,39 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     use HasFactory;
 
     use HoldsCustomerData {
+        assertTenantInsert as assertCustomerDataInsert;
         assertTenantWrite as assertCustomerDataWrite;
     }
 
     /** Progress, a cache of the stamp ledger: only the stamp Actions change it, in bypass(). */
     private const array LEDGER_COLUMNS = ['current_stamps', 'lifetime_stamps', 'completed_count', 'last_stamp_at'];
+
+    /** Columns only the stamp and enrollment Actions change, in bypass(). */
+    private const array ACTION_COLUMNS = [...self::LEDGER_COLUMNS, 'referral_code'];
+
+    /**
+     * Outside bypass() a new enrollment starts with no progress: stamps come
+     * with ledger entries, from the stamp Actions.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantInsert(array $values): void
+    {
+        $this->assertCustomerDataInsert($values);
+
+        if (app(TenantContext::class)->isBypassed()) {
+            return;
+        }
+
+        $progress = array_filter(
+            array_intersect_key($values, array_flip(self::LEDGER_COLUMNS)),
+            fn (mixed $value): bool => ! in_array($value, [null, 0, '0'], true),
+        );
+
+        if ($progress !== []) {
+            throw new LogicException('A new enrollment starts with no progress: the stamp Actions add stamps, in TenantContext::bypass().');
+        }
+    }
 
     /**
      * Progress changes only with the ledger, so a counter never moves without
@@ -70,8 +98,8 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     {
         $this->assertCustomerDataWrite($operation, $values);
 
-        if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::LEDGER_COLUMNS) !== []) {
-            throw new LogicException('Progress is a cache of the stamp ledger: the stamp Actions update it, in TenantContext::bypass().');
+        if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::ACTION_COLUMNS) !== []) {
+            throw new LogicException('Progress is a cache of the stamp ledger, and the referral code the enrollment Action\'s: they change in TenantContext::bypass().');
         }
     }
 

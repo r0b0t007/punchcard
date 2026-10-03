@@ -28,12 +28,13 @@ enum StampSource: string
     /**
      * Sources that prove the customer was at the business (a tap, a staff scan,
      * staff by hand): only these make a customer "stamped here" (ADR 0006).
-     * System events (bonus, birthday, referral) do not.
+     * System events (bonus, birthday, referral) and corrections, which are
+     * administrative fixes, do not.
      *
      * @return list<string>
      */
     public static function presenceValues(): array
     {
-        return array_map(fn (self $source): string => $source->value, [self::Nfc, self::Qr, self::Manual, self::Correction]);
+        return array_map(fn (self $source): string => $source->value, [self::Nfc, self::Qr, self::Manual]);
     }
 }
