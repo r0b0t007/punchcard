@@ -13,6 +13,7 @@ use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Reward;
+use App\Models\Stamper;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Route;
@@ -84,6 +85,17 @@ final readonly class Tenants
     public function reward(CardEnrollment $enrollment): Reward
     {
         return app(TenantContext::class)->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create());
+    }
+
+    /** Registers a stamper at the business's location, inside bypass(), as an admin would. */
+    public function stamper(Business $business): Stamper
+    {
+        $location = $this->locationOf($business);
+
+        return app(TenantContext::class)->bypass(fn (): Stamper => Stamper::factory()->create([
+            'business_id' => $business->id,
+            'location_id' => $location->id,
+        ]));
     }
 
     /** Registers /_tenant, which returns the TenantContext the `tenant` middleware set. */
