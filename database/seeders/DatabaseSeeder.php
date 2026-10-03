@@ -17,6 +17,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Everything below has a known password; never seed it outside local and testing.
+        DemoSeeder::assertDemoEnvironment();
+
         // User::factory(10)->create();
 
         User::factory()->create([
