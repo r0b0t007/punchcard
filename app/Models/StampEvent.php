@@ -65,8 +65,8 @@ class StampEvent extends Model implements TenantModel
      * staff scan), in bypass(): a business recording one directly could stamp a
      * customer it cannot see, and make them "stamped here". The business must
      * honour the enrollment's card: visibility alone is not enough. Nothing
-     * but a correction is recorded at an archived business or location
-     * (ArchivedSites): the ledger stays fixable where the stamps were given.
+     * but a correction taking stamps back is recorded at an archived business
+     * or location (ArchivedSites): the ledger stays fixable where they were given.
      *
      * @param  array<string, mixed>  $values
      */
@@ -80,7 +80,7 @@ class StampEvent extends Model implements TenantModel
 
         // A tap holds its stamper's lock, which the archive waits for (CloseSites);
         // a stamp without a stamper (QR, manual, system) locks the site rows instead.
-        if (! $this->isCorrection($values['source'] ?? null)) {
+        if (! $this->takesStampsBack($values)) {
             ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp', lock: ($values['stamper_id'] ?? null) === null);
         }
 
@@ -94,9 +94,17 @@ class StampEvent extends Model implements TenantModel
         }
     }
 
-    private function isCorrection(mixed $source): bool
+    /**
+     * A correction that takes stamps back: the ledger stays fixable at an archived site.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function takesStampsBack(array $values): bool
     {
-        return $source === StampSource::Correction || $source === StampSource::Correction->value;
+        $source = $values['source'] ?? null;
+
+        return ($source === StampSource::Correction || $source === StampSource::Correction->value)
+            && is_numeric($values['qty'] ?? null) && (int) $values['qty'] < 0;
     }
 
     /**

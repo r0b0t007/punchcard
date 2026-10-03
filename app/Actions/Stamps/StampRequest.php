@@ -93,6 +93,12 @@ final readonly class StampRequest
         return in_array($this->source->value, StampSource::presenceValues(), true);
     }
 
+    /** A correction that takes stamps back: the only stamp still written at an archived site, so the ledger stays fixable. */
+    public function takesStampsBack(): bool
+    {
+        return $this->source === StampSource::Correction && $this->qty < 0;
+    }
+
     /** Taps and scans are what a customer can repeat: only they are held to the cooldown and the daily cap. */
     public function isLimited(): bool
     {

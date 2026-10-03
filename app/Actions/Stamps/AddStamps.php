@@ -36,7 +36,7 @@ use LogicException;
  * 1. a retried request (same idempotency key at the business) returns the
  *    earlier stamp, or is refused if the key was used for another stamp;
  * 2. the card must be active and honoured by the business, the site open
- *    (corrections excepted) and, for a tap, the stamper current and active;
+ *    (a correction may still take stamps back) and, for a tap, the stamper current and active;
  * 3. taps and scans keep to the cooldown (per customer per card) and the
  *    daily cap (per customer per business, today where the stamp is given);
  * 4. the stamp is appended to the ledger, the progress cache follows it and
@@ -62,7 +62,7 @@ final readonly class AddStamps
             $result = $this->attempt($enrollment->id, $request);
         } catch (UniqueConstraintViolationException $duplicate) {
             // Two requests raced on one idempotency key: the second now finds the first.
-            if ($request->idempotencyKey === null) {
+            if ($request->idempotencyKey === null || ! str_contains($duplicate->getMessage(), 'idempotency_key')) {
                 throw $duplicate;
             }
 
@@ -147,14 +147,18 @@ final readonly class AddStamps
         return new StampResult($earlier, $enrollment, [], replayed: true);
     }
 
-    /** Staff stamp where they work: a member of the business, or an org admin of its organization. */
+    /** Staff stamp where they work: a member of the business (at their location, if limited to one), or an org admin of its organization. */
     private function assertStaff(StampRequest $request): void
     {
         if ($request->staffId === null) {
             return;
         }
 
-        $member = BusinessMember::query()->where('business_id', $request->businessId)->where('user_id', $request->staffId)->exists()
+        $member = BusinessMember::query()
+            ->where('business_id', $request->businessId)
+            ->where('user_id', $request->staffId)
+            ->where(fn ($membership) => $membership->whereNull('location_id')->orWhere('location_id', $request->locationId))
+            ->exists()
             || OrganizationMember::query()
                 ->where('user_id', $request->staffId)
                 ->where('role', OrganizationRole::OrgAdmin)
@@ -180,7 +184,7 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
-        if ($request->source !== StampSource::Correction && ! ArchivedSites::isOpen($request->businessId, $request->locationId)) {
+        if (! $request->takesStampsBack() && ! ArchivedSites::isOpen($request->businessId, $request->locationId)) {
             throw new StampRejected(StampRejection::SiteClosed);
         }
 
@@ -305,12 +309,21 @@ final readonly class AddStamps
         $valid = [];
 
         foreach ($tiers as $tier) {
-            if (! is_array($tier) || ! is_int($tier['stamps'] ?? null) || $tier['stamps'] < 1 || ! is_string($tier['reward'] ?? null) || trim($tier['reward']) === '') {
-                throw new LogicException("Progressive card {$card->id} has malformed tiers.");
+            $malformed = ! is_array($tier)
+                || ! is_int($tier['stamps'] ?? null)
+                || $tier['stamps'] < 1
+                || isset($valid[$tier['stamps']])
+                || ! is_string($tier['reward'] ?? null)
+                || trim($tier['reward']) === '';
+
+            if ($malformed) {
+                throw new LogicException("Progressive card {$card->id} has malformed tiers (each needs its own stamps count and a reward).");
             }
 
-            $valid[] = ['stamps' => $tier['stamps'], 'reward' => $tier['reward']];
+            $valid[$tier['stamps']] = ['stamps' => $tier['stamps'], 'reward' => $tier['reward']];
         }
+
+        $valid = array_values($valid);
 
         usort($valid, fn (array $a, array $b): int => $a['stamps'] <=> $b['stamps']);
 

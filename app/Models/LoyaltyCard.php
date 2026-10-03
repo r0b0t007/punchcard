@@ -10,6 +10,7 @@ use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
+use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\LoyaltyCardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * A loyalty card: the organization's program (ADR 0006), honoured by the
@@ -53,11 +55,35 @@ class LoyaltyCard extends Model implements TenantModel
 {
     use ChangedOnlyByOrgAdmin {
         assertTenantInsert as assertProgramInsert;
+        assertTenantWrite as assertProgramWrite;
     }
     use GuardsTenantWrites;
 
     /** @use HasFactory<LoyaltyCardFactory> */
     use HasFactory;
+
+    /**
+     * A card's mode is fixed once customers hold it, also in bypass():
+     * progressive enrollments never reset, so turning the card cyclic would pay
+     * their stamps out as rewards at the next tap. Bulk updates change no mode.
+     *
+     * @param  'update'|'delete'  $operation
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantWrite(string $operation, array $values): void
+    {
+        $this->assertProgramWrite($operation, $values);
+
+        if (! array_key_exists('mode', $values)) {
+            return;
+        }
+
+        $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => CardEnrollment::query()->where('card_id', $this->id)->exists());
+
+        if ($held) {
+            throw new LogicException('A card\'s mode cannot change once customers hold it (or in a bulk update): start a new card.');
+        }
+    }
 
     /**
      * No new card in an archived organization, also in bypass().
