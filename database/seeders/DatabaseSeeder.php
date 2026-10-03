@@ -23,5 +23,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // An independent café and a franchise to click through; never in production.
+        $this->call(DemoSeeder::class);
     }
 }
