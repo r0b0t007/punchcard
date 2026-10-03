@@ -10,7 +10,7 @@ On Windows, run PHP and Composer through Laravel Herd and Node 22 natively; run 
 
 Sessions, cache, rate limiting and queues use the `database` drivers in every environment. Production runs
 `php artisan queue:work` under Supervisor (a Ploi daemon), with separate `wallet`, `push` and `default` queues. Replay
-protection never depended on Redis: it is a Postgres row lock on the stamper.
+protection never depended on Redis: it is a Postgres row lock on the NFC tag (`nfc_tags`).
 
 Add Redis and Horizon (CHW-43) when any of these happens:
 

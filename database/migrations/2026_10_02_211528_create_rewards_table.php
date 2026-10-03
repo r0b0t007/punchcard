@@ -80,7 +80,7 @@ return new class extends Migration
                 SQL);
 
             DB::unprepared(<<<'SQL'
-                create function rewards_outcome_final() returns trigger language plpgsql as $$
+                create or replace function rewards_outcome_final() returns trigger language plpgsql as $$
                 begin
                     if old.status <> 'available' and new.status is distinct from old.status then
                         raise exception 'rewards_outcome_final: a % reward stays %', old.status, old.status;

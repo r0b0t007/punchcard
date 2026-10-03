@@ -22,8 +22,9 @@ and was never used before. A copied URL, screenshot or shared link must fail.
 3. Session MAC key: `KSes = CMAC(SDMFileReadKey, 3C C3 00 01 00 80 || UID || SDMReadCtr(LE))` (16 bytes).
 4. `full = CMAC(KSes, "")` (MAC input is empty when SDMMACInputOffset == SDMMACOffset, which is our tag config).
 5. Truncate: take bytes at odd indexes 1,3,5,…,15 of `full` → 8 bytes. Compare with `c` using `hash_equals`.
-6. Look up the tag by UID (`nfc_tags`, platform state) and its active stamper (`stampers`, the tag's assignment
-   to a business and location; at most one active per tag). Reject a retired tag or a disabled stamper.
+6. Look up the tag by UID (`nfc_tags`, platform state) and its current stamper (`Stamper::current()`, i.e.
+   `unassigned_at is null`; at most one per tag). Never pick a stamper by `status`: an ended assignment may still
+   say `active`. Reject a retired tag, no current stamper, or a current stamper whose `status` is `disabled`.
    Require `counter > nfc_tags.last_counter`, then set `last_counter = counter` inside the same DB transaction,
    with `lockForUpdate()` on the tag row. Also keep a unique index on `(nfc_tag_id, counter)` in `stamp_events`
    as a second guard. The tag outlives its stampers: removing or moving a stamper never resets the counter.

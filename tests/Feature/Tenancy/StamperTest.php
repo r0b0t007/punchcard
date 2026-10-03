@@ -6,6 +6,7 @@ use App\Enums\BusinessRole;
 use App\Enums\StamperStatus;
 use App\Models\NfcTag;
 use App\Models\Stamper;
+use App\Support\Nfc\NfcTagBuilder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -187,6 +188,45 @@ describe('tags', function (): void {
 
         expect(NfcTag::query()->count())->toBe(0)
             ->and($this->a1Stamper->tag)->toBeNull();
+    });
+
+    it('keeps the tag read guard outside bypass()', function (string $how): void {
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
+
+        match ($how) {
+            'withoutGlobalScope' => NfcTag::query()->withoutGlobalScope(NfcTagBuilder::PLATFORM_SCOPE)->get(),
+            'withoutGlobalScopes' => NfcTag::query()->withoutGlobalScopes()->get(),
+            'replace it' => NfcTag::query()->withGlobalScope(NfcTagBuilder::PLATFORM_SCOPE, fn (): null => null)->get(),
+            'through a stamper' => Stamper::query()->with(['tag' => fn ($query) => $query->withoutGlobalScopes()])->get(),
+        };
+    })->throws(LogicException::class, 'platform scope cannot be')->with(['withoutGlobalScope', 'withoutGlobalScopes', 'replace it', 'through a stamper']);
+
+    it('never assigns a retired tag, whatever writes it', function (): void {
+        $retired = $this->context->bypass(fn (): NfcTag => NfcTag::factory()->create(['retired_at' => now()]));
+
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(fn () => (new Stamper)->forceFill([
+            'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id, 'nfc_tag_id' => $retired->id,
+        ])->save())))->toThrow(QueryException::class, 'stampers_tag_retired');
+    });
+
+    it('keeps an assignment\'s tag, even in a raw write', function (): void {
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(
+            fn () => DB::table('stampers')->where('id', $this->a1Stamper->id)->update(['nfc_tag_id' => $this->a2Stamper->nfc_tag_id]),
+        )))->toThrow(QueryException::class, 'stampers_tag_fixed');
+    });
+
+    it('knows a new stamper is active before it is reloaded', function (): void {
+        $stamper = $this->context->bypass(function (): Stamper {
+            $stamper = (new Stamper)->forceFill([
+                'business_id' => $this->tenants->a2->id, 'location_id' => $this->tenants->locationOf($this->tenants->a2)->id,
+                'nfc_tag_id' => NfcTag::factory()->create()->id,
+            ]);
+            $stamper->save();
+
+            return $stamper;
+        });
+
+        expect($stamper->status)->toBe(StamperStatus::Active);
     });
 
     it('never deletes a tag, whatever deletes it', function (string $how): void {

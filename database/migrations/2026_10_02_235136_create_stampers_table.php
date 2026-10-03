@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Schema;
  * a stamper in its business's organization and at a location of that
  * business; a location with stampers cannot be deleted (move them first).
  *
+ * On every driver, triggers also keep an assignment's tag fixed and refuse
+ * assigning a retired (lost, stolen) tag, whatever writes the row.
  * On Postgres (production), CHECK constraints also refuse an unknown status
  * (so the tap endpoint never fails on the enum cast) and arming outside 1..10
  * stamps or without a deadline.
@@ -66,8 +68,12 @@ return new class extends Migration
                 SQL);
 
             DB::unprepared(<<<'SQL'
-                create function stampers_assignment_ended() returns trigger language plpgsql as $$
+                create or replace function stampers_assignment_ended() returns trigger language plpgsql as $$
                 begin
+                    if new.nfc_tag_id is distinct from old.nfc_tag_id then
+                        raise exception 'stampers_tag_fixed: an assignment keeps its tag';
+                    end if;
+
                     if old.unassigned_at is not null and new.unassigned_at is distinct from old.unassigned_at then
                         raise exception 'stampers_assignment_ended: an ended assignment stays ended';
                     end if;
@@ -78,16 +84,41 @@ return new class extends Migration
 
                 create trigger stampers_assignment_ended before update on stampers
                     for each row execute function stampers_assignment_ended();
+
+                create or replace function stampers_tag_not_retired() returns trigger language plpgsql as $$
+                begin
+                    if exists (select 1 from nfc_tags where id = new.nfc_tag_id and retired_at is not null) then
+                        raise exception 'stampers_tag_retired: a retired tag cannot be assigned';
+                    end if;
+
+                    return new;
+                end
+                $$;
+
+                create trigger stampers_tag_not_retired before insert on stampers
+                    for each row execute function stampers_tag_not_retired();
                 SQL);
 
             return;
         }
 
         DB::unprepared(<<<'SQL'
+            create trigger stampers_tag_fixed before update on stampers
+            when new.nfc_tag_id is not old.nfc_tag_id
+            begin
+                select raise(abort, 'stampers_tag_fixed: an assignment keeps its tag');
+            end;
+
             create trigger stampers_assignment_ended before update on stampers
             when old.unassigned_at is not null and new.unassigned_at is not old.unassigned_at
             begin
                 select raise(abort, 'stampers_assignment_ended: an ended assignment stays ended');
+            end;
+
+            create trigger stampers_tag_not_retired before insert on stampers
+            when (select retired_at from nfc_tags where id = new.nfc_tag_id) is not null
+            begin
+                select raise(abort, 'stampers_tag_retired: a retired tag cannot be assigned');
             end;
             SQL);
     }
@@ -98,6 +129,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement('drop function if exists stampers_assignment_ended()');
+            DB::statement('drop function if exists stampers_tag_not_retired()');
         }
     }
 };

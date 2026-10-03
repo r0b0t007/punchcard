@@ -38,6 +38,9 @@ class NfcTag extends Model
     /** @use HasFactory<NfcTagFactory> */
     use HasFactory;
 
+    /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
+    protected $attributes = ['key_version' => 1, 'last_counter' => 0];
+
     /**
      * @return HasMany<Stamper, $this>
      */
@@ -48,7 +51,7 @@ class NfcTag extends Model
 
     protected static function booted(): void
     {
-        static::addGlobalScope('platform', static function (Builder $query): void {
+        static::addGlobalScope(NfcTagBuilder::PLATFORM_SCOPE, static function (Builder $query): void {
             if (! app(TenantContext::class)->isBypassed()) {
                 $query->whereRaw('1 = 0');
             }

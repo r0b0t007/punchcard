@@ -43,7 +43,7 @@ return new class extends Migration
                 SQL);
 
             DB::unprepared(<<<'SQL_WRAP'
-            create function nfc_tags_forward_only() returns trigger language plpgsql as $$
+            create or replace function nfc_tags_forward_only() returns trigger language plpgsql as $$
             begin
                 if new.uid is distinct from old.uid
                     or new.last_counter < old.last_counter
@@ -56,7 +56,7 @@ return new class extends Migration
             end
             $$;
             
-            create function nfc_tags_never_deleted() returns trigger language plpgsql as $$
+            create or replace function nfc_tags_never_deleted() returns trigger language plpgsql as $$
             begin
                 raise exception 'nfc_tags_never_deleted: retire a tag instead';
             end

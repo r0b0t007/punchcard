@@ -56,6 +56,9 @@ class Stamper extends Model implements TenantModel
     /** @use HasFactory<StamperFactory> */
     use HasFactory;
 
+    /** @var array<string, mixed> The database default, also in memory before a refresh. */
+    protected $attributes = ['status' => 'active'];
+
     /**
      * An admin action assigns tags (CHW-138), in bypass().
      *
