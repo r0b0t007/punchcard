@@ -10,6 +10,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -59,6 +61,24 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     public function isAnonymised(): bool
     {
         return $this->anonymised_at !== null;
+    }
+
+    /**
+     * People still behind their account: what campaigns, exports and other
+     * fan-outs to users start from.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function notAnonymised(Builder $query): void
+    {
+        $query->whereNull('anonymised_at');
+    }
+
+    /** No mail to an anonymised account: there is nobody to receive it. */
+    public function routeNotificationForMail(): ?string
+    {
+        return $this->isAnonymised() ? null : $this->email;
     }
 
     /**

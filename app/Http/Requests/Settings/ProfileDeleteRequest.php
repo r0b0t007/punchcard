@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Settings;
 
-use App\Actions\Account\DeleteAccount;
+use App\Actions\Account\MustHandOverBusiness;
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
 use Closure;
@@ -33,14 +33,14 @@ class ProfileDeleteRequest extends FormRequest
      *
      * @return list<Closure(Validator): void>
      */
-    public function after(): array
+    public function after(MustHandOverBusiness $mustHandOverBusiness): array
     {
         return [
-            function (Validator $validator): void {
+            function (Validator $validator) use ($mustHandOverBusiness): void {
                 $user = $this->user();
 
-                if ($user instanceof User && app(DeleteAccount::class)->blockedByOwnership($user)) {
-                    $validator->errors()->add('account', __('Hand over or close your business before deleting your account.'));
+                if ($user instanceof User && $mustHandOverBusiness->handle($user)) {
+                    $validator->errors()->add('account', __('Hand over or close your business before deleting your account: contact support to do so.'));
                 }
             },
         ];

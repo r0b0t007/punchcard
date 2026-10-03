@@ -29,6 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // A changed password (or a deleted, anonymised account) signs out every other device.
+        $middleware->authenticateSessions();
+
         $middleware->alias(['tenant' => SetTenant::class]);
 
         // The tenant must be set before route model bindings resolve, so another

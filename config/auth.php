@@ -64,8 +64,9 @@ return [
     */
 
     'providers' => [
+        // Eloquent, minus anonymised accounts (App\Support\Auth\ActiveUserProvider).
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'active-eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

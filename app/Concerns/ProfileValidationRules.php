@@ -2,6 +2,7 @@
 
 namespace App\Concerns;
 
+use App\Actions\Account\DeleteAccount;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,9 @@ trait ProfileValidationRules
     }
 
     /**
-     * Get the validation rules used to validate user emails.
+     * Get the validation rules used to validate user emails. The domain of
+     * anonymised accounts is reserved (DeleteAccount), so nobody can take an
+     * address one is about to get.
      *
      * @return array<int, ValidationRule|array<mixed>|string>
      */
@@ -43,6 +46,7 @@ trait ProfileValidationRules
             'string',
             'email',
             'max:255',
+            'not_regex:/@'.preg_quote(DeleteAccount::RESERVED_EMAIL_DOMAIN, '/').'$/i',
             $userId === null
                 ? Rule::unique(User::class)
                 : Rule::unique(User::class)->ignore($userId),
