@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenancy;
 
-use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\CardBusiness;
@@ -16,15 +15,17 @@ use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
- * Closes a business (CHW-139): its stampers' assignments end, its locations
- * are archived, it stops honouring its cards and its status becomes
- * Archived, so its members get no tenant and nothing new happens there. Its
- * history stays: stamps, enrollments, rewards, memberships.
+ * Closes a business (CHW-139): it is archived, its locations too, its
+ * stampers' assignments end and it stops honouring its cards, so its members
+ * get no tenant and nothing new happens there. Its history stays: stamps,
+ * enrollments, rewards, memberships, and its status (a suspension or a
+ * pending verification survives a restore).
  *
  * Mirrors deleting a business: franchise HQ (an org admin, working across
  * the organization) closes one of its franchisees; closing an independent
  * café or a chain is a platform admin action, in bypass(). Only the platform
- * admin restores it (RestoreArchived).
+ * admin restores it (RestoreArchived). archived_at is written first, like in
+ * ArchiveLocation, and archiving an archived business changes nothing.
  */
 final readonly class ArchiveBusiness
 {
@@ -37,10 +38,11 @@ final readonly class ArchiveBusiness
         }
 
         DB::transaction(fn () => $this->context->bypass(function () use ($business): void {
-            Stamper::query()->current()->where('business_id', $business->id)->update(['unassigned_at' => now()]);
+            Business::query()->whereKey($business->id)->whereNull('archived_at')->update(['archived_at' => now()]);
             Location::query()->open()->where('business_id', $business->id)->update(['archived_at' => now()]);
+            Stamper::query()->current()->where('business_id', $business->id)->update(['unassigned_at' => now()]);
             CardBusiness::query()->where('business_id', $business->id)->delete();
-            $business->forceFill(['status' => BusinessStatus::Archived])->save();
+            $business->refresh();
         }));
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenancy;
 
-use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
@@ -13,10 +12,10 @@ use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
- * Closes an organization (CHW-139): every business is archived
- * (ArchiveBusiness), its cards are deactivated and the organization is
- * archived, so nobody resolves into it. Its history stays. A platform admin
- * action only, in bypass(); RestoreArchived undoes it.
+ * Closes an organization (CHW-139): it is archived, every business with it
+ * (ArchiveBusiness) and its cards are deactivated, so nobody resolves into
+ * it. Its history stays. A platform admin action only, in bypass();
+ * RestoreArchived undoes it, one level at a time.
  */
 final readonly class ArchiveOrganization
 {
@@ -32,14 +31,16 @@ final readonly class ArchiveOrganization
         }
 
         DB::transaction(function () use ($organization): void {
+            Organization::query()->whereKey($organization->id)->whereNull('archived_at')->update(['archived_at' => now()]);
+
             Business::query()
                 ->where('organization_id', $organization->id)
-                ->where('status', '!=', BusinessStatus::Archived)
+                ->whereNull('archived_at')
                 ->get()
                 ->each(fn (Business $business) => $this->archiveBusiness->handle($business));
 
             LoyaltyCard::query()->where('organization_id', $organization->id)->update(['active' => false]);
-            $organization->forceFill(['archived_at' => now()])->save();
+            $organization->refresh();
         });
     }
 }

@@ -104,7 +104,7 @@ describe('on a worker', function (): void {
         $independent = $context->bypass(fn (): Business => Business::factory()->for(Organization::factory()->create(['type' => OrganizationType::Independent]))->create()->load('organization'));
 
         match ($case) {
-            'business deleted', 'business suspended', 'business archived' => $context->set($this->tenants->orgA, $this->tenants->a2),
+            'business deleted', 'business suspended', 'business archived', 'organization archived' => $context->set($this->tenants->orgA, $this->tenants->a2),
             'organization deleted' => $context->set($this->tenants->orgB, orgAdmin: true),
             'independent café suspended' => $context->set($independent->organization, orgAdmin: true),
         };
@@ -116,7 +116,8 @@ describe('on a worker', function (): void {
         $context->bypass(fn () => match ($case) {
             'business deleted' => $this->tenants->a2->delete(),
             'business suspended' => $this->tenants->a2->forceFill(['status' => BusinessStatus::Suspended])->save(),
-            'business archived' => $this->tenants->a2->forceFill(['status' => BusinessStatus::Archived])->save(),
+            'business archived' => $this->tenants->a2->forceFill(['archived_at' => now()])->save(),
+            'organization archived' => $this->tenants->orgA->forceFill(['archived_at' => now()])->save(),
             'organization deleted' => $this->tenants->orgB->delete(),
             'independent café suspended' => $independent->forceFill(['status' => BusinessStatus::Suspended])->save(),
         });
@@ -126,7 +127,7 @@ describe('on a worker', function (): void {
         expect(TenantProbeJob::$seen)->toBe([])
             ->and(DB::table('failed_jobs')->count())->toBe(1)
             ->and(DB::table('jobs')->count())->toBe(0);
-    })->with(['business deleted', 'business suspended', 'business archived', 'organization deleted', 'independent café suspended']);
+    })->with(['business deleted', 'business suspended', 'business archived', 'organization archived', 'organization deleted', 'independent café suspended']);
 
     it('keeps running franchise HQ jobs while a franchisee is suspended', function (): void {
         app(TenantContext::class)->set($this->tenants->orgA, orgAdmin: true);

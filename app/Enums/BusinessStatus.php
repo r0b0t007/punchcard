@@ -10,7 +10,4 @@ enum BusinessStatus: string
     case Pending = 'pending';
     case Verified = 'verified';
     case Suspended = 'suspended';
-
-    /** Closed (CHW-139): no longer operating, its history kept; ArchiveBusiness. */
-    case Archived = 'archived';
 }

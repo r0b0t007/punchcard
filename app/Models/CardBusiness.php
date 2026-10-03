@@ -47,7 +47,7 @@ class CardBusiness extends Pivot implements TenantModel
     public function assertTenantInsert(array $values): void
     {
         $this->assertProgramInsert($values);
-        ArchivedSites::assertOpen($values['business_id'] ?? null, null, 'A card participation');
+        ArchivedSites::assertOpen($values['business_id'] ?? null, null, 'A card participation', lock: true);
     }
 
     use GuardsTenantWrites;

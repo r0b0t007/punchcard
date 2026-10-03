@@ -9,6 +9,7 @@ use App\Enums\RewardStatus;
 use App\Enums\RewardType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Models\Concerns\HoldsCustomerData;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -80,7 +81,8 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /**
      * Seeing a reward does not let a business redeem, expire or re-credit it:
      * the redeem Action does, after proof of presence, and the expiry job, both
-     * in bypass(). Database triggers then keep the outcome final.
+     * in bypass(). Database triggers then keep the outcome final. Nobody
+     * redeems at an archived business or location (ArchivedSites).
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -88,6 +90,10 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     public function assertTenantWrite(string $operation, array $values): void
     {
         $this->assertCustomerDataWrite($operation, $values);
+
+        if (isset($values['redeemed_business_id']) || isset($values['redeemed_location_id'])) {
+            ArchivedSites::assertOpen($values['redeemed_business_id'] ?? null, $values['redeemed_location_id'] ?? null, 'A redemption');
+        }
 
         if (! app(TenantContext::class)->isBypassed() && array_intersect(array_keys($values), self::OUTCOME_COLUMNS) !== []) {
             throw new LogicException('A reward is redeemed or expired by the redeem Action or the expiry job, in TenantContext::bypass().');

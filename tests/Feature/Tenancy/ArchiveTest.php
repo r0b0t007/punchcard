@@ -9,9 +9,11 @@ use App\Actions\Tenancy\ResolveTenant;
 use App\Actions\Tenancy\RestoreArchived;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\RewardStatus;
 use App\Models\Business;
 use App\Models\CardBusiness;
 use App\Models\CardEnrollment;
+use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Stamper;
@@ -90,19 +92,48 @@ describe('locations', function (): void {
 
         match ($what) {
             'a stamper' => $this->context->bypass(fn () => Stamper::factory()->create(['business_id' => $this->tenants->a1->id, 'location_id' => $this->a1Location->id])),
+            'a stamper moved there' => $this->context->bypass(function (): void {
+                $otherLocation = Location::factory()->create(['business_id' => $this->tenants->a1->id]);
+                Stamper::factory()->create(['business_id' => $this->tenants->a1->id, 'location_id' => $otherLocation->id])
+                    ->update(['location_id' => $this->a1Location->id]);
+            }),
             'a stamp' => $this->tenants->stamp($this->customer, $this->tenants->a1),
         };
-    })->throws(LogicException::class, 'archived')->with(['a stamper', 'a stamp']);
+    })->throws(LogicException::class, 'archived')->with(['a stamper', 'a stamper moved there', 'a stamp']);
 
-    it('leaves archiving and restoring a location to the Actions and the platform admin', function (string $how): void {
-        if ($how === 'restore it directly') {
+    it('keeps the date a location was first archived', function (): void {
+        $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
+        $archivedAt = $this->a1Location->archived_at;
+
+        $this->travel(1)->hours();
+        $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
+
+        expect($this->a1Location->archived_at?->toIso8601String())->toBe($archivedAt?->toIso8601String());
+    });
+
+    it('leaves archiving and restoring to the Actions and the platform admin', function (string $how): void {
+        if ($how === 'restore a location directly') {
             $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
         }
 
         $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
 
-        $this->a1Location->forceFill(['archived_at' => $how === 'archive it directly' ? now() : null])->save();
-    })->throws(LogicException::class, 'archived')->with(['archive it directly', 'restore it directly']);
+        match ($how) {
+            'archive a location directly' => $this->a1Location->forceFill(['archived_at' => now()])->save(),
+            'restore a location directly' => $this->a1Location->forceFill(['archived_at' => null])->save(),
+            'archive locations in bulk' => Location::query()->update(['archived_at' => now()]),
+            'archive the business directly' => $this->tenants->a1->forceFill(['archived_at' => now()])->save(),
+            'archive the organization directly' => $this->tenants->orgA->forceFill(['archived_at' => now()])->save(),
+            'archive organizations in bulk' => Organization::query()->update(['archived_at' => now()]),
+        };
+    })->throws(LogicException::class, 'archiv')->with([
+        'archive a location directly',
+        'restore a location directly',
+        'archive locations in bulk',
+        'archive the business directly',
+        'archive the organization directly',
+        'archive organizations in bulk',
+    ]);
 });
 
 describe('businesses', function (): void {
@@ -113,7 +144,7 @@ describe('businesses', function (): void {
         app(ArchiveBusiness::class)->handle($this->tenants->a2);
 
         $this->context->bypass(function () use ($events): void {
-            expect($this->tenants->a2->fresh()?->status)->toBe(BusinessStatus::Archived)
+            expect($this->tenants->a2->fresh()?->archived_at)->not->toBeNull()
                 ->and($this->tenants->locationOf($this->tenants->a2)->archived_at)->not->toBeNull()
                 ->and($this->a2Stamper->fresh()?->unassigned_at)->not->toBeNull()
                 ->and(CardBusiness::query()->where('business_id', $this->tenants->a2->id)->exists())->toBeFalse()
@@ -136,7 +167,7 @@ describe('businesses', function (): void {
     it('lets the platform admin archive an independent café', function (): void {
         $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->tenants->b1));
 
-        expect($this->context->bypass(fn (): ?BusinessStatus => $this->tenants->b1->fresh()?->status))->toBe(BusinessStatus::Archived);
+        expect($this->context->bypass(fn (): bool => $this->tenants->b1->fresh()?->archived_at !== null))->toBeTrue();
     });
 
     it('gives an archived business\'s members no tenant, and keeps the rest of the franchise working', function (): void {
@@ -155,14 +186,34 @@ describe('businesses', function (): void {
         $this->tenants->stamp($this->customer, $this->tenants->a1);
     });
 
-    it('never stamps at or attaches a card to an archived business, even in bypass()', function (string $what): void {
-        $this->context->bypass(fn () => $this->tenants->a2->forceFill(['status' => BusinessStatus::Archived])->save());
+    it('opens nothing new at an archived business, even in bypass() and while its location is open', function (string $what): void {
+        $this->context->bypass(fn () => $this->tenants->a2->forceFill(['archived_at' => now()])->save());
+        $a2Location = $this->tenants->locationOf($this->tenants->a2);
 
         match ($what) {
             'a stamp' => $this->tenants->stamp($this->customer, $this->tenants->a2),
             'a card' => $this->context->bypass(fn () => LoyaltyCard::factory()->for($this->tenants->orgA)->create()->businesses()->attach($this->tenants->a2)),
+            'a stamper' => $this->context->bypass(fn () => Stamper::factory()->create(['business_id' => $this->tenants->a2->id, 'location_id' => $a2Location->id])),
+            'a location' => $this->context->bypass(fn () => Location::factory()->create(['business_id' => $this->tenants->a2->id])),
+            'a redemption' => $this->context->bypass(fn () => $this->tenants->reward($this->customer)->forceFill([
+                'status' => RewardStatus::Redeemed,
+                'redeemed_at' => now(),
+                'redeemed_business_id' => $this->tenants->a2->id,
+                'redeemed_location_id' => $a2Location->id,
+            ])->save()),
         };
-    })->throws(LogicException::class, 'archived')->with(['a stamp', 'a card']);
+    })->throws(LogicException::class, 'archived')->with(['a stamp', 'a card', 'a stamper', 'a location', 'a redemption']);
+
+    it('keeps the status a business had through an archive and a restore', function (BusinessStatus $status): void {
+        $this->context->bypass(function () use ($status): void {
+            $this->tenants->a2->forceFill(['status' => $status])->save();
+            app(ArchiveBusiness::class)->handle($this->tenants->a2);
+            app(RestoreArchived::class)->handle($this->tenants->a2);
+        });
+
+        expect($this->tenants->a2->status)->toBe($status)
+            ->and($this->tenants->a2->archived_at)->toBeNull();
+    })->with([BusinessStatus::Suspended, BusinessStatus::Pending]);
 });
 
 describe('organizations', function (): void {
@@ -180,7 +231,7 @@ describe('organizations', function (): void {
 
         $this->context->bypass(function () use ($events): void {
             expect($this->tenants->orgA->fresh()?->archived_at)->not->toBeNull()
-                ->and(Business::query()->where('organization_id', $this->tenants->orgA->id)->pluck('status')->unique()->all())->toBe([BusinessStatus::Archived])
+                ->and(Business::query()->where('organization_id', $this->tenants->orgA->id)->whereNull('archived_at')->exists())->toBeFalse()
                 ->and($this->tenants->cardA->fresh()?->active)->toBeFalse()
                 ->and(StampEvent::query()->count())->toBe($events);
         });
@@ -188,6 +239,16 @@ describe('organizations', function (): void {
         app(ResolveTenant::class)->handle($hq);
 
         expect($this->context->organizationId())->toBeNull();
+    });
+
+    it('closes the businesses of an archived organization, even one not archived itself', function (): void {
+        $a1Owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
+        $this->context->bypass(fn () => $this->tenants->orgA->forceFill(['archived_at' => now()])->save());
+
+        app(ResolveTenant::class)->handle($a1Owner);
+
+        expect($this->context->organizationId())->toBeNull()
+            ->and(fn () => $this->tenants->stamp($this->customer, $this->tenants->a1))->toThrow(LogicException::class, 'archived');
     });
 });
 
@@ -208,12 +269,29 @@ describe('restoring', function (): void {
             };
 
             expect(match ($what) {
-                'a business' => $this->tenants->a2->fresh()?->status === BusinessStatus::Verified,
+                'a business' => $this->tenants->a2->fresh()?->archived_at === null,
                 'a location' => $this->a1Location->fresh()?->archived_at === null,
                 'an organization' => $this->tenants->orgB->fresh()?->archived_at === null,
             })->toBeTrue();
         });
     })->with(['a business', 'a location', 'an organization']);
+
+    it('restores only what is archived', function (string $what): void {
+        $this->context->bypass(fn () => app(RestoreArchived::class)->handle(match ($what) {
+            'a business' => $this->tenants->a2,
+            'a location' => $this->a1Location,
+            'an organization' => $this->tenants->orgB,
+        }));
+    })->throws(LogicException::class, 'Only an archived')->with(['a business', 'a location', 'an organization']);
+
+    it('restores top down: never inside an organization or business still archived', function (string $what): void {
+        $this->context->bypass(function () use ($what): void {
+            match ($what) {
+                'a business of an archived organization' => [app(ArchiveOrganization::class)->handle($this->tenants->orgA), app(RestoreArchived::class)->handle($this->tenants->a2)],
+                'a location of an archived business' => [app(ArchiveBusiness::class)->handle($this->tenants->a2), app(RestoreArchived::class)->handle($this->tenants->locationOf($this->tenants->a2))],
+            };
+        });
+    })->throws(LogicException::class, 'first')->with(['a business of an archived organization', 'a location of an archived business']);
 
     it('lets a restored business\'s members back in', function (): void {
         $a2Owner = $this->tenants->member(User::factory()->create(), $this->tenants->a2, BusinessRole::Owner);

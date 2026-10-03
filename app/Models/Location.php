@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -38,11 +39,29 @@ use LogicException;
 #[UseEloquentBuilder(TenantBuilder::class)]
 class Location extends Model implements TenantModel
 {
-    use BelongsToBusiness;
+    use BelongsToBusiness {
+        assertTenantInsert as assertSiteDataInsert;
+    }
     use GuardsTenantWrites;
 
     /** @use HasFactory<LocationFactory> */
     use HasFactory;
+
+    /**
+     * A location is created open, at a business that is not archived (also in
+     * bypass()); imports may bring an archived one, in bypass().
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantInsert(array $values): void
+    {
+        $this->assertSiteDataInsert($values);
+        ArchivedSites::assertOpen($values['business_id'] ?? null, null, 'A location', lock: true);
+
+        if (($values['archived_at'] ?? null) !== null && ! app(TenantContext::class)->isBypassed()) {
+            throw new LogicException('A location is archived by ArchiveLocation, in TenantContext::bypass().');
+        }
+    }
 
     /**
      * Archiving and restoring a location go through ArchiveLocation and the

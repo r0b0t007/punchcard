@@ -42,6 +42,7 @@ use LogicException;
  * @property string|null $category
  * @property BusinessStatus $status
  * @property string|null $plan
+ * @property Carbon|null $archived_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Organization $organization
@@ -92,8 +93,8 @@ class Business extends Model implements TenantModel
 
         $status = $values['status'] ?? BusinessStatus::Pending->value;
 
-        if (($status instanceof BusinessStatus ? $status : BusinessStatus::tryFrom((string) $status)) !== BusinessStatus::Pending || ($values['plan'] ?? null) !== null) {
-            throw new LogicException('A new business starts pending and without a plan; verification and billing actions change them, in TenantContext::bypass().');
+        if (($status instanceof BusinessStatus ? $status : BusinessStatus::tryFrom((string) $status)) !== BusinessStatus::Pending || ($values['plan'] ?? null) !== null || ($values['archived_at'] ?? null) !== null) {
+            throw new LogicException('A new business starts pending, open and without a plan; verification, billing and admin actions change them, in TenantContext::bypass().');
         }
 
         if ($context->organizationId() === null || (int) $values['organization_id'] !== $context->organizationId()) {
@@ -109,7 +110,8 @@ class Business extends Model implements TenantModel
      * The owner (or an org admin) may update the business; staff may not. Only
      * franchise HQ (org admin, across the organization) removes a franchisee;
      * closing an independent café or chain is an admin action, in bypass().
-     * Status and plan change only through verification and billing actions.
+     * Status, plan and archiving change only through verification, billing
+     * and archive actions.
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -130,8 +132,8 @@ class Business extends Model implements TenantModel
             throw new LogicException('Only the owner or an org admin can change the business.');
         }
 
-        if (array_intersect(array_keys($values), ['status', 'plan']) !== []) {
-            throw new LogicException('Business status and plan change through verification and billing actions, in TenantContext::bypass().');
+        if (array_intersect(array_keys($values), ['status', 'plan', 'archived_at']) !== []) {
+            throw new LogicException('Business status, plan and archiving change through verification, billing and archive actions, in TenantContext::bypass().');
         }
     }
 
@@ -144,7 +146,7 @@ class Business extends Model implements TenantModel
     #[Scope]
     protected function operating(Builder $query): void
     {
-        $query->whereNotIn('status', [BusinessStatus::Suspended, BusinessStatus::Archived]);
+        $query->where('status', '!=', BusinessStatus::Suspended)->whereNull('archived_at');
     }
 
     /** Reads the stored organization type, in bypass(): bulk writes have no loaded model to ask. */
@@ -195,6 +197,7 @@ class Business extends Model implements TenantModel
     {
         return [
             'status' => BusinessStatus::class,
+            'archived_at' => 'datetime',
         ];
     }
 }

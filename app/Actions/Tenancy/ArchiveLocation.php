@@ -17,6 +17,10 @@ use LogicException;
  * its history stays. The business's owner or an org admin of the
  * organization may do it, like deleting a location; admin actions in
  * bypass(). Only the platform admin restores it (RestoreArchived).
+ *
+ * archived_at is written before the stampers end, so an assignment racing
+ * the archive either sees it (ArchivedSites locks the row) or is ended here.
+ * Archiving an archived location changes nothing.
  */
 final readonly class ArchiveLocation
 {
@@ -34,8 +38,9 @@ final readonly class ArchiveLocation
         }
 
         DB::transaction(fn () => $this->context->bypass(function () use ($location): void {
+            Location::query()->open()->whereKey($location->id)->update(['archived_at' => now()]);
             Stamper::query()->current()->where('location_id', $location->id)->update(['unassigned_at' => now()]);
-            $location->forceFill(['archived_at' => now()])->save();
+            $location->refresh();
         }));
     }
 }
