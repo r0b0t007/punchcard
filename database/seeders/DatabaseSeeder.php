@@ -13,15 +13,20 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the application's database: a test user and the demo (an
+     * independent café and a franchise to click through). Everything here has
+     * a known password, so it refuses every environment but local and testing,
+     * before writing anything.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        DemoSeeder::assertDemoEnvironment();
 
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        $this->call(DemoSeeder::class);
     }
 }
