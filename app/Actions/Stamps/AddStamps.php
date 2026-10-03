@@ -22,6 +22,7 @@ use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
+use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
@@ -31,17 +32,22 @@ use LogicException;
 
 /**
  * The single entry point for every stamp (stamp-flow skill, CHW-24). In one
- * transaction, with the enrollment row locked:
+ * transaction, the tap's stamper locked first, then the enrollment row (the
+ * lock order /t follows: tag, stamper, enrollment):
  *
- * 1. a retried request (same idempotency key at the business) returns the
- *    earlier stamp, or is refused if the key was used for another stamp;
+ * 1. staff must work at the business; a retried request (same idempotency
+ *    key at the business) returns the earlier stamp if it is the same stamp
+ *    by the same person, or is refused;
  * 2. the card must be active and honoured by the business, the site open
- *    (a correction may still take stamps back) and, for a tap, the stamper current and active;
- * 3. taps and scans keep to the cooldown (per customer per card) and the
- *    daily cap (per customer per business, today where the stamp is given);
+ *    (a correction may still take stamps back) and, for a tap, the stamper
+ *    current and active;
+ * 3. stamps that prove presence (tap, scan, manual) keep to the cooldown (per
+ *    customer per card) and the daily cap (per customer per card per
+ *    business, today where the stamp is given); an armed tap gives what room
+ *    is left, a scan or manual stamp over the cap is refused;
  * 4. the stamp is appended to the ledger, the progress cache follows it and
- *    rewards unlock: cyclic cards carry the extra stamps over, progressive
- *    cards unlock each tier once and never reset.
+ *    stamps that add unlock rewards: cyclic cards carry the extra stamps
+ *    over, progressive cards unlock each tier once and never reset.
  *
  * A refusal is a StampRejected and writes nothing. EnrollmentChanged follows
  * the commit. Outside bypass() (staff from their tenant) the caller's business
@@ -61,8 +67,9 @@ final readonly class AddStamps
         try {
             $result = $this->attempt($enrollment->id, $request);
         } catch (UniqueConstraintViolationException $duplicate) {
-            // Two requests raced on one idempotency key: the second now finds the first.
-            if ($request->idempotencyKey === null || ! str_contains($duplicate->getMessage(), 'idempotency_key')) {
+            // A request with a key may have raced another on it: the second attempt
+            // finds the first and replays or refuses it. Anything else rethrows again.
+            if ($request->idempotencyKey === null) {
                 throw $duplicate;
             }
 
@@ -84,7 +91,11 @@ final readonly class AddStamps
     private function attempt(int $enrollmentId, StampRequest $request): StampResult
     {
         return DB::transaction(fn (): StampResult => $this->context->bypass(function () use ($enrollmentId, $request): StampResult {
+            $stamper = $request->stamperId === null ? null : Stamper::query()->whereKey($request->stamperId)->lockForUpdate()->first();
             $enrollment = CardEnrollment::query()->whereKey($enrollmentId)->lockForUpdate()->firstOrFail();
+
+            $this->assertStaff($request);
+
             $earlier = $request->idempotencyKey === null ? null : StampEvent::query()
                 ->where('business_id', $request->businessId)
                 ->where('idempotency_key', $request->idempotencyKey)
@@ -97,16 +108,16 @@ final readonly class AddStamps
             $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
             $location = Location::query()->findOrFail($request->locationId);
             $now = now();
+            $qty = $request->qty;
 
-            $this->assertStaff($request);
-            $this->assertAllowed($card, $location, $request);
+            $this->assertAllowed($card, $location, $stamper, $request);
 
-            if ($request->isLimited()) {
+            if ($request->provesPresence()) {
                 $this->assertCooldown($enrollment, $card, $now);
-                $this->assertDailyCap($enrollment, $card, $location, $request, $now);
+                $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
             }
 
-            if ($enrollment->current_stamps + $request->qty < 0) {
+            if ($enrollment->current_stamps + $qty < 0) {
                 throw new StampRejected(StampRejection::CorrectionBelowZero);
             }
 
@@ -119,26 +130,28 @@ final readonly class AddStamps
                 'counter' => $request->counter,
                 'staff_id' => $request->staffId,
                 'source' => $request->source,
-                'qty' => $request->qty,
+                'qty' => $qty,
                 'idempotency_key' => $request->idempotencyKey,
                 'reason' => $request->reason,
                 'created_at' => $now,
             ]);
             $event->save();
 
-            $rewards = $this->progress($enrollment, $card, $request, $now);
+            $rewards = $this->progress($enrollment, $card, $request, $qty, $now);
 
             return new StampResult($event, $enrollment, $rewards, replayed: false);
         }));
     }
 
-    /** The key's earlier stamp is this one again (same customer, place, source and quantity), or the key is taken. */
+    /** The key's earlier stamp is this one again (same customer, place, source, quantity, staff and reason), or the key is taken. */
     private function replay(StampEvent $earlier, CardEnrollment $enrollment, StampRequest $request): StampResult
     {
         $same = (int) $earlier->enrollment_id === $enrollment->id
             && (int) $earlier->location_id === $request->locationId
             && $earlier->source === $request->source
-            && $earlier->qty === $request->qty;
+            && $earlier->qty === $request->qty
+            && ($earlier->staff_id === null ? null : (int) $earlier->staff_id) === $request->staffId
+            && $earlier->reason === $request->reason;
 
         if (! $same) {
             throw new StampRejected(StampRejection::IdempotencyConflict);
@@ -170,7 +183,12 @@ final readonly class AddStamps
         }
     }
 
-    private function assertAllowed(LoyaltyCard $card, Location $location, StampRequest $request): void
+    /**
+     * The open-site check locks like the ledger's own (ArchivedSites): the site
+     * rows for a stamp without a stamper, the stamper (locked above) for a tap,
+     * so a racing archive is a clean SiteClosed or StamperUnavailable.
+     */
+    private function assertAllowed(LoyaltyCard $card, Location $location, ?Stamper $stamper, StampRequest $request): void
     {
         if ((int) $location->business_id !== $request->businessId) {
             throw new LogicException('A stamp\'s location belongs to its business.');
@@ -184,13 +202,13 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
-        if (! $request->takesStampsBack() && ! ArchivedSites::isOpen($request->businessId, $request->locationId)) {
+        if (! $request->takesStampsBack() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null)) {
             throw new StampRejected(StampRejection::SiteClosed);
         }
 
         if ($request->stamperId !== null) {
-            $stamper = Stamper::query()->current()->whereKey($request->stamperId)->first();
             $working = $stamper instanceof Stamper
+                && $stamper->unassigned_at === null
                 && $stamper->status === StamperStatus::Active
                 && $stamper->business_id === $request->businessId
                 && $stamper->location_id === $request->locationId;
@@ -214,46 +232,58 @@ final readonly class AddStamps
         }
     }
 
-    /** Today's taps and scans on this card at this business, the day starting at midnight where the stamp is given. */
-    private function assertDailyCap(CardEnrollment $enrollment, LoyaltyCard $card, Location $location, StampRequest $request, CarbonInterface $now): void
+    /**
+     * The stamps this one may give under the daily cap: today's taps, scans
+     * and manual stamps on this card at this business, the day starting at
+     * midnight where the stamp is given. An armed tap gives the room left; a
+     * scan or manual stamp that does not fit, or any stamp once the cap is
+     * reached, is refused.
+     */
+    private function withinDailyCap(CardEnrollment $enrollment, LoyaltyCard $card, Location $location, StampRequest $request, CarbonInterface $now): int
     {
         if ($card->daily_cap === null) {
-            return;
+            return $request->qty;
         }
 
         $today = (int) StampEvent::query()
             ->where('enrollment_id', $enrollment->id)
             ->where('business_id', $request->businessId)
-            ->whereIn('source', [StampSource::Nfc, StampSource::Qr])
+            ->whereIn('source', StampSource::presenceValues())
             ->where('created_at', '>=', $now->toImmutable()->setTimezone($location->timezone)->startOfDay()->utc())
             ->sum('qty');
+        $room = $card->daily_cap - $today;
 
-        if ($today + $request->qty > $card->daily_cap) {
+        if ($room < 1 || ($request->qty > $room && $request->source !== StampSource::Nfc)) {
             throw new StampRejected(StampRejection::DailyCap);
         }
+
+        return min($request->qty, $room);
     }
 
     /**
-     * Moves the progress cache with the ledger and unlocks the rewards earned.
+     * Moves the progress cache with the ledger and unlocks the rewards earned:
+     * only stamps that add do, so a correction never pays out.
      *
      * @return list<Reward>
      */
-    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, StampRequest $request, CarbonInterface $now): array
+    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, StampRequest $request, int $qty, CarbonInterface $now): array
     {
         $before = $enrollment->lifetime_stamps;
-        $current = $enrollment->current_stamps + $request->qty;
-        $lifetime = $before + $request->qty;
+        $current = $enrollment->current_stamps + $qty;
+        $lifetime = $before + $qty;
         $completed = $enrollment->completed_count;
         $rewards = [];
 
-        if ($card->mode === CardMode::Cyclic) {
+        if ($qty > 0 && $card->mode === CardMode::Cyclic) {
             while ($current >= $card->stamps_required) {
                 $current -= $card->stamps_required;
                 $completed++;
                 $rewards[] = $this->unlock($enrollment, $card, $completed, $card->reward_text, $now);
             }
-        } else {
-            foreach ($this->tiers($card) as $tier) {
+        }
+
+        if ($qty > 0 && $card->mode === CardMode::Progressive) {
+            foreach (ProgressiveTiers::parse($card->tiers) as $tier) {
                 $crossed = $tier['stamps'] > $before && $tier['stamps'] <= $lifetime;
 
                 if ($crossed && ! Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->where('milestone', $tier['stamps'])->exists()) {
@@ -290,43 +320,5 @@ final readonly class AddStamps
         $reward->save();
 
         return $reward;
-    }
-
-    /**
-     * A progressive card's tiers, lowest first. Malformed tiers stop the stamp:
-     * a misconfigured card must not silently drop rewards.
-     *
-     * @return list<array{stamps: int, reward: string}>
-     */
-    private function tiers(LoyaltyCard $card): array
-    {
-        $tiers = $card->tiers;
-
-        if (! is_array($tiers) || $tiers === []) {
-            throw new LogicException("Progressive card {$card->id} has no tiers.");
-        }
-
-        $valid = [];
-
-        foreach ($tiers as $tier) {
-            $malformed = ! is_array($tier)
-                || ! is_int($tier['stamps'] ?? null)
-                || $tier['stamps'] < 1
-                || isset($valid[$tier['stamps']])
-                || ! is_string($tier['reward'] ?? null)
-                || trim($tier['reward']) === '';
-
-            if ($malformed) {
-                throw new LogicException("Progressive card {$card->id} has malformed tiers (each needs its own stamps count and a reward).");
-            }
-
-            $valid[$tier['stamps']] = ['stamps' => $tier['stamps'], 'reward' => $tier['reward']];
-        }
-
-        $valid = array_values($valid);
-
-        usort($valid, fn (array $a, array $b): int => $a['stamps'] <=> $b['stamps']);
-
-        return $valid;
     }
 }

@@ -8,6 +8,7 @@ use App\Enums\CardMode;
 use App\Enums\RewardType;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -74,14 +75,33 @@ class LoyaltyCard extends Model implements TenantModel
     {
         $this->assertProgramWrite($operation, $values);
 
-        if (! array_key_exists('mode', $values)) {
-            return;
+        if (array_key_exists('mode', $values)) {
+            $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => CardEnrollment::query()->where('card_id', $this->id)->exists());
+
+            if ($held) {
+                throw new LogicException('A card\'s mode cannot change once customers hold it (or in a bulk update): start a new card.');
+            }
         }
 
-        $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => CardEnrollment::query()->where('card_id', $this->id)->exists());
+        if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
+            $this->assertTiers(
+                $values['mode'] ?? ($this->exists ? $this->getRawOriginal('mode') : null),
+                array_key_exists('tiers', $values) ? $values['tiers'] : ($this->exists ? $this->getRawOriginal('tiers') : null),
+            );
+        }
+    }
 
-        if ($held) {
-            throw new LogicException('A card\'s mode cannot change once customers hold it (or in a bulk update): start a new card.');
+    /**
+     * Tiers are checked when the card is saved, also in bypass(): a progressive
+     * card needs well-formed tiers, and any tiers given must be well-formed, so
+     * one bad edit cannot stop every stamp on the card.
+     */
+    private function assertTiers(mixed $mode, mixed $tiers): void
+    {
+        $progressive = $mode === CardMode::Progressive || $mode === CardMode::Progressive->value;
+
+        if ($progressive || $tiers !== null) {
+            ProgressiveTiers::parse($tiers);
         }
     }
 
@@ -93,6 +113,7 @@ class LoyaltyCard extends Model implements TenantModel
     public function assertTenantInsert(array $values): void
     {
         $this->assertProgramInsert($values);
+        $this->assertTiers($values['mode'] ?? null, $values['tiers'] ?? null);
         ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'A card', lock: true);
     }
 

@@ -55,7 +55,7 @@ final readonly class StampRequest
         return new self(StampSource::Qr, $qty, (int) $location->business_id, $location->id, staffId: $staff->id, idempotencyKey: self::key($idempotencyKey));
     }
 
-    /** Staff added stamps by hand, with a reason; no cooldown or cap. */
+    /** Staff added stamps by hand, with a reason; held to the cooldown and the daily cap like a scan. */
     public static function manual(Location $location, User $staff, string $idempotencyKey, string $reason, int $qty): self
     {
         self::assertBetween($qty, 1, self::MAX_STAMPS);
@@ -76,7 +76,7 @@ final readonly class StampRequest
     }
 
     /** A stamp given by a rule (bonus, birthday, referral), credited to a location. */
-    public static function system(StampSource $source, Location $location, int $qty = 1): self
+    public static function system(StampSource $source, Location $location, int $qty = 1, ?string $idempotencyKey = null): self
     {
         if (! in_array($source, [StampSource::Bonus, StampSource::Birthday, StampSource::Referral], true)) {
             throw new InvalidArgumentException("{$source->value} is not a system stamp.");
@@ -84,10 +84,10 @@ final readonly class StampRequest
 
         self::assertBetween($qty, 1, self::MAX_STAMPS);
 
-        return new self($source, $qty, (int) $location->business_id, $location->id);
+        return new self($source, $qty, (int) $location->business_id, $location->id, idempotencyKey: $idempotencyKey === null ? null : self::key($idempotencyKey));
     }
 
-    /** The customer was there (a tap, a scan, staff by hand): it starts the cooldown and counts as a visit. */
+    /** The customer was there (a tap, a scan, staff by hand): held to the cooldown and the daily cap, it starts the cooldown and counts as a visit. */
     public function provesPresence(): bool
     {
         return in_array($this->source->value, StampSource::presenceValues(), true);
@@ -97,12 +97,6 @@ final readonly class StampRequest
     public function takesStampsBack(): bool
     {
         return $this->source === StampSource::Correction && $this->qty < 0;
-    }
-
-    /** Taps and scans are what a customer can repeat: only they are held to the cooldown and the daily cap. */
-    public function isLimited(): bool
-    {
-        return in_array($this->source, [StampSource::Nfc, StampSource::Qr], true);
     }
 
     private static function assertBetween(int $qty, int $min, int $max): void
