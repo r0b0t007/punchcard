@@ -52,7 +52,7 @@ and 4); key numbers, layout and rotation steps are in `docs/runbooks/stamper-key
 In code: `App\Support\Nfc\SunVerifier::decrypt($e, $metaReadKey)` returns a `SunMessage` (UID + counter, not yet
 trusted); derive the file key from its UID; then `verifyMac($message, $c, $fileReadKey)` returns a `VerifiedTap`.
 The meta key always uses the global version (`metaReadKey(config('punchcard.nfc.key_version'))`), never
-`$stamper->key_version`, which only feeds `fileReadKey($uid, $stamper->key_version)`.
+the tag's `key_version` (`nfc_tags.key_version`), which only feeds `fileReadKey($uid, $tag->key_version)`.
 Only a `VerifiedTap` may reach the replay check and the stamp. `SunMessage` and `VerifiedTap` have private
 constructors and refuse serialization, which prevents mistakes but is not a security boundary (reflection can still
 build one): never accept a `VerifiedTap` from outside the request that verified it. Both methods throw
@@ -78,9 +78,9 @@ because replay protection is the stamper row lock in the database.
 ## Rules
 
 - Never log `e`, `c`, UIDs with keys, or derived keys. Log the stamper id and the rejection reason only.
-- Reject reasons are the `App\Enums\TapRejection` enum: `malformed`, `unknown_tag`, `bad_mac`, `replay`, `stamper_disabled`, `cooldown`, `daily_cap`. Record each rejected tap for the owner's fraud view.
+- Reject reasons are the `App\Enums\TapRejection` enum (`TapRejection::fromStamp()` maps the `AddStamps` refusals). Every tap, refused or not, is a row in the tap log (`taps`, platform data, pruned after `punchcard.taps.retention_days`) for the owner's fraud view. A malformed, forged or unknown-tag tap is recorded with no tag or counter: nothing in it can be trusted.
 - Rate limit `/t` per IP and per user (`RateLimiter::for('tap', ...)`).
-- The endpoint is a normal GET that renders an Inertia page (C1/C2/C3/cooldown). It must work logged out: keep the raw `e` and `c` in the session (never a `VerifiedTap`), finish sign-in, then verify again and apply the stamp once.
+- `ReceiveTap` verifies, spends the counter and records the tap in its own committed step (the tag row locked, then the current stamper, whose arming it reads and clears), so a refused URL can never be opened again. `ApplyTap` stamps it through `AddStamps` once the customer is known. Signed out, the tap waits as a **pending tap** on the server (`punchcard.taps.pending_minutes`), its id in the session; after sign-in it is applied once. Never keep `e` or `c` in the session: the counter is already spent, so verifying them again would be a replay.
 - A disabled stamper (paused by the business) rejects everything. A lost or stolen tag is retired
   (`nfc_tags.retired_at`, one-way, platform only) and rejects everything; re-provisioning bumps `key_version`.
-- Development without hardware: a `php artisan punchcard:fake-tap {stamper}` command (to build) generates valid URLs from test keys. Never enable it in production.
+- Development without hardware: `php artisan punchcard:fake-tap {stamper}` prints a valid URL for the tag's next counter (`App\Support\Nfc\FakeTap`, which refuses to run in production).

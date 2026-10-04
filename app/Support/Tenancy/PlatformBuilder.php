@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Nfc;
+namespace App\Support\Tenancy;
 
-use App\Support\Tenancy\TenantBuilder;
-use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -13,22 +11,23 @@ use Illuminate\Database\Eloquent\Scope;
 use LogicException;
 
 /**
- * Query builder for NFC tags: platform state, written only by admin actions
- * and the tap endpoint, in TenantContext::bypass(). It refuses every write
- * outside bypass(), model saves and query-builder writes alike (bulk updates,
- * increments, relation updates such as $stamper->tag()->update()), because a
- * tag's moves are irreversible: database triggers keep its counter and key
- * version forward and its retirement one-way, so a stray write could kill a
- * tag for good. Its read guard (the platform scope) cannot be removed or
- * replaced outside bypass() either.
+ * Query builder for platform data (IsPlatformData): NFC tags and the tap log,
+ * no tenant's rows, written only by admin actions and the tap endpoint, in
+ * TenantContext::bypass(). It refuses every write outside bypass(), model
+ * saves and query-builder writes alike (bulk updates, increments, relation
+ * updates such as $stamper->tag()->update()): a tag's moves are irreversible
+ * (database triggers keep its counter and key version forward and its
+ * retirement one-way), and the tap log is the replay and fraud record. Its
+ * read guard (the platform scope) cannot be removed or replaced outside
+ * bypass() either.
  *
  * @template TModel of Model
  *
  * @extends Builder<TModel>
  */
-final class NfcTagBuilder extends Builder
+final class PlatformBuilder extends Builder
 {
-    /** The read guard NfcTag registers: tags read as empty outside bypass(). */
+    /** The read guard platform models register (IsPlatformData): rows read as empty outside bypass(). */
     public const string PLATFORM_SCOPE = 'platform';
 
     /**
@@ -37,7 +36,7 @@ final class NfcTagBuilder extends Builder
     public function withoutGlobalScope($scope): static
     {
         if ($scope === self::PLATFORM_SCOPE) {
-            $this->assertPlatformAccess('Tags read as empty outside TenantContext::bypass(); the platform scope cannot be removed.');
+            $this->assertPlatformAccess($this->name().' rows read as empty outside TenantContext::bypass(); the platform scope cannot be removed.');
         }
 
         return parent::withoutGlobalScope($scope);
@@ -51,7 +50,7 @@ final class NfcTagBuilder extends Builder
     {
         // Eloquent registers the model's own scope this way on every query; only a different one is a replacement.
         if ($identifier === self::PLATFORM_SCOPE && $scope !== ($this->model->getGlobalScopes()[self::PLATFORM_SCOPE] ?? null)) {
-            $this->assertPlatformAccess('Tags read as empty outside TenantContext::bypass(); the platform scope cannot be replaced.');
+            $this->assertPlatformAccess($this->name().' rows read as empty outside TenantContext::bypass(); the platform scope cannot be replaced.');
         }
 
         return parent::withGlobalScope($identifier, $scope);
@@ -164,7 +163,12 @@ final class NfcTagBuilder extends Builder
 
     private function assertPlatformWrite(): void
     {
-        $this->assertPlatformAccess('NFC tags are platform state: admin actions and the tap endpoint write them, in TenantContext::bypass().');
+        $this->assertPlatformAccess($this->name().' rows are platform state: only admin actions and the tap endpoint write them, in TenantContext::bypass().');
+    }
+
+    private function name(): string
+    {
+        return class_basename($this->model);
     }
 
     private function assertPlatformAccess(string $message): void

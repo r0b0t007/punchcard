@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Actions\Account\DeleteAccount;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
+use App\Enums\TapRejection;
+use App\Enums\TapStatus;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\Reward;
 use App\Models\StampEvent;
+use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -296,3 +299,22 @@ it('keeps anonymised accounts out of user fan-outs and mail', function (): void 
     expect(User::query()->notAnonymised()->whereKey($user->id)->exists())->toBeFalse()
         ->and($anonymised?->routeNotificationForMail())->toBeNull();
 });
+
+it('scrubs the IP and user agent from the account\'s taps, deleted or anonymised', function (bool $withHistory): void {
+    $user = User::factory()->create();
+
+    if ($withHistory) {
+        $this->tenants->stamp($this->tenants->enroll($user, $this->tenants->cardA), $this->tenants->a1);
+    }
+
+    $tap = $this->context->bypass(function () use ($user): Tap {
+        $tap = (new Tap)->forceFill(['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay, 'ip' => '203.0.113.7', 'user_agent' => 'Test phone']);
+        $tap->save();
+
+        return $tap;
+    });
+
+    ($this->deleteAccount)($user)->assertSessionHasNoErrors();
+
+    expect($this->context->bypass(fn (): ?array => Tap::query()->whereKey($tap->id)->first()?->only(['ip', 'user_agent'])))->toBe(['ip' => null, 'user_agent' => null]);
+})->with(['without history' => [false], 'with history' => [true]]);

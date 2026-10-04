@@ -8,6 +8,8 @@ use App\Enums\StampSource;
 use App\Models\Location;
 use App\Models\Stamper;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use InvalidArgumentException;
 
 /**
@@ -33,10 +35,15 @@ final readonly class StampRequest
         public ?int $staffId = null,
         public ?string $idempotencyKey = null,
         public ?string $reason = null,
+        public ?CarbonImmutable $at = null,
     ) {}
 
-    /** A verified tap on the stamper (1 stamp, or what staff armed it with), at its counter. */
-    public static function nfc(Stamper $stamper, int $counter, int $qty = 1): self
+    /**
+     * A verified tap on the stamper (1 stamp, or what staff armed it with), at its counter.
+     * $at is when the tap happened, if it is applied later (a signed-out tap claimed after
+     * sign-in): the cooldown, the cap's day and the stamp's time are the tap's.
+     */
+    public static function nfc(Stamper $stamper, int $counter, int $qty = 1, ?CarbonInterface $at = null): self
     {
         self::assertBetween($qty, 1, self::MAX_TAP);
 
@@ -44,7 +51,7 @@ final readonly class StampRequest
             throw new InvalidArgumentException('A tap counter is never negative.');
         }
 
-        return new self(StampSource::Nfc, $qty, (int) $stamper->business_id, (int) $stamper->location_id, $stamper->id, (int) $stamper->nfc_tag_id, $counter);
+        return new self(StampSource::Nfc, $qty, (int) $stamper->business_id, (int) $stamper->location_id, $stamper->id, (int) $stamper->nfc_tag_id, $counter, at: $at?->toImmutable());
     }
 
     /** Staff scanned the customer's member QR. */

@@ -8,14 +8,14 @@ template and SDM settings with a reader) are in the provisioning runbook from CH
 The only secret is `NFC_SUN_MASTER_KEY` (32 hex characters, AES-128) in the server environment. It is never
 committed, logged or sent to a client. Every tag key is derived from it with NXP AN10922 AES-128
 diversification (`App\Support\Nfc\KeyDiversifier`), so the database stores no key material, only each
-stamper's `key_version`.
+tag's `key_version` (`nfc_tags`).
 
-| Tag key | Purpose                                              | Derived from                                      | Scope       |
-| ------- | ---------------------------------------------------- | ------------------------------------------------- | ----------- |
-| 0       | Application master key: changes keys and settings    | key number, tag UID, `punchcard`, stamper version | Per tag     |
-| 1       | SDMMetaReadKey: decrypts `e` (UID + counter)         | key number, `punchcard`, `NFC_SUN_KEY_VERSION`    | System-wide |
-| 2       | SDMFileReadKey: signs `c`                            | key number, tag UID, `punchcard`, stamper version | Per tag     |
-| 3, 4    | Unused: set to derived per-tag values, never default | key number, tag UID, `punchcard`, stamper version | Per tag     |
+| Tag key | Purpose                                              | Derived from                                   | Scope       |
+| ------- | ---------------------------------------------------- | ---------------------------------------------- | ----------- |
+| 0       | Application master key: changes keys and settings    | key number, tag UID, `punchcard`, tag version  | Per tag     |
+| 1       | SDMMetaReadKey: decrypts `e` (UID + counter)         | key number, `punchcard`, `NFC_SUN_KEY_VERSION` | System-wide |
+| 2       | SDMFileReadKey: signs `c`                            | key number, tag UID, `punchcard`, tag version  | Per tag     |
+| 3, 4    | Unused: set to derived per-tag values, never default | key number, tag UID, `punchcard`, tag version  | Per tag     |
 
 Key 1 has to be system-wide: the UID is encrypted inside `e`, so the server cannot know which tag tapped
 before decrypting. A leaked key 1 lets someone read UIDs and counters (link taps), but it cannot produce a
