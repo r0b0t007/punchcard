@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\Taps\ApplyTap;
 use App\Actions\Taps\ReceiveTap;
 use App\Actions\Tenancy\ArchiveLocation;
+use App\Actions\Tenancy\ArchiveOrganization;
+use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Events\EnrollmentChanged;
@@ -18,6 +20,7 @@ use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -87,10 +90,15 @@ it('records a refusal on the tap, and the counter stays spent', function (): voi
         ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1);
 });
 
-it('maps the stamp refusals a tap can hit', function (string $change, TapRejection $rejection): void {
+it('refuses a tap whose stamper, site or card changed before it was applied, and enrolls nobody', function (string $change, TapRejection $rejection): void {
     $tap = ($this->tapAt)(5);
     $this->context->bypass(fn () => match ($change) {
         'the location archived meanwhile' => app(ArchiveLocation::class)->handle($this->tenants->locationOf($this->tenants->a1)),
+        'the organization archived meanwhile' => app(ArchiveOrganization::class)->handle($this->tenants->orgA),
+        'the business closed without its stampers ended' => $this->tenants->a1->forceFill(['archived_at' => now()])->save(),
+        'the organization closed without its stampers ended' => $this->tenants->orgA->forceFill(['archived_at' => now()])->save(),
+        'the card misconfigured' => DB::table('loyalty_cards')->where('id', $this->tenants->cardA->id)->update(['mode' => 'progressive', 'tiers' => '[]']),
+        'the stamper paused meanwhile' => $this->stamper->forceFill(['status' => StamperStatus::Disabled])->save(),
         'the card switched off' => $this->tenants->cardA->forceFill(['active' => false])->save(),
         'the card no longer honoured here' => $this->tenants->cardA->businesses()->detach($this->tenants->a1->id),
     });
@@ -99,12 +107,64 @@ it('maps the stamp refusals a tap can hit', function (string $change, TapRejecti
 
     expect($applied->status)->toBe(TapStatus::Rejected)
         ->and($applied->rejection)->toBe($rejection)
+        ->and($applied->user_id)->toBe($this->customer->id)
+        ->and(($this->enrollment)())->toBeNull()
         ->and($this->context->bypass(fn (): int => StampEvent::query()->count()))->toBe(0);
 })->with([
-    'the location archived meanwhile' => ['the location archived meanwhile', TapRejection::SiteClosed],
+    'the location archived meanwhile' => ['the location archived meanwhile', TapRejection::UnassignedTag],
+    'the organization archived meanwhile' => ['the organization archived meanwhile', TapRejection::UnassignedTag],
+    'the business closed without its stampers ended' => ['the business closed without its stampers ended', TapRejection::SiteClosed],
+    'the organization closed without its stampers ended' => ['the organization closed without its stampers ended', TapRejection::SiteClosed],
+    'the card misconfigured' => ['the card misconfigured', TapRejection::CardMisconfigured],
+    'the stamper paused meanwhile' => ['the stamper paused meanwhile', TapRejection::StamperDisabled],
     'the card switched off' => ['the card switched off', TapRejection::NotHonoured],
     'the card no longer honoured here' => ['the card no longer honoured here', TapRejection::NotHonoured],
 ]);
+
+it('judges the cooldown at the tap\'s time, not at sign-in', function (): void {
+    ($this->apply)(($this->tapAt)(5));
+    $this->travel(2)->minutes();
+    $signedOut = ($this->tapAt)(6);
+    $this->travel(19)->minutes();
+
+    $applied = ($this->apply)($signedOut);
+
+    expect($applied->rejection)->toBe(TapRejection::Cooldown)
+        ->and($applied->available_at?->toDateTimeString())->toBe('2026-10-05 10:20:00')
+        ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1);
+});
+
+it('counts a tap before midnight on that day, even applied after it', function (): void {
+    $this->context->bypass(function (): void {
+        $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'UTC'])->save();
+        $this->tenants->cardA->forceFill(['cooldown_min' => 0, 'daily_cap' => 1])->save();
+    });
+    Carbon::setTestNow('2026-10-05 23:55:00');
+    ($this->apply)(($this->tapAt)(5));
+    Carbon::setTestNow('2026-10-05 23:58:00');
+    $signedOut = ($this->tapAt)(6);
+    Carbon::setTestNow('2026-10-06 00:05:00');
+
+    expect(($this->apply)($signedOut)->rejection)->toBe(TapRejection::DailyCap);
+});
+
+it('gives an armed tap the room left under the daily cap when it is applied', function (): void {
+    $this->context->bypass(function (): void {
+        $this->tenants->cardA->forceFill(['cooldown_min' => 0, 'daily_cap' => 3])->save();
+        $this->stamper->forceFill(['armed_qty' => 4, 'armed_until' => now()->addSeconds(60)])->save();
+    });
+
+    $tap = ($this->apply)(($this->tapAt)(5));
+
+    expect($tap->status)->toBe(TapStatus::Stamped)
+        ->and($this->context->bypass(fn (): int => (int) StampEvent::query()->whereKey($tap->stamp_event_id)->value('qty')))->toBe(3);
+});
+
+it('lets only the first customer claim a signed-out tap', function (): void {
+    $tap = ($this->apply)(($this->tapAt)(5));
+
+    ($this->apply)($tap, User::factory()->create());
+})->throws(LogicException::class, 'another customer');
 
 it('lets a pending tap expire after 30 minutes', function (): void {
     $tap = ($this->tapAt)(5);
@@ -114,6 +174,7 @@ it('lets a pending tap expire after 30 minutes', function (): void {
 
     expect($expired->status)->toBe(TapStatus::Expired)
         ->and($expired->rejection)->toBe(TapRejection::Expired)
+        ->and($expired->user_id)->toBe($this->customer->id)
         ->and(($this->enrollment)())->toBeNull();
 });
 

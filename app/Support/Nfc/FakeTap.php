@@ -10,10 +10,14 @@ use LogicException;
  * Builds the `e` and `c` a provisioned tag would emit for a UID and counter
  * (NXP AN12196), from the configured master key: for tests, Playwright and
  * `php artisan punchcard:fake-tap`. Anyone holding it can stamp from home, so
- * it refuses to run in production.
+ * it runs only in local and testing (any other environment may hold the real
+ * master key).
  */
 final readonly class FakeTap
 {
+    /** The only environments it runs in: staging may share the real master key. */
+    public const array ENVIRONMENTS = ['local', 'testing'];
+
     public function __construct(private KeyDiversifier $keys) {}
 
     /**
@@ -23,8 +27,8 @@ final readonly class FakeTap
      */
     public function build(string $uid, int $counter, int $keyVersion = 1, ?int $metaVersion = null): array
     {
-        if (app()->isProduction()) {
-            throw new LogicException('Fake taps are never built in production.');
+        if (! app()->environment(self::ENVIRONMENTS)) {
+            throw new LogicException('Fake taps are built only in local and testing, never in production or staging.');
         }
 
         $metaVersion ??= (int) config('punchcard.nfc.key_version');

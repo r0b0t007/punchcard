@@ -45,15 +45,16 @@ it('prints a working URL for a stamper\'s next tap', function (): void {
         ->and($tap->counter)->toBe(1);
 });
 
-it('never builds a fake tap in production', function (): void {
-    app()->detectEnvironment(fn (): string => 'production');
+it('builds fake taps only in local and testing', function (string $environment): void {
+    app()->detectEnvironment(fn (): string => $environment);
 
     try {
-        app(FakeTap::class)->build(SunVectors::PROVISIONED_TAP['uid'], 7);
+        expect(fn () => app(FakeTap::class)->build(SunVectors::PROVISIONED_TAP['uid'], 7))->toThrow(LogicException::class, 'only in local and testing')
+            ->and(Artisan::call('punchcard:fake-tap', ['stamper' => $this->stamper->id]))->toBe(1);
     } finally {
         app()->detectEnvironment(fn (): string => 'testing');
     }
-})->throws(LogicException::class, 'production');
+})->with(['production', 'staging', 'prod']);
 
 it('prunes the tap log after 180 days', function (): void {
     $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));

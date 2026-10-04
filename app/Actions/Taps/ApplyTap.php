@@ -8,13 +8,16 @@ use App\Actions\Cards\EnrollCustomer;
 use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampRequest;
+use App\Actions\Stamps\StampResult;
+use App\Enums\StamperStatus;
+use App\Enums\StampRejection;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
-use App\Models\CardEnrollment;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -26,16 +29,25 @@ use LogicException;
  *
  * - a tap already applied, refused or expired is returned as it is; one
  *   waiting past its expiry becomes expired; one received by a signed-in
- *   customer is theirs alone;
+ *   customer, or already claimed, is theirs alone;
+ * - the stamper is locked next, as ReceiveTap does (tag, stamper, then the
+ *   enrollment in AddStamps): an archive ends stampers before closing
+ *   anything (CloseSites), so a stamper still current under the lock keeps
+ *   its site open until this commits. An ended or paused stamper, or a closed
+ *   site, refuses the tap before anyone is enrolled;
  * - the customer is enrolled on the business's card (EnrollCustomer) and
- *   stamped through AddStamps, which locks the stamper, then the enrollment;
+ *   stamped through AddStamps at the tap's own time, so the cooldown and the
+ *   daily cap judge the visit, not the later sign-in; both in a savepoint, so
+ *   a refused tap leaves no new card behind;
  * - an AddStamps refusal is recorded on the tap (TapRejection::fromStamp, the
  *   cooldown's next time too), never thrown: ReceiveTap already spent the
  *   counter, so the URL stays used whatever happens here.
  *
  * It runs in the stamper's tenant, without rights, so the queued listeners of
  * EnrollmentChanged know the organization and business (QueuedTenant); the
- * request's own tenant is put back afterwards.
+ * request's own tenant is put back afterwards. Call it outside any
+ * transaction: the listeners are dispatched when this one commits, which must
+ * happen while the stamper's tenant is still set.
  */
 final readonly class ApplyTap
 {
@@ -61,7 +73,7 @@ final readonly class ApplyTap
         $tap = $this->context->bypass(fn (): Tap => Tap::query()->whereKey($tapId)->lockForUpdate()->firstOrFail());
 
         if ($tap->user_id !== null && $tap->user_id !== $user->id) {
-            throw new LogicException('This tap was received by another customer.');
+            throw new LogicException('This tap was received or claimed by another customer.');
         }
 
         if (! $tap->isPending()) {
@@ -69,23 +81,34 @@ final readonly class ApplyTap
         }
 
         if ($tap->expires_at === null || $tap->expires_at->isPast()) {
-            return $this->finish($tap, ['status' => TapStatus::Expired, 'rejection' => TapRejection::Expired]);
+            return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Expired, 'rejection' => TapRejection::Expired]);
         }
 
         [$stamper, $business] = $this->context->bypass(fn (): array => [
-            Stamper::query()->findOrFail($tap->stamper_id),
+            Stamper::query()->whereKey($tap->stamper_id)->lockForUpdate()->firstOrFail(),
             Business::query()->with('organization')->findOrFail($tap->business_id),
         ]);
 
-        $this->context->set($business->organization, $business);
-        $enrollment = $this->enrollCustomer->handle($business, $user);
+        $refusal = match (true) {
+            $stamper->unassigned_at !== null => TapRejection::UnassignedTag,
+            $stamper->status !== StamperStatus::Active => TapRejection::StamperDisabled,
+            ! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id) => TapRejection::SiteClosed,
+            default => null,
+        };
 
-        if (! $enrollment instanceof CardEnrollment) {
-            return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::NotHonoured]);
+        if ($refusal !== null) {
+            return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => $refusal]);
         }
 
+        $this->context->set($business->organization, $business);
+
         try {
-            $result = $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty));
+            $result = DB::transaction(function () use ($tap, $stamper, $business, $user): StampResult {
+                $enrollment = $this->enrollCustomer->handle($business, $user)
+                    ?? throw new StampRejected(StampRejection::NotHonoured);
+
+                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at));
+            });
         } catch (StampRejected $rejected) {
             return $this->finish($tap, [
                 'user_id' => $user->id,

@@ -51,7 +51,10 @@ return new class extends Migration
                     add constraint taps_status_check check (status in ('pending', 'stamped', 'rejected', 'expired')),
                     add constraint taps_qty_check check (qty between 1 and 10),
                     add constraint taps_counter_check check (counter is null or nfc_tag_id is not null),
-                    add constraint taps_rejection_check check ((status in ('rejected', 'expired')) = (rejection is not null))
+                    add constraint taps_rejection_check check ((status in ('rejected', 'expired')) = (rejection is not null)),
+                    add constraint taps_pending_check check (
+                        status <> 'pending' or (stamper_id is not null and business_id is not null and counter is not null and expires_at is not null)
+                    )
             SQL);
         }
     }

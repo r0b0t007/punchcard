@@ -14,8 +14,8 @@ use Illuminate\Console\Command;
 
 /**
  * Prints a working tap URL for a stamper's tag, as if a phone had just
- * touched it: for local work and end-to-end tests without hardware. Refuses
- * to run in production (anyone with it could stamp from home).
+ * touched it: for local work and end-to-end tests without hardware. Runs only
+ * in local and testing (anyone with it could stamp from home).
  */
 #[Signature('punchcard:fake-tap {stamper : The stamper id} {--counter= : The counter to use (default: the tag\'s next one)}')]
 #[Description('Print a working tap URL for a stamper (local and testing only)')]
@@ -23,8 +23,8 @@ class FakeTapCommand extends Command
 {
     public function handle(TenantContext $context, FakeTap $fakeTap): int
     {
-        if ($this->laravel->isProduction()) {
-            $this->error('Fake taps are never built in production.');
+        if (! $this->laravel->environment(FakeTap::ENVIRONMENTS)) {
+            $this->error('Fake taps are built only in local and testing.');
 
             return self::FAILURE;
         }

@@ -12,9 +12,9 @@ use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Nfc\KeyDiversifier;
+use App\Support\Nfc\SunMessage;
 use App\Support\Nfc\SunVerificationFailed;
 use App\Support\Nfc\SunVerifier;
-use App\Support\Nfc\VerifiedTap;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -26,17 +26,19 @@ use InvalidArgumentException;
  *    tag's file read key from its own key_version. A malformed, forged or
  *    unknown-tag URL is recorded refused, with no tag or counter: nothing in
  *    it can be trusted.
- * 2. In one committed step, the tag row locked: the counter must be above the
- *    tag's last one, and is spent before anything else can refuse the tap, so
- *    a refused URL can never be opened again. Then the current stamper is
- *    locked (Stamper::current(), never by status), its arming read and
- *    cleared, and the tap recorded pending (or refused: retired tag, no
- *    stamper, paused stamper).
+ * 2. In one committed step, the tag row locked: the MAC verified with the
+ *    tag's own key version, then the counter must be above the tag's last
+ *    one, and is spent before anything else can refuse the tap, so a refused
+ *    URL can never be opened again. Then the current stamper is locked
+ *    (Stamper::current(), never by status), its arming read and cleared, and
+ *    the tap recorded pending (or refused: retired tag, no stamper, paused
+ *    stamper).
  *
  * The stamp itself comes later, in ApplyTap, once the customer is known, so
  * an AddStamps refusal can never roll the counter back. A key configuration
  * error (InvalidArgumentException) is a server error, never a recorded tap;
- * nothing here logs the URL or any key.
+ * nothing here logs the URL or any key. Call it outside any transaction: the
+ * spent counter must commit on its own.
  */
 final readonly class ReceiveTap
 {
@@ -65,29 +67,32 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
-        $keyVersion = $this->context->bypass(fn (): mixed => NfcTag::query()->where('uid', $message->uid)->value('key_version'));
+        return DB::transaction(fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request)));
+    }
 
-        if ($keyVersion === null) {
+    /**
+     * Under the tag lock: verify the MAC with the tag's key version as it is
+     * now (a re-provisioning cannot slip in between), spend the counter, then
+     * find the stamper and its arming. FOR NO KEY UPDATE, not FOR UPDATE: taps
+     * on the tag still queue here, but a stamp event's foreign key check on the
+     * tag (KEY SHARE) is never blocked by it, so applying an earlier tap on the
+     * same stamper cannot deadlock with this one.
+     *
+     * @param  array{user_id: int|null, ip: string|null, user_agent: string|null}  $request
+     */
+    private function spend(SunMessage $message, #[\SensitiveParameter] string $c, array $request): Tap
+    {
+        $tag = NfcTag::query()->where('uid', $message->uid)->lock('for no key update')->first();
+
+        if (! $tag instanceof NfcTag) {
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::UnknownTag]);
         }
 
         try {
-            $tap = $this->verifier->verifyMac($message, $c, $this->keys->fileReadKey($message->uid, (int) $keyVersion));
+            $tap = $this->verifier->verifyMac($message, $c, $this->keys->fileReadKey($message->uid, $tag->key_version));
         } catch (SunVerificationFailed $failed) {
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
-
-        return DB::transaction(fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($tap, $request)));
-    }
-
-    /**
-     * Under the tag lock: spend the counter, then find the stamper and its arming.
-     *
-     * @param  array{user_id: int|null, ip: string|null, user_agent: string|null}  $request
-     */
-    private function spend(VerifiedTap $tap, array $request): Tap
-    {
-        $tag = NfcTag::query()->where('uid', $tap->uid)->lockForUpdate()->firstOrFail();
 
         // A replay carries no counter: its counter is already on the row that spent it.
         if ($tap->counter <= $tag->last_counter) {

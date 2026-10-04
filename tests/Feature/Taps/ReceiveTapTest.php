@@ -15,6 +15,7 @@ use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -196,3 +197,14 @@ it('treats a missing key as a server error, never as a tap', function (): void {
     expect(fn () => ($this->receive)(['e' => str_repeat('A', 32), 'c' => str_repeat('B', 16)]))->toThrow(InvalidArgumentException::class)
         ->and($this->context->bypass(fn (): int => Tap::query()->count()))->toBe(0);
 });
+
+it('locks the tag without blocking a stamp event\'s foreign key check on it', function (): void {
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    ($this->receive)(($this->url)(5));
+
+    expect(collect($queries)->contains(fn (string $sql): bool => str_contains($sql, 'from "nfc_tags"') && str_contains($sql, 'for no key update')))->toBeTrue();
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
