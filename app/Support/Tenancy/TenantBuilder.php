@@ -46,7 +46,7 @@ final class TenantBuilder extends Builder
     private const array TENANT_COLUMNS = ['organization_id', 'business_id'];
 
     /** Raw writes that skip the model or the scope (lowercase, as Eloquent forwards them). */
-    /** Raw writes Eloquent forwards to the base query (lowercase, as __call sees them); NfcTagBuilder guards the same ones. */
+    /** Raw writes Eloquent forwards to the base query (lowercase, as __call sees them); PlatformBuilder guards the same ones. */
     public const array UNGUARDED_WRITES = [
         'insert', 'insertgetid', 'insertorignore', 'insertorignorereturning',
         'insertusing', 'insertorignoreusing', 'updateorinsert', 'updatefrom', 'truncate',

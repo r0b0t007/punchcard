@@ -8,6 +8,7 @@ use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\Reward;
 use App\Models\StampEvent;
+use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -16,7 +17,8 @@ use Illuminate\Support\Str;
 use LogicException;
 
 /**
- * Deletes a user's account (CHW-139). The stamp ledger is permanent and
+ * Deletes a user's account (CHW-139). The IP and user agent of their taps
+ * (the tap log) are scrubbed first. The stamp ledger is permanent and
  * nothing it points at can be deleted, so:
  *
  * - no history: the user is deleted, as before, with their passkeys,
@@ -60,6 +62,7 @@ final readonly class DeleteAccount
 
             DB::table('sessions')->where('user_id', $user->id)->delete();
             DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null]);
 
             if (! $this->hasHistory($user) && $this->deleted($user)) {
                 return;

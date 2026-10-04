@@ -6,7 +6,7 @@ use App\Enums\BusinessRole;
 use App\Enums\StamperStatus;
 use App\Models\NfcTag;
 use App\Models\Stamper;
-use App\Support\Nfc\NfcTagBuilder;
+use App\Support\Tenancy\PlatformBuilder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -194,9 +194,9 @@ describe('tags', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true, businessRole: BusinessRole::Owner);
 
         match ($how) {
-            'withoutGlobalScope' => NfcTag::query()->withoutGlobalScope(NfcTagBuilder::PLATFORM_SCOPE)->get(),
+            'withoutGlobalScope' => NfcTag::query()->withoutGlobalScope(PlatformBuilder::PLATFORM_SCOPE)->get(),
             'withoutGlobalScopes' => NfcTag::query()->withoutGlobalScopes()->get(),
-            'replace it' => NfcTag::query()->withGlobalScope(NfcTagBuilder::PLATFORM_SCOPE, fn (): null => null)->get(),
+            'replace it' => NfcTag::query()->withGlobalScope(PlatformBuilder::PLATFORM_SCOPE, fn (): null => null)->get(),
             'through a stamper' => Stamper::query()->with(['tag' => fn ($query) => $query->withoutGlobalScopes()])->get(),
         };
     })->throws(LogicException::class, 'platform scope cannot be')->with(['withoutGlobalScope', 'withoutGlobalScopes', 'replace it', 'through a stamper']);
