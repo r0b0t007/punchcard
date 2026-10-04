@@ -281,6 +281,23 @@ describe('integrity', function (): void {
         $this->tenants->stamp($this->alice, $this->tenants->a1, ['source' => StampSource::Correction, 'qty' => 1, 'reason' => 'Missed stamps']);
     })->throws(LogicException::class, 'takes stamps back');
 
+    it('lets Postgres refuse a stamp of zero, whatever writes it', function (): void {
+        $staff = User::factory()->create();
+
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(fn (): bool => StampEvent::query()->insert([
+            'organization_id' => $this->tenants->orgA->id,
+            'business_id' => $this->tenants->a1->id,
+            'location_id' => $this->tenants->locationOf($this->tenants->a1)->id,
+            'enrollment_id' => $this->alice->id,
+            'staff_id' => $staff->id,
+            'source' => StampSource::Manual->value,
+            'qty' => 0,
+            'idempotency_key' => 'raw-zero',
+            'reason' => 'Nothing',
+            'created_at' => now(),
+        ]))))->toThrow(QueryException::class, 'stamp_events_');
+    })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only');
+
     it('lets Postgres refuse a correction that adds stamps, whatever writes it', function (): void {
         $staff = User::factory()->create();
 

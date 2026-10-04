@@ -294,10 +294,8 @@ describe('progressive cards', function (): void {
             ->and($this->context->bypass(fn (): int => Reward::query()->where('enrollment_id', $this->enrollment->id)->count()))->toBe(1);
     });
 
-    it('refuses a card whose tiers are malformed', function (mixed $tiers): void {
-        ($this->card)(['tiers' => $tiers]);
-
-        ($this->add)(($this->qr)());
+    it('refuses malformed tiers when a card is saved', function (mixed $tiers): void {
+        $this->context->bypass(fn () => LoyaltyCard::factory()->for($this->tenants->orgA)->create(['mode' => CardMode::Progressive, 'tiers' => $tiers]));
     })->throws(LogicException::class, 'tiers')->with([
         'none' => [null],
         'empty' => [[]],
@@ -307,6 +305,12 @@ describe('progressive cards', function (): void {
         'a repeated threshold' => [[['stamps' => 5, 'reward' => 'A'], ['stamps' => 5, 'reward' => 'B']]],
         'stamps as text' => [[['stamps' => '5', 'reward' => 'A']]],
     ]);
+
+    it('refuses the stamp cleanly when stored tiers are malformed', function (): void {
+        DB::table('loyalty_cards')->where('id', $this->cardModel->id)->update(['tiers' => json_encode([['stamps' => '5', 'reward' => 'A']])]);
+
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::CardMisconfigured);
+    });
 });
 
 describe('card mode', function (): void {
@@ -330,9 +334,10 @@ describe('card mode', function (): void {
     it('is fixed once customers hold the card', function (string $how): void {
         $this->context->bypass(fn () => match ($how) {
             'switching a held card' => $this->tenants->cardA->forceFill(['mode' => CardMode::Progressive])->save(),
+            'changing a held card\'s tiers' => $this->tenants->cardA->forceFill(['tiers' => [['stamps' => 5, 'reward' => 'Gift']]])->save(),
             'switching cards in bulk' => LoyaltyCard::query()->whereKey($this->tenants->cardB->id)->update(['mode' => CardMode::Progressive]),
         });
-    })->throws(LogicException::class, 'mode')->with(['switching a held card', 'switching cards in bulk']);
+    })->throws(LogicException::class, 'mode')->with(['switching a held card', 'changing a held card\'s tiers', 'switching cards in bulk']);
 
     it('can change while nobody holds the card', function (): void {
         $this->context->bypass(fn () => $this->tenants->cardB->forceFill(['mode' => CardMode::Progressive, 'tiers' => [['stamps' => 5, 'reward' => 'Gift']]])->save());

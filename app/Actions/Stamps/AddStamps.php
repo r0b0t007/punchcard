@@ -113,7 +113,7 @@ final readonly class AddStamps
             }
 
             $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
-            $givenHere = $request->takesStampsBack()
+            $givenHere = $request->isCorrection()
                 ? (int) StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->sum('qty')
                 : 0;
             $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists() || $givenHere > 0;
@@ -122,13 +122,14 @@ final readonly class AddStamps
             $qty = $request->qty;
 
             $this->assertAllowed($card, $honoured, $location, $stamper, $request);
+            $tiers = $card->mode === CardMode::Progressive && $request->qty > 0 ? $this->tiers($card) : [];
 
             if ($request->provesPresence()) {
                 $this->assertCooldown($enrollment, $card, $now);
                 $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
             }
 
-            if ($request->takesStampsBack() && $givenHere + $qty < 0) {
+            if ($request->isCorrection() && $givenHere + $qty < 0) {
                 throw new StampRejected(StampRejection::CorrectionExceedsGiven);
             }
 
@@ -152,7 +153,7 @@ final readonly class AddStamps
             ]);
             $event->save();
 
-            $rewards = $this->progress($enrollment, $card, $event, $request, $qty, $now);
+            $rewards = $this->progress($enrollment, $card, $tiers, $event, $request, $qty, $now);
 
             return new StampResult($event, $enrollment, $rewards, replayed: false);
         }));
@@ -214,7 +215,7 @@ final readonly class AddStamps
             throw new LogicException('A stamp\'s location belongs to its business.');
         }
 
-        if (! $card->active && ! $request->takesStampsBack()) {
+        if (! $card->active && ! $request->isCorrection()) {
             throw new StampRejected(StampRejection::CardInactive);
         }
 
@@ -222,7 +223,7 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
-        if (! $request->takesStampsBack() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null)) {
+        if (! $request->isCorrection() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null)) {
             throw new StampRejected(StampRejection::SiteClosed);
         }
 
@@ -285,9 +286,10 @@ final readonly class AddStamps
      * only stamps that add do, so a correction (which takes stamps back) never
      * pays out.
      *
+     * @param  list<array{stamps: int, reward: string}>  $tiers  a progressive card's tiers, lowest first
      * @return list<Reward>
      */
-    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, StampEvent $event, StampRequest $request, int $qty, CarbonInterface $now): array
+    private function progress(CardEnrollment $enrollment, LoyaltyCard $card, array $tiers, StampEvent $event, StampRequest $request, int $qty, CarbonInterface $now): array
     {
         $before = $enrollment->lifetime_stamps;
         $current = $enrollment->current_stamps + $qty;
@@ -307,7 +309,7 @@ final readonly class AddStamps
         }
 
         if ($qty > 0 && $card->mode === CardMode::Progressive) {
-            $crossed = array_filter(ProgressiveTiers::parse($card->tiers), fn (array $tier): bool => $tier['stamps'] > $before && $tier['stamps'] <= $lifetime);
+            $crossed = array_filter($tiers, fn (array $tier): bool => $tier['stamps'] > $before && $tier['stamps'] <= $lifetime);
             $unlocked = $crossed === [] ? [] : Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->pluck('milestone')->all();
 
             foreach ($crossed as $tier) {
@@ -326,6 +328,22 @@ final readonly class AddStamps
         ])->save();
 
         return $rewards;
+    }
+
+    /**
+     * A progressive card's tiers. They are checked when the card is saved; a
+     * card whose stored tiers are still malformed (written before that check,
+     * or raw) refuses the stamp cleanly rather than failing the tap.
+     *
+     * @return list<array{stamps: int, reward: string}>
+     */
+    private function tiers(LoyaltyCard $card): array
+    {
+        try {
+            return ProgressiveTiers::parse($card->tiers);
+        } catch (LogicException) {
+            throw new StampRejected(StampRejection::CardMisconfigured);
+        }
     }
 
     /** A reward is a snapshot of what was earned, so a later card edit does not change it. No expiry yet. */

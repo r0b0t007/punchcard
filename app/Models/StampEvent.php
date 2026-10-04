@@ -78,13 +78,13 @@ class StampEvent extends Model implements TenantModel
 
         $this->assertSiteDataInsert($values);
 
-        if ($this->isCorrection($values) && ! $this->takesStampsBack($values)) {
+        if ($this->isCorrection($values) && (! is_numeric($values['qty'] ?? null) || (int) $values['qty'] >= 0)) {
             throw new LogicException('A correction takes stamps back; restoring missed stamps is a manual stamp.');
         }
 
         // A tap holds its stamper's lock, which the archive waits for (CloseSites);
         // a stamp without a stamper (QR, manual, system) locks the site rows instead.
-        if (! $this->takesStampsBack($values)) {
+        if (! $this->isCorrection($values)) {
             ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp', lock: ($values['stamper_id'] ?? null) === null);
         }
 
@@ -92,7 +92,7 @@ class StampEvent extends Model implements TenantModel
             ->where('business_id', $values['business_id'] ?? null)
             ->whereIn('card_id', CardEnrollment::query()->whereKey($values['enrollment_id'] ?? null)->select('card_id'))
             ->exists()
-            || ($this->takesStampsBack($values) && self::query()
+            || ($this->isCorrection($values) && self::query()
                 ->where('enrollment_id', $values['enrollment_id'] ?? null)
                 ->where('business_id', $values['business_id'] ?? null)
                 ->exists()));
@@ -103,16 +103,11 @@ class StampEvent extends Model implements TenantModel
     }
 
     /**
-     * A correction that takes stamps back: the ledger stays fixable at an archived site.
+     * A correction, which always takes stamps back (checked above): the ledger
+     * stays fixable where the stamps were given, archived or not.
      *
      * @param  array<string, mixed>  $values
      */
-    private function takesStampsBack(array $values): bool
-    {
-        return $this->isCorrection($values) && is_numeric($values['qty'] ?? null) && (int) $values['qty'] < 0;
-    }
-
-    /** @param  array<string, mixed>  $values */
     private function isCorrection(array $values): bool
     {
         $source = $values['source'] ?? null;

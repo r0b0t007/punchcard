@@ -89,10 +89,10 @@ final readonly class StampRequest
         return in_array($this->source->value, StampSource::presenceValues(), true);
     }
 
-    /** A correction that takes stamps back: the only stamp still written at an archived site, so the ledger stays fixable. */
-    public function takesStampsBack(): bool
+    /** A correction, which always takes stamps back: still written where the stamps were given, so the ledger stays fixable. */
+    public function isCorrection(): bool
     {
-        return $this->source === StampSource::Correction && $this->qty < 0;
+        return $this->source === StampSource::Correction;
     }
 
     private static function assertBetween(int $qty, int $min, int $max): void

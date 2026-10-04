@@ -64,9 +64,11 @@ class LoyaltyCard extends Model implements TenantModel
     use HasFactory;
 
     /**
-     * A card's mode is fixed once customers hold it, also in bypass():
-     * progressive enrollments never reset, so turning the card cyclic would pay
-     * their stamps out as rewards at the next tap. Bulk updates change no mode.
+     * A card's mode and tiers are fixed once customers hold it, also in
+     * bypass(): progressive enrollments never reset, so turning the card cyclic
+     * would pay their stamps out as rewards at the next tap, and moving or
+     * adding a tier would skip a reward or pay one twice. Bulk updates change
+     * neither.
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
@@ -75,25 +77,20 @@ class LoyaltyCard extends Model implements TenantModel
     {
         $this->assertProgramWrite($operation, $values);
 
-        if (array_key_exists('mode', $values)) {
+        if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
             // Locking the card first makes a racing first enrollment (its foreign key
             // locks the card too) commit before this check, or wait for the change.
             $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
                 && CardEnrollment::query()->where('card_id', $this->id)->exists());
 
             if ($held) {
-                throw new LogicException('A card\'s mode cannot change once customers hold it (or in a bulk update): start a new card.');
+                throw new LogicException('A card\'s mode and tiers cannot change once customers hold it (or in a bulk update): start a new card.');
             }
-        }
 
-        if (array_key_exists('tiers', $values) && ! $this->exists) {
-            throw new LogicException('A card\'s tiers change one card at a time, where its mode is known: not in a bulk update.');
-        }
-
-        if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
+            // Only a single, loaded card gets here: the stored mode and tiers fill in what this write leaves out.
             $this->assertTiers(
-                $values['mode'] ?? ($this->exists ? $this->getRawOriginal('mode') : null),
-                array_key_exists('tiers', $values) ? $values['tiers'] : ($this->exists ? $this->getRawOriginal('tiers') : null),
+                $values['mode'] ?? $this->getRawOriginal('mode'),
+                array_key_exists('tiers', $values) ? $values['tiers'] : $this->getRawOriginal('tiers'),
             );
         }
     }

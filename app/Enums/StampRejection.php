@@ -14,6 +14,9 @@ enum StampRejection: string
     /** The card is switched off. */
     case CardInactive = 'card_inactive';
 
+    /** The card's progressive tiers are malformed, so its rewards cannot be counted. */
+    case CardMisconfigured = 'card_misconfigured';
+
     /** The business does not honour the card. */
     case NotHonoured = 'not_honoured';
 
