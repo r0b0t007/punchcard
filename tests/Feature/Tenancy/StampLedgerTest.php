@@ -266,7 +266,6 @@ describe('integrity', function (): void {
         expect(fn () => DB::transaction(fn () => $this->tenants->stamp($this->alice, $this->tenants->a1, $values)))
             ->toThrow(QueryException::class, $constraint);
     })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only')->with([
-        'more than 50 stamps' => [['qty' => 51, 'source' => StampSource::Manual, 'reason' => 'x'], 'stamp_events_qty_check'],
         'more than 50 stamps' => [['qty' => 51], 'stamp_events_qty_check'],
         'a negative qty outside a correction' => [['qty' => -1, 'source' => StampSource::Manual, 'reason' => 'x'], 'stamp_events_negative_check'],
         'a manual stamp without a reason' => [['source' => StampSource::Manual], 'stamp_events_reason_check'],
