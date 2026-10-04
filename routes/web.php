@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\TapController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -14,6 +15,13 @@ if (app()->environment('local')) {
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+});
+
+// The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
+Route::middleware('cache.headers:no_store;private')->group(function (): void {
+    Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->name('taps.receive');
+    Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->name('taps.claim');
+    Route::get('t/{tap}', [TapController::class, 'show'])->whereNumber('tap')->name('taps.show');
 });
 
 require __DIR__.'/settings.php';

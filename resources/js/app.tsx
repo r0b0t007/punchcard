@@ -15,7 +15,9 @@ void createInertiaApp({
     // direction from the page props.
     layout: (name) => {
         switch (true) {
-            case name === 'welcome' || name.startsWith('dev/'):
+            case name === 'welcome' ||
+                name.startsWith('dev/') ||
+                name.startsWith('tap/'):
                 return I18nLayout;
             case name.startsWith('auth/'):
                 return [I18nLayout, AuthLayout];

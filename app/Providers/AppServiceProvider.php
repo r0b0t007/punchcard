@@ -7,8 +7,10 @@ use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Queue;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -78,6 +81,24 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
+        $this->registerRateLimiters();
+    }
+
+    /**
+     * The tap endpoint (/t): per IP and per signed-in customer, before the tap is
+     * received, since every request writes a tap row (sun-nfc-verification skill).
+     */
+    private function registerRateLimiters(): void
+    {
+        RateLimiter::for('tap', function (Request $request): array {
+            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by('ip:'.$request->ip())];
+
+            if ($request->user() !== null) {
+                $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier());
+            }
+
+            return $limits;
+        });
     }
 
     /**
