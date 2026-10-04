@@ -3,25 +3,56 @@ import TapScreen from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import { useTranslation } from '@/hooks/use-translation';
 
+/** When the next stamp is possible, in the location's time (DescribeTap). */
+type NextStamp = {
+    day: 'today' | 'tomorrow' | 'later';
+    /** Y-m-d */
+    date: string;
+    /** H:i */
+    time: string;
+};
+
 /** Stamped too recently on this card: friendly, not an error (CHW-25). */
 export default function TapCooldown({
     card,
-    availableAt,
+    nextStamp,
 }: {
     card: TapCard | null;
-    availableAt: string | null;
+    nextStamp: NextStamp | null;
 }) {
-    const { t } = useTranslation();
+    const { t, locale } = useTranslation();
+
+    const message = (next: NextStamp): string => {
+        switch (next.day) {
+            case 'today':
+                return t('Your next stamp is available at :time.', {
+                    time: next.time,
+                });
+            case 'tomorrow':
+                return t('Your next stamp is available tomorrow at :time.', {
+                    time: next.time,
+                });
+            case 'later':
+                return t('Your next stamp is available on :date at :time.', {
+                    // A calendar date: format it in UTC so no timezone shifts the day.
+                    date: new Intl.DateTimeFormat(locale, {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        timeZone: 'UTC',
+                    }).format(new Date(`${next.date}T00:00:00Z`)),
+                    time: next.time,
+                });
+        }
+    };
 
     return (
         <>
             <Head title={t('Already stamped')} />
             <TapScreen title={t('Already stamped')} card={card}>
-                {availableAt ? (
+                {nextStamp ? (
                     <p className="text-muted-foreground">
-                        {t('Your next stamp is available at :time.', {
-                            time: availableAt,
-                        })}
+                        {message(nextStamp)}
                     </p>
                 ) : null}
             </TapScreen>

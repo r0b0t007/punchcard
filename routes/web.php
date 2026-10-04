@@ -21,7 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 Route::middleware('cache.headers:no_store;private')->group(function (): void {
     Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->name('taps.receive');
     Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->name('taps.claim');
-    Route::get('t/{tap}', [TapController::class, 'show'])->whereNumber('tap')->name('taps.show');
+    Route::get('t/result', [TapController::class, 'show'])->name('taps.result');
 });
 
 require __DIR__.'/settings.php';

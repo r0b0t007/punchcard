@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
@@ -82,16 +83,45 @@ class AppServiceProvider extends ServiceProvider
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
         $this->registerRateLimiters();
+        $this->trustConfiguredProxies();
+    }
+
+    /**
+     * The proxies in front of the app (Cloudflare's ranges in production,
+     * TRUSTED_PROXIES), so request()->ip() is the customer's, for the tap rate
+     * limit and the tap log. None by default: X-Forwarded-For from anyone else
+     * is ignored, so it can't dodge the limit or fake the logged IP.
+     */
+    private function trustConfiguredProxies(): void
+    {
+        $proxies = (array) config('punchcard.trusted_proxies');
+
+        if ($proxies !== []) {
+            TrustProxies::at($proxies);
+        }
     }
 
     /**
      * The tap endpoint (/t): per IP and per signed-in customer, before the tap is
      * received, since every request writes a tap row (sun-nfc-verification skill).
      */
+    /**
+     * The rate limit key for a client address: an IPv6 client is its /64 (one
+     * device can rotate through a whole /64), an IPv4 one its address.
+     */
+    public static function clientKey(?string $ip): string
+    {
+        if ($ip !== null && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            return 'ip6:'.bin2hex(substr((string) inet_pton($ip), 0, 8));
+        }
+
+        return 'ip:'.$ip;
+    }
+
     private function registerRateLimiters(): void
     {
         RateLimiter::for('tap', function (Request $request): array {
-            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by('ip:'.$request->ip())];
+            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(self::clientKey($request->ip()))];
 
             if ($request->user() !== null) {
                 $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier());

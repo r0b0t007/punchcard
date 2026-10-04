@@ -177,6 +177,8 @@
     "Your email address is unverified.": "Votre adresse e-mail n’est pas vérifiée.",
     "Your first stamp is waiting": "Votre premier tampon vous attend",
     "Your next stamp is available at :time.": "Votre prochain tampon sera disponible à :time.",
+    "Your next stamp is available on :date at :time.": "Votre prochain tampon sera disponible le :date à :time.",
+    "Your next stamp is available tomorrow at :time.": "Votre prochain tampon sera disponible demain à :time.",
     "e.g., MacBook Pro, iPhone": "p. ex. MacBook Pro, iPhone",
     "log in": "connexion",
     "login using a recovery code": "vous connecter avec un code de récupération",

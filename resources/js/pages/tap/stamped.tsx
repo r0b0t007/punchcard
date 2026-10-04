@@ -22,8 +22,9 @@ export default function TapStamped({
         <>
             <Head title={title} />
             <TapScreen title={title} card={card}>
-                {rewards.map((reward) => (
-                    <p key={reward} className="font-display text-xl font-bold">
+                {rewards.map((reward, index) => (
+                    // Two rewards can share a text (a cyclic card completed twice).
+                    <p key={index} className="font-display text-xl font-bold">
                         {t('Reward unlocked: :reward', { reward })}
                     </p>
                 ))}

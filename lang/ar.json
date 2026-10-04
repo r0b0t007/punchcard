@@ -177,6 +177,8 @@
     "Your email address is unverified.": "لم يتم التحقق من بريدك الإلكتروني بعد.",
     "Your first stamp is waiting": "طابعك الأول في انتظارك",
     "Your next stamp is available at :time.": "طابعك التالي متاح الساعة :time.",
+    "Your next stamp is available on :date at :time.": "طابعك التالي متاح يوم :date الساعة :time.",
+    "Your next stamp is available tomorrow at :time.": "طابعك التالي متاح غدًا الساعة :time.",
     "e.g., MacBook Pro, iPhone": "مثل: MacBook Pro أو iPhone",
     "log in": "تسجيل الدخول",
     "login using a recovery code": "تسجيل الدخول باستخدام رمز استرداد",

@@ -21,8 +21,8 @@ use App\Support\Tenancy\TenantContext;
  * - tap/pending (C1): signed out, the café's card with nothing on it yet;
  * - tap/stamped (C2): the card after the stamp, the stamps given and any
  *   reward unlocked;
- * - tap/cooldown: the card, and when the next stamp is possible, in the
- *   location's time;
+ * - tap/cooldown: the card, and when the next stamp is possible (day and
+ *   time) in the location's time;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
  *   in the tap log): used, expired, limit, unavailable, card or invalid.
  *
@@ -55,11 +55,9 @@ final readonly class DescribeTap
             }
 
             if ($tap->rejection === TapRejection::Cooldown) {
-                $location = Location::query()->find($tap->location_id);
-
                 return ['component' => 'tap/cooldown', 'props' => [
                     'card' => $this->card($tap, $this->enrollmentOf($tap)),
-                    'availableAt' => $tap->available_at?->setTimezone($location->timezone ?? config('app.timezone'))->format('H:i'),
+                    'nextStamp' => $this->nextStamp($tap),
                 ]];
             }
 
@@ -95,6 +93,34 @@ final readonly class DescribeTap
             'rewardText' => $card->reward_text,
             'brandColor' => $business->organization->brand_color,
             'stampStyle' => $card->stamp_style,
+        ];
+    }
+
+    /**
+     * When the next stamp is possible, in the location's time: today,
+     * tomorrow or a later date (a cooldown can be a day or more).
+     *
+     * @return array{day: 'today'|'tomorrow'|'later', date: string, time: string}|null
+     */
+    private function nextStamp(Tap $tap): ?array
+    {
+        $timezone = Location::query()->whereKey($tap->location_id)->value('timezone') ?? config('app.timezone');
+        $at = $tap->available_at?->setTimezone($timezone);
+
+        if ($at === null) {
+            return null;
+        }
+
+        $days = (int) now($timezone)->startOfDay()->diffInDays($at->copy()->startOfDay());
+
+        return [
+            'day' => match (true) {
+                $days <= 0 => 'today',
+                $days === 1 => 'tomorrow',
+                default => 'later',
+            },
+            'date' => $at->format('Y-m-d'),
+            'time' => $at->format('H:i'),
         ];
     }
 
