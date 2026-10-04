@@ -44,6 +44,7 @@ use LogicException;
  * @property string $reward_text
  * @property RewardStatus $status
  * @property Carbon $unlocked_at
+ * @property int|null $stamp_event_id the stamp that unlocked it (AddStamps)
  * @property Carbon|null $expires_at
  * @property Carbon|null $redeemed_at
  * @property int|null $redeemed_by
@@ -227,6 +228,6 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /** A reward stays what was earned, by whom, at which milestone. */
     protected function immutableColumns(): array
     {
-        return ['enrollment_id', 'mode', 'milestone', 'reward_type', 'reward_value', 'reward_text', 'unlocked_at'];
+        return ['enrollment_id', 'mode', 'milestone', 'reward_type', 'reward_value', 'reward_text', 'unlocked_at', 'stamp_event_id'];
     }
 }

@@ -65,8 +65,8 @@ class StampEvent extends Model implements TenantModel
      * staff scan), in bypass(): a business recording one directly could stamp a
      * customer it cannot see, and make them "stamped here". The business must
      * honour the enrollment's card: visibility alone is not enough. Nothing
-     * but a correction is recorded at an archived business or location
-     * (ArchivedSites): the ledger stays fixable where the stamps were given.
+     * but a correction taking stamps back is recorded at an archived business
+     * or location (ArchivedSites): the ledger stays fixable where they were given.
      *
      * @param  array<string, mixed>  $values
      */
@@ -78,24 +78,40 @@ class StampEvent extends Model implements TenantModel
 
         $this->assertSiteDataInsert($values);
 
+        if ($this->isCorrection($values) && (! is_numeric($values['qty'] ?? null) || (int) $values['qty'] >= 0)) {
+            throw new LogicException('A correction takes stamps back; restoring missed stamps is a manual stamp.');
+        }
+
         // A tap holds its stamper's lock, which the archive waits for (CloseSites);
         // a stamp without a stamper (QR, manual, system) locks the site rows instead.
-        if (! $this->isCorrection($values['source'] ?? null)) {
+        if (! $this->isCorrection($values)) {
             ArchivedSites::assertOpen($values['business_id'] ?? null, $values['location_id'] ?? null, 'A stamp', lock: ($values['stamper_id'] ?? null) === null);
         }
 
         $honoured = app(TenantContext::class)->bypass(fn (): bool => CardBusiness::query()
             ->where('business_id', $values['business_id'] ?? null)
             ->whereIn('card_id', CardEnrollment::query()->whereKey($values['enrollment_id'] ?? null)->select('card_id'))
-            ->exists());
+            ->exists()
+            || ($this->isCorrection($values) && self::query()
+                ->where('enrollment_id', $values['enrollment_id'] ?? null)
+                ->where('business_id', $values['business_id'] ?? null)
+                ->exists()));
 
         if (! $honoured) {
-            throw new LogicException('A stamp is recorded at a business that honours the card.');
+            throw new LogicException('A stamp is recorded at a business that honours the card (a correction taking stamps back: where they were given).');
         }
     }
 
-    private function isCorrection(mixed $source): bool
+    /**
+     * A correction, which always takes stamps back (checked above): the ledger
+     * stays fixable where the stamps were given, archived or not.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function isCorrection(array $values): bool
     {
+        $source = $values['source'] ?? null;
+
         return $source === StampSource::Correction || $source === StampSource::Correction->value;
     }
 

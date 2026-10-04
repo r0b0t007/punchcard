@@ -8,8 +8,10 @@ use App\Enums\CardMode;
 use App\Enums\RewardType;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
+use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\LoyaltyCardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * A loyalty card: the organization's program (ADR 0006), honoured by the
@@ -29,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property int $stamps_required
  * @property CardMode $mode
- * @property list<array{stamps: int, reward: string}>|null $tiers
+ * @property array<array-key, mixed>|null $tiers progressive tiers, meant as list<array{stamps: int, reward: string}>; unvalidated JSON, which AddStamps checks when it reads them
  * @property string|null $stamp_style
  * @property string|null $banner_path
  * @property RewardType $reward_type
@@ -53,11 +56,56 @@ class LoyaltyCard extends Model implements TenantModel
 {
     use ChangedOnlyByOrgAdmin {
         assertTenantInsert as assertProgramInsert;
+        assertTenantWrite as assertProgramWrite;
     }
     use GuardsTenantWrites;
 
     /** @use HasFactory<LoyaltyCardFactory> */
     use HasFactory;
+
+    /**
+     * A card's mode and tiers are fixed once customers hold it, also in
+     * bypass(): progressive enrollments never reset, so turning the card cyclic
+     * would pay their stamps out as rewards at the next tap, and moving or
+     * adding a tier would skip a reward or pay one twice. Bulk updates change
+     * neither.
+     *
+     * @param  'update'|'delete'  $operation
+     * @param  array<string, mixed>  $values
+     */
+    public function assertTenantWrite(string $operation, array $values): void
+    {
+        $this->assertProgramWrite($operation, $values);
+
+        if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
+            // Locking the card first makes a racing first enrollment (its foreign key
+            // locks the card too) commit before this check, or wait for the change.
+            $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
+                && CardEnrollment::query()->where('card_id', $this->id)->exists());
+
+            if ($held) {
+                throw new LogicException('A card\'s mode and tiers cannot change once customers hold it (or in a bulk update): start a new card.');
+            }
+
+            // Only a single, loaded card gets here: the stored mode and tiers fill in what this write leaves out.
+            $this->assertTiers(
+                $values['mode'] ?? $this->getRawOriginal('mode'),
+                array_key_exists('tiers', $values) ? $values['tiers'] : $this->getRawOriginal('tiers'),
+            );
+        }
+    }
+
+    /**
+     * A progressive card's tiers are checked when it is saved, also in
+     * bypass(), so one bad edit cannot stop every stamp on the card. A cyclic
+     * card ignores its tiers.
+     */
+    private function assertTiers(mixed $mode, mixed $tiers): void
+    {
+        if ($mode === CardMode::Progressive || $mode === CardMode::Progressive->value) {
+            ProgressiveTiers::parse($tiers);
+        }
+    }
 
     /**
      * No new card in an archived organization, also in bypass().
@@ -67,6 +115,7 @@ class LoyaltyCard extends Model implements TenantModel
     public function assertTenantInsert(array $values): void
     {
         $this->assertProgramInsert($values);
+        $this->assertTiers($values['mode'] ?? null, $values['tiers'] ?? null);
         ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'A card', lock: true);
     }
 

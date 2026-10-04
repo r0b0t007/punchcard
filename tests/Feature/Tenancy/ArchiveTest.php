@@ -114,6 +114,12 @@ describe('locations', function (): void {
         expect($correction->exists)->toBeTrue();
     })->with(['the location', 'the business']);
 
+    it('takes no stamp but a correction once archived', function (): void {
+        $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->tenants->locationOf($this->tenants->a2)));
+
+        $this->tenants->stamp($this->customer, $this->tenants->a2, ['source' => StampSource::Manual, 'qty' => 1, 'reason' => 'Card forgotten']);
+    })->throws(LogicException::class, 'archived');
+
     it('keeps the date a location was first archived', function (): void {
         $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
         $archivedAt = $this->a1Location->archived_at;
