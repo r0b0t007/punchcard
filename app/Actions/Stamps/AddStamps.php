@@ -118,7 +118,7 @@ final readonly class AddStamps
                 : 0;
             $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists() || $givenHere > 0;
             $location = Location::query()->findOrFail($request->locationId);
-            $now = now();
+            $now = $request->at ?? now();
             $qty = $request->qty;
 
             $this->assertAllowed($card, $honoured, $location, $stamper, $request);
@@ -324,7 +324,8 @@ final readonly class AddStamps
             'current_stamps' => $current,
             'lifetime_stamps' => $lifetime,
             'completed_count' => $completed,
-            ...($request->provesPresence() ? ['last_stamp_at' => $now] : []),
+            // A tap applied late never moves the last stamp back.
+            ...($request->provesPresence() && ($enrollment->last_stamp_at === null || $enrollment->last_stamp_at->lessThan($now)) ? ['last_stamp_at' => $now] : []),
         ])->save();
 
         return $rewards;

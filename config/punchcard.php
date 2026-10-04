@@ -26,12 +26,20 @@ return [
         'sun_master_key' => env('NFC_SUN_MASTER_KEY'),
         // Version of the system-wide meta read key. Changing it is a hard cutover:
         // every tag must be re-provisioned (docs/runbooks/stamper-keys.md). Each
-        // stamper keeps its own key_version, which only feeds its per-tag keys.
+        // tag keeps its own key_version (nfc_tags), which only feeds its per-tag keys.
         // Parsed strictly: anything but a whole number 1..65535 becomes false, which
         // punchcard:nfc:check reports, instead of a typo like "2v" silently meaning 2.
         'key_version' => filter_var(env('NFC_SUN_KEY_VERSION', 1), FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 0xFFFF],
         ]),
+    ],
+
+    'taps' => [
+        // The tap log keeps each tap's IP and user agent (personal data): rows are
+        // pruned after this many days (scheduled model:prune).
+        'retention_days' => (int) env('TAP_RETENTION_DAYS', 180),
+        // A signed-out tap waits this long for its customer to sign in.
+        'pending_minutes' => (int) env('TAP_PENDING_MINUTES', 30),
     ],
 
     'stamps' => [
