@@ -128,7 +128,7 @@ describe('who sees what', function (): void {
     })->throws(LogicException::class, 'cache of the stamp ledger');
 
     it('makes nobody "stamped here" through a bonus, birthday, referral or correction', function (StampSource $source): void {
-        $this->tenants->stamp($this->bob, $this->tenants->a1, ['source' => $source, 'reason' => 'HQ fix']);
+        $this->tenants->stamp($this->bob, $this->tenants->a1, ['source' => $source, 'reason' => 'HQ fix', 'qty' => $source === StampSource::Correction ? -1 : 1]);
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 
         expect(CardEnrollment::query()->whereKey($this->bob->id)->exists())->toBeFalse();
@@ -266,7 +266,7 @@ describe('integrity', function (): void {
         expect(fn () => DB::transaction(fn () => $this->tenants->stamp($this->alice, $this->tenants->a1, $values)))
             ->toThrow(QueryException::class, $constraint);
     })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only')->with([
-        'zero stamps' => [['qty' => 0, 'source' => StampSource::Correction, 'reason' => 'x'], 'stamp_events_qty_check'],
+        'more than 50 stamps' => [['qty' => 51, 'source' => StampSource::Manual, 'reason' => 'x'], 'stamp_events_qty_check'],
         'more than 50 stamps' => [['qty' => 51], 'stamp_events_qty_check'],
         'a negative qty outside a correction' => [['qty' => -1, 'source' => StampSource::Manual, 'reason' => 'x'], 'stamp_events_negative_check'],
         'a manual stamp without a reason' => [['source' => StampSource::Manual], 'stamp_events_reason_check'],
@@ -277,4 +277,25 @@ describe('integrity', function (): void {
         'a manual stamp without an idempotency key' => [['source' => StampSource::Manual, 'reason' => 'x', 'idempotency_key' => null], 'stamp_events_staff_check'],
         'an empty reason' => [['source' => StampSource::Manual, 'reason' => ''], 'stamp_events_reason_check'],
     ]);
+
+    it('records a correction only as stamps taken back', function (): void {
+        $this->tenants->stamp($this->alice, $this->tenants->a1, ['source' => StampSource::Correction, 'qty' => 1, 'reason' => 'Missed stamps']);
+    })->throws(LogicException::class, 'takes stamps back');
+
+    it('lets Postgres refuse a correction that adds stamps, whatever writes it', function (): void {
+        $staff = User::factory()->create();
+
+        expect(fn () => DB::transaction(fn () => $this->context->bypass(fn (): bool => StampEvent::query()->insert([
+            'organization_id' => $this->tenants->orgA->id,
+            'business_id' => $this->tenants->a1->id,
+            'location_id' => $this->tenants->locationOf($this->tenants->a1)->id,
+            'enrollment_id' => $this->alice->id,
+            'staff_id' => $staff->id,
+            'source' => StampSource::Correction->value,
+            'qty' => 1,
+            'idempotency_key' => 'raw-correction',
+            'reason' => 'Missed stamps',
+            'created_at' => now(),
+        ]))))->toThrow(QueryException::class, 'stamp_events_correction_check');
+    })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'CHECK constraints are Postgres only');
 });

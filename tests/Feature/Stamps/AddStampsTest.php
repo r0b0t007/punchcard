@@ -118,15 +118,19 @@ describe('cooldown, per customer per card', function (): void {
         expect(($this->add)($request->call($this))->event->exists)->toBeTrue();
     })->with([
         'correction' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Double stamp', -1),
-        'bonus' => fn (): StampRequest => StampRequest::system(StampSource::Bonus, $this->a1Location, 1),
+        'bonus' => fn (): StampRequest => StampRequest::system(StampSource::Bonus, $this->a1Location, (string) Str::uuid()),
     ]);
 });
 
 it('starts the cooldown with stamps that prove the customer was there', function (string $first, ?StampRejection $then): void {
+    if ($first === 'correction') {
+        ($this->add)(StampRequest::system(StampSource::Bonus, $this->a1Location, (string) Str::uuid(), 2));
+    }
+
     ($this->add)(match ($first) {
         'manual' => StampRequest::manual($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Card forgotten', 1),
-        'correction' => StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Missed stamp', 1),
-        'bonus' => StampRequest::system(StampSource::Bonus, $this->a1Location, 1),
+        'correction' => StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Double stamp', -1),
+        'bonus' => StampRequest::system(StampSource::Bonus, $this->a1Location, (string) Str::uuid()),
     });
 
     expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe($then);
@@ -178,8 +182,8 @@ describe('daily cap, per customer per business', function (): void {
     });
 
     it('sums taps, scans and manual stamps, leaves bonus stamps and corrections out, and writes nothing when it refuses', function (): void {
-        ($this->add)(StampRequest::system(StampSource::Bonus, $this->a1Location, 10));
-        ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Missed stamps', 5));
+        ($this->add)(StampRequest::system(StampSource::Bonus, $this->a1Location, (string) Str::uuid(), 4));
+        ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Bonus given twice', -2));
         ($this->add)(StampRequest::nfc($this->tenants->stamper($this->tenants->a1), 1, 2));
         ($this->add)(StampRequest::manual($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Card forgotten', 1));
         ($this->add)(($this->qr)(2));
@@ -233,10 +237,10 @@ describe('cyclic cards', function (): void {
             ->and($result->rewards)->toHaveCount(1);
     });
 
-    it('completes a card when a correction restores missed stamps', function (): void {
-        ($this->add)(($this->qr)(8));
+    it('numbers rewards after the ones already there, imported or not', function (): void {
+        $this->tenants->reward($this->enrollment);
 
-        expect(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Missed stamps', 2))->rewards)->toHaveCount(1);
+        expect(($this->add)(($this->qr)(10))->rewards[0]->milestone)->toBe(2);
     });
 
     it('never pays out on a correction that takes stamps back, even after the card was made shorter', function (): void {
@@ -356,11 +360,22 @@ describe('corrections', function (): void {
     });
 
     it('takes stamps back, never below zero', function (): void {
+        ($this->card)(['cooldown_min' => 0, 'daily_cap' => null]);
         ($this->add)(($this->qr)(3));
         $result = ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Wrong customer', -2));
+        ($this->add)(($this->qr)(9));
 
         expect($result->enrollment->only(['current_stamps', 'lifetime_stamps']))->toBe(['current_stamps' => 1, 'lifetime_stamps' => 1])
-            ->and(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Again', -2))))->toBe(StampRejection::CorrectionBelowZero);
+            ->and(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Reward already given', -1))))->toBe(StampRejection::CorrectionBelowZero);
+    });
+
+    it('takes back at most the stamps this business gave', function (): void {
+        ($this->card)(['cooldown_min' => 0]);
+        ($this->add)(($this->qr)(2));
+        ($this->add)(($this->qr)(3, at: $this->a2Location, staff: $this->a2Staff));
+
+        expect(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Fraud', -3))))->toBe(StampRejection::CorrectionExceedsGiven)
+            ->and(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Fraud', -2))->enrollment->current_stamps)->toBe(3);
     });
 
     it('still corrects at an archived location, where nothing else is stamped', function (): void {
@@ -368,7 +383,7 @@ describe('corrections', function (): void {
         $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->a1Location));
 
         expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::SiteClosed)
-            ->and(($this->rejection)(fn () => ($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'More stamps', 1))))->toBe(StampRejection::SiteClosed)
+
             ->and(($this->add)(StampRequest::correction($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Fraud', -2))->enrollment->current_stamps)->toBe(0);
     });
 });
@@ -405,8 +420,8 @@ describe('idempotency', function (): void {
     })->with(['another quantity', 'another customer']);
 
     it('applies a retried system stamp once', function (): void {
-        $first = ($this->add)(StampRequest::system(StampSource::Birthday, $this->a1Location, 2, 'birthday-2026'));
-        $retry = ($this->add)(StampRequest::system(StampSource::Birthday, $this->a1Location, 2, 'birthday-2026'));
+        $first = ($this->add)(StampRequest::system(StampSource::Birthday, $this->a1Location, 'birthday-2026', 2));
+        $retry = ($this->add)(StampRequest::system(StampSource::Birthday, $this->a1Location, 'birthday-2026', 2));
 
         expect($retry->replayed)->toBeTrue()
             ->and($retry->event->id)->toBe($first->event->id)
@@ -497,11 +512,26 @@ describe('refusals', function (): void {
         'a manual stamp without a reason' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, 'k', ' ', 1),
         'a reason over 255 characters' => fn (): StampRequest => StampRequest::manual($this->a1Location, $this->a1Staff, 'k', str_repeat('a', 256), 1),
         'a correction of 0' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, 'k', 'Fix', 0),
-        'a system stamp as a scan' => fn (): StampRequest => StampRequest::system(StampSource::Qr, $this->a1Location, 1),
+        'a correction that adds stamps' => fn (): StampRequest => StampRequest::correction($this->a1Location, $this->a1Staff, 'k', 'Missed stamps', 2),
+        'a system stamp as a scan' => fn (): StampRequest => StampRequest::system(StampSource::Qr, $this->a1Location, 'k'),
+        'a system stamp without a key' => fn (): StampRequest => StampRequest::system(StampSource::Bonus, $this->a1Location, ' '),
     ]);
 });
 
 describe('callers', function (): void {
+    it('lets staff pick for a manual stamp or a correction only customers their business can see', function (): void {
+        ($this->card)(['cooldown_min' => 0]);
+        ($this->add)(($this->qr)(at: $this->a2Location, staff: $this->a2Staff));
+        $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+        $manual = fn (): StampResult => app(AddStamps::class)->handle($this->enrollment, StampRequest::manual($this->a1Location, $this->a1Staff, (string) Str::uuid(), 'Card forgotten', 1));
+
+        expect($manual)->toThrow(LogicException::class, 'can see');
+
+        app(AddStamps::class)->handle($this->enrollment, ($this->qr)());
+
+        expect($manual()->enrollment->lifetime_stamps)->toBe(3);
+    });
+
     it('lets staff stamp at their own business, from their tenant', function (): void {
         $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
 

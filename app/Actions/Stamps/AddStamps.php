@@ -39,7 +39,7 @@ use LogicException;
  *    key at the business) returns the earlier stamp if it is the same stamp
  *    by the same person, or is refused;
  * 2. the card must be active and honoured by the business and the site open
- *    (a correction may still take stamps back where they were given) and, for a tap, the stamper
+ *    (a correction may still take back, at most, the stamps given there) and, for a tap, the stamper
  *    current and active;
  * 3. stamps that prove presence (tap, scan, manual) keep to the cooldown (per
  *    customer per card) and the daily cap (per customer per card per
@@ -62,6 +62,13 @@ final readonly class AddStamps
     {
         if (! $this->context->isBypassed() && $this->context->businessId() !== $request->businessId) {
             throw new LogicException('Stamps are given at the business you work in.');
+        }
+
+        // Staff pick the customer for a manual stamp or a correction: only one the
+        // business may see (ADR 0006). A scan proves who is there with their QR.
+        if (! $this->context->isBypassed() && in_array($request->source, [StampSource::Manual, StampSource::Correction], true)
+            && ! CardEnrollment::query()->whereKey($enrollment->id)->exists()) {
+            throw new LogicException('Staff stamp or correct only customers their business can see.');
         }
 
         try {
@@ -106,8 +113,10 @@ final readonly class AddStamps
             }
 
             $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
-            $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists()
-                || ($request->takesStampsBack() && StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->exists());
+            $givenHere = $request->takesStampsBack()
+                ? (int) StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->sum('qty')
+                : 0;
+            $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists() || $givenHere > 0;
             $location = Location::query()->findOrFail($request->locationId);
             $now = now();
             $qty = $request->qty;
@@ -117,6 +126,10 @@ final readonly class AddStamps
             if ($request->provesPresence()) {
                 $this->assertCooldown($enrollment, $card, $now);
                 $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
+            }
+
+            if ($request->takesStampsBack() && $givenHere + $qty < 0) {
+                throw new StampRejected(StampRejection::CorrectionExceedsGiven);
             }
 
             if ($enrollment->current_stamps + $qty < 0) {
@@ -217,8 +230,8 @@ final readonly class AddStamps
             $working = $stamper instanceof Stamper
                 && $stamper->unassigned_at === null
                 && $stamper->status === StamperStatus::Active
-                && $stamper->business_id === $request->businessId
-                && $stamper->location_id === $request->locationId;
+                && (int) $stamper->business_id === $request->businessId
+                && (int) $stamper->location_id === $request->locationId;
 
             if (! $working) {
                 throw new StampRejected(StampRejection::StamperUnavailable);
@@ -269,8 +282,8 @@ final readonly class AddStamps
 
     /**
      * Moves the progress cache with the ledger and unlocks the rewards earned:
-     * only stamps that add do (a correction restoring missed stamps can
-     * complete a card; one taking stamps back never pays out).
+     * only stamps that add do, so a correction (which takes stamps back) never
+     * pays out.
      *
      * @return list<Reward>
      */
@@ -282,21 +295,23 @@ final readonly class AddStamps
         $completed = $enrollment->completed_count;
         $rewards = [];
 
-        if ($qty > 0 && $card->mode === CardMode::Cyclic) {
+        if ($qty > 0 && $card->mode === CardMode::Cyclic && $current >= $card->stamps_required) {
+            // Milestones follow the highest one already there (an import may have added some).
+            $milestone = max($completed, (int) Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Cyclic)->max('milestone'));
+
             while ($current >= $card->stamps_required) {
                 $current -= $card->stamps_required;
                 $completed++;
-                $rewards[] = $this->unlock($enrollment, $card, $event, $completed, $card->reward_text, $now);
+                $rewards[] = $this->unlock($enrollment, $card, $event, ++$milestone, $card->reward_text, $now);
             }
         }
 
         if ($qty > 0 && $card->mode === CardMode::Progressive) {
-            $unlocked = Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->pluck('milestone')->all();
+            $crossed = array_filter(ProgressiveTiers::parse($card->tiers), fn (array $tier): bool => $tier['stamps'] > $before && $tier['stamps'] <= $lifetime);
+            $unlocked = $crossed === [] ? [] : Reward::query()->where('enrollment_id', $enrollment->id)->where('mode', CardMode::Progressive)->pluck('milestone')->all();
 
-            foreach (ProgressiveTiers::parse($card->tiers) as $tier) {
-                $crossed = $tier['stamps'] > $before && $tier['stamps'] <= $lifetime;
-
-                if ($crossed && ! in_array($tier['stamps'], $unlocked, true)) {
+            foreach ($crossed as $tier) {
+                if (! in_array($tier['stamps'], $unlocked, true)) {
                     $completed++;
                     $rewards[] = $this->unlock($enrollment, $card, $event, $tier['stamps'], $tier['reward'], $now);
                 }

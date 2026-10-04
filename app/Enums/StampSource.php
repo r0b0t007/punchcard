@@ -22,7 +22,7 @@ enum StampSource: string
 
     case Referral = 'referral';
 
-    /** A correction of earlier events (qty may be negative), with a reason. */
+    /** A correction taking earlier stamps back (qty always negative), with a reason. */
     case Correction = 'correction';
 
     /**

@@ -78,6 +78,10 @@ class StampEvent extends Model implements TenantModel
 
         $this->assertSiteDataInsert($values);
 
+        if ($this->isCorrection($values) && ! $this->takesStampsBack($values)) {
+            throw new LogicException('A correction takes stamps back; restoring missed stamps is a manual stamp.');
+        }
+
         // A tap holds its stamper's lock, which the archive waits for (CloseSites);
         // a stamp without a stamper (QR, manual, system) locks the site rows instead.
         if (! $this->takesStampsBack($values)) {
@@ -105,10 +109,15 @@ class StampEvent extends Model implements TenantModel
      */
     private function takesStampsBack(array $values): bool
     {
+        return $this->isCorrection($values) && is_numeric($values['qty'] ?? null) && (int) $values['qty'] < 0;
+    }
+
+    /** @param  array<string, mixed>  $values */
+    private function isCorrection(array $values): bool
+    {
         $source = $values['source'] ?? null;
 
-        return ($source === StampSource::Correction || $source === StampSource::Correction->value)
-            && is_numeric($values['qty'] ?? null) && (int) $values['qty'] < 0;
+        return $source === StampSource::Correction || $source === StampSource::Correction->value;
     }
 
     /**

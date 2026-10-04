@@ -66,17 +66,13 @@ final readonly class StampRequest
     /** A correction of earlier stamps (negative takes them back), with a reason. */
     public static function correction(Location $location, User $staff, string $idempotencyKey, string $reason, int $qty): self
     {
-        self::assertBetween($qty, -self::MAX_STAMPS, self::MAX_STAMPS);
-
-        if ($qty === 0) {
-            throw new InvalidArgumentException('A correction changes at least one stamp.');
-        }
+        self::assertBetween($qty, -self::MAX_STAMPS, -1);
 
         return new self(StampSource::Correction, $qty, (int) $location->business_id, $location->id, staffId: $staff->id, idempotencyKey: self::key($idempotencyKey), reason: self::reason($reason));
     }
 
     /** A stamp given by a rule (bonus, birthday, referral), credited to a location. */
-    public static function system(StampSource $source, Location $location, int $qty = 1, ?string $idempotencyKey = null): self
+    public static function system(StampSource $source, Location $location, string $idempotencyKey, int $qty = 1): self
     {
         if (! in_array($source, [StampSource::Bonus, StampSource::Birthday, StampSource::Referral], true)) {
             throw new InvalidArgumentException("{$source->value} is not a system stamp.");
@@ -84,7 +80,7 @@ final readonly class StampRequest
 
         self::assertBetween($qty, 1, self::MAX_STAMPS);
 
-        return new self($source, $qty, (int) $location->business_id, $location->id, idempotencyKey: $idempotencyKey === null ? null : self::key($idempotencyKey));
+        return new self($source, $qty, (int) $location->business_id, $location->id, idempotencyKey: self::key($idempotencyKey));
     }
 
     /** The customer was there (a tap, a scan, staff by hand): held to the cooldown and the daily cap, it starts the cooldown and counts as a visit. */

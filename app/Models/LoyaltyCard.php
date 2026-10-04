@@ -76,7 +76,10 @@ class LoyaltyCard extends Model implements TenantModel
         $this->assertProgramWrite($operation, $values);
 
         if (array_key_exists('mode', $values)) {
-            $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => CardEnrollment::query()->where('card_id', $this->id)->exists());
+            // Locking the card first makes a racing first enrollment (its foreign key
+            // locks the card too) commit before this check, or wait for the change.
+            $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
+                && CardEnrollment::query()->where('card_id', $this->id)->exists());
 
             if ($held) {
                 throw new LogicException('A card\'s mode cannot change once customers hold it (or in a bulk update): start a new card.');

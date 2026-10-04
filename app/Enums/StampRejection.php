@@ -34,4 +34,7 @@ enum StampRejection: string
 
     /** The correction would take the card below zero stamps. */
     case CorrectionBelowZero = 'correction_below_zero';
+
+    /** The correction would take back more stamps than this business gave. */
+    case CorrectionExceedsGiven = 'correction_exceeds_given';
 }
