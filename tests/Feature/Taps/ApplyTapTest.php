@@ -11,6 +11,7 @@ use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Events\EnrollmentChanged;
 use App\Models\CardEnrollment;
+use App\Models\Location;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Models\StampEvent;
@@ -117,9 +118,51 @@ it('refuses a tap whose stamper, site or card changed before it was applied, and
     'the organization closed without its stampers ended' => ['the organization closed without its stampers ended', TapRejection::SiteClosed],
     'the card misconfigured' => ['the card misconfigured', TapRejection::CardMisconfigured],
     'the stamper paused meanwhile' => ['the stamper paused meanwhile', TapRejection::StamperDisabled],
-    'the card switched off' => ['the card switched off', TapRejection::NotHonoured],
+    'the card switched off' => ['the card switched off', TapRejection::CardInactive],
     'the card no longer honoured here' => ['the card no longer honoured here', TapRejection::NotHonoured],
 ]);
+
+it('refuses a tap whose stamper moved before it was applied: the stamp is given where the tap happened', function (): void {
+    $tap = ($this->tapAt)(5);
+    $this->context->bypass(fn () => $this->stamper->forceFill([
+        'location_id' => Location::factory()->create(['business_id' => $this->tenants->a1->id])->id,
+    ])->save());
+
+    $applied = ($this->apply)($tap);
+
+    expect($applied->rejection)->toBe(TapRejection::UnassignedTag)
+        ->and($this->context->bypass(fn (): int => StampEvent::query()->count()))->toBe(0);
+});
+
+it('stamps a late tap when the stamps around it are outside the cooldown', function (): void {
+    $signedOut = ($this->tapAt)(5);
+    $this->travel(25)->minutes();
+    ($this->apply)(($this->tapAt)(6));
+    $this->travel(3)->minutes();
+
+    expect(($this->apply)($signedOut)->status)->toBe(TapStatus::Stamped)
+        ->and(($this->enrollment)()?->last_stamp_at?->toDateTimeString())->toBe('2026-10-05 10:25:00');
+});
+
+it('counts a late tap on its own day, not against the next day\'s stamps', function (): void {
+    $this->context->bypass(function (): void {
+        $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'UTC'])->save();
+        $this->tenants->cardA->forceFill(['cooldown_min' => 0, 'daily_cap' => 1])->save();
+    });
+    Carbon::setTestNow('2026-10-05 23:50:00');
+    $signedOut = ($this->tapAt)(5);
+    Carbon::setTestNow('2026-10-06 00:05:00');
+    ($this->apply)(($this->tapAt)(6));
+    Carbon::setTestNow('2026-10-06 00:15:00');
+
+    expect(($this->apply)($signedOut)->status)->toBe(TapStatus::Stamped);
+});
+
+it('refuses to run inside a caller\'s transaction', function (): void {
+    $tap = ($this->tapAt)(5);
+
+    DB::transaction(fn (): Tap => ($this->apply)($tap));
+})->throws(LogicException::class, 'outside any transaction');
 
 it('judges the cooldown at the tap\'s time, not at sign-in', function (): void {
     ($this->apply)(($this->tapAt)(5));

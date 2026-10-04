@@ -85,10 +85,22 @@ final class SunVerifier
         $given = $this->decodeHex($cmac, self::CMAC_HEX);
 
         // Only decrypt() creates a SunMessage, so the UID is 14 hex characters and the counter fits 3 bytes.
-        $sessionVector = self::SESSION_MAC_PREFIX
-            .hex2bin($message->uid)
-            .substr(pack('V', $message->counter), 0, 3);
+        if (! hash_equals(self::sessionMac($fileReadKey, $message->uid, $message->counter), $given)) {
+            throw new SunVerificationFailed(TapRejection::BadMac);
+        }
 
+        return $this->verifiedTap($message->uid, $message->counter);
+    }
+
+    /**
+     * The 8-byte SUN MAC a tag computes for its UID (14 hex characters) and
+     * counter (AN12196 section 3.4.2): a session MAC key from the file read
+     * key, a CMAC over the empty input, its odd bytes. Shared with FakeTap so
+     * fake taps can never drift from what is verified.
+     */
+    public static function sessionMac(#[\SensitiveParameter] string $fileReadKey, string $uid, int $counter): string
+    {
+        $sessionVector = self::SESSION_MAC_PREFIX.hex2bin($uid).substr(pack('V', $counter), 0, 3);
         $full = AesCmac::compute(AesCmac::compute($fileReadKey, $sessionVector), '');
         $truncated = '';
 
@@ -96,11 +108,7 @@ final class SunVerifier
             $truncated .= $full[$i];
         }
 
-        if (! hash_equals($truncated, $given)) {
-            throw new SunVerificationFailed(TapRejection::BadMac);
-        }
-
-        return $this->verifiedTap($message->uid, $message->counter);
+        return $truncated;
     }
 
     /** SunMessage and VerifiedTap have private constructors; these closures run in their class scope. */

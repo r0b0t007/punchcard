@@ -240,23 +240,38 @@ final readonly class AddStamps
         }
     }
 
+    /**
+     * No other stamp proving presence on this card within the cooldown of
+     * this one, before or after it: a tap applied late (at its own time) is
+     * judged against the stamps around it, not only the last one. For a stamp
+     * given now nothing comes after, so this is the last stamp plus the
+     * cooldown. availableAt is the nearest conflicting stamp's end.
+     */
     private function assertCooldown(CardEnrollment $enrollment, LoyaltyCard $card, CarbonInterface $now): void
     {
-        if ($enrollment->last_stamp_at === null || $card->cooldown_min === 0) {
+        if ($card->cooldown_min === 0) {
             return;
         }
 
-        $availableAt = $enrollment->last_stamp_at->toImmutable()->addMinutes($card->cooldown_min);
+        $at = $now->toImmutable();
+        $nearest = StampEvent::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereIn('source', StampSource::presenceValues())
+            ->where('created_at', '>', $at->subMinutes($card->cooldown_min))
+            ->where('created_at', '<', $at->addMinutes($card->cooldown_min))
+            ->orderByDesc('created_at')
+            ->value('created_at');
 
-        if ($availableAt->greaterThan($now)) {
-            throw new StampRejected(StampRejection::Cooldown, $availableAt);
+        if ($nearest !== null) {
+            throw new StampRejected(StampRejection::Cooldown, $at->parse($nearest)->addMinutes($card->cooldown_min));
         }
     }
 
     /**
-     * The stamps this one may give under the daily cap: today's taps, scans
-     * and manual stamps on this card at this business, the day starting at
-     * midnight where the stamp is given. An armed tap gives the room left; a
+     * The stamps this one may give under the daily cap: the taps, scans and
+     * manual stamps on this card at this business on the stamp's own day,
+     * midnight to midnight where it is given (a tap applied late counts on its
+     * day, not on the next one's stamps). An armed tap gives the room left; a
      * scan or manual stamp that does not fit, or any stamp once the cap is
      * reached, is refused.
      */
@@ -266,11 +281,13 @@ final readonly class AddStamps
             return $request->qty;
         }
 
+        $dayStart = $now->toImmutable()->setTimezone($location->timezone)->startOfDay();
         $today = (int) StampEvent::query()
             ->where('enrollment_id', $enrollment->id)
             ->where('business_id', $request->businessId)
             ->whereIn('source', StampSource::presenceValues())
-            ->where('created_at', '>=', $now->toImmutable()->setTimezone($location->timezone)->startOfDay()->utc())
+            ->where('created_at', '>=', $dayStart->utc())
+            ->where('created_at', '<', $dayStart->addDay()->utc())
             ->sum('qty');
         $room = $card->daily_cap - $today;
 

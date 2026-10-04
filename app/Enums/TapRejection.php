@@ -25,7 +25,7 @@ enum TapRejection: string
     /** The tag was retired (lost, broken or replaced). */
     case RetiredTag = 'retired_tag';
 
-    /** No stamper holds the tag now: it was unassigned, or its site closed. */
+    /** No stamper holds the tag now (unassigned, or its site closed), or it moved since the tap. */
     case UnassignedTag = 'unassigned_tag';
 
     /** The stamper was disabled (lost or stolen). */

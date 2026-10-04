@@ -15,9 +15,11 @@ use RuntimeException;
 
 /**
  * Finds or creates a customer's card at a business (CHW-25): the first tap at
- * a café enrolls the customer on its card. The card is the business's active
- * honoured card, the oldest if it has several (one card per business for the
- * MVP); null when it honours none. A new enrollment gets an unguessable
+ * a café enrolls the customer on its card. The card is the business's
+ * honoured card, an active one first, the oldest if it has several (one card
+ * per business for the MVP); null when it honours none. A switched-off card
+ * is still returned, so AddStamps refuses it as inactive (ApplyTap's
+ * savepoint drops the new enrollment). A new enrollment gets an unguessable
  * referral code. Two first taps racing for the same card meet on
  * unique(card_id, user_id), and the loser takes the winner's enrollment. Runs
  * in bypass(): the customer has no tenant.
@@ -37,8 +39,8 @@ final readonly class EnrollCustomer
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
             $card = LoyaltyCard::query()
-                ->where('active', true)
                 ->whereHas('businesses', fn ($businesses) => $businesses->whereKey($business->id))
+                ->orderByDesc('active')
                 ->orderBy('id')
                 ->first();
 

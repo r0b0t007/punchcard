@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $nfc_tag_id
  * @property int|null $stamper_id
  * @property int|null $business_id
+ * @property int|null $location_id
  * @property int|null $counter
  * @property int|null $user_id
  * @property int $qty

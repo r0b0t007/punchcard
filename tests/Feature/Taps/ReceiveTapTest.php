@@ -55,12 +55,13 @@ afterEach(function (): void {
 it('records a verified tap as pending and spends its counter', function (): void {
     $tap = ($this->receive)(($this->url)(5), $this->customer);
 
-    expect($tap->only(['status', 'rejection', 'nfc_tag_id', 'stamper_id', 'business_id', 'counter', 'qty', 'user_id', 'ip', 'user_agent']))->toBe([
+    expect($tap->only(['status', 'rejection', 'nfc_tag_id', 'stamper_id', 'business_id', 'location_id', 'counter', 'qty', 'user_id', 'ip', 'user_agent']))->toBe([
         'status' => TapStatus::Pending,
         'rejection' => null,
         'nfc_tag_id' => $this->tag->id,
         'stamper_id' => $this->stamper->id,
         'business_id' => $this->tenants->a1->id,
+        'location_id' => $this->tenants->locationOf($this->tenants->a1)->id,
         'counter' => 5,
         'qty' => 1,
         'user_id' => $this->customer->id,
@@ -79,6 +80,7 @@ it('refuses a replayed or older counter', function (int $counter): void {
     expect($replay->status)->toBe(TapStatus::Rejected)
         ->and($replay->rejection)->toBe(TapRejection::Replay)
         ->and($replay->counter)->toBeNull()
+        ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => $this->stamper->id, 'business_id' => $this->tenants->a1->id])
         ->and(($this->lastCounter)())->toBe(5);
 })->with(['the same counter' => [5], 'an older counter' => [4]]);
 
@@ -127,6 +129,7 @@ it('refuses a retired tag, a tag no stamper holds and a paused stamper, and stil
         ->and($tap->rejection)->toBe($rejection)
         ->and($tap->nfc_tag_id)->toBe($this->tag->id)
         ->and($tap->counter)->toBe(5)
+        ->and($tap->business_id)->toBe($state === 'unassigned' ? null : $this->tenants->a1->id)
         ->and(($this->lastCounter)())->toBe(5);
 })->with([
     'a retired tag' => ['retired', TapRejection::RetiredTag],
@@ -208,3 +211,7 @@ it('locks the tag without blocking a stamp event\'s foreign key check on it', fu
 
     expect(collect($queries)->contains(fn (string $sql): bool => str_contains($sql, 'from "nfc_tags"') && str_contains($sql, 'for no key update')))->toBeTrue();
 })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
+
+it('refuses to run inside a caller\'s transaction, where a rollback would revive the counter', function (): void {
+    DB::transaction(fn (): Tap => ($this->receive)(($this->url)(5)));
+})->throws(LogicException::class, 'outside any transaction');

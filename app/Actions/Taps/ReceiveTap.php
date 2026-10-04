@@ -11,6 +11,7 @@ use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Database\Outermost;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Nfc\SunMessage;
 use App\Support\Nfc\SunVerificationFailed;
@@ -37,8 +38,10 @@ use InvalidArgumentException;
  * The stamp itself comes later, in ApplyTap, once the customer is known, so
  * an AddStamps refusal can never roll the counter back. A key configuration
  * error (InvalidArgumentException) is a server error, never a recorded tap;
- * nothing here logs the URL or any key. Call it outside any transaction: the
- * spent counter must commit on its own.
+ * nothing here logs the URL or any key. It refuses to run inside a caller's
+ * transaction (Outermost): the spent counter must commit on its own. A
+ * refused tap whose tag still has a stamper names it, its business and
+ * location (a replay too), for the owner's fraud view.
  */
 final readonly class ReceiveTap
 {
@@ -55,6 +58,8 @@ final readonly class ReceiveTap
         ?string $ip,
         ?string $userAgent,
     ): Tap {
+        Outermost::assert('ReceiveTap');
+
         $request = [
             'user_id' => $user?->id,
             'ip' => $ip,
@@ -94,25 +99,29 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
+        // The tag is trusted now: name its stamper on every outcome, a replay included, for the owner's fraud view.
+        $stamper = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
+        $trusted = [
+            ...$request,
+            'nfc_tag_id' => $tag->id,
+            ...($stamper instanceof Stamper ? ['stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id] : []),
+        ];
+
         // A replay carries no counter: its counter is already on the row that spent it.
         if ($tap->counter <= $tag->last_counter) {
-            return $this->record([...$request, 'nfc_tag_id' => $tag->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay]);
+            return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay]);
         }
 
         $tag->forceFill(['last_counter' => $tap->counter])->save();
-        $trusted = [...$request, 'nfc_tag_id' => $tag->id, 'counter' => $tap->counter];
+        $trusted = [...$trusted, 'counter' => $tap->counter];
 
         if ($tag->retired_at !== null) {
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::RetiredTag]);
         }
 
-        $stamper = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
-
         if (! $stamper instanceof Stamper) {
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::UnassignedTag]);
         }
-
-        $trusted = [...$trusted, 'stamper_id' => $stamper->id, 'business_id' => $stamper->business_id];
 
         if ($stamper->status !== StamperStatus::Active) {
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::StamperDisabled]);

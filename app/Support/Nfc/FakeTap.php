@@ -36,13 +36,7 @@ final readonly class FakeTap
         $plain = "\xC7".hex2bin($uid).$counterBytes.str_repeat("\xA5", 5);
         $e = (string) openssl_encrypt($plain, 'aes-128-cbc', $this->keys->metaReadKey($metaVersion), OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, str_repeat("\0", 16));
 
-        $sessionKey = AesCmac::compute($this->keys->fileReadKey($uid, $keyVersion), "\x3C\xC3\x00\x01\x00\x80".hex2bin($uid).$counterBytes);
-        $full = AesCmac::compute($sessionKey, '');
-        $c = '';
-
-        for ($i = 1; $i < 16; $i += 2) {
-            $c .= $full[$i];
-        }
+        $c = SunVerifier::sessionMac($this->keys->fileReadKey($uid, $keyVersion), $uid, $counter);
 
         return ['e' => strtoupper(bin2hex($e)), 'c' => strtoupper(bin2hex($c))];
     }

@@ -9,7 +9,6 @@ use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampRequest;
 use App\Actions\Stamps\StampResult;
-use App\Enums\StamperStatus;
 use App\Enums\StampRejection;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -17,6 +16,7 @@ use App\Models\Business;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Database\Outermost;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -33,8 +33,9 @@ use LogicException;
  * - the stamper is locked next, as ReceiveTap does (tag, stamper, then the
  *   enrollment in AddStamps): an archive ends stampers before closing
  *   anything (CloseSites), so a stamper still current under the lock keeps
- *   its site open until this commits. An ended or paused stamper, or a closed
- *   site, refuses the tap before anyone is enrolled;
+ *   its site open until this commits. An ended stamper, one moved since the
+ *   tap (the stamp is given where the tap happened), or a closed site refuses
+ *   the tap before anyone is enrolled;
  * - the customer is enrolled on the business's card (EnrollCustomer) and
  *   stamped through AddStamps at the tap's own time, so the cooldown and the
  *   daily cap judge the visit, not the later sign-in; both in a savepoint, so
@@ -45,9 +46,9 @@ use LogicException;
  *
  * It runs in the stamper's tenant, without rights, so the queued listeners of
  * EnrollmentChanged know the organization and business (QueuedTenant); the
- * request's own tenant is put back afterwards. Call it outside any
- * transaction: the listeners are dispatched when this one commits, which must
- * happen while the stamper's tenant is still set.
+ * request's own tenant is put back afterwards. It refuses to run inside a
+ * caller's transaction (Outermost): the listeners are dispatched when this one
+ * commits, which must happen while the stamper's tenant is still set.
  */
 final readonly class ApplyTap
 {
@@ -59,6 +60,8 @@ final readonly class ApplyTap
 
     public function handle(Tap $tap, User $user): Tap
     {
+        Outermost::assert('ApplyTap');
+
         $previous = $this->context->snapshot();
 
         try {
@@ -89,9 +92,11 @@ final readonly class ApplyTap
             Business::query()->with('organization')->findOrFail($tap->business_id),
         ]);
 
+        // AddStamps checks a paused stamper and a closed site too; these come first because
+        // enrolling a customer in a closed organization would throw, and an ended or moved
+        // stamper has a clearer reason than "unavailable".
         $refusal = match (true) {
-            $stamper->unassigned_at !== null => TapRejection::UnassignedTag,
-            $stamper->status !== StamperStatus::Active => TapRejection::StamperDisabled,
+            $stamper->unassigned_at !== null || $stamper->location_id !== $tap->location_id => TapRejection::UnassignedTag,
             ! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id) => TapRejection::SiteClosed,
             default => null,
         };
