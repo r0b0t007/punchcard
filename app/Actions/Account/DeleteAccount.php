@@ -53,6 +53,8 @@ final readonly class DeleteAccount
     public function handle(User $user): void
     {
         DB::transaction(fn () => $this->context->bypass(function () use ($user): void {
+            // Their taps first, in ApplyTap's order (tap, then enrollment, then the user's key), so the two never deadlock.
+            Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
             User::query()->whereKey($user->id)->lockForUpdate()->value('id');
             CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
 

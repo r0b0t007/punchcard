@@ -123,7 +123,8 @@ final readonly class ApplyTap
             ]);
         }
 
-        return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Stamped, 'stamp_event_id' => $result->event->id]);
+        // The stamps given: an armed tap may get fewer, the room left under the daily cap.
+        return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Stamped, 'stamp_event_id' => $result->event->id, 'qty' => $result->event->qty]);
     }
 
     /** @param  array<string, mixed>  $outcome */

@@ -263,7 +263,8 @@ final readonly class AddStamps
             ->value('created_at');
 
         if ($nearest !== null) {
-            throw new StampRejected(StampRejection::Cooldown, $at->parse($nearest)->addMinutes($card->cooldown_min));
+            // Never a time already past: a tap applied late is told when the next stamp is possible from now.
+            throw new StampRejected(StampRejection::Cooldown, $at->parse($nearest)->addMinutes($card->cooldown_min)->max(now()));
         }
     }
 

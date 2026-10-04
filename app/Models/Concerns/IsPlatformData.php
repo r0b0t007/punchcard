@@ -11,8 +11,10 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Platform data: no tenant's rows (NFC tags, the tap log). It reads as empty
- * outside TenantContext::bypass(), and the model's PlatformBuilder refuses
- * every write there; admin actions and the tap endpoint work in bypass().
+ * outside TenantContext::bypass(), and its PlatformBuilder refuses every write
+ * there (tests/Unit/TenancyBoundaryTest checks every platform model declares
+ * #[UseEloquentBuilder(PlatformBuilder::class)], so the read guard never
+ * comes without the write guard); admin actions and the tap endpoint work in bypass().
  *
  * @phpstan-require-extends Model
  */

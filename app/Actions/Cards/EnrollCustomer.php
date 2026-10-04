@@ -15,9 +15,11 @@ use RuntimeException;
 
 /**
  * Finds or creates a customer's card at a business (CHW-25): the first tap at
- * a café enrolls the customer on its card. The card is the business's
- * honoured card, an active one first, the oldest if it has several (one card
- * per business for the MVP); null when it honours none. A switched-off card
+ * a café enrolls the customer on its card. A card the customer already holds
+ * among those the business honours comes first (their progress never
+ * splits); otherwise the business's honoured card, an active one first, the
+ * oldest if it has several (one card per business for the MVP); null when it
+ * honours none. A switched-off card
  * is still returned, so AddStamps refuses it as inactive (ApplyTap's
  * savepoint drops the new enrollment). A new enrollment gets an unguessable
  * referral code. Two first taps racing for the same card meet on
@@ -38,18 +40,30 @@ final readonly class EnrollCustomer
     public function handle(Business $business, User $user): ?CardEnrollment
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
-            $card = LoyaltyCard::query()
+            $cards = LoyaltyCard::query()
                 ->whereHas('businesses', fn ($businesses) => $businesses->whereKey($business->id))
                 ->orderByDesc('active')
                 ->orderBy('id')
-                ->first();
+                ->pluck('id')
+                ->all();
 
-            if (! $card instanceof LoyaltyCard) {
+            if ($cards === []) {
                 return null;
             }
 
+            // A card the customer already holds here comes first, so a tap never splits their progress.
+            $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->get()->keyBy('card_id');
+
+            foreach ($cards as $cardId) {
+                if ($held->has($cardId)) {
+                    return $held->get($cardId);
+                }
+            }
+
+            $card = $cards[0];
+
             for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
-                $existing = CardEnrollment::query()->where('card_id', $card->id)->where('user_id', $user->id)->first();
+                $existing = CardEnrollment::query()->where('card_id', $card)->where('user_id', $user->id)->first();
 
                 if ($existing instanceof CardEnrollment) {
                     return $existing;
@@ -57,7 +71,7 @@ final readonly class EnrollCustomer
 
                 try {
                     return DB::transaction(function () use ($card, $user): CardEnrollment {
-                        $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card->id, 'user_id' => $user->id, 'referral_code' => $this->referralCode()]);
+                        $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card, 'user_id' => $user->id, 'referral_code' => $this->referralCode()]);
                         $enrollment->save();
 
                         return $enrollment;
@@ -67,7 +81,7 @@ final readonly class EnrollCustomer
                 }
             }
 
-            throw new RuntimeException("Could not enroll user {$user->id} on card {$card->id}.");
+            throw new RuntimeException("Could not enroll user {$user->id} on card {$card}.");
         });
     }
 

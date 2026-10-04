@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Taps\ExpirePendingTaps;
 use App\Actions\Taps\ReceiveTap;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -80,4 +81,28 @@ it('keeps the tap log out of reach outside bypass()', function (): void {
 
     expect(Tap::query()->count())->toBe(0)
         ->and(fn () => (new Tap)->forceFill(['status' => TapStatus::Rejected, 'rejection' => TapRejection::Malformed])->save())->toThrow(LogicException::class, 'platform state');
+});
+
+it('expires the signed-out taps nobody claimed in time, and only those', function (): void {
+    $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
+    $pending = fn (int $counter, int $minutes): Tap => $this->context->bypass(function () use ($tag, $counter, $minutes): Tap {
+        $tap = (new Tap)->forceFill([
+            'nfc_tag_id' => $tag->id,
+            'counter' => $counter,
+            'stamper_id' => $this->stamper->id,
+            'business_id' => $this->stamper->business_id,
+            'location_id' => $this->stamper->location_id,
+            'status' => TapStatus::Pending,
+            'expires_at' => now()->addMinutes($minutes),
+        ]);
+        $tap->save();
+
+        return $tap;
+    });
+    $stale = $pending(1, -1);
+    $waiting = $pending(2, 10);
+
+    expect(app(ExpirePendingTaps::class)->handle())->toBe(1)
+        ->and($this->context->bypass(fn (): array => [$stale->fresh()?->status, $stale->fresh()?->rejection, $waiting->fresh()?->status]))
+        ->toBe([TapStatus::Expired, TapRejection::Expired, TapStatus::Pending]);
 });

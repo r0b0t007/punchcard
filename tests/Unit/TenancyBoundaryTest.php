@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Concerns\IsPlatformData;
+use App\Support\Tenancy\PlatformBuilder;
 use App\Support\Tenancy\TenantModel;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\Finder\Finder;
 use Tests\Support\TenancyBoundary;
@@ -103,5 +106,23 @@ it('keeps soft deletes off tenant models until the guards handle them', function
 
     foreach ($tenantModels as $class) {
         expect(class_uses_recursive($class))->not->toContain(SoftDeletes::class);
+    }
+});
+
+it('gives every platform model the write guard with its read guard', function (): void {
+    $platformModels = array_filter(
+        array_map(fn (string $file): string => 'App\\Models\\'.basename($file, '.php'), glob(app_path('Models/*.php')) ?: []),
+        fn (string $class): bool => in_array(IsPlatformData::class, class_uses_recursive($class), true),
+    );
+
+    expect($platformModels)->not->toBe([]);
+
+    foreach ($platformModels as $class) {
+        $builders = array_map(
+            fn (ReflectionAttribute $attribute): mixed => $attribute->getArguments()[0] ?? null,
+            (new ReflectionClass($class))->getAttributes(UseEloquentBuilder::class),
+        );
+
+        expect($builders)->toBe([PlatformBuilder::class], "{$class} uses IsPlatformData without #[UseEloquentBuilder(PlatformBuilder::class)]");
     }
 });

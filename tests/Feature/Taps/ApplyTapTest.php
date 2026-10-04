@@ -12,6 +12,7 @@ use App\Enums\TapStatus;
 use App\Events\EnrollmentChanged;
 use App\Models\CardEnrollment;
 use App\Models\Location;
+use App\Models\LoyaltyCard;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Models\StampEvent;
@@ -173,8 +174,32 @@ it('judges the cooldown at the tap\'s time, not at sign-in', function (): void {
     $applied = ($this->apply)($signedOut);
 
     expect($applied->rejection)->toBe(TapRejection::Cooldown)
-        ->and($applied->available_at?->toDateTimeString())->toBe('2026-10-05 10:20:00')
+        ->and($applied->available_at?->toDateTimeString())->toBe('2026-10-05 10:21:00')
         ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1);
+});
+
+it('never tells a late tap to come back at a time already past', function (): void {
+    ($this->apply)(($this->tapAt)(5));
+    $this->travel(2)->minutes();
+    $signedOut = ($this->tapAt)(6);
+    $this->travel(5)->minutes();
+
+    expect(($this->apply)($signedOut)->available_at?->toDateTimeString())->toBe('2026-10-05 10:20:00');
+});
+
+it('stamps the card the customer already holds here, never a second one', function (): void {
+    $newerCard = $this->context->bypass(function (): LoyaltyCard {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create();
+        $card->businesses()->attach($this->tenants->a1->id);
+
+        return $card;
+    });
+    $held = $this->tenants->enroll($this->customer, $newerCard);
+
+    $tap = ($this->apply)(($this->tapAt)(5));
+
+    expect($this->context->bypass(fn (): int => (int) StampEvent::query()->whereKey($tap->stamp_event_id)->value('enrollment_id')))->toBe($held->id)
+        ->and(($this->enrollment)())->toBeNull();
 });
 
 it('counts a tap before midnight on that day, even applied after it', function (): void {
@@ -200,6 +225,7 @@ it('gives an armed tap the room left under the daily cap when it is applied', fu
     $tap = ($this->apply)(($this->tapAt)(5));
 
     expect($tap->status)->toBe(TapStatus::Stamped)
+        ->and($tap->qty)->toBe(3)
         ->and($this->context->bypass(fn (): int => (int) StampEvent::query()->whereKey($tap->stamp_event_id)->value('qty')))->toBe(3);
 });
 
