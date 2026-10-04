@@ -169,10 +169,11 @@ it('stamps nothing more when a result page is reloaded, and refuses the reused U
     expect(($this->stamps)())->toBe(1);
 });
 
+// Asia/Dubai is a fixed UTC+4 in every tz database; Morocco's offset is not.
 it('shows when the next stamp is possible, in the location\'s time', function (string $now, int $cooldown, array $nextStamp): void {
     Carbon::setTestNow($now);
     $this->context->bypass(function () use ($cooldown): void {
-        $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Africa/Casablanca'])->save();
+        $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save();
         $this->tenants->cardA->forceFill(['cooldown_min' => $cooldown])->save();
     });
     $this->actingAs($this->customer)->get(($this->tapUrl)(5));
@@ -187,10 +188,10 @@ it('shows when the next stamp is possible, in the location\'s time', function (s
             ->where('nextStamp', $nextStamp)
             ->where('card.stampsCollected', 1));
 })->with([
-    'later today' => ['2026-10-05 10:00:00', 20, ['day' => 'today', 'date' => '2026-10-05', 'time' => '11:20']],
-    'past midnight' => ['2026-10-05 22:45:00', 20, ['day' => 'tomorrow', 'date' => '2026-10-06', 'time' => '00:05']],
-    'a daily card' => ['2026-10-05 10:00:00', 1440, ['day' => 'tomorrow', 'date' => '2026-10-06', 'time' => '11:00']],
-    'a two-day card' => ['2026-10-05 10:00:00', 2880, ['day' => 'later', 'date' => '2026-10-07', 'time' => '11:00']],
+    'later today' => ['2026-10-05 10:00:00', 20, ['day' => 'today', 'date' => '2026-10-05', 'time' => '14:20']],
+    'past midnight' => ['2026-10-05 19:45:00', 20, ['day' => 'tomorrow', 'date' => '2026-10-06', 'time' => '00:05']],
+    'a daily card' => ['2026-10-05 10:00:00', 1440, ['day' => 'tomorrow', 'date' => '2026-10-06', 'time' => '14:00']],
+    'a two-day card' => ['2026-10-05 10:00:00', 2880, ['day' => 'later', 'date' => '2026-10-07', 'time' => '14:00']],
 ]);
 
 it('gives a friendly reason when there is no stamp', function (Closure $arrange, string $reason): void {
