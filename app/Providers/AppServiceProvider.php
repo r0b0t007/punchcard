@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\Auth\ActiveUserProvider;
+use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
@@ -102,26 +103,14 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * The tap endpoint (/t): per IP and per signed-in customer, before the tap is
-     * received, since every request writes a tap row (sun-nfc-verification skill).
+     * The tap endpoint (/t): per client address (ClientAddress) and per signed-in
+     * customer, before the tap is received, since every request writes a tap row
+     * (sun-nfc-verification skill).
      */
-    /**
-     * The rate limit key for a client address: an IPv6 client is its /64 (one
-     * device can rotate through a whole /64), an IPv4 one its address.
-     */
-    public static function clientKey(?string $ip): string
-    {
-        if ($ip !== null && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
-            return 'ip6:'.bin2hex(substr((string) inet_pton($ip), 0, 8));
-        }
-
-        return 'ip:'.$ip;
-    }
-
     private function registerRateLimiters(): void
     {
         RateLimiter::for('tap', function (Request $request): array {
-            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(self::clientKey($request->ip()))];
+            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(ClientAddress::rateLimitKey($request->ip()))];
 
             if ($request->user() !== null) {
                 $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier());

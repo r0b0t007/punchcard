@@ -172,6 +172,7 @@
     "When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.": "Une fois l’authentification à deux facteurs activée, un code sécurisé vous sera demandé à la connexion. Vous le trouverez dans une application compatible TOTP sur votre téléphone.",
     "Whoops!": "Oups !",
     "You are receiving this email because we received a password reset request for your account.": "Vous recevez cet e-mail car nous avons reçu une demande de réinitialisation du mot de passe de votre compte.",
+    "You can collect your next stamp now. Touch the stamper again.": "Vous pouvez recevoir votre prochain tampon dès maintenant. Touchez de nouveau la borne avec votre téléphone.",
     "You reached today's stamp limit here. See you tomorrow.": "Vous avez atteint la limite de tampons du jour ici. À demain !",
     "You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.": "Un code sécurisé et aléatoire vous sera demandé à la connexion ; vous le trouverez dans l’application compatible TOTP de votre téléphone.",
     "Your email address is unverified.": "Votre adresse e-mail n’est pas vérifiée.",

@@ -172,6 +172,7 @@
     "When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.": "عند تفعيل المصادقة الثنائية، سيُطلب منك رمز آمن عند تسجيل الدخول. يمكنك الحصول عليه من تطبيق يدعم TOTP على هاتفك.",
     "Whoops!": "عذرًا!",
     "You are receiving this email because we received a password reset request for your account.": "تصلك هذه الرسالة لأننا تلقّينا طلبًا لإعادة تعيين كلمة مرور حسابك.",
+    "You can collect your next stamp now. Touch the stamper again.": "يمكنك الآن الحصول على طابعك التالي. قرّب هاتفك من جهاز الختم مرة أخرى.",
     "You reached today's stamp limit here. See you tomorrow.": "بلغت حدّ الطوابع لهذا اليوم هنا. نراك غدًا.",
     "You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.": "سيُطلب منك رمز آمن وعشوائي عند تسجيل الدخول، ويمكنك الحصول عليه من التطبيق الداعم لـ TOTP على هاتفك.",
     "Your email address is unverified.": "لم يتم التحقق من بريدك الإلكتروني بعد.",

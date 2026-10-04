@@ -5,7 +5,8 @@ import { useTranslation } from '@/hooks/use-translation';
 
 /** When the next stamp is possible, in the location's time (DescribeTap). */
 type NextStamp = {
-    day: 'today' | 'tomorrow' | 'later';
+    /** now: the cooldown has passed since this tap. */
+    day: 'now' | 'today' | 'tomorrow' | 'later';
     /** Y-m-d */
     date: string;
     /** H:i */
@@ -24,6 +25,10 @@ export default function TapCooldown({
 
     const message = (next: NextStamp): string => {
         switch (next.day) {
+            case 'now':
+                return t(
+                    'You can collect your next stamp now. Touch the stamper again.',
+                );
             case 'today':
                 return t('Your next stamp is available at :time.', {
                     time: next.time,

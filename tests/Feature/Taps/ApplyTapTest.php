@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Taps\ApplyTap;
 use App\Actions\Taps\ReceiveTap;
+use App\Actions\Taps\TapBelongsToAnotherCustomer;
 use App\Actions\Tenancy\ArchiveLocation;
 use App\Actions\Tenancy\ArchiveOrganization;
 use App\Enums\StamperStatus;
@@ -73,6 +74,8 @@ it('enrolls the customer on the business\'s card and stamps, once', function ():
     expect($tap->status)->toBe(TapStatus::Stamped)
         ->and($tap->user_id)->toBe($this->customer->id)
         ->and($tap->stamp_event_id)->not->toBeNull()
+        ->and($tap->card_id)->toBe($this->tenants->cardA->id)
+        ->and($tap->card_stamps)->toBe(1)
         ->and($again->status)->toBe(TapStatus::Stamped)
         ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1)
         ->and(($this->enrollment)()?->referral_code)->toMatch('/^[A-Z2-9]{8}$/')
@@ -88,6 +91,8 @@ it('records a refusal on the tap, and the counter stays spent', function (): voi
     expect($cooldown->status)->toBe(TapStatus::Rejected)
         ->and($cooldown->rejection)->toBe(TapRejection::Cooldown)
         ->and($cooldown->available_at?->toDateTimeString())->toBe('2026-10-05 10:20:00')
+        ->and($cooldown->card_id)->toBe($this->tenants->cardA->id)
+        ->and($cooldown->card_stamps)->toBeNull()
         ->and($replay->rejection)->toBe(TapRejection::Replay)
         ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1);
 });
@@ -233,7 +238,7 @@ it('lets only the first customer claim a signed-out tap', function (): void {
     $tap = ($this->apply)(($this->tapAt)(5));
 
     ($this->apply)($tap, User::factory()->create());
-})->throws(LogicException::class, 'another customer');
+})->throws(TapBelongsToAnotherCustomer::class, 'another customer');
 
 it('lets a pending tap expire after 30 minutes', function (): void {
     $tap = ($this->tapAt)(5);
@@ -251,7 +256,7 @@ it('never lets another customer claim a tap someone received', function (): void
     $tap = ($this->tapAt)(5, user: $this->customer);
 
     ($this->apply)($tap, User::factory()->create());
-})->throws(LogicException::class, 'another customer');
+})->throws(TapBelongsToAnotherCustomer::class, 'another customer');
 
 it('ignores a tap that was refused when received', function (): void {
     $this->context->bypass(fn () => $this->stamper->forceFill(['unassigned_at' => now()])->save());

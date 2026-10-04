@@ -7,11 +7,11 @@ use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Events\EnrollmentChanged;
 use App\Models\CardEnrollment;
+use App\Models\LoyaltyCard;
 use App\Models\NfcTag;
 use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
-use App\Providers\AppServiceProvider;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
@@ -212,6 +212,61 @@ it('gives a friendly reason when there is no stamp', function (Closure $arrange,
     }, 'card'],
 ]);
 
+it('keeps the pending taps not yet applied when a claim fails midway', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $first = ($this->lastTap)();
+    $this->travel(1)->minutes();
+    $this->get(($this->tapUrl)(6));
+    $second = ($this->lastTap)();
+    $database = new stdClass;
+    $database->down = true;
+    Tap::saving(function (Tap $tap) use ($second, $database): void {
+        if ($database->down && $tap->id === $second->id) {
+            throw new RuntimeException('The database went away.');
+        }
+    });
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertServerError();
+    $database->down = false;
+    $this->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+
+    expect(($this->statusOf)($first))->toBe(TapStatus::Stamped)
+        ->and($this->context->bypass(fn (): ?TapRejection => $second->fresh()?->rejection))->toBe(TapRejection::Cooldown)
+        ->and(($this->stamps)())->toBe(1);
+});
+
+it('says the next stamp is possible now once the cooldown has passed', function (): void {
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+    $this->travel(5)->minutes();
+    $this->get(($this->tapUrl)(6));
+    $this->travel(1)->days();
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/cooldown')->where('nextStamp.day', 'now'));
+});
+
+it('shows the card as the stamp left it, not as later stamps changed it', function (): void {
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+    $this->context->bypass(fn () => CardEnrollment::query()->where('user_id', $this->customer->id)->firstOrFail()->forceFill(['current_stamps' => 7])->save());
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('given', 1)->where('card.stampsCollected', 1));
+});
+
+it('shows the card the stamp was refused on, not the one a first tap here would get', function (): void {
+    $newer = $this->context->bypass(function (): LoyaltyCard {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create(['name' => 'Newer card']);
+        $card->businesses()->attach($this->tenants->a1->id);
+
+        return $card;
+    });
+    $this->tenants->enroll($this->customer, $newer);
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+    $this->travel(5)->minutes();
+
+    $this->get(($this->tapUrl)(6));
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/cooldown')->where('card.cardName', 'Newer card')->where('card.stampsCollected', 1));
+});
+
 it('records a URL with arrays or nothing in it as malformed, never a server error', function (string $query): void {
     $this->get('/t?'.$query)->assertRedirect(route('taps.result'));
 
@@ -240,7 +295,6 @@ it('rate limits an IPv6 client by its /64, so rotating addresses does not help',
 
     $this->withServerVariables(['REMOTE_ADDR' => '2001:db8:1:2:abcd::3'])->get(($this->tapUrl)(3))->assertTooManyRequests();
     $this->withServerVariables(['REMOTE_ADDR' => '2001:db8:1:3::1'])->get(($this->tapUrl)(3))->assertRedirect();
-    expect(AppServiceProvider::clientKey('203.0.113.7'))->toBe('ip:203.0.113.7');
 });
 
 it('rate limits taps per customer, whatever their IP', function (): void {

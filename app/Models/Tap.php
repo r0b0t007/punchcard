@@ -27,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $stamper_id
  * @property int|null $business_id
  * @property int|null $location_id
+ * @property int|null $card_id
+ * @property int|null $card_stamps
  * @property int|null $counter
  * @property int|null $user_id
  * @property int $qty
@@ -80,6 +82,7 @@ class Tap extends Model
         return [
             'counter' => 'integer',
             'qty' => 'integer',
+            'card_stamps' => 'integer',
             'status' => TapStatus::class,
             'rejection' => TapRejection::class,
             'available_at' => 'datetime',
