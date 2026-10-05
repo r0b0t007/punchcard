@@ -40,12 +40,7 @@ final readonly class EnrollCustomer
     public function handle(Business $business, User $user): ?CardEnrollment
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
-            $cards = LoyaltyCard::query()
-                ->whereHas('businesses', fn ($businesses) => $businesses->whereKey($business->id))
-                ->orderByDesc('active')
-                ->orderBy('id')
-                ->pluck('id')
-                ->all();
+            $cards = LoyaltyCard::query()->honouredBy($business->id)->pluck('id')->all();
 
             if ($cards === []) {
                 return null;

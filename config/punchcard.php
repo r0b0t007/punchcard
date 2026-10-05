@@ -40,6 +40,10 @@ return [
         'retention_days' => (int) env('TAP_RETENTION_DAYS', 180),
         // A signed-out tap waits this long for its customer to sign in.
         'pending_minutes' => (int) env('TAP_PENDING_MINUTES', 30),
+        // Rate limits on /t, checked before a tap is recorded (every request writes a tap row).
+        // Per IP is loose: many customers share one behind a mobile carrier's CGNAT or café Wi-Fi.
+        'per_ip_per_minute' => (int) env('TAP_PER_IP_PER_MINUTE', 120),
+        'per_user_per_minute' => (int) env('TAP_PER_USER_PER_MINUTE', 10),
     ],
 
     'stamps' => [
@@ -79,5 +83,13 @@ return [
     ],
     'default_locale' => 'fr',
     'rtl_locales' => ['ar'],
+
+    // Proxies whose X-Forwarded-For is trusted: comma-separated IPs or CIDRs, or "*"
+    // for whatever proxy connects (only when the origin is reachable through proxies
+    // alone). List every hop in front of PHP: Cloudflare's published ranges and any
+    // load balancer or nginx host between them and PHP. Empty trusts none.
+    'trusted_proxies' => trim((string) env('TRUSTED_PROXIES', '')) === '*'
+        ? '*'
+        : array_values(array_filter(array_map(trim(...), explode(',', (string) env('TRUSTED_PROXIES', ''))))),
 
 ];

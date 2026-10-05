@@ -101,62 +101,73 @@ final readonly class AddStamps
             $stamper = $request->stamperId === null ? null : Stamper::query()->whereKey($request->stamperId)->lockForUpdate()->first();
             $enrollment = CardEnrollment::query()->whereKey($enrollmentId)->lockForUpdate()->firstOrFail();
 
-            $this->assertStaff($request);
-
-            $earlier = $request->idempotencyKey === null ? null : StampEvent::query()
-                ->where('business_id', $request->businessId)
-                ->where('idempotency_key', $request->idempotencyKey)
-                ->first();
-
-            if ($earlier instanceof StampEvent) {
-                return $this->replay($earlier, $enrollment, $request);
+            try {
+                return $this->stampLocked($enrollment, $stamper, $request);
+            } catch (StampRejected $rejected) {
+                // The locked enrollment as the refusal found it: a tap's result page shows it.
+                throw $rejected->onCard($enrollment);
             }
-
-            $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
-            $givenHere = $request->isCorrection()
-                ? (int) StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->sum('qty')
-                : 0;
-            $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists() || $givenHere > 0;
-            $location = Location::query()->findOrFail($request->locationId);
-            $now = $request->at ?? now();
-            $qty = $request->qty;
-
-            $this->assertAllowed($card, $honoured, $location, $stamper, $request);
-            $tiers = $card->mode === CardMode::Progressive && $request->qty > 0 ? $this->tiers($card) : [];
-
-            if ($request->provesPresence()) {
-                $this->assertCooldown($enrollment, $card, $now);
-                $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
-            }
-
-            if ($request->isCorrection() && $givenHere + $qty < 0) {
-                throw new StampRejected(StampRejection::CorrectionExceedsGiven);
-            }
-
-            if ($enrollment->current_stamps + $qty < 0) {
-                throw new StampRejected(StampRejection::CorrectionBelowZero);
-            }
-
-            $event = (new StampEvent)->forceFill([
-                'enrollment_id' => $enrollment->id,
-                'business_id' => $request->businessId,
-                'location_id' => $request->locationId,
-                'stamper_id' => $request->stamperId,
-                'nfc_tag_id' => $request->nfcTagId,
-                'counter' => $request->counter,
-                'staff_id' => $request->staffId,
-                'source' => $request->source,
-                'qty' => $qty,
-                'idempotency_key' => $request->idempotencyKey,
-                'reason' => $request->reason,
-                'created_at' => $now,
-            ]);
-            $event->save();
-
-            $rewards = $this->progress($enrollment, $card, $tiers, $event, $request, $qty, $now);
-
-            return new StampResult($event, $enrollment, $rewards, replayed: false);
         }));
+    }
+
+    /** Checks and records the stamp on the enrollment attempt() has locked. */
+    private function stampLocked(CardEnrollment $enrollment, ?Stamper $stamper, StampRequest $request): StampResult
+    {
+        $this->assertStaff($request);
+
+        $earlier = $request->idempotencyKey === null ? null : StampEvent::query()
+            ->where('business_id', $request->businessId)
+            ->where('idempotency_key', $request->idempotencyKey)
+            ->first();
+
+        if ($earlier instanceof StampEvent) {
+            return $this->replay($earlier, $enrollment, $request);
+        }
+
+        $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
+        $givenHere = $request->isCorrection()
+            ? (int) StampEvent::query()->where('enrollment_id', $enrollment->id)->where('business_id', $request->businessId)->sum('qty')
+            : 0;
+        $honoured = CardBusiness::query()->where('card_id', $card->id)->where('business_id', $request->businessId)->exists() || $givenHere > 0;
+        $location = Location::query()->findOrFail($request->locationId);
+        $now = $request->at ?? now();
+        $qty = $request->qty;
+
+        $this->assertAllowed($card, $honoured, $location, $stamper, $request);
+        $tiers = $card->mode === CardMode::Progressive && $request->qty > 0 ? $this->tiers($card) : [];
+
+        if ($request->provesPresence()) {
+            $this->assertCooldown($enrollment, $card, $now);
+            $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
+        }
+
+        if ($request->isCorrection() && $givenHere + $qty < 0) {
+            throw new StampRejected(StampRejection::CorrectionExceedsGiven);
+        }
+
+        if ($enrollment->current_stamps + $qty < 0) {
+            throw new StampRejected(StampRejection::CorrectionBelowZero);
+        }
+
+        $event = (new StampEvent)->forceFill([
+            'enrollment_id' => $enrollment->id,
+            'business_id' => $request->businessId,
+            'location_id' => $request->locationId,
+            'stamper_id' => $request->stamperId,
+            'nfc_tag_id' => $request->nfcTagId,
+            'counter' => $request->counter,
+            'staff_id' => $request->staffId,
+            'source' => $request->source,
+            'qty' => $qty,
+            'idempotency_key' => $request->idempotencyKey,
+            'reason' => $request->reason,
+            'created_at' => $now,
+        ]);
+        $event->save();
+
+        $rewards = $this->progress($enrollment, $card, $tiers, $event, $request, $qty, $now);
+
+        return new StampResult($event, $enrollment, $rewards, replayed: false);
     }
 
     /** The key's earlier stamp is this one again (same customer, place, source, quantity, staff and reason), or the key is taken. */

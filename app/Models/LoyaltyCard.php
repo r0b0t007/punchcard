@@ -15,7 +15,9 @@ use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\LoyaltyCardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -117,6 +119,20 @@ class LoyaltyCard extends Model implements TenantModel
         $this->assertProgramInsert($values);
         $this->assertTiers($values['mode'] ?? null, $values['tiers'] ?? null);
         ArchivedSites::assertOrganizationOpen($values['organization_id'] ?? null, 'A card', lock: true);
+    }
+
+    /**
+     * The cards a business honours, in the order a first tap there picks one
+     * (CHW-25): an active card first, then the oldest.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function honouredBy(Builder $query, int $businessId): void
+    {
+        $query->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($businessId))
+            ->orderByDesc('active')
+            ->orderBy('id');
     }
 
     /**

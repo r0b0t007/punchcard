@@ -20,7 +20,6 @@ use App\Support\Database\Outermost;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
-use LogicException;
 
 /**
  * Turns a pending tap into a stamp once its customer is known: at once when
@@ -76,7 +75,7 @@ final readonly class ApplyTap
         $tap = $this->context->bypass(fn (): Tap => Tap::query()->whereKey($tapId)->lockForUpdate()->firstOrFail());
 
         if ($tap->user_id !== null && $tap->user_id !== $user->id) {
-            throw new LogicException('This tap was received or claimed by another customer.');
+            throw new TapBelongsToAnotherCustomer;
         }
 
         if (! $tap->isPending()) {
@@ -107,6 +106,8 @@ final readonly class ApplyTap
 
         $this->context->set($business->organization, $business);
 
+        // The tap keeps the card it is judged on and that card's stamps, refused (AddStamps
+        // says which, StampRejected::onCard) or not, for its result page.
         try {
             $result = DB::transaction(function () use ($tap, $stamper, $business, $user): StampResult {
                 $enrollment = $this->enrollCustomer->handle($business, $user)
@@ -120,11 +121,20 @@ final readonly class ApplyTap
                 'status' => TapStatus::Rejected,
                 'rejection' => TapRejection::fromStamp($rejected->rejection),
                 'available_at' => $rejected->availableAt,
+                'card_id' => $rejected->cardId,
+                'card_stamps' => $rejected->cardStamps,
             ]);
         }
 
         // The stamps given: an armed tap may get fewer, the room left under the daily cap.
-        return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Stamped, 'stamp_event_id' => $result->event->id, 'qty' => $result->event->qty]);
+        return $this->finish($tap, [
+            'user_id' => $user->id,
+            'status' => TapStatus::Stamped,
+            'stamp_event_id' => $result->event->id,
+            'qty' => $result->event->qty,
+            'card_id' => $result->enrollment->card_id,
+            'card_stamps' => $result->enrollment->current_stamps,
+        ]);
     }
 
     /** @param  array<string, mixed>  $outcome */

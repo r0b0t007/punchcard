@@ -3,12 +3,16 @@
 namespace App\Providers;
 
 use App\Support\Auth\ActiveUserProvider;
+use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Queue;
@@ -16,8 +20,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -78,6 +84,46 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
+        $this->registerRateLimiters();
+        $this->trustConfiguredProxies();
+    }
+
+    /**
+     * The proxies in front of the app (Cloudflare's ranges in production,
+     * TRUSTED_PROXIES), so request()->ip() is the customer's, for the tap rate
+     * limit and the tap log. None by default: X-Forwarded-For from anyone else
+     * is ignored, so it can't dodge the limit or fake the logged IP.
+     */
+    private function trustConfiguredProxies(): void
+    {
+        $proxies = config('punchcard.trusted_proxies');
+
+        // "*" stays a string: Laravel only reads the bare string as "trust whatever proxy connects".
+        if ($proxies === '*' || (is_array($proxies) && $proxies !== [])) {
+            TrustProxies::at($proxies);
+        }
+    }
+
+    /**
+     * The tap endpoint (/t): per client address (ClientAddress) and per signed-in
+     * customer, before the tap is received, since every request writes a tap row
+     * (sun-nfc-verification skill).
+     */
+    private function registerRateLimiters(): void
+    {
+        RateLimiter::for('tap', function (Request $request): array {
+            // Over the limit: to the friendly "too many taps" page, rendered after the locale
+            // and shared props are set (the throttle runs before them), with e/c out of the URL.
+            $busy = fn (Request $request, array $headers): SymfonyResponse => to_route('taps.busy')->withHeaders($headers);
+
+            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(ClientAddress::rateLimitKey($request->ip()))->response($busy)];
+
+            if ($request->user() !== null) {
+                $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier())->response($busy);
+            }
+
+            return $limits;
+        });
     }
 
     /**

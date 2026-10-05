@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\TapController;
+use App\Http\Middleware\NeverCache;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -14,6 +16,16 @@ if (app()->environment('local')) {
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+});
+
+// The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
+Route::middleware(NeverCache::class)->group(function (): void {
+    // block(): one tap request at a time per session, so a quick second tap and a result page can't
+    // overwrite each other's pending list (every request saves the whole session).
+    Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->block(10, 10)->name('taps.receive');
+    Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->block(10, 10)->name('taps.claim');
+    Route::get('t/result', [TapController::class, 'show'])->block(10, 10)->name('taps.result');
+    Route::inertia('t/busy', 'tap/refused', ['reason' => 'busy'])->name('taps.busy');
 });
 
 require __DIR__.'/settings.php';
