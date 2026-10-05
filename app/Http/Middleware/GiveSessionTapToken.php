@@ -22,10 +22,12 @@ final class GiveSessionTapToken
      */
     public function handle(Request $request, Closure $next): Response
     {
-        TapSession::ensureToken($request->session());
+        // Constructing it gives the session its token; a session from before the token moves its taps onto it.
+        app(TapSession::class)->adoptLegacyPending();
+
         $response = $next($request);
 
-        // Again after: a session ended during the request (logout) is saved with a new token too.
+        // Again after: a session ended during the request (logout) is saved with its new token too.
         TapSession::ensureToken($request->session());
 
         return $response;

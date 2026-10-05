@@ -9,7 +9,6 @@ use App\Enums\TapStatus;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Taps\TapSession;
-use App\Support\Tenancy\TenantContext;
 use Throwable;
 
 /**
@@ -28,7 +27,7 @@ use Throwable;
  */
 final readonly class ClaimPendingTaps
 {
-    public function __construct(private ApplyTap $applyTap, private TenantContext $context) {}
+    public function __construct(private ApplyTap $applyTap) {}
 
     public function handle(TapSession $session, User $user, ?Tap $received = null): ?Tap
     {
@@ -36,11 +35,11 @@ final readonly class ClaimPendingTaps
         $stamped = $shown instanceof Tap && $shown->status === TapStatus::Stamped && $shown->user_id === $user->id ? $shown : null;
         $newest = null;
 
-        foreach ($session->pending() as $id) {
-            $tap = $this->context->bypass(fn (): ?Tap => Tap::query()->find($id));
+        foreach ($session->pendingTaps() as $waiting) {
+            $id = $waiting->id;
 
             try {
-                $tap = $tap instanceof Tap ? $this->applyTap->handle($tap, $user) : null;
+                $tap = $this->applyTap->handle($waiting, $user);
             } catch (TapBelongsToAnotherCustomer) {
                 $tap = null;
             } catch (Throwable $failed) {

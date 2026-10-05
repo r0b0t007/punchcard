@@ -590,6 +590,80 @@ it('tells a customer their tap expired when the scheduler expired it before they
 
     $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/refused')->where('reason', 'expired'));
+
+    // Told once: coming back to /t/claim later goes home, not to that old result.
+    $this->get(route('taps.claim'))->assertRedirect(route('home'));
+});
+
+it('moves a session\'s pending taps from before the claim token onto it, once', function (): void {
+    $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addSeconds(60)])->save());
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+    // A session from before the deploy: its list of tap ids, no hash on the tap.
+    $this->context->bypass(fn () => $tap->forceFill(['claim_token_hash' => null])->save());
+    session()->put('taps.pending', [$tap->id]);
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+
+    expect(($this->stamps)())->toBe(3)
+        ->and(session()->has('taps.pending'))->toBeFalse();
+});
+
+it('gives a session a new claim token at sign-in, so a session id planted before can\'t claim later taps', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $planted = session('taps.token');
+
+    $this->post(route('login.store'), ['email' => $this->customer->email, 'password' => 'password'])->assertRedirect(route('taps.claim'));
+
+    // The tap from before sign-in moved onto the new token and is still claimed.
+    expect(session('taps.token'))->toBeString()->not->toBe($planted);
+    $this->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+    expect(($this->stamps)())->toBe(1);
+
+    // A later signed-out tap in a browser still presenting the planted id lands under the old token: not this session's.
+    $this->travel(1)->days();
+    $this->get(route('home'));
+    $later = $this->context->bypass(function () use ($planted): Tap {
+        $tap = (new Tap)->forceFill([
+            'status' => TapStatus::Pending, 'qty' => 1, 'expires_at' => now()->addMinutes(30),
+            'nfc_tag_id' => $this->tag->id, 'counter' => 99, 'stamper_id' => $this->stamper->id,
+            'business_id' => $this->stamper->business_id, 'location_id' => $this->stamper->location_id,
+            'claim_token_hash' => hash('sha256', (string) $planted),
+        ]);
+        $tap->save();
+
+        return $tap;
+    });
+
+    $this->get(route('taps.claim'))->assertRedirect(route('home'));
+    expect(($this->statusOf)($later))->toBe(TapStatus::Pending)
+        ->and(($this->stamps)())->toBe(1);
+});
+
+it('moves only an unclaimed, unowned pending or expired tap from an old session list', function (string $case): void {
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+    $other = User::factory()->create();
+    $this->context->bypass(fn () => $tap->forceFill(match ($case) {
+        'owned' => ['claim_token_hash' => null, 'user_id' => $other->id],
+        'already under a token' => ['claim_token_hash' => hash('sha256', 'another-token')],
+        'stamped' => ['claim_token_hash' => null, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay],
+    })->save());
+    session()->put('taps.pending', [$tap->id]);
+
+    $this->get(route('home'));
+
+    expect(app(TapSession::class)->pending())->toBe([]);
+})->with(['owned', 'already under a token', 'stamped']);
+
+it('mints the same claim token for every request of a session that has none', function (): void {
+    $this->get(route('home'));
+    session()->forget('taps.token');
+    $first = TapSession::ensureToken(session()->driver());
+    session()->forget('taps.token');
+
+    expect(TapSession::ensureToken(session()->driver()))->toBe($first)
+        ->and($first)->not->toBe(session()->getId());
 });
 
 it('never claims a tap waiting under another session\'s claim token', function (): void {
