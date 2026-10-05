@@ -1,4 +1,5 @@
 import { Gift } from 'lucide-react';
+import { monogramOf } from '@/components/loyalty-card/monogram';
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import {
@@ -29,8 +30,8 @@ export type LoyaltyCardProps = {
     progressLabel?: string;
     /** Shows the next empty slot as the stamp waiting for sign-in (C1). */
     ghostNext?: boolean;
-    /** The newest stamps that just landed, animated in (C2). */
-    landing?: number;
+    /** The stamps before the ones that just landed (C2): the slots they filled animate in. */
+    landingFrom?: number;
     className?: string;
 };
 
@@ -51,7 +52,7 @@ export default function LoyaltyCard({
     rewardText,
     progressLabel,
     ghostNext = false,
-    landing = 0,
+    landingFrom,
     className,
 }: LoyaltyCardProps) {
     const { t } = useTranslation();
@@ -59,17 +60,21 @@ export default function LoyaltyCard({
         stampsRequired,
         stampsCollected,
     );
+    // The slots the stamps just given filled (not one slot per stamp: a long card shares slots).
+    const filledBefore =
+        landingFrom === undefined
+            ? filled
+            : progressFor(stampsRequired, landingFrom).filled;
     const { brand, foreground, stamp } = cardInks(brandColor, brandForeground);
-    // A broken logo falls back to the monogram and plain stamps.
-    const [logoFailed, setLogoFailed] = useState(false);
-    const logo = logoUrl && !logoFailed ? logoUrl : null;
-
     // The one place runtime colours enter the UI: CSS variables scoped to this card.
     const brandVariables = {
         '--card-brand': brand,
         '--card-brand-foreground': foreground,
         '--card-stamp': stamp,
     } as CSSProperties;
+    // A broken logo falls back to the monogram and plain stamps.
+    const [logoFailed, setLogoFailed] = useState(false);
+    const logo = logoUrl && !logoFailed ? logoUrl : null;
 
     return (
         <div
@@ -99,9 +104,7 @@ export default function LoyaltyCard({
                         />
                     ) : (
                         <span className="font-display text-lg font-bold">
-                            {(
-                                Array.from(businessName.trim())[0] ?? ''
-                            ).toUpperCase()}
+                            {monogramOf(businessName)}
                         </span>
                     )}
                 </span>
@@ -124,8 +127,7 @@ export default function LoyaltyCard({
                 className={cn('grid gap-2', gridColumnsClass(slots))}
             >
                 {Array.from({ length: slots }, (_, index) => {
-                    const isLanding =
-                        index < filled && index >= filled - landing;
+                    const isLanding = index >= filledBefore && index < filled;
 
                     return (
                         <li key={index} className="relative grid">

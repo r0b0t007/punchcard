@@ -73,11 +73,19 @@ it('stamps a signed-in customer at once and shows their card, never cached', fun
             ->component('tap/stamped')
             ->where('given', 1)
             ->where('rewards', [])
-            ->where('stampedAt', '14:00')
+            ->where('stampedAt', ['day' => 'today', 'date' => '2026-10-05', 'time' => '14:00'])
+            ->where('stampsBefore', 0)
+            ->where('fresh', true)
             ->where('card.businessName', 'A1')
             ->where('card.locationName', 'A1 site')
             ->where('card.stampsCollected', 1)
             ->where('card.stampsRequired', 10));
+
+    // Coming back to it is not a new stamp: no landing again, and the day shows.
+    $this->travel(1)->days();
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('fresh', false)
+        ->where('stampedAt.day', 'other'));
 });
 
 it('keeps a signed-out tap pending, then stamps it once after signing in or up', function (string $how): void {
@@ -196,6 +204,10 @@ it('shows when the next stamp is possible, in the location\'s time', function (s
             ->where('nextStamp', $nextStamp)
             ->where('stampedMinutesAgo', 5)
             ->where('card.stampsCollected', 1));
+
+    // Measured from now, so coming back later says how long ago it really was.
+    $this->travel(10)->minutes();
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->where('stampedMinutesAgo', 15));
 })->with([
     'later today' => ['2026-10-05 10:00:00', 20, ['day' => 'today', 'date' => '2026-10-05', 'time' => '14:20']],
     'past midnight' => ['2026-10-05 19:45:00', 20, ['day' => 'tomorrow', 'date' => '2026-10-06', 'time' => '00:05']],
@@ -374,6 +386,7 @@ it('shows a card the stamp completed as full, next to its reward', function (): 
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
         ->component('tap/stamped')
         ->where('card.stampsCollected', 10)
+        ->where('stampsBefore', 9)
         ->has('rewards', 1));
     expect(($this->lastTap)()->card_stamps)->toBe(0);
 });
@@ -441,8 +454,9 @@ it('trusts whatever proxy connects when TRUSTED_PROXIES is "*"', function (): vo
     TrustProxies::flushState();
 });
 
-it('says how long ago the last stamp before the tap landed, not a stamp given since', function (): void {
+it('says how long ago the last stamp before the tap landed, not a stamp given since or one outside the cooldown', function (): void {
     $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $this->tenants->stamp($enrollment, $this->tenants->a1, ['created_at' => now()->subDays(3)]);
     $this->get(($this->tapUrl)(5));
     $this->travel(3)->minutes();
     $this->tenants->stamp($enrollment, $this->tenants->a1);

@@ -16,10 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The tap flow test (tests/e2e/tap-flow.spec.ts) writes tap URLs with punchcard:fake-tap,
-    # which runs in local only, from the published NXP AN10922 test vector key (not a real key).
+    # which runs in local only (the demo seeder too).
     env:
       APP_ENV: local
-      NFC_SUN_MASTER_KEY: 00112233445566778899AABBCCDDEEFF # gitleaks:allow
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,6 +35,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      # A throwaway SUN master key for this run only: fake taps are built and verified with it.
+      - name: Generate a test SUN key
+        run: echo "NFC_SUN_MASTER_KEY=$(openssl rand -hex 16 | tr a-f A-F)" >> "$GITHUB_ENV"
 
       - name: Install and build
         run: |

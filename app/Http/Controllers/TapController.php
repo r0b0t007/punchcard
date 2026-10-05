@@ -59,7 +59,7 @@ final class TapController extends Controller
 
         $screen = $describeTap->handle($tap);
 
-        return Inertia::render($screen['component'], $screen['props']);
+        return Inertia::render($screen['component'], [...$screen['props'], 'fresh' => $session->firstLookAt($tap)]);
     }
 
     public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse

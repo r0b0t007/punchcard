@@ -155,6 +155,7 @@
     "Sign up": "Inscrivez-vous",
     "Something went wrong.": "Une erreur s’est produite.",
     "Stamped at :time": "Tamponné à :time",
+    "Stamped on :date at :time": "Tamponné le :date à :time",
     "System": "Système",
     "The passkey operation was cancelled.": "L’opération avec la clé d’accès a été annulée.",
     "The provided password was incorrect.": "Le mot de passe fourni est incorrect.",

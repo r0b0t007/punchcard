@@ -3,30 +3,42 @@ import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import { useTranslation } from '@/hooks/use-translation';
 
+/** When the stamp was given, in the location's time (DescribeTap). */
+type Moment = {
+    day: 'today' | 'other';
+    /** Y-m-d */
+    date: string;
+    /** H:i */
+    time: string;
+};
+
 /** C2: the stamp landed; a reward it unlocked is announced in place (CHW-25). */
 export default function TapStamped({
     card,
     given,
     rewards,
     stampedAt,
+    stampsBefore,
+    fresh,
 }: {
     card: TapCard | null;
     given: number;
     rewards: string[];
-    stampedAt: string | null;
+    stampedAt: Moment | null;
+    stampsBefore: number;
+    fresh: boolean;
 }) {
-    const { t } = useTranslation();
+    const { t, locale } = useTranslation();
+    const added = t(':count stamp added|:count stamps added', {
+        count: given,
+    });
     const remaining = card
         ? Math.max(card.stampsRequired - card.stampsCollected, 0)
         : 0;
 
     return (
         <>
-            <Head
-                title={t(':count stamp added|:count stamps added', {
-                    count: given,
-                })}
-            />
+            <Head title={added} />
             <TapScreen>
                 {stampedAt ? (
                     <p className="flex items-center gap-2 self-start rounded-full bg-accent px-4 py-2 font-medium text-success">
@@ -34,10 +46,29 @@ export default function TapStamped({
                             aria-hidden="true"
                             className="size-2 rounded-full bg-success"
                         />
-                        {t('Stamped at :time', { time: stampedAt })}
+                        {stampedAt.day === 'today'
+                            ? t('Stamped at :time', { time: stampedAt.time })
+                            : t('Stamped on :date at :time', {
+                                  // A calendar date: format it in UTC so no timezone shifts the day.
+                                  date: new Intl.DateTimeFormat(locale, {
+                                      weekday: 'long',
+                                      day: 'numeric',
+                                      month: 'long',
+                                      timeZone: 'UTC',
+                                  }).format(
+                                      new Date(`${stampedAt.date}T00:00:00Z`),
+                                  ),
+                                  time: stampedAt.time,
+                              })}
                     </p>
                 ) : null}
-                {card ? <TapLoyaltyCard card={card} landing={given} /> : null}
+                {card ? (
+                    // The stamp lands on the first look only, not on a reload or a later visit.
+                    <TapLoyaltyCard
+                        card={card}
+                        landingFrom={fresh ? stampsBefore : undefined}
+                    />
+                ) : null}
                 {rewards.length > 0 ? (
                     <div className="flex flex-col gap-3">
                         <p className="self-start rounded-full bg-stamp px-4 py-2 font-semibold text-stamp-foreground">
@@ -75,7 +106,11 @@ export default function TapStamped({
                             </p>
                         ) : null}
                     </div>
-                ) : null}
+                ) : (
+                    <h1 className="font-display text-5xl leading-none font-bold">
+                        {added}
+                    </h1>
+                )}
             </TapScreen>
         </>
     );

@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import LoyaltyCard from '@/components/loyalty-card';
 import type { LoyaltyCardProps, StampStyle } from '@/components/loyalty-card';
+import { monogramOf } from '@/components/loyalty-card/monogram';
 import { cardInks } from '@/lib/color';
 
 /** The café's card as a tap result shows it (DescribeTap). */
@@ -55,7 +56,7 @@ export function TapCafe({ card }: { card: TapCard }) {
                 style={brandVariables}
                 className="grid size-13 shrink-0 place-items-center rounded-full bg-card-brand font-display text-3xl font-bold text-card-brand-foreground ring-1 ring-border"
             >
-                {(Array.from(card.businessName.trim())[0] ?? '').toUpperCase()}
+                {monogramOf(card.businessName)}
             </span>
             <div className="min-w-0">
                 <p className="truncate text-lg font-semibold">
@@ -77,7 +78,7 @@ export function TapLoyaltyCard({
     ...states
 }: { card: TapCard } & Pick<
     LoyaltyCardProps,
-    'progressLabel' | 'ghostNext' | 'landing'
+    'progressLabel' | 'ghostNext' | 'landingFrom'
 >) {
     return (
         <LoyaltyCard

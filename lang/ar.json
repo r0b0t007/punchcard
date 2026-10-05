@@ -155,6 +155,7 @@
     "Sign up": "أنشئ حسابًا",
     "Something went wrong.": "حدث خطأ ما.",
     "Stamped at :time": "تمّ الختم الساعة :time",
+    "Stamped on :date at :time": "تمّ الختم يوم :date الساعة :time",
     "System": "النظام",
     "The passkey operation was cancelled.": "أُلغيت عملية مفتاح المرور.",
     "The provided password was incorrect.": "كلمة المرور المُدخلة غير صحيحة.",
