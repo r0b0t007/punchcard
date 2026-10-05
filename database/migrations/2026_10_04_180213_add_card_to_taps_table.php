@@ -17,7 +17,7 @@ return new class extends Migration
     {
         Schema::table('taps', function (Blueprint $table): void {
             $table->foreignId('card_id')->nullable()->after('location_id')->constrained('loyalty_cards')->noActionOnDelete();
-            $table->unsignedSmallInteger('card_stamps')->nullable()->after('card_id');
+            $table->unsignedInteger('card_stamps')->nullable()->after('card_id');
         });
 
         if (DB::getDriverName() === 'pgsql') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Taps;
 
 use App\Models\Tap;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Session\Session;
 
 /**
@@ -21,7 +22,7 @@ final readonly class TapSession
 
     private const int MAX_PENDING = 5;
 
-    public function __construct(private Session $session) {}
+    public function __construct(private Session $session, private TenantContext $context) {}
 
     public function keepPending(Tap $tap): void
     {
@@ -53,10 +54,11 @@ final readonly class TapSession
         $this->session->put(self::SHOWN, $tap->id);
     }
 
-    public function shown(): ?int
+    /** The tap /t/result shows, read in bypass(): taps are platform data. */
+    public function shown(): ?Tap
     {
         $id = $this->session->get(self::SHOWN);
 
-        return is_int($id) ? $id : null;
+        return is_int($id) ? $this->context->bypass(fn (): ?Tap => Tap::query()->find($id)) : null;
     }
 }

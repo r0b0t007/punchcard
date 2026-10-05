@@ -15,8 +15,11 @@ use App\Support\Tenancy\TenantContext;
  * oldest first, each at its own time (a second one is usually refused for the
  * cooldown), each forgotten only once applied, so an error keeps the rest for
  * the next try. A tap received or claimed by another customer is skipped and
- * forgotten. Returns the tap to show, the one that stamped if any, and makes
- * it the session's result; null when there was nothing to claim.
+ * forgotten. The tap to show, the newest that stamped or else the newest
+ * applied, becomes the session's result as soon as it is applied (a later
+ * error keeps it); a stamp the session already shows this customer stays
+ * shown over a refusal, so retrying after an error does not hide it. Returns
+ * the tap to show, or null when there was nothing to claim.
  */
 final readonly class ClaimPendingTaps
 {
@@ -24,7 +27,12 @@ final readonly class ClaimPendingTaps
 
     public function handle(TapSession $session, User $user): ?Tap
     {
-        $shown = null;
+        $claimed = false;
+        $shown = $session->shown();
+
+        if (! $shown instanceof Tap || $shown->status !== TapStatus::Stamped || $shown->user_id !== $user->id) {
+            $shown = null;
+        }
 
         foreach ($session->pending() as $id) {
             $tap = $this->context->bypass(fn (): ?Tap => Tap::query()->find($id));
@@ -36,16 +44,14 @@ final readonly class ClaimPendingTaps
             }
 
             $session->forgetPending($id);
+            $claimed = $claimed || $tap instanceof Tap;
 
-            if ($tap instanceof Tap && (! $shown instanceof Tap || $tap->status === TapStatus::Stamped)) {
+            if ($tap instanceof Tap && (! $shown instanceof Tap || $shown->status !== TapStatus::Stamped || $tap->status === TapStatus::Stamped)) {
                 $shown = $tap;
+                $session->show($shown);
             }
         }
 
-        if ($shown instanceof Tap) {
-            $session->show($shown);
-        }
-
-        return $shown;
+        return $claimed ? $shown : null;
     }
 }

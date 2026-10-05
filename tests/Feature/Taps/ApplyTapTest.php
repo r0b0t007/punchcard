@@ -92,7 +92,7 @@ it('records a refusal on the tap, and the counter stays spent', function (): voi
         ->and($cooldown->rejection)->toBe(TapRejection::Cooldown)
         ->and($cooldown->available_at?->toDateTimeString())->toBe('2026-10-05 10:20:00')
         ->and($cooldown->card_id)->toBe($this->tenants->cardA->id)
-        ->and($cooldown->card_stamps)->toBeNull()
+        ->and($cooldown->card_stamps)->toBe(1)
         ->and($replay->rejection)->toBe(TapRejection::Replay)
         ->and(($this->enrollment)()?->lifetime_stamps)->toBe(1);
 });
@@ -127,6 +127,17 @@ it('refuses a tap whose stamper, site or card changed before it was applied, and
     'the card switched off' => ['the card switched off', TapRejection::CardInactive],
     'the card no longer honoured here' => ['the card no longer honoured here', TapRejection::NotHonoured],
 ]);
+
+it('records no card on a tap refused before any card was picked', function (): void {
+    $tap = ($this->tapAt)(5);
+    $this->context->bypass(fn () => $this->tenants->cardA->businesses()->detach($this->tenants->a1->id));
+
+    $applied = ($this->apply)($tap);
+
+    expect($applied->rejection)->toBe(TapRejection::NotHonoured)
+        ->and($applied->card_id)->toBeNull()
+        ->and($applied->card_stamps)->toBeNull();
+});
 
 it('refuses a tap whose stamper moved before it was applied: the stamp is given where the tap happened', function (): void {
     $tap = ($this->tapAt)(5);

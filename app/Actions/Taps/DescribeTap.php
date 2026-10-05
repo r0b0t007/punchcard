@@ -7,23 +7,23 @@ namespace App\Actions\Taps;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
-use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Reward;
-use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Support\Tenancy\TenantContext;
 
 /**
  * The screen a tap's result page shows (CHW-25), with what it needs:
  *
- * - tap/pending (C1): signed out, the café's card with nothing on it yet;
+ * - tap/pending (C1): signed out, the café's card with nothing on it yet
+ *   (refused at once when the café has no active card to give);
  * - tap/stamped (C2): the card as that stamp left it (the tap keeps the
  *   count, so a later visit doesn't mix it with newer stamps), the stamps
  *   given and any reward unlocked;
- * - tap/cooldown: the card the tap was refused on, and when the next stamp
- *   is possible (day and time) in the location's time, or now once passed;
+ * - tap/cooldown: the card the tap was refused on, as the refusal found it,
+ *   and when the next stamp is possible (day and time) in the location's
+ *   time, or now once passed;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
  *   in the tap log): used, expired, limit, unavailable, card or invalid.
  *
@@ -41,24 +41,24 @@ final readonly class DescribeTap
     {
         return $this->context->bypass(function () use ($tap): array {
             if ($tap->status === TapStatus::Pending && $tap->expires_at?->isPast() === false) {
-                return ['component' => 'tap/pending', 'props' => ['card' => $this->card($tap, 0)]];
+                $card = $this->card($tap, 0);
+
+                return $card === null || ! $card['active']
+                    ? ['component' => 'tap/refused', 'props' => ['reason' => 'card']]
+                    : ['component' => 'tap/pending', 'props' => ['card' => $card]];
             }
 
             if ($tap->status === TapStatus::Stamped) {
-                $event = StampEvent::query()->findOrFail($tap->stamp_event_id);
-
                 return ['component' => 'tap/stamped', 'props' => [
                     'card' => $this->card($tap, $tap->card_stamps),
-                    'given' => $event->qty,
-                    'rewards' => Reward::query()->where('stamp_event_id', $event->id)->orderBy('milestone')->pluck('reward_text')->all(),
+                    'given' => $tap->qty,
+                    'rewards' => Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->pluck('reward_text')->all(),
                 ]];
             }
 
             if ($tap->rejection === TapRejection::Cooldown) {
-                $held = CardEnrollment::query()->where('card_id', $tap->card_id)->where('user_id', $tap->user_id)->value('current_stamps');
-
                 return ['component' => 'tap/cooldown', 'props' => [
-                    'card' => $this->card($tap, is_int($held) ? $held : 0),
+                    'card' => $this->card($tap, $tap->card_stamps),
                     'nextStamp' => $this->nextStamp($tap),
                 ]];
             }
@@ -92,6 +92,7 @@ final readonly class DescribeTap
             'rewardText' => $card->reward_text,
             'brandColor' => $business->organization->brand_color,
             'stampStyle' => $card->stamp_style,
+            'active' => $card->active,
         ];
     }
 
