@@ -656,6 +656,32 @@ it('moves only an unclaimed, unowned pending or expired tap from an old session 
     expect(app(TapSession::class)->pending())->toBe([]);
 })->with(['owned', 'already under a token', 'stamped']);
 
+it('moves a signed-in customer\'s own tap that failed to apply from an old session list', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+    // Before the deploy: received while signed in, its stamp failed to apply, kept in the list.
+    $this->context->bypass(fn () => $tap->forceFill(['claim_token_hash' => null, 'user_id' => $this->customer->id])->save());
+    session()->put('taps.pending', [$tap->id]);
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+
+    expect(($this->stamps)())->toBe(1);
+});
+
+it('claims every tap waiting under the session\'s token, more than five included', function (): void {
+    foreach (range(1, 7) as $counter) {
+        $this->get(($this->tapUrl)($counter));
+    }
+    $hash = $this->context->bypass(fn (): ?string => Tap::query()->latest('id')->value('claim_token_hash'));
+    // Seven under one token, as a move-over or a sign-in re-key can leave them.
+    $this->context->bypass(fn (): int => Tap::query()->update(['claim_token_hash' => $hash]));
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+
+    expect($this->context->bypass(fn (): int => Tap::query()->where('status', TapStatus::Pending)->count()))->toBe(0)
+        ->and(app(TapSession::class)->hasPending())->toBeFalse();
+});
+
 it('mints the same claim token for every request of a session that has none', function (): void {
     $this->get(route('home'));
     session()->forget('taps.token');

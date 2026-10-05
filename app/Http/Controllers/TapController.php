@@ -69,7 +69,7 @@ final class TapController extends Controller
         }
 
         // Taps still waiting that could not be applied (reported): reloading tries again.
-        return $session->pending() === []
+        return ! $session->hasPending()
             ? to_route('home')
             : Inertia::render('tap/refused', ['reason' => 'retry']);
     }

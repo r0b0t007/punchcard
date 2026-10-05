@@ -36,8 +36,6 @@ final readonly class ClaimPendingTaps
         $newest = null;
 
         foreach ($session->pendingTaps() as $waiting) {
-            $id = $waiting->id;
-
             try {
                 $tap = $this->applyTap->handle($waiting, $user);
             } catch (TapBelongsToAnotherCustomer) {
@@ -48,7 +46,7 @@ final readonly class ClaimPendingTaps
                 continue;
             }
 
-            $session->forgetPending($id);
+            $session->forgetPending($waiting->id);
 
             if ($tap instanceof Tap) {
                 $newest = $tap;

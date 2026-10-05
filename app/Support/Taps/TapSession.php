@@ -42,7 +42,7 @@ final readonly class TapSession
 
     public function __construct(private Session $session, private TenantContext $context)
     {
-        $this->tokenHash = hash('sha256', self::ensureToken($session));
+        $this->tokenHash = self::hashOf(self::ensureToken($session));
     }
 
     /**
@@ -78,20 +78,28 @@ final readonly class TapSession
 
         if (is_string($old) && $old !== '' && $old !== $new) {
             $context->bypass(fn (): int => Tap::query()
-                ->where('claim_token_hash', hash('sha256', $old))
+                ->where('claim_token_hash', self::hashOf($old))
                 ->whereIn('status', [TapStatus::Pending, TapStatus::Expired])
-                ->update(['claim_token_hash' => hash('sha256', $new)]));
+                ->update(['claim_token_hash' => self::hashOf($new)]));
         }
 
         $session->put(self::TOKEN, $new);
     }
 
+    /** Whether the session still lists its pending taps the way it did before the claim token. */
+    public static function hasLegacyPending(Session $session): bool
+    {
+        return $session->has(self::LEGACY_PENDING);
+    }
+
     /**
-     * Moves a session's pending taps from before the claim token onto it, once
-     * (unclaimed and unowned ones only). The old list is forgotten only after
-     * the move, so a failed move tries again on the next request.
+     * Moves a session's pending taps from before the claim token onto it, once:
+     * unclaimed ones, unowned or the signed-in customer's own (a stamp that
+     * failed to apply, kept for retry). The old list is forgotten only after
+     * the move, so a failed move tries again on the next request. Drop with
+     * LEGACY_PENDING once SESSION_LIFETIME has passed since the deploy.
      */
-    public function adoptLegacyPending(): void
+    public function adoptLegacyPending(?int $userId): void
     {
         $ids = array_values(array_filter((array) $this->session->get(self::LEGACY_PENDING, []), is_int(...)));
 
@@ -99,7 +107,7 @@ final readonly class TapSession
             $this->context->bypass(fn (): int => Tap::query()
                 ->whereKey($ids)
                 ->whereNull('claim_token_hash')
-                ->whereNull('user_id')
+                ->where(fn ($owner) => $userId === null ? $owner->whereNull('user_id') : $owner->whereNull('user_id')->orWhere('user_id', $userId))
                 ->whereIn('status', [TapStatus::Pending, TapStatus::Expired])
                 ->update(['claim_token_hash' => $this->tokenHash]));
         }
@@ -118,6 +126,7 @@ final readonly class TapSession
         $this->context->bypass(function () use ($tap): void {
             Tap::query()->whereKey($tap->id)->where('status', TapStatus::Pending)->update(['claim_token_hash' => $this->tokenHash]);
 
+            // A subquery on the same table with LIMIT: valid on PostgreSQL and SQLite, not MySQL.
             $this->claimable()
                 ->whereNotIn('id', $this->claimable()->select('id')->orderByDesc('id')->limit(self::MAX_PENDING))
                 ->update(['claim_token_hash' => null]);
@@ -126,13 +135,21 @@ final readonly class TapSession
 
     /**
      * The taps waiting in this session, oldest first: pending ones, and any
-     * the scheduler expired before they were claimed.
+     * the scheduler expired before they were claimed. All of them: a move-over
+     * or a sign-in re-key can leave more than MAX_PENDING, and a claim must not
+     * skip the newest.
      *
      * @return Collection<int, Tap>
      */
     public function pendingTaps(): Collection
     {
-        return $this->context->bypass(fn (): Collection => $this->claimable()->oldest('id')->limit(self::MAX_PENDING)->get());
+        return $this->context->bypass(fn (): Collection => $this->claimable()->oldest('id')->get());
+    }
+
+    /** Whether any tap still waits in this session. */
+    public function hasPending(): bool
+    {
+        return $this->context->bypass(fn (): bool => $this->claimable()->exists());
     }
 
     /**
@@ -186,6 +203,12 @@ final readonly class TapSession
         $id = $this->session->get(self::SHOWN);
 
         return is_int($id) ? $this->context->bypass(fn (): ?Tap => Tap::query()->find($id)) : null;
+    }
+
+    /** What a tap stores of the session's claim token: its sha256, never the token. */
+    private static function hashOf(string $token): string
+    {
+        return hash('sha256', $token);
     }
 
     /**

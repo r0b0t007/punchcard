@@ -108,11 +108,6 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * The tap endpoint (/t): per client address (ClientAddress) and per signed-in
-     * customer, before the tap is received, since every request writes a tap row
-     * (sun-nfc-verification skill).
-     */
-    /**
      * A new tap claim token at sign-in (Login fires once the session id is
      * regenerated), so a session id planted before sign-in can't claim the
      * taps made later in that browser (TapSession, CHW-142).
@@ -126,6 +121,11 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * The tap endpoint (/t): per client address (ClientAddress) and per signed-in
+     * customer, before the tap is received, since every request writes a tap row
+     * (sun-nfc-verification skill).
+     */
     private function registerRateLimiters(): void
     {
         RateLimiter::for('tap', function (Request $request): array {
