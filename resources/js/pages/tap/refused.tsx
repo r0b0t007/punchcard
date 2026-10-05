@@ -1,6 +1,8 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import TapScreen from '@/components/tap/tap-screen';
+import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { home } from '@/routes';
 
 type Reason =
     | 'used'
@@ -35,8 +37,19 @@ export default function TapRefused({ reason }: { reason: Reason }) {
     return (
         <>
             <Head title={t('No stamp this time')} />
-            <TapScreen title={t('No stamp this time')}>
-                <p className="text-muted-foreground">{messages[reason]}</p>
+            <TapScreen
+                actions={
+                    <Button asChild size="lg">
+                        <Link href={home()}>{t('Done')}</Link>
+                    </Button>
+                }
+            >
+                <h1 className="font-display text-4xl leading-tight font-bold text-balance">
+                    {t('No stamp this time')}
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                    {messages[reason]}
+                </p>
             </TapScreen>
         </>
     );

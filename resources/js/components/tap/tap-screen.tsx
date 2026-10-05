@@ -1,10 +1,13 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import LoyaltyCard from '@/components/loyalty-card';
-import type { StampStyle } from '@/components/loyalty-card';
+import type { LoyaltyCardProps, StampStyle } from '@/components/loyalty-card';
+import { monogramOf } from '@/components/loyalty-card/monogram';
+import { cardInks } from '@/lib/color';
 
 /** The café's card as a tap result shows it (DescribeTap). */
 export type TapCard = {
     businessName: string;
+    locationName: string | null;
     cardName: string | null;
     stampsRequired: number;
     stampsCollected: number;
@@ -14,39 +17,79 @@ export type TapCard = {
 };
 
 /**
- * The frame of the tap result screens (C1, C2, cooldown, refused): one
- * column, the café's card, the message, actions at thumb height. The café's
- * brand colour only reaches the card (ADR 0007).
+ * The frame of the tap result screens (C1, C2, cooldown, refused; Claude
+ * Design "Punchcard Tap Flow"): content from the top, one primary action at
+ * thumb height. The café's brand colour reaches only the card and the café's
+ * monogram (ADR 0007).
  */
 export default function TapScreen({
-    title,
-    card,
     children,
+    actions,
 }: {
-    title: string;
-    card?: TapCard | null;
-    children?: ReactNode;
+    children: ReactNode;
+    actions?: ReactNode;
 }) {
     return (
-        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 bg-background px-4 py-8 text-foreground">
-            {card ? (
-                <p className="text-sm text-muted-foreground">
+        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background text-foreground">
+            <div className="flex flex-col gap-7 px-6 pt-8">{children}</div>
+            {actions ? (
+                <div className="mt-auto flex flex-col gap-3 px-6 pt-8 pb-8">
+                    {actions}
+                </div>
+            ) : null}
+        </main>
+    );
+}
+
+/** The café the tap happened at: its monogram in the brand colour, name and location (C1). */
+export function TapCafe({ card }: { card: TapCard }) {
+    const { brand, foreground } = cardInks(card.brandColor);
+    const brandVariables = {
+        '--card-brand': brand,
+        '--card-brand-foreground': foreground,
+    } as CSSProperties;
+
+    return (
+        <div className="flex items-center gap-3">
+            <span
+                aria-hidden="true"
+                style={brandVariables}
+                className="grid size-13 shrink-0 place-items-center rounded-full bg-card-brand font-display text-3xl font-bold text-card-brand-foreground ring-1 ring-border"
+            >
+                {monogramOf(card.businessName)}
+            </span>
+            <div className="min-w-0">
+                <p className="truncate text-lg font-semibold">
                     {card.businessName}
                 </p>
-            ) : null}
-            <h1 className="font-display text-3xl font-bold">{title}</h1>
-            {card ? (
-                <LoyaltyCard
-                    businessName={card.businessName}
-                    cardName={card.cardName}
-                    stampsRequired={card.stampsRequired}
-                    stampsCollected={card.stampsCollected}
-                    rewardText={card.rewardText}
-                    brandColor={card.brandColor}
-                    stampStyle={card.stampStyle ?? undefined}
-                />
-            ) : null}
-            <div className="mt-auto flex flex-col gap-3">{children}</div>
-        </main>
+                {card.locationName ? (
+                    <p className="truncate text-muted-foreground">
+                        {card.locationName}
+                    </p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+/** LoyaltyCard for a tap result's card. */
+export function TapLoyaltyCard({
+    card,
+    ...states
+}: { card: TapCard } & Pick<
+    LoyaltyCardProps,
+    'progressLabel' | 'ghostNext' | 'landingFrom'
+>) {
+    return (
+        <LoyaltyCard
+            businessName={card.businessName}
+            cardName={card.cardName}
+            stampsRequired={card.stampsRequired}
+            stampsCollected={card.stampsCollected}
+            rewardText={card.rewardText}
+            brandColor={card.brandColor}
+            stampStyle={card.stampStyle ?? undefined}
+            {...states}
+        />
     );
 }

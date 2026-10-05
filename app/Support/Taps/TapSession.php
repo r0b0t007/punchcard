@@ -21,6 +21,8 @@ final readonly class TapSession
 
     private const string SHOWN = 'taps.last';
 
+    private const string FRESH = 'taps.fresh';
+
     private const int MAX_PENDING = 5;
 
     public function __construct(private Session $session, private TenantContext $context) {}
@@ -63,9 +65,20 @@ final readonly class TapSession
         $this->session->put(self::PENDING, array_values(array_filter($this->pending(), fn (int $pending): bool => $pending !== $id)));
     }
 
+    /** Makes the tap the result; a tap not shown before is fresh until its result page is first seen. */
     public function show(Tap $tap): void
     {
+        if ($this->session->get(self::SHOWN) !== $tap->id) {
+            $this->session->put(self::FRESH, $tap->id);
+        }
+
         $this->session->put(self::SHOWN, $tap->id);
+    }
+
+    /** Whether this is the first look at the tap's result (its stamp lands only then); asking uses it up. */
+    public function firstLookAt(Tap $tap): bool
+    {
+        return $this->session->pull(self::FRESH) === $tap->id;
     }
 
     /** The tap /t/result shows, read in bypass(): taps are platform data. */
