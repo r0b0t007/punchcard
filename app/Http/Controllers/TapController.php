@@ -24,9 +24,11 @@ use Inertia\Response;
  * - GET /t (rate limited before anything is recorded): TakeTap, then the
  *   result page, so reloading never taps again. A tap still pending waits
  *   for sign-in, which returns to /t/claim.
- * - GET /t/result: this session's last tap (DescribeTap); once the customer
- *   is signed in, any tap still pending in the session is claimed first.
- * - GET /t/claim (signed in): ClaimPendingTaps.
+ * - GET /t/result: this session's last tap (DescribeTap); a pending one is
+ *   claimed once the customer is signed in.
+ * - GET /t/claim (signed in): ClaimPendingTaps, or "try again" when taps
+ *   still wait that could not be applied.
+ * - GET /t/busy: the rate limiter's friendly page.
  */
 final class TapController extends Controller
 {
@@ -49,7 +51,8 @@ final class TapController extends Controller
             return to_route('home');
         }
 
-        if ($request->user() instanceof User && $session->pending() !== []) {
+        // Signed in since tapping signed out, or a stamp that failed to apply: claim it now.
+        if ($tap->isPending() && $request->user() instanceof User) {
             return to_route('taps.claim');
         }
 
@@ -58,10 +61,15 @@ final class TapController extends Controller
         return Inertia::render($screen['component'], $screen['props']);
     }
 
-    public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): RedirectResponse
+    public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse
     {
-        return $claimPendingTaps->handle($session, $request->user()) instanceof Tap
-            ? to_route('taps.result')
-            : to_route('home');
+        if ($claimPendingTaps->handle($session, $request->user()) instanceof Tap) {
+            return to_route('taps.result');
+        }
+
+        // Taps still waiting that could not be applied (reported): reloading tries again.
+        return $session->pending() === []
+            ? to_route('home')
+            : Inertia::render('tap/refused', ['reason' => 'retry']);
     }
 }

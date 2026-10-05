@@ -17,6 +17,8 @@ use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -212,7 +214,8 @@ it('gives a friendly reason when there is no stamp', function (Closure $arrange,
     }, 'card'],
 ]);
 
-it('keeps the pending taps not yet applied when a claim fails midway', function (): void {
+it('reports a pending tap that fails to apply and keeps it, without holding back the newer ones', function (): void {
+    Exceptions::fake();
     $this->get(($this->tapUrl)(5));
     $first = ($this->lastTap)();
     $this->travel(1)->minutes();
@@ -220,20 +223,23 @@ it('keeps the pending taps not yet applied when a claim fails midway', function 
     $second = ($this->lastTap)();
     $database = new stdClass;
     $database->down = true;
-    Tap::saving(function (Tap $tap) use ($second, $database): void {
-        if ($database->down && $tap->id === $second->id) {
+    Tap::saving(function (Tap $tap) use ($first, $database): void {
+        if ($database->down && $tap->id === $first->id) {
             throw new RuntimeException('The database went away.');
         }
     });
 
-    $this->actingAs($this->customer)->get(route('taps.claim'))->assertServerError();
-    $this->get(route('taps.result'))->assertRedirect(route('taps.claim'));
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+    Exceptions::assertReported(RuntimeException::class);
+    expect(($this->statusOf)($second))->toBe(TapStatus::Stamped)
+        ->and(($this->statusOf)($first))->toBe(TapStatus::Pending);
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('given', 1));
     $database->down = false;
     $this->get(route('taps.claim'))->assertRedirect(route('taps.result'));
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('given', 1));
 
-    expect(($this->statusOf)($first))->toBe(TapStatus::Stamped)
-        ->and($this->context->bypass(fn (): ?TapRejection => $second->fresh()?->rejection))->toBe(TapRejection::Cooldown)
+    expect($this->context->bypass(fn (): ?TapRejection => $first->fresh()?->rejection))->toBe(TapRejection::Cooldown)
         ->and(($this->stamps)())->toBe(1);
 });
 
@@ -270,6 +276,7 @@ it('shows the card the stamp was refused on, not the one a first tap here would 
 });
 
 it('retries a signed-in tap whose stamp failed to apply, armed stamps included', function (): void {
+    Exceptions::fake();
     $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addSeconds(60)])->save());
     $database = new stdClass;
     $database->down = true;
@@ -279,10 +286,12 @@ it('retries a signed-in tap whose stamp failed to apply, armed stamps included',
         }
     });
 
-    $this->actingAs($this->customer)->get(($this->tapUrl)(5))->assertServerError();
-    $database->down = false;
-
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5))->assertRedirect(route('taps.result'));
+    Exceptions::assertReported(RuntimeException::class);
     $this->get(route('taps.result'))->assertRedirect(route('taps.claim'))->assertHeader('Cache-Control', 'no-store, private');
+    $this->get(route('taps.claim'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/refused')->where('reason', 'retry'));
+
+    $database->down = false;
     $this->get(route('taps.claim'))->assertRedirect(route('taps.result'));
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('given', 3));
     expect(($this->stamps)())->toBe(3);
@@ -306,6 +315,7 @@ it('does not invite a signed-out customer to sign up for a switched-off card', f
 });
 
 it('retries a failed stamp when the customer reloads the tap URL', function (): void {
+    Exceptions::fake();
     $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addSeconds(60)])->save());
     $database = new stdClass;
     $database->down = true;
@@ -316,7 +326,7 @@ it('retries a failed stamp when the customer reloads the tap URL', function (): 
     });
     $url = ($this->tapUrl)(5);
 
-    $this->actingAs($this->customer)->get($url)->assertServerError();
+    $this->actingAs($this->customer)->get($url)->assertRedirect(route('taps.result'));
     $database->down = false;
     $this->get($url)->assertRedirect(route('taps.result'));
 
@@ -338,6 +348,45 @@ it('never caches the sign-in redirect of a signed-out claim', function (): void 
     $this->get(route('taps.claim'))->assertRedirect(route('login'))->assertHeader('Cache-Control', 'no-store, private');
 });
 
+it('keeps showing a tap waiting for sign-in when its URL is opened again', function (): void {
+    $url = ($this->tapUrl)(5);
+    $this->get($url);
+
+    $this->get($url)->assertRedirect(route('taps.result'));
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/pending'));
+    expect(($this->lastTap)()->rejection)->toBe(TapRejection::Replay);
+});
+
+it('shows a card the stamp completed as full, next to its reward', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 9, 'lifetime_stamps' => 9])->save());
+
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
+        ->component('tap/stamped')
+        ->where('card.stampsCollected', 10)
+        ->has('rewards', 1));
+    expect(($this->lastTap)()->card_stamps)->toBe(0);
+});
+
+it('takes one tap request at a time per session', function (string $route): void {
+    expect(Route::getRoutes()->getByName($route)?->locksFor())->toBe(10);
+})->with(['taps.receive', 'taps.claim', 'taps.result']);
+
+it('says there are too many taps in the customer\'s language', function (): void {
+    $this->withCookie('locale', 'ar')->get(route('taps.busy'))
+        ->assertOk()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('tap/refused')
+            ->where('reason', 'busy')
+            ->where('locale', 'ar')
+            ->where('dir', 'rtl')
+            ->has('translations'));
+});
+
 it('records a URL with arrays or nothing in it as malformed, never a server error', function (string $query): void {
     $this->get('/t?'.$query)->assertRedirect(route('taps.result'));
 
@@ -352,7 +401,10 @@ it('rate limits taps per IP before recording them, whatever X-Forwarded-For says
         $this->withHeader('X-Forwarded-For', "198.51.100.{$counter}")->get(($this->tapUrl)($counter))->assertRedirect();
     }
 
-    $this->withHeader('X-Forwarded-For', '198.51.100.9')->get(($this->tapUrl)(4))->assertTooManyRequests()->assertHeader('Cache-Control', 'no-store, private');
+    $this->withHeader('X-Forwarded-For', '198.51.100.9')->get(($this->tapUrl)(4))
+        ->assertRedirect(route('taps.busy'))
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertHeader('Retry-After');
     expect($this->context->bypass(fn (): int => Tap::query()->count()))->toBe(3)
         ->and(($this->lastTap)()->ip)->toBe('127.0.0.1');
 });
@@ -364,7 +416,7 @@ it('rate limits an IPv6 client by its /64, so rotating addresses does not help',
         $this->withServerVariables(['REMOTE_ADDR' => $ip])->get(($this->tapUrl)($counter + 1))->assertRedirect();
     }
 
-    $this->withServerVariables(['REMOTE_ADDR' => '2001:db8:1:2:abcd::3'])->get(($this->tapUrl)(3))->assertTooManyRequests();
+    $this->withServerVariables(['REMOTE_ADDR' => '2001:db8:1:2:abcd::3'])->get(($this->tapUrl)(3))->assertRedirect(route('taps.busy'));
     $this->withServerVariables(['REMOTE_ADDR' => '2001:db8:1:3::1'])->get(($this->tapUrl)(3))->assertRedirect();
 });
 
@@ -375,7 +427,7 @@ it('rate limits taps per customer, whatever their IP', function (): void {
         $this->actingAs($this->customer)->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$counter}"])->get(($this->tapUrl)($counter))->assertRedirect();
     }
 
-    $this->actingAs($this->customer)->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->get(($this->tapUrl)(3))->assertTooManyRequests();
+    $this->actingAs($this->customer)->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->get(($this->tapUrl)(3))->assertRedirect(route('taps.busy'));
 });
 
 it('hands the café\'s tenant to the queued listeners of a stamp', function (): void {

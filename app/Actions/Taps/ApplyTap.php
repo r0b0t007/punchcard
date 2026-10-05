@@ -13,7 +13,6 @@ use App\Enums\StampRejection;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
-use App\Models\CardEnrollment;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
@@ -107,32 +106,23 @@ final readonly class ApplyTap
 
         $this->context->set($business->organization, $business);
 
-        // The tap keeps the card it is judged on and that card's stamps, refused or not, for its result page.
+        // The tap keeps the card it is judged on and that card's stamps, refused (AddStamps
+        // says which, StampRejected::onCard) or not, for its result page.
         try {
             $result = DB::transaction(function () use ($tap, $stamper, $business, $user): StampResult {
                 $enrollment = $this->enrollCustomer->handle($business, $user)
                     ?? throw new StampRejected(StampRejection::NotHonoured);
 
-                try {
-                    return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at));
-                } catch (StampRejected $rejected) {
-                    // Nothing was written: the count read now (locked again, the refusal's savepoint
-                    // released AddStamps' lock) is the card as the refusal found it.
-                    $stamps = $this->context->bypass(fn (): mixed => CardEnrollment::query()->whereKey($enrollment->id)->lockForUpdate()->value('current_stamps'));
-
-                    throw new StampRefusedOnCard($rejected, $enrollment->card_id, is_int($stamps) ? $stamps : 0);
-                }
+                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at));
             });
-        } catch (StampRejected|StampRefusedOnCard $refused) {
-            $rejected = $refused instanceof StampRefusedOnCard ? $refused->rejected : $refused;
-
+        } catch (StampRejected $rejected) {
             return $this->finish($tap, [
                 'user_id' => $user->id,
                 'status' => TapStatus::Rejected,
                 'rejection' => TapRejection::fromStamp($rejected->rejection),
                 'available_at' => $rejected->availableAt,
-                'card_id' => $refused instanceof StampRefusedOnCard ? $refused->cardId : null,
-                'card_stamps' => $refused instanceof StampRefusedOnCard ? $refused->cardStamps : null,
+                'card_id' => $rejected->cardId,
+                'card_stamps' => $rejected->cardStamps,
             ]);
         }
 

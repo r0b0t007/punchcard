@@ -20,9 +20,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
 // The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
 Route::middleware(NeverCache::class)->group(function (): void {
-    Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->name('taps.receive');
-    Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->name('taps.claim');
-    Route::get('t/result', [TapController::class, 'show'])->name('taps.result');
+    // block(): one tap request at a time per session, so a quick second tap and a result page can't
+    // overwrite each other's pending list (every request saves the whole session).
+    Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->block(10, 10)->name('taps.receive');
+    Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->block(10, 10)->name('taps.claim');
+    Route::get('t/result', [TapController::class, 'show'])->block(10, 10)->name('taps.result');
+    Route::inertia('t/busy', 'tap/refused', ['reason' => 'busy'])->name('taps.busy');
 });
 
 require __DIR__.'/settings.php';

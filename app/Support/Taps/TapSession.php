@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Taps;
 
+use App\Enums\TapStatus;
 use App\Models\Tap;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Session\Session;
@@ -42,6 +43,19 @@ final readonly class TapSession
         sort($ids);
 
         return $ids;
+    }
+
+    /** The newest pending tap still waiting for sign-in (not expired), read in bypass(). */
+    public function newestWaiting(): ?Tap
+    {
+        $ids = $this->pending();
+
+        return $ids === [] ? null : $this->context->bypass(fn (): ?Tap => Tap::query()
+            ->whereKey($ids)
+            ->where('status', TapStatus::Pending)
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first());
     }
 
     public function forgetPending(int $id): void

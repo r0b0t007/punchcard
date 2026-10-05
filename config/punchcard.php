@@ -41,7 +41,8 @@ return [
         // A signed-out tap waits this long for its customer to sign in.
         'pending_minutes' => (int) env('TAP_PENDING_MINUTES', 30),
         // Rate limits on /t, checked before a tap is recorded (every request writes a tap row).
-        'per_ip_per_minute' => (int) env('TAP_PER_IP_PER_MINUTE', 30),
+        // Per IP is loose: many customers share one behind a mobile carrier's CGNAT or café Wi-Fi.
+        'per_ip_per_minute' => (int) env('TAP_PER_IP_PER_MINUTE', 120),
         'per_user_per_minute' => (int) env('TAP_PER_USER_PER_MINUTE', 10),
     ],
 

@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Enums\TapStatus;
+use App\Enums\TapRejection;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Taps\TapSession;
 
 /**
- * A tap URL opened in a browser session (CHW-25): ReceiveTap, then the tap
- * becomes the session's result and, while pending, one of its pending taps
- * before anything else can fail, so a stamp that fails to apply is retried
- * from the result page instead of lost (an armed tap's stamps included). A
- * signed-in customer's pending taps are claimed at once (ClaimPendingTaps),
- * also when this tap is not pending (a reload of a URL whose stamp failed to
- * apply is a replay, but the failed tap still waits); a signed-out
- * customer's wait for sign-in. Returns the tap to show: one that stamped,
- * else this one.
+ * A tap URL opened in a browser session (CHW-25). ReceiveTap, then the tap
+ * becomes the session's result and, while pending, one of its pending taps,
+ * before anything else can fail: a stamp that fails to apply is retried
+ * later instead of lost (an armed tap's stamps included).
+ *
+ * - Signed in: the session's pending taps are claimed (ClaimPendingTaps),
+ *   also when this tap is not pending (reloading a URL whose stamp failed
+ *   is a replay, but the failed tap still waits), and the result is the one
+ *   ClaimPendingTaps picks.
+ * - Signed out: the tap waits for sign-in. A replay (the Back button
+ *   re-requests the URL) keeps showing a tap still waiting, so the customer
+ *   still sees how to keep it.
+ *
+ * Returns the tap the result page shows.
  */
 final readonly class TakeTap
 {
@@ -33,17 +38,17 @@ final readonly class TakeTap
             $session->keepPending($tap);
         }
 
-        if (! $user instanceof User) {
-            return $tap;
+        if ($user instanceof User) {
+            return $this->claimPendingTaps->handle($session, $user, $tap->isPending() ? null : $tap) ?? $tap;
         }
 
-        $claimed = $this->claimPendingTaps->handle($session, $user);
+        $waiting = $tap->rejection === TapRejection::Replay ? $session->newestWaiting() : null;
 
-        if ($claimed instanceof Tap && ($tap->isPending() || $claimed->status === TapStatus::Stamped)) {
-            return $claimed;
+        if ($waiting instanceof Tap) {
+            $session->show($waiting);
+
+            return $waiting;
         }
-
-        $session->show($tap);
 
         return $tap;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
+use App\Enums\CardMode;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
@@ -25,7 +26,8 @@ use App\Support\Tenancy\TenantContext;
  *   and when the next stamp is possible (day and time) in the location's
  *   time, or now once passed;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
- *   in the tap log): used, expired, limit, unavailable, card or invalid.
+ *   in the tap log): used, expired, limit, unavailable, card or invalid
+ *   (busy, too many taps, comes from the rate limiter).
  *
  * Reads in bypass(): the viewer is a customer, with no tenant. Only what the
  * customer may see: their own card's progress, the café's public card.
@@ -49,10 +51,12 @@ final readonly class DescribeTap
             }
 
             if ($tap->status === TapStatus::Stamped) {
+                $rewards = Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->pluck('reward_text')->all();
+
                 return ['component' => 'tap/stamped', 'props' => [
-                    'card' => $this->card($tap, $tap->card_stamps),
+                    'card' => $this->card($tap, $tap->card_stamps, completed: $rewards !== []),
                     'given' => $tap->qty,
-                    'rewards' => Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->pluck('reward_text')->all(),
+                    'rewards' => $rewards,
                 ]];
             }
 
@@ -70,10 +74,12 @@ final readonly class DescribeTap
     /**
      * The café's card as the customer sees it: the tap's card, or before one
      * was picked the card a first tap there would get (LoyaltyCard::honouredBy).
+     * A cyclic card the stamp completed shows full, next to its reward, not
+     * reset to what carries over.
      *
      * @return array<string, mixed>|null
      */
-    private function card(Tap $tap, ?int $stamps): ?array
+    private function card(Tap $tap, ?int $stamps, bool $completed = false): ?array
     {
         $business = Business::query()->with('organization')->find($tap->business_id);
         $card = $tap->card_id !== null
@@ -88,7 +94,7 @@ final readonly class DescribeTap
             'businessName' => $business->name,
             'cardName' => $card->name,
             'stampsRequired' => $card->stamps_required,
-            'stampsCollected' => $stamps ?? 0,
+            'stampsCollected' => $completed && $card->mode === CardMode::Cyclic ? $card->stamps_required : ($stamps ?? 0),
             'rewardText' => $card->reward_text,
             'brandColor' => $business->organization->brand_color,
             'stampStyle' => $card->stamp_style,

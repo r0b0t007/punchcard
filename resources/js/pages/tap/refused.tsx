@@ -2,7 +2,15 @@ import { Head } from '@inertiajs/react';
 import TapScreen from '@/components/tap/tap-screen';
 import { useTranslation } from '@/hooks/use-translation';
 
-type Reason = 'used' | 'expired' | 'limit' | 'unavailable' | 'card' | 'invalid';
+type Reason =
+    | 'used'
+    | 'expired'
+    | 'limit'
+    | 'unavailable'
+    | 'card'
+    | 'invalid'
+    | 'busy'
+    | 'retry';
 
 /** A tap that gave no stamp, with a friendly reason; the detail stays in the tap log (CHW-25). */
 export default function TapRefused({ reason }: { reason: Reason }) {
@@ -16,6 +24,12 @@ export default function TapRefused({ reason }: { reason: Reason }) {
         ),
         card: t("This café's card is not available right now."),
         invalid: t('This tap could not be read. Touch the stamper again.'),
+        busy: t(
+            'Too many taps right now. Wait a moment, then touch the stamper again.',
+        ),
+        retry: t(
+            'We could not save your stamp just now. Reload this page to try again.',
+        ),
     };
 
     return (

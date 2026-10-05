@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -110,10 +111,14 @@ class AppServiceProvider extends ServiceProvider
     private function registerRateLimiters(): void
     {
         RateLimiter::for('tap', function (Request $request): array {
-            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(ClientAddress::rateLimitKey($request->ip()))];
+            // Over the limit: to the friendly "too many taps" page, rendered after the locale
+            // and shared props are set (the throttle runs before them), with e/c out of the URL.
+            $busy = fn (Request $request, array $headers): SymfonyResponse => to_route('taps.busy')->withHeaders($headers);
+
+            $limits = [Limit::perMinute((int) config('punchcard.taps.per_ip_per_minute'))->by(ClientAddress::rateLimitKey($request->ip()))->response($busy)];
 
             if ($request->user() !== null) {
-                $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier());
+                $limits[] = Limit::perMinute((int) config('punchcard.taps.per_user_per_minute'))->by('user:'.$request->user()->getAuthIdentifier())->response($busy);
             }
 
             return $limits;
