@@ -8,6 +8,7 @@ use App\Enums\StampRejection;
 use App\Models\CardEnrollment;
 use Carbon\CarbonInterface;
 use RuntimeException;
+use Throwable;
 
 /**
  * AddStamps refused the stamp; nothing was written. A cooldown says when the
@@ -21,13 +22,14 @@ final class StampRejected extends RuntimeException
         public readonly ?CarbonInterface $availableAt = null,
         public readonly ?int $cardId = null,
         public readonly ?int $cardStamps = null,
+        ?Throwable $previous = null,
     ) {
-        parent::__construct("Stamp refused: {$rejection->value}.");
+        parent::__construct("Stamp refused: {$rejection->value}.", previous: $previous);
     }
 
-    /** The same refusal, with the card and stamps of the enrollment it was judged on. */
+    /** The same refusal (chained, so its trace still shows where it came from), with the card and stamps of the enrollment it was judged on. */
     public function onCard(CardEnrollment $enrollment): self
     {
-        return new self($this->rejection, $this->availableAt, $enrollment->card_id, $enrollment->current_stamps);
+        return new self($this->rejection, $this->availableAt, $enrollment->card_id, $enrollment->current_stamps, $this);
     }
 }

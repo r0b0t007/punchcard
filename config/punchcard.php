@@ -84,8 +84,12 @@ return [
     'default_locale' => 'fr',
     'rtl_locales' => ['ar'],
 
-    // Proxies whose X-Forwarded-For is trusted (comma-separated IPs or CIDRs):
-    // Cloudflare's published ranges in production. Empty trusts none.
-    'trusted_proxies' => array_values(array_filter(array_map(trim(...), explode(',', (string) env('TRUSTED_PROXIES', ''))))),
+    // Proxies whose X-Forwarded-For is trusted: comma-separated IPs or CIDRs, or "*"
+    // for whatever proxy connects (only when the origin is reachable through proxies
+    // alone). List every hop in front of PHP: Cloudflare's published ranges and any
+    // load balancer or nginx host between them and PHP. Empty trusts none.
+    'trusted_proxies' => trim((string) env('TRUSTED_PROXIES', '')) === '*'
+        ? '*'
+        : array_values(array_filter(array_map(trim(...), explode(',', (string) env('TRUSTED_PROXIES', ''))))),
 
 ];

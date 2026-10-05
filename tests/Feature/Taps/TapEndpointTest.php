@@ -12,9 +12,11 @@ use App\Models\NfcTag;
 use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
+use App\Providers\AppServiceProvider;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
@@ -385,6 +387,53 @@ it('says there are too many taps in the customer\'s language', function (): void
             ->where('locale', 'ar')
             ->where('dir', 'rtl')
             ->has('translations'));
+});
+
+it('shows what became of a failed tap when its URL is reloaded, not just that the URL was used', function (): void {
+    Exceptions::fake();
+    $database = new stdClass;
+    $database->down = true;
+    Tap::saving(function (Tap $tap) use ($database): void {
+        if ($database->down && $tap->status === TapStatus::Stamped) {
+            throw new RuntimeException('The database went away.');
+        }
+    });
+    $url = ($this->tapUrl)(5);
+    $this->actingAs($this->customer)->get($url);
+    $database->down = false;
+    $this->travel(31)->minutes();
+
+    $this->get($url);
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/refused')->where('reason', 'expired'));
+});
+
+it('sends only a signed-out customer back to the claim after signing in', function (): void {
+    Exceptions::fake();
+    Tap::saving(function (Tap $tap): void {
+        if ($tap->status === TapStatus::Stamped) {
+            throw new RuntimeException('The database went away.');
+        }
+    });
+
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+
+    expect(session('url.intended'))->toBeNull()
+        ->and(($this->lastTap)()->status)->toBe(TapStatus::Pending);
+});
+
+it('trusts whatever proxy connects when TRUSTED_PROXIES is "*"', function (): void {
+    putenv('TRUSTED_PROXIES=*');
+    $config = require config_path('punchcard.php');
+    putenv('TRUSTED_PROXIES');
+    config(['punchcard.trusted_proxies' => $config['trusted_proxies']]);
+    (fn () => $this->trustConfiguredProxies())->call(app()->getProvider(AppServiceProvider::class));
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.7'])->withHeader('X-Forwarded-For', '203.0.113.50')->get(($this->tapUrl)(5));
+
+    expect($config['trusted_proxies'])->toBe('*')
+        ->and(($this->lastTap)()->ip)->toBe('203.0.113.50');
+    TrustProxies::flushState();
 });
 
 it('records a URL with arrays or nothing in it as malformed, never a server error', function (string $query): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
+use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Tap;
 use App\Models\User;
@@ -21,7 +22,8 @@ use Throwable;
  *
  * Then sets the session's result once: a stamp (the newest applied, or one
  * already shown to this customer, so a retry does not hide it), else the tap
- * just received ($received, when it was not pending), else the newest tap
+ * just received ($received, when it was not pending, unless it only replays a
+ * URL: then the pending tap it retried tells the real outcome), else the newest tap
  * applied. Returns it, or null when there was nothing to claim or show.
  */
 final readonly class ClaimPendingTaps
@@ -55,7 +57,8 @@ final readonly class ClaimPendingTaps
             }
         }
 
-        $result = $newest instanceof Tap ? ($stamped ?? $received ?? $newest) : $received;
+        $replayed = $received instanceof Tap && $received->rejection === TapRejection::Replay;
+        $result = $newest instanceof Tap ? ($stamped ?? ($replayed ? $newest : $received) ?? $newest) : $received;
 
         if ($result instanceof Tap) {
             $session->show($result);

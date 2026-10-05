@@ -96,9 +96,10 @@ class AppServiceProvider extends ServiceProvider
      */
     private function trustConfiguredProxies(): void
     {
-        $proxies = (array) config('punchcard.trusted_proxies');
+        $proxies = config('punchcard.trusted_proxies');
 
-        if ($proxies !== []) {
+        // "*" stays a string: Laravel only reads the bare string as "trust whatever proxy connects".
+        if ($proxies === '*' || (is_array($proxies) && $proxies !== [])) {
             TrustProxies::at($proxies);
         }
     }

@@ -92,7 +92,9 @@ describe('cooldown, per customer per card', function (): void {
             $this->fail('The cooldown let a stamp through.');
         } catch (StampRejected $rejected) {
             expect($rejected->rejection)->toBe(StampRejection::Cooldown)
-                ->and($rejected->availableAt?->toDateTimeString())->toBe('2026-10-05 10:20:00');
+                ->and($rejected->availableAt?->toDateTimeString())->toBe('2026-10-05 10:20:00')
+                ->and($rejected->cardStamps)->toBe(1)
+                ->and($rejected->getPrevious())->toBeInstanceOf(StampRejected::class);
         }
 
         $this->travel(1)->seconds();

@@ -36,7 +36,8 @@ final class TapController extends Controller
     {
         $tap = $takeTap->handle($request->sun('e'), $request->sun('c'), $request->user(), $request->ip(), $request->userAgent(), $session);
 
-        if ($tap->isPending()) {
+        // Only a signed-out customer signs in next; a signed-in one retries from the result page.
+        if ($tap->isPending() && $request->user() === null) {
             redirect()->setIntendedUrl(route('taps.claim'));
         }
 
