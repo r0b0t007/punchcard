@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Actions\Taps\AdoptLegacyPendingTaps;
 use App\Support\Taps\TapSession;
 use Closure;
 use Illuminate\Http\Request;
@@ -25,9 +26,9 @@ final class GiveSessionTapToken
         TapSession::ensureToken($request->session());
 
         // A session from before the token moves its taps onto it, once.
-        if (TapSession::hasLegacyPending($request->session())) {
+        if (TapSession::legacyPendingIds($request->session()) !== null) {
             $userId = $request->user()?->getAuthIdentifier();
-            app(TapSession::class)->adoptLegacyPending(is_int($userId) ? $userId : null);
+            app(AdoptLegacyPendingTaps::class)->handle($request->session(), is_int($userId) ? $userId : null);
         }
 
         $response = $next($request);

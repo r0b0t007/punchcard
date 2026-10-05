@@ -31,11 +31,11 @@ final readonly class TakeTap
 
     public function handle(string $e, string $c, ?User $user, ?string $ip, ?string $userAgent, TapSession $session): Tap
     {
-        $tap = $this->receiveTap->handle($e, $c, $user, $ip, $userAgent);
+        $tap = $this->receiveTap->handle($e, $c, $user, $ip, $userAgent, $session->claimTokenHash());
         $session->show($tap);
 
         if ($tap->isPending()) {
-            $session->keepPending($tap);
+            $session->trimPending();
         }
 
         if ($user instanceof User) {

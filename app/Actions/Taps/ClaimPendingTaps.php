@@ -39,6 +39,7 @@ final readonly class ClaimPendingTaps
             try {
                 $tap = $this->applyTap->handle($waiting, $user);
             } catch (TapBelongsToAnotherCustomer) {
+                $session->forgetPending($waiting->id);
                 $tap = null;
             } catch (Throwable $failed) {
                 report($failed);
@@ -46,7 +47,10 @@ final readonly class ClaimPendingTaps
                 continue;
             }
 
-            $session->forgetPending($waiting->id);
+            // ApplyTap clears the link with an outcome; a tap returned as it was (expired) is let go here.
+            if ($tap?->claim_token_hash !== null) {
+                $session->forgetPending($waiting->id);
+            }
 
             if ($tap instanceof Tap) {
                 $newest = $tap;

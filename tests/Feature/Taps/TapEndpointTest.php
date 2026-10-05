@@ -20,6 +20,7 @@ use App\Support\Taps\TapSession;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Route;
@@ -502,7 +503,7 @@ it('keeps at most five signed-out taps waiting, the newest, and the rest in the 
     }
     $oldest = $this->context->bypass(fn (): Tap => Tap::query()->oldest('id')->firstOrFail());
 
-    expect(app(TapSession::class)->pending())->toHaveCount(5)->not->toContain($oldest->id)
+    expect(app(TapSession::class)->pendingTaps()->modelKeys())->toHaveCount(5)->not->toContain($oldest->id)
         ->and($oldest->claim_token_hash)->toBeNull()
         ->and($oldest->status)->toBe(TapStatus::Pending);
 });
@@ -653,7 +654,7 @@ it('moves only an unclaimed, unowned pending or expired tap from an old session 
 
     $this->get(route('home'));
 
-    expect(app(TapSession::class)->pending())->toBe([]);
+    expect(app(TapSession::class)->pendingTaps()->modelKeys())->toBe([]);
 })->with(['owned', 'already under a token', 'stamped']);
 
 it('moves a signed-in customer\'s own tap that failed to apply from an old session list', function (): void {
@@ -680,6 +681,50 @@ it('claims every tap waiting under the session\'s token, more than five included
 
     expect($this->context->bypass(fn (): int => Tap::query()->where('status', TapStatus::Pending)->count()))->toBe(0)
         ->and(app(TapSession::class)->hasPending())->toBeFalse();
+});
+
+it('no longer offers a tap that expired more than a day ago', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $this->travel(31)->minutes();
+    app(ExpirePendingTaps::class)->handle();
+    $this->travel(2)->days();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('home'));
+});
+
+it('no longer offers a pending tap more than a day past its expiry that the scheduler never expired', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $this->travel(2)->days();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('home'));
+    expect(($this->stamps)())->toBe(0);
+});
+
+it('lets a sign-in through when moving its taps onto the new token fails', function (): void {
+    Exceptions::fake();
+    $this->get(($this->tapUrl)(5));
+    $token = session('taps.token');
+    DB::connection()->beforeExecuting(function (string $query): void {
+        if (str_starts_with($query, 'update "taps" set "claim_token_hash"')) {
+            throw new RuntimeException('The database went away.');
+        }
+    });
+
+    $this->post(route('login.store'), ['email' => $this->customer->email, 'password' => 'password'])->assertRedirect(route('taps.claim'));
+
+    Exceptions::assertReported(RuntimeException::class);
+    expect(session('taps.token'))->toBe($token);
+    $this->assertAuthenticatedAs($this->customer);
+});
+
+it('lets a claimed tap go from the session with its outcome', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'));
+
+    expect($this->context->bypass(fn (): ?string => $tap->fresh()?->claim_token_hash))->toBeNull()
+        ->and(($this->statusOf)($tap))->toBe(TapStatus::Stamped);
 });
 
 it('mints the same claim token for every request of a session that has none', function (): void {

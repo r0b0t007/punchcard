@@ -9,6 +9,7 @@ use App\Enums\TapStatus;
 use App\Models\Concerns\IsPlatformData;
 use App\Support\Tenancy\PlatformBuilder;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -68,6 +69,24 @@ class Tap extends Model
     public function pruneAll(int $chunkSize = 1000): int
     {
         return app(TenantContext::class)->bypass(fn (): int => $this->pruneAllRows($chunkSize));
+    }
+
+    /**
+     * The taps waiting under a session's claim token (TapSession, CHW-142):
+     * pending or expired ones whose expiry is less than a day old, so the claim
+     * can say they expired. Older expired ones stay out: a browser that
+     * re-sends an expired session id re-mints the same token, and must not
+     * get an earlier visitor's taps back.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function waitingUnder(Builder $query, string $claimTokenHash): void
+    {
+        // Bounded for pending taps too: the scheduler may be late in expiring them.
+        $query->where('claim_token_hash', $claimTokenHash)
+            ->whereIn('status', [TapStatus::Pending, TapStatus::Expired])
+            ->where('expires_at', '>', now()->subDay());
     }
 
     public function isPending(): bool

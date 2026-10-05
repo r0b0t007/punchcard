@@ -17,8 +17,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The NFC tap endpoint (CHW-25, sun-nfc-verification skill). Tap ids live in
- * the session only (TapSession), never in a URL, a form or a redirect; every
+ * The NFC tap endpoint (CHW-25, sun-nfc-verification skill). Tap ids never
+ * appear in a URL, a form or a redirect: a session's waiting taps are found by
+ * its claim token, the result it shows is in the session (TapSession); every
  * response is no-store (NeverCache).
  *
  * - GET /t (rate limited before anything is recorded): TakeTap, then the

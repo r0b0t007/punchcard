@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Actions\Taps\RekeyTapClaimToken;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
-use App\Support\Taps\TapSession;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -116,7 +116,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(Login::class, function (): void {
             if (request()->hasSession()) {
-                TapSession::rekeyAfterSignIn(request()->session(), app(TenantContext::class));
+                app(RekeyTapClaimToken::class)->handle(request()->session());
             }
         });
     }

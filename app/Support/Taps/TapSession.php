@@ -18,10 +18,10 @@ use Illuminate\Database\Eloquent\Collection;
  * - Pending taps (a signed-out customer's, kept until claimed, up to
  *   MAX_PENDING so a second tap does not drop an armed first one) are found
  *   in the database by the session's claim token (CHW-142): the session keeps
- *   one token for good (GiveSessionTapToken), the tap the token's sha256, so
- *   a request writing back an older session payload can't lose a pending tap.
- *   A tap the scheduler expired meanwhile stays claimable, so its result says
- *   it expired. Logging out ends the session, and its token with it.
+ *   one token (GiveSessionTapToken), the tap the token's sha256, written by
+ *   ReceiveTap with the tap itself, so a request writing back an older
+ *   session payload can't lose a pending tap (Tap::waitingUnder). Sign-in
+ *   re-keys the token (RekeyTapClaimToken); logging out ends the session.
  * - The tap /t/result shows, and whether it is fresh, stay in the session: a
  *   stale write there only changes which result shows, never loses a stamp.
  */
@@ -29,7 +29,7 @@ final readonly class TapSession
 {
     private const string TOKEN = 'taps.token';
 
-    /** Before CHW-142 the session listed its pending tap ids here; moved onto the token once. */
+    /** Before CHW-142 the session listed its pending tap ids here (AdoptLegacyPendingTaps). */
     private const string LEGACY_PENDING = 'taps.pending';
 
     private const string SHOWN = 'taps.last';
@@ -38,21 +38,16 @@ final readonly class TapSession
 
     private const int MAX_PENDING = 5;
 
-    private string $tokenHash;
-
-    public function __construct(private Session $session, private TenantContext $context)
-    {
-        $this->tokenHash = self::hashOf(self::ensureToken($session));
-    }
+    public function __construct(private Session $session, private TenantContext $context) {}
 
     /**
      * Gives the session its claim token if it has none yet. Derived from the
      * session id (secret, like the cookie that carries it) and the app key, so
      * concurrent requests of a session without a token all mint the same one:
-     * whichever saves last, the token is the same. Sign-in re-keys it
-     * (rekeyAfterSignIn), so a signed-in session never holds a token derived
-     * from an id that existed before: one planted in a victim's browser
-     * (session fixation) can't follow the attacker into their account.
+     * whichever saves last, the token is the same. Sign-in re-keys it from the
+     * regenerated id (RekeyTapClaimToken), so a session id planted before
+     * sign-in can't claim the taps made later, unless that re-key failed and
+     * was reported (the old token is kept then, so the sign-in still works).
      */
     public static function ensureToken(Session $session): string
     {
@@ -66,76 +61,61 @@ final readonly class TapSession
         return $token;
     }
 
-    /**
-     * After sign-in (Login, which fires once the session id is regenerated): a
-     * new token from the new id, and the taps waiting under the old one move
-     * onto it, so the customer still claims them.
-     */
-    public static function rekeyAfterSignIn(Session $session, TenantContext $context): void
-    {
-        $old = $session->get(self::TOKEN);
-        $new = self::mint($session);
-
-        if (is_string($old) && $old !== '' && $old !== $new) {
-            $context->bypass(fn (): int => Tap::query()
-                ->where('claim_token_hash', self::hashOf($old))
-                ->whereIn('status', [TapStatus::Pending, TapStatus::Expired])
-                ->update(['claim_token_hash' => self::hashOf($new)]));
-        }
-
-        $session->put(self::TOKEN, $new);
-    }
-
-    /** Whether the session still lists its pending taps the way it did before the claim token. */
-    public static function hasLegacyPending(Session $session): bool
-    {
-        return $session->has(self::LEGACY_PENDING);
-    }
-
-    /**
-     * Moves a session's pending taps from before the claim token onto it, once:
-     * unclaimed ones, unowned or the signed-in customer's own (a stamp that
-     * failed to apply, kept for retry). The old list is forgotten only after
-     * the move, so a failed move tries again on the next request. Drop with
-     * LEGACY_PENDING once SESSION_LIFETIME has passed since the deploy.
-     */
-    public function adoptLegacyPending(?int $userId): void
-    {
-        $ids = array_values(array_filter((array) $this->session->get(self::LEGACY_PENDING, []), is_int(...)));
-
-        if ($ids !== []) {
-            $this->context->bypass(fn (): int => Tap::query()
-                ->whereKey($ids)
-                ->whereNull('claim_token_hash')
-                ->where(fn ($owner) => $userId === null ? $owner->whereNull('user_id') : $owner->whereNull('user_id')->orWhere('user_id', $userId))
-                ->whereIn('status', [TapStatus::Pending, TapStatus::Expired])
-                ->update(['claim_token_hash' => $this->tokenHash]));
-        }
-
-        $this->session->forget(self::LEGACY_PENDING);
-    }
-
-    private static function mint(Session $session): string
+    /** The session's claim token as it would be minted from its id now. */
+    public static function mint(Session $session): string
     {
         return hash_hmac('sha256', 'tap-claim-token|'.$session->getId(), (string) config('app.key'));
     }
 
-    /** Keeps a pending tap waiting in this session; past MAX_PENDING the oldest stops waiting here. */
-    public function keepPending(Tap $tap): void
+    /** Replaces the session's claim token (RekeyTapClaimToken). */
+    public static function replaceToken(Session $session, string $token): void
     {
-        $this->context->bypass(function () use ($tap): void {
-            Tap::query()->whereKey($tap->id)->where('status', TapStatus::Pending)->update(['claim_token_hash' => $this->tokenHash]);
+        $session->put(self::TOKEN, $token);
+    }
 
-            // A subquery on the same table with LIMIT: valid on PostgreSQL and SQLite, not MySQL.
-            $this->claimable()
-                ->whereNotIn('id', $this->claimable()->select('id')->orderByDesc('id')->limit(self::MAX_PENDING))
-                ->update(['claim_token_hash' => null]);
-        });
+    /** What a tap stores of a claim token: its sha256, never the token. */
+    public static function hashOf(string $token): string
+    {
+        return hash('sha256', $token);
     }
 
     /**
-     * The taps waiting in this session, oldest first: pending ones, and any
-     * the scheduler expired before they were claimed. All of them: a move-over
+     * The tap ids the session listed before the claim token, if it still has that list.
+     *
+     * @return list<int>|null
+     */
+    public static function legacyPendingIds(Session $session): ?array
+    {
+        return $session->has(self::LEGACY_PENDING)
+            ? array_values(array_filter((array) $session->get(self::LEGACY_PENDING), is_int(...)))
+            : null;
+    }
+
+    public static function forgetLegacyPending(Session $session): void
+    {
+        $session->forget(self::LEGACY_PENDING);
+    }
+
+    /** The hash ReceiveTap stores on a tap made in this session, from its token as it is now. */
+    public function claimTokenHash(): string
+    {
+        return self::hashOf(self::ensureToken($this->session));
+    }
+
+    /**
+     * Keeps at most MAX_PENDING taps waiting in this session, the newest
+     * (ReceiveTap already linked the new one, with the tap itself).
+     */
+    public function trimPending(): void
+    {
+        $this->context->bypass(fn (): int => $this->waiting()
+            // A subquery on the same table with LIMIT: valid on PostgreSQL and SQLite, not MySQL.
+            ->whereNotIn('id', $this->waiting()->select('id')->orderByDesc('id')->limit(self::MAX_PENDING))
+            ->update(['claim_token_hash' => null]));
+    }
+
+    /**
+     * The taps waiting in this session, oldest first. All of them: a move-over
      * or a sign-in re-key can leave more than MAX_PENDING, and a claim must not
      * skip the newest.
      *
@@ -143,41 +123,31 @@ final readonly class TapSession
      */
     public function pendingTaps(): Collection
     {
-        return $this->context->bypass(fn (): Collection => $this->claimable()->oldest('id')->get());
+        return $this->context->bypass(fn (): Collection => $this->waiting()->oldest('id')->get());
     }
 
     /** Whether any tap still waits in this session. */
     public function hasPending(): bool
     {
-        return $this->context->bypass(fn (): bool => $this->claimable()->exists());
-    }
-
-    /**
-     * The ids of the taps waiting in this session, oldest first.
-     *
-     * @return list<int>
-     */
-    public function pending(): array
-    {
-        return array_values($this->pendingTaps()->modelKeys());
+        return $this->context->bypass(fn (): bool => $this->waiting()->exists());
     }
 
     /** The newest pending tap still waiting for sign-in (not expired), read in bypass(). */
     public function newestWaiting(): ?Tap
     {
-        return $this->context->bypass(fn (): ?Tap => $this->claimable()
+        return $this->context->bypass(fn (): ?Tap => $this->waiting()
             ->where('status', TapStatus::Pending)
             ->where('expires_at', '>', now())
             ->latest('id')
             ->first());
     }
 
-    /** Stops a tap waiting in this session (claimed, expired and told, or not this customer's). */
+    /** Stops a tap waiting in this session (expired and told, or not this customer's). */
     public function forgetPending(int $id): void
     {
         $this->context->bypass(fn (): int => Tap::query()
             ->whereKey($id)
-            ->where('claim_token_hash', $this->tokenHash)
+            ->where('claim_token_hash', $this->claimTokenHash())
             ->update(['claim_token_hash' => null]));
     }
 
@@ -205,21 +175,13 @@ final readonly class TapSession
         return is_int($id) ? $this->context->bypass(fn (): ?Tap => Tap::query()->find($id)) : null;
     }
 
-    /** What a tap stores of the session's claim token: its sha256, never the token. */
-    private static function hashOf(string $token): string
-    {
-        return hash('sha256', $token);
-    }
-
     /**
-     * This session's claimable taps (call inside bypass()).
+     * This session's waiting taps, by its token as it is now (call inside bypass()).
      *
      * @return PlatformBuilder<Tap>
      */
-    private function claimable(): PlatformBuilder
+    private function waiting(): PlatformBuilder
     {
-        return Tap::query()
-            ->where('claim_token_hash', $this->tokenHash)
-            ->whereIn('status', [TapStatus::Pending, TapStatus::Expired]);
+        return Tap::query()->waitingUnder($this->claimTokenHash());
     }
 }
