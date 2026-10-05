@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Taps\ClaimPendingTaps;
 use App\Actions\Taps\DescribeTap;
 use App\Actions\Taps\TakeTap;
+use App\Enums\TapStatus;
 use App\Http\Requests\ReceiveTapRequest;
 use App\Models\Tap;
 use App\Models\User;
@@ -69,8 +70,11 @@ final class TapController extends Controller
         }
 
         // Taps still waiting that could not be applied (reported): reloading tries again.
-        return $session->pending() === []
-            ? to_route('home')
-            : Inertia::render('tap/refused', ['reason' => 'retry']);
+        if ($session->pending() !== []) {
+            return Inertia::render('tap/refused', ['reason' => 'retry']);
+        }
+
+        // Nothing left to claim: a tap the scheduler expired meanwhile still shows its result.
+        return $session->shown()?->status === TapStatus::Expired ? to_route('taps.result') : to_route('home');
     }
 }

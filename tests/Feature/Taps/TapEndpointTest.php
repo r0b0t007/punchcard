@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Taps\ExpirePendingTaps;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
+use App\Support\Taps\TapSession;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Carbon;
@@ -469,6 +471,51 @@ it('says how long ago the last stamp before the tap landed, not a stamp given si
         ->where('stampedMinutesAgo', null));
 });
 
+it('keeps a signed-out tap when another request writes back an older session', function (): void {
+    $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addSeconds(60)])->save());
+    $this->get(route('home'));
+    expect(session('taps.token'))->toBeString();
+    $before = session()->all();
+
+    $this->get(($this->tapUrl)(5));
+    // A request that loaded the session before the tap saves it after: the session payload goes back.
+    session()->flush();
+    session()->put($before);
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+    expect(($this->stamps)())->toBe(3);
+});
+
+it('keeps only a hash of the session\'s claim token on the tap', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+    $token = session('taps.token');
+
+    expect($token)->toBeString()
+        ->and($tap->claim_token_hash)->toBe(hash('sha256', (string) $token))
+        ->and($this->context->bypass(fn (): bool => Tap::query()->where('claim_token_hash', $token)->exists()))->toBeFalse();
+});
+
+it('keeps at most five signed-out taps waiting, the newest, and the rest in the tap log', function (): void {
+    foreach (range(1, 6) as $counter) {
+        $this->get(($this->tapUrl)($counter));
+    }
+    $oldest = $this->context->bypass(fn (): Tap => Tap::query()->oldest('id')->firstOrFail());
+
+    expect(app(TapSession::class)->pending())->toHaveCount(5)->not->toContain($oldest->id)
+        ->and($oldest->claim_token_hash)->toBeNull()
+        ->and($oldest->status)->toBe(TapStatus::Pending);
+});
+
+it('stops claiming a signed-out tap once the session is ended', function (): void {
+    $this->get(($this->tapUrl)(5));
+
+    session()->invalidate();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('home'));
+    expect(($this->stamps)())->toBe(0);
+});
+
 it('records a URL with arrays or nothing in it as malformed, never a server error', function (string $query): void {
     $this->get('/t?'.$query)->assertRedirect(route('taps.result'));
 
@@ -534,6 +581,38 @@ it('tells a customer their signed-out tap expired', function (): void {
 
     expect(($this->statusOf)($tap))->toBe(TapStatus::Expired)
         ->and($this->context->bypass(fn (): bool => CardEnrollment::query()->where('user_id', $this->customer->id)->exists()))->toBeFalse();
+});
+
+it('tells a customer their tap expired when the scheduler expired it before they signed in', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $this->travel(31)->minutes();
+    app(ExpirePendingTaps::class)->handle();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/refused')->where('reason', 'expired'));
+});
+
+it('never claims a tap waiting under another session\'s claim token', function (): void {
+    $this->get(($this->tapUrl)(5));
+    $tap = ($this->lastTap)();
+    session()->put('taps.token', 'another-sessions-token');
+
+    $this->actingAs($this->customer)->get(route('taps.claim'))->assertRedirect(route('home'));
+
+    expect(($this->stamps)())->toBe(0)
+        ->and($this->context->bypass(fn (): ?int => $tap->fresh()?->user_id))->toBeNull();
+});
+
+it('saves every session with a claim token, also one ended during the request', function (): void {
+    Route::middleware('web')->get('/_test/end-session', function (): string {
+        session()->invalidate();
+
+        return 'ended';
+    });
+
+    $this->get('/_test/end-session')->assertOk();
+
+    expect(session('taps.token'))->toBeString();
 });
 
 it('works in Arabic, right to left', function (): void {

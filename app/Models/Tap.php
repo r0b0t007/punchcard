@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $card_stamps
  * @property int|null $counter
  * @property int|null $user_id
+ * @property string|null $claim_token_hash
  * @property int $qty
  * @property TapStatus $status
  * @property TapRejection|null $rejection
