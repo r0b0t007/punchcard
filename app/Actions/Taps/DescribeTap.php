@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Actions\Taps;
 
 use App\Enums\CardMode;
+use App\Enums\StampSource;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
+use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Reward;
+use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Support\Tenancy\TenantContext;
 
@@ -21,8 +24,9 @@ use App\Support\Tenancy\TenantContext;
  *   (refused at once when the café has no active card to give);
  * - tap/stamped (C2): the card as that stamp left it (the tap keeps the
  *   count, so a later visit doesn't mix it with newer stamps), the stamps
- *   given and any reward unlocked;
+ *   given, any reward unlocked and the stamp's time in the location's time;
  * - tap/cooldown: the card the tap was refused on, as the refusal found it,
+ *   how many minutes before the tap the last stamp landed,
  *   and when the next stamp is possible (day and time) in the location's
  *   time, or now once passed;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
@@ -57,6 +61,7 @@ final readonly class DescribeTap
                     'card' => $this->card($tap, $tap->card_stamps, completed: $rewards !== []),
                     'given' => $tap->qty,
                     'rewards' => $rewards,
+                    'stampedAt' => $tap->created_at?->setTimezone($this->timezone($tap))->format('H:i'),
                 ]];
             }
 
@@ -64,6 +69,7 @@ final readonly class DescribeTap
                 return ['component' => 'tap/cooldown', 'props' => [
                     'card' => $this->card($tap, $tap->card_stamps),
                     'nextStamp' => $this->nextStamp($tap),
+                    'stampedMinutesAgo' => $this->stampedMinutesAgo($tap),
                 ]];
             }
 
@@ -92,6 +98,7 @@ final readonly class DescribeTap
 
         return [
             'businessName' => $business->name,
+            'locationName' => Location::query()->whereKey($tap->location_id)->value('name'),
             'cardName' => $card->name,
             'stampsRequired' => $card->stamps_required,
             'stampsCollected' => $completed && $card->mode === CardMode::Cyclic ? $card->stamps_required : ($stamps ?? 0),
@@ -111,7 +118,7 @@ final readonly class DescribeTap
      */
     private function nextStamp(Tap $tap): ?array
     {
-        $timezone = Location::query()->whereKey($tap->location_id)->value('timezone') ?? config('app.timezone');
+        $timezone = $this->timezone($tap);
         $at = $tap->available_at?->setTimezone($timezone);
 
         if ($at === null) {
@@ -130,6 +137,37 @@ final readonly class DescribeTap
             'date' => $at->format('Y-m-d'),
             'time' => $at->format('H:i'),
         ];
+    }
+
+    /**
+     * How long before the refused tap the customer's last stamp on the card
+     * landed, in whole minutes: the newest stamp proving presence at or before
+     * the tap, so a late-applied tap or a later visit doesn't change it. Null
+     * when the refusal came from a stamp after the tap.
+     */
+    private function stampedMinutesAgo(Tap $tap): ?int
+    {
+        if ($tap->user_id === null || $tap->card_id === null || $tap->created_at === null) {
+            return null;
+        }
+
+        $enrollment = CardEnrollment::query()->where('card_id', $tap->card_id)->where('user_id', $tap->user_id)->value('id');
+        $last = $enrollment === null ? null : StampEvent::query()
+            ->where('enrollment_id', $enrollment)
+            ->whereIn('source', StampSource::presenceValues())
+            ->where('created_at', '<=', $tap->created_at)
+            ->orderByDesc('created_at')
+            ->first()?->created_at;
+
+        return $last === null ? null : (int) $last->diffInMinutes($tap->created_at);
+    }
+
+    /** The tap's location's timezone, the one its times are shown in. */
+    private function timezone(Tap $tap): string
+    {
+        $timezone = Location::query()->whereKey($tap->location_id)->value('timezone');
+
+        return is_string($timezone) ? $timezone : (string) config('app.timezone');
     }
 
     private function reason(Tap $tap): string

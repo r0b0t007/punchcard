@@ -25,6 +25,12 @@ export type LoyaltyCardProps = {
     /** Text colour stored by the server for brandColor; ignored when brandColor is missing or invalid. */
     brandForeground?: string | null;
     rewardText: string;
+    /** Replaces the progress line, e.g. "Sign in to keep it" on C1. */
+    progressLabel?: string;
+    /** Shows the next empty slot as the stamp waiting for sign-in (C1). */
+    ghostNext?: boolean;
+    /** The newest stamps that just landed, animated in (C2). */
+    landing?: number;
     className?: string;
 };
 
@@ -43,6 +49,9 @@ export default function LoyaltyCard({
     brandColor,
     brandForeground,
     rewardText,
+    progressLabel,
+    ghostNext = false,
+    landing = 0,
     className,
 }: LoyaltyCardProps) {
     const { t } = useTranslation();
@@ -114,17 +123,27 @@ export default function LoyaltyCard({
                 aria-hidden="true"
                 className={cn('grid gap-2', gridColumnsClass(slots))}
             >
-                {Array.from({ length: slots }, (_, index) => (
-                    <li key={index} className="grid">
-                        <Stamp
-                            filled={index < filled}
-                            index={index}
-                            stampStyle={stampStyle}
-                            logoUrl={logo}
-                            onLogoError={() => setLogoFailed(true)}
-                        />
-                    </li>
-                ))}
+                {Array.from({ length: slots }, (_, index) => {
+                    const isLanding =
+                        index < filled && index >= filled - landing;
+
+                    return (
+                        <li key={index} className="relative grid">
+                            {isLanding && (
+                                <span className="pointer-events-none absolute inset-0 animate-stamp-splash rounded-full border-2 border-card-stamp motion-reduce:hidden" />
+                            )}
+                            <Stamp
+                                filled={index < filled}
+                                index={index}
+                                stampStyle={stampStyle}
+                                logoUrl={logo}
+                                onLogoError={() => setLogoFailed(true)}
+                                ghost={ghostNext && index === filled}
+                                landing={isLanding}
+                            />
+                        </li>
+                    );
+                })}
             </ol>
 
             {/* Two lines so neither the reward nor the progress is clipped on a 320px phone. */}
@@ -134,12 +153,13 @@ export default function LoyaltyCard({
                     <span className="min-w-0 truncate">{rewardText}</span>
                 </p>
                 <p>
-                    {remaining === 0
-                        ? t('Reward ready')
-                        : t(
-                              ':count more stamp to your reward|:count more stamps to your reward',
-                              { count: remaining },
-                          )}
+                    {progressLabel ??
+                        (remaining === 0
+                            ? t('Reward ready')
+                            : t(
+                                  ':count more stamp to your reward|:count more stamps to your reward',
+                                  { count: remaining },
+                              ))}
                 </p>
             </footer>
         </div>

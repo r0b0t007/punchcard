@@ -60,6 +60,8 @@ afterEach(function (): void {
 });
 
 it('stamps a signed-in customer at once and shows their card, never cached', function (): void {
+    // Asia/Dubai: a fixed UTC+4 in every tz database.
+    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save());
     $this->actingAs($this->customer)->get(($this->tapUrl)(5))
         ->assertRedirect(route('taps.result'))
         ->assertHeader('Cache-Control', 'no-store, private');
@@ -71,7 +73,9 @@ it('stamps a signed-in customer at once and shows their card, never cached', fun
             ->component('tap/stamped')
             ->where('given', 1)
             ->where('rewards', [])
+            ->where('stampedAt', '14:00')
             ->where('card.businessName', 'A1')
+            ->where('card.locationName', 'A1 site')
             ->where('card.stampsCollected', 1)
             ->where('card.stampsRequired', 10));
 });
@@ -190,6 +194,7 @@ it('shows when the next stamp is possible, in the location\'s time', function (s
         ->assertInertia(fn (Assert $page): Assert => $page
             ->component('tap/cooldown')
             ->where('nextStamp', $nextStamp)
+            ->where('stampedMinutesAgo', 5)
             ->where('card.stampsCollected', 1));
 })->with([
     'later today' => ['2026-10-05 10:00:00', 20, ['day' => 'today', 'date' => '2026-10-05', 'time' => '14:20']],
@@ -434,6 +439,20 @@ it('trusts whatever proxy connects when TRUSTED_PROXIES is "*"', function (): vo
     expect($config['trusted_proxies'])->toBe('*')
         ->and(($this->lastTap)()->ip)->toBe('203.0.113.50');
     TrustProxies::flushState();
+});
+
+it('says how long ago the last stamp before the tap landed, not a stamp given since', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $this->get(($this->tapUrl)(5));
+    $this->travel(3)->minutes();
+    $this->tenants->stamp($enrollment, $this->tenants->a1);
+    $this->travel(7)->minutes();
+
+    $this->actingAs($this->customer)->get(route('taps.claim'));
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
+        ->component('tap/cooldown')
+        ->where('stampedMinutesAgo', null));
 });
 
 it('records a URL with arrays or nothing in it as malformed, never a server error', function (string $query): void {

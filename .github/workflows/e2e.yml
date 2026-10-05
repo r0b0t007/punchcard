@@ -15,6 +15,11 @@ jobs:
   playwright:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The tap flow test (tests/e2e/tap-flow.spec.ts) writes tap URLs with punchcard:fake-tap,
+    # which runs in local only, from the published NXP AN10922 test vector key (not a real key).
+    env:
+      APP_ENV: local
+      NFC_SUN_MASTER_KEY: 00112233445566778899AABBCCDDEEFF # gitleaks:allow
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,6 +47,7 @@ jobs:
           touch database/database.sqlite
           php artisan key:generate
           php artisan migrate --force
+          php artisan db:seed --no-interaction
           npm run build
 
       - name: Install browsers

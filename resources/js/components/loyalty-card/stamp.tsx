@@ -19,6 +19,9 @@ const ICONS = { check: Check, heart: Heart, star: Star };
  * One slot of the stamp grid. Empty slots are dashed outlines; filled ones are
  * ink-stamp marks in the card's stamp colour. Icon and logo stamps sit slightly
  * askew, per position; round dots and rings would not show a rotation.
+ *
+ * - ghost: the stamp waiting for sign-in (C1), a faint mark in a dashed ring.
+ * - landing: a stamp just given (C2), pressed onto the card.
  */
 export default function Stamp({
     filled,
@@ -26,20 +29,35 @@ export default function Stamp({
     stampStyle,
     logoUrl,
     onLogoError,
+    ghost = false,
+    landing = false,
 }: {
     filled: boolean;
     index: number;
     stampStyle: StampStyle;
     logoUrl?: string | null;
     onLogoError?: () => void;
+    ghost?: boolean;
+    landing?: boolean;
 }) {
+    if (!filled && ghost) {
+        return (
+            <span className="grid aspect-square place-items-center rounded-full border-2 border-dashed border-card-stamp bg-card-stamp/15 text-card-stamp">
+                <Star className="size-2/5 opacity-60" fill="currentColor" />
+            </span>
+        );
+    }
+
     if (!filled) {
         return (
             <span className="aspect-square rounded-full border-2 border-dashed border-card-brand-foreground/80" />
         );
     }
 
-    const mark = 'grid aspect-square place-items-center rounded-full';
+    const mark = cn(
+        'grid aspect-square place-items-center rounded-full',
+        landing && 'animate-stamp-land motion-reduce:animate-none',
+    );
     const askew = cn(mark, rotationClass(index));
 
     if (stampStyle === 'ring') {
