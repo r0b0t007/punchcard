@@ -216,6 +216,19 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * A customer's own rewards: on their own enrollments (CHW-26). Customers
+     * have no tenant; this is how their reward screens see rewards, in
+     * bypass().
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function ownedBy(Builder $query, User $user): void
+    {
+        $query->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id));
+    }
+
+    /**
      * Rewards whose redeem window covers a moment, as isRedeemWindowOpenAt()
      * decides it; keep the two in step.
      *

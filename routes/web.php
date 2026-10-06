@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\RewardController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,16 @@ Route::middleware(NeverCache::class)->group(function (): void {
     Route::get('t/claim', [TapController::class, 'claim'])->middleware('auth')->block(10, 10)->name('taps.claim');
     Route::get('t/result', [TapController::class, 'show'])->block(10, 10)->name('taps.result');
     Route::inertia('t/busy', 'tap/refused', ['reason' => 'busy'])->name('taps.busy');
+});
+
+// The customer's rewards and redeeming them (CHW-26). Not "verified": an unverified customer sees
+// their rewards and is asked to verify before redeeming (OpenRedeemWindow). Never cached. The redeem
+// screen polls while the tap lands in the same session (an Android PWA shares the browser's
+// cookies): block() queues them like the /t requests, so a poll never writes back a stale session.
+Route::middleware(['auth', NeverCache::class])->group(function (): void {
+    Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
+    Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:90,1')->block(10, 10)->name('rewards.redeem.show');
+    Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:30,1')->block(10, 10)->name('rewards.redeem');
 });
 
 require __DIR__.'/settings.php';

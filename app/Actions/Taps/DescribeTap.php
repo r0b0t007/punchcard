@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
+use App\Actions\Rewards\DescribeCustomerReward;
 use App\Enums\CardMode;
+use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -15,8 +17,8 @@ use App\Models\LoyaltyCard;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\Tap;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,9 +29,11 @@ use Illuminate\Support\Carbon;
  * - tap/stamped (C2): the card as that stamp left it (the tap keeps the
  *   count, so a later visit doesn't mix it with newer stamps) and as it was
  *   before (the stamps that landed animate), the stamps given, any reward
- *   unlocked and when the stamp was given, in the location's time;
+ *   unlocked (C3: still to redeem or not) and when the stamp was given, in
+ *   the location's time;
  * - tap/redeemed: the reward the tap redeemed instead of stamping (CHW-26),
- *   where and when, in the location's time, for staff to glance at;
+ *   where and when, in the location's time, and how long it still shows
+ *   live, for staff to glance at;
  * - tap/cooldown: the card the tap was refused on, as the refusal found it,
  *   how many minutes ago (from now) the stamp that caused the cooldown
  *   landed, and when the next stamp is possible (day and time) in the
@@ -65,7 +69,9 @@ final readonly class DescribeTap
             }
 
             if ($tap->status === TapStatus::Stamped) {
-                $rewards = Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->pluck('reward_text')->all();
+                $rewards = Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->get(['id', 'reward_text', 'status'])
+                    ->map(fn (Reward $reward): array => ['id' => $reward->id, 'text' => $reward->reward_text, 'available' => $reward->status === RewardStatus::Available])
+                    ->all();
                 $completed = $rewards !== [] && $card?->mode === CardMode::Cyclic;
 
                 return ['component' => 'tap/stamped', 'props' => [
@@ -73,7 +79,7 @@ final readonly class DescribeTap
                     'stampsBefore' => $this->stampsBefore($tap, $card, count($rewards)),
                     'given' => $tap->qty,
                     'rewards' => $rewards,
-                    'stampedAt' => $tap->created_at === null ? null : $this->moment($tap->created_at, $timezone),
+                    'stampedAt' => $tap->created_at === null ? null : LocalMoment::of($tap->created_at, $timezone),
                 ]];
             }
 
@@ -83,7 +89,9 @@ final readonly class DescribeTap
                 return ['component' => 'tap/redeemed', 'props' => [
                     'card' => $this->card($tap, $card, $location, $tap->card_stamps),
                     'rewardText' => $reward?->reward_text,
-                    'redeemedAt' => $reward?->redeemed_at === null ? null : $this->moment($reward->redeemed_at, $timezone),
+                    'redeemedAt' => $reward?->redeemed_at === null ? null : LocalMoment::of($reward->redeemed_at, $timezone),
+                    // Live on the first look only (fresh, TapController), and only so long after the redemption.
+                    'liveSeconds' => $reward instanceof Reward ? DescribeCustomerReward::liveSeconds($reward) : 0,
                 ]];
             }
 
@@ -135,23 +143,6 @@ final readonly class DescribeTap
         $carried = $card?->mode === CardMode::Cyclic ? $card->stamps_required * $rewards : 0;
 
         return max(0, (int) $tap->card_stamps + $carried - $tap->qty);
-    }
-
-    /**
-     * A moment in the location's time: today or another day (the result page
-     * can be opened again later), the date and the time.
-     *
-     * @return array{day: 'today'|'other', date: string, time: string}
-     */
-    private function moment(CarbonInterface $at, string $timezone): array
-    {
-        $local = $at->copy()->setTimezone($timezone);
-
-        return [
-            'day' => $local->isSameDay(now($timezone)) ? 'today' : 'other',
-            'date' => $local->format('Y-m-d'),
-            'time' => $local->format('H:i'),
-        ];
     }
 
     /**

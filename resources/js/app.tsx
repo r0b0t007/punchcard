@@ -17,7 +17,9 @@ void createInertiaApp({
         switch (true) {
             case name === 'welcome' ||
                 name.startsWith('dev/') ||
-                name.startsWith('tap/'):
+                name.startsWith('tap/') ||
+                // The customer's reward screens: full screen, like the tap screens (CHW-26).
+                name.startsWith('rewards/'):
                 return I18nLayout;
             case name.startsWith('auth/'):
                 return [I18nLayout, AuthLayout];

@@ -1,18 +1,24 @@
-import { Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
+import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { momentLabel } from '@/lib/local-moment';
+import type { LocalMoment } from '@/lib/local-moment';
+import { index as myRewards, redeem } from '@/routes/rewards';
 
-/** When the stamp was given, in the location's time (DescribeTap). */
-type Moment = {
-    day: 'today' | 'other';
-    /** Y-m-d */
-    date: string;
-    /** H:i */
-    time: string;
+/** A reward this stamp unlocked, and whether it is still to redeem (DescribeTap). */
+type UnlockedReward = {
+    id: number;
+    text: string;
+    available: boolean;
 };
 
-/** C2: the stamp landed; a reward it unlocked is announced in place (CHW-25). */
+/**
+ * C2: the stamp landed (CHW-25). C3 when it unlocked a reward (CHW-26): the
+ * card glows complete, the reward is announced, and it can be redeemed now
+ * or kept for later.
+ */
 export default function TapStamped({
     card,
     given,
@@ -23,8 +29,8 @@ export default function TapStamped({
 }: {
     card: TapCard | null;
     given: number;
-    rewards: string[];
-    stampedAt: Moment | null;
+    rewards: UnlockedReward[];
+    stampedAt: LocalMoment | null;
     stampsBefore: number;
     fresh: boolean;
 }) {
@@ -35,39 +41,66 @@ export default function TapStamped({
     const remaining = card
         ? Math.max(card.stampsRequired - card.stampsCollected, 0)
         : 0;
+    const toRedeem = rewards.find((reward) => reward.available);
 
     return (
         <>
-            <Head title={added} />
-            <TapScreen>
+            <Head title={rewards.length > 0 ? t('Reward unlocked') : added} />
+            <TapScreen
+                actions={
+                    toRedeem ? (
+                        <>
+                            <Form {...redeem.form(toRedeem.id)}>
+                                {({ processing }) => (
+                                    <Button
+                                        type="submit"
+                                        size="lg"
+                                        className="w-full"
+                                        disabled={processing}
+                                    >
+                                        {t('Redeem now')}
+                                    </Button>
+                                )}
+                            </Form>
+                            <Button asChild size="lg" variant="outline">
+                                <Link href={myRewards()}>
+                                    {t('Save for later')}
+                                </Link>
+                            </Button>
+                        </>
+                    ) : null
+                }
+            >
                 {stampedAt ? (
                     <p className="flex items-center gap-2 self-start rounded-full bg-accent px-4 py-2 font-medium text-success">
                         <span
                             aria-hidden="true"
                             className="size-2 rounded-full bg-success"
                         />
-                        {stampedAt.day === 'today'
-                            ? t('Stamped at :time', { time: stampedAt.time })
-                            : t('Stamped on :date at :time', {
-                                  // A calendar date: format it in UTC so no timezone shifts the day.
-                                  date: new Intl.DateTimeFormat(locale, {
-                                      weekday: 'long',
-                                      day: 'numeric',
-                                      month: 'long',
-                                      timeZone: 'UTC',
-                                  }).format(
-                                      new Date(`${stampedAt.date}T00:00:00Z`),
-                                  ),
-                                  time: stampedAt.time,
-                              })}
+                        {momentLabel(locale, stampedAt, {
+                            today: (time) => t('Stamped at :time', { time }),
+                            other: (date, time) =>
+                                t('Stamped on :date at :time', { date, time }),
+                        })}
                     </p>
                 ) : null}
                 {card ? (
-                    // The stamp lands on the first look only, not on a reload or a later visit.
-                    <TapLoyaltyCard
-                        card={card}
-                        landingFrom={fresh ? stampsBefore : undefined}
-                    />
+                    <div className="relative">
+                        {rewards.length > 0 ? (
+                            // The completed card glows (C3).
+                            <div
+                                aria-hidden="true"
+                                className="absolute -inset-4 rounded-4xl bg-stamp/30 blur-2xl"
+                            />
+                        ) : null}
+                        <div className="relative">
+                            {/* The stamp lands on the first look only, not on a reload or a later visit. */}
+                            <TapLoyaltyCard
+                                card={card}
+                                landingFrom={fresh ? stampsBefore : undefined}
+                            />
+                        </div>
+                    </div>
                 ) : null}
                 {rewards.length > 0 ? (
                     <div className="flex flex-col gap-3">
@@ -75,13 +108,16 @@ export default function TapStamped({
                             {t('Reward unlocked')}
                         </p>
                         <h1 className="flex flex-col gap-2 font-display text-5xl leading-none font-extrabold">
-                            {rewards.map((reward, index) => (
-                                // Two rewards can share a text (a cyclic card completed twice).
-                                <span key={index}>{reward}</span>
+                            {rewards.map((reward) => (
+                                <span key={reward.id}>{reward.text}</span>
                             ))}
                         </h1>
                         <p className="text-lg text-muted-foreground">
-                            {t('Have it today or keep it for your next visit.')}
+                            {toRedeem
+                                ? t(
+                                      'Have it today or keep it for your next visit.',
+                                  )
+                                : t('This reward was already redeemed.')}
                         </p>
                     </div>
                 ) : card ? (
