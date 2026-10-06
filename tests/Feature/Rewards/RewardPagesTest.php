@@ -107,6 +107,44 @@ it('keeps another customer\'s reward out of reach, even from the café\'s owner'
         ->and(($this->fresh)($own)->redeem_window_until)->not->toBeNull();
 })->with(['another customer', 'the owner']);
 
+it('closes the window on Back, so the next tap stamps', function (): void {
+    $this->actingAs($this->customer)->post(route('rewards.redeem', $this->reward->id));
+
+    $this->delete(route('rewards.redeem.close', $this->reward->id))->assertRedirect(route('rewards.index'));
+    $this->travel(5)->seconds();
+    $this->get(($this->tapUrl)(5));
+
+    expect(($this->fresh)($this->reward)->redeem_window_until)->toBeNull()
+        ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available);
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped'));
+});
+
+it('closes only the customer\'s own window', function (): void {
+    $this->actingAs($this->customer)->post(route('rewards.redeem', $this->reward->id));
+
+    $this->actingAs(User::factory()->create())->delete(route('rewards.redeem.close', $this->reward->id))->assertNotFound();
+
+    expect(($this->fresh)($this->reward)->redeem_window_until)->not->toBeNull();
+});
+
+it('rounds the seconds left down, so the ring never outlasts the window', function (): void {
+    $this->actingAs($this->customer)->post(route('rewards.redeem', $this->reward->id));
+    Carbon::setTestNow('2026-10-05 10:00:00.400');
+
+    $this->get(route('rewards.redeem.show', $this->reward->id))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('reward.secondsLeft', 59));
+});
+
+it('keeps the redeem screen\'s polling off the other routes\' limits', function (): void {
+    $this->actingAs($this->customer);
+
+    foreach (range(1, 35) as $poll) {
+        $this->get(route('rewards.redeem.show', $this->reward->id))->assertOk();
+    }
+
+    $this->post(route('rewards.redeem', $this->reward->id))->assertRedirect(route('rewards.redeem.show', $this->reward->id));
+});
+
 it('never reopens a window on a reward already redeemed', function (): void {
     $this->actingAs($this->customer)->post(route('rewards.redeem', $this->reward->id));
     $this->travel(5)->seconds();
@@ -187,7 +225,7 @@ it('offers the reward a stamp just unlocked, until it is redeemed (C3)', functio
 
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
         ->component('tap/stamped')
-        ->where('rewards', [['id' => $unlocked->id, 'text' => $unlocked->reward_text, 'available' => true]]));
+        ->where('rewards', [['id' => $unlocked->id, 'text' => $unlocked->reward_text, 'status' => 'available']]));
 
     $this->post(route('rewards.redeem', $unlocked->id));
     $this->travel(5)->seconds();
@@ -195,5 +233,5 @@ it('offers the reward a stamp just unlocked, until it is redeemed (C3)', functio
     $stamped = $this->context->bypass(fn (): Tap => Tap::query()->where('status', TapStatus::Stamped)->sole());
 
     expect(($this->fresh)($unlocked)->status)->toBe(RewardStatus::Redeemed)
-        ->and(app(DescribeTap::class)->handle($stamped)['props']['rewards'])->toBe([['id' => $unlocked->id, 'text' => $unlocked->reward_text, 'available' => false]]);
+        ->and(app(DescribeTap::class)->handle($stamped)['props']['rewards'])->toBe([['id' => $unlocked->id, 'text' => $unlocked->reward_text, 'status' => 'redeemed']]);
 });

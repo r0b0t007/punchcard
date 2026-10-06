@@ -7,11 +7,11 @@ import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { index as myRewards, redeem } from '@/routes/rewards';
 
-/** A reward this stamp unlocked, and whether it is still to redeem (DescribeTap). */
+/** A reward this stamp unlocked, and where it stands now (DescribeTap). */
 type UnlockedReward = {
     id: number;
     text: string;
-    available: boolean;
+    status: 'available' | 'redeemed' | 'expired';
 };
 
 /**
@@ -41,7 +41,7 @@ export default function TapStamped({
     const remaining = card
         ? Math.max(card.stampsRequired - card.stampsCollected, 0)
         : 0;
-    const toRedeem = rewards.find((reward) => reward.available);
+    const toRedeem = rewards.find((reward) => reward.status === 'available');
 
     return (
         <>
@@ -117,7 +117,12 @@ export default function TapStamped({
                                 ? t(
                                       'Have it today or keep it for your next visit.',
                                   )
-                                : t('This reward was already redeemed.')}
+                                : rewards.some(
+                                        (reward) =>
+                                            reward.status === 'redeemed',
+                                    )
+                                  ? t('This reward was already redeemed.')
+                                  : t('This reward is no longer available.')}
                         </p>
                     </div>
                 ) : card ? (

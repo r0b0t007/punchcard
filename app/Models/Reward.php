@@ -77,6 +77,9 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /** @var array{0: mixed, 1: mixed}|null The enrollment id and its card, looked up once by fillTenantColumns(). */
     private ?array $enrollmentCard = null;
 
+    /** A redemption shows live for this long after it (liveSecondsLeft). */
+    public const int LIVE_SECONDS = 120;
+
     /** The customer's redeem window (OpenRedeemWindow). */
     private const array WINDOW_COLUMNS = ['redeem_window_opened_at', 'redeem_window_until'];
 
@@ -169,6 +172,20 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     public function constrainToBusiness(Builder $query, int $businessId): void
     {
         $query->where(fn (Builder $visible) => $visible->whereHas('enrollment')->orWhere('redeemed_business_id', $businessId));
+    }
+
+    /**
+     * How long a redemption still shows live, from now: the screen staff hand
+     * the reward over on (tap/redeemed, C4) counts this down, then only says
+     * it was already redeemed. 0 for a reward not redeemed.
+     */
+    public function liveSecondsLeft(): int
+    {
+        if ($this->redeemed_at === null) {
+            return 0;
+        }
+
+        return max(0, self::LIVE_SECONDS - (int) ceil($this->redeemed_at->diffInSeconds(now())));
     }
 
     /**

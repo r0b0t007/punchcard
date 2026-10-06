@@ -35,8 +35,9 @@ Route::middleware(NeverCache::class)->group(function (): void {
 // cookies): block() queues them like the /t requests, so a poll never writes back a stale session.
 Route::middleware(['auth', NeverCache::class])->group(function (): void {
     Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
-    Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:90,1')->block(10, 10)->name('rewards.redeem.show');
-    Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:30,1')->block(10, 10)->name('rewards.redeem');
+    Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:reward-screen')->block(10, 10)->name('rewards.redeem.show');
+    Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem');
+    Route::delete('rewards/{reward}/redeem', [RewardController::class, 'close'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem.close');
 });
 
 require __DIR__.'/settings.php';

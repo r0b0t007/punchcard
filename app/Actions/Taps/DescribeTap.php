@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Actions\Rewards\DescribeCustomerReward;
 use App\Enums\CardMode;
-use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -29,7 +27,8 @@ use Illuminate\Support\Carbon;
  * - tap/stamped (C2): the card as that stamp left it (the tap keeps the
  *   count, so a later visit doesn't mix it with newer stamps) and as it was
  *   before (the stamps that landed animate), the stamps given, any reward
- *   unlocked (C3: still to redeem or not) and when the stamp was given, in
+ *   unlocked (C3: still to redeem, redeemed or expired) and when the stamp
+ *   was given, in
  *   the location's time;
  * - tap/redeemed: the reward the tap redeemed instead of stamping (CHW-26),
  *   where and when, in the location's time, and how long it still shows
@@ -70,7 +69,7 @@ final readonly class DescribeTap
 
             if ($tap->status === TapStatus::Stamped) {
                 $rewards = Reward::query()->where('stamp_event_id', $tap->stamp_event_id)->orderBy('milestone')->get(['id', 'reward_text', 'status'])
-                    ->map(fn (Reward $reward): array => ['id' => $reward->id, 'text' => $reward->reward_text, 'available' => $reward->status === RewardStatus::Available])
+                    ->map(fn (Reward $reward): array => ['id' => $reward->id, 'text' => $reward->reward_text, 'status' => $reward->status->value])
                     ->all();
                 $completed = $rewards !== [] && $card?->mode === CardMode::Cyclic;
 
@@ -91,7 +90,7 @@ final readonly class DescribeTap
                     'rewardText' => $reward?->reward_text,
                     'redeemedAt' => $reward?->redeemed_at === null ? null : LocalMoment::of($reward->redeemed_at, $timezone),
                     // Live on the first look only (fresh, TapController), and only so long after the redemption.
-                    'liveSeconds' => $reward instanceof Reward ? DescribeCustomerReward::liveSeconds($reward) : 0,
+                    'liveSeconds' => $reward?->liveSecondsLeft() ?? 0,
                 ]];
             }
 

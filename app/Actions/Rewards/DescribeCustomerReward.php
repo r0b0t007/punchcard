@@ -18,24 +18,13 @@ use App\Support\Tenancy\TenantContext;
  * in the location's time.
  *
  * A redemption is "live" (the screen staff hand the reward over on) for
- * LIVE_SECONDS after it, and the screen counts that down itself: liveSeconds()
- * is how long is left, never a flag that stays on while a tab stays open.
+ * Reward::LIVE_SECONDS after it, and the screen counts that down itself: how
+ * long is left, never a flag that stays on while a tab stays open. The window's
+ * seconds left are rounded down, so the ring never outlasts the window.
  */
 final readonly class DescribeCustomerReward
 {
-    public const int LIVE_SECONDS = 120;
-
     public function __construct(private TenantContext $context) {}
-
-    /** The seconds a redemption still shows live, from now. */
-    public static function liveSeconds(Reward $reward): int
-    {
-        if ($reward->redeemed_at === null) {
-            return 0;
-        }
-
-        return max(0, self::LIVE_SECONDS - (int) ceil($reward->redeemed_at->diffInSeconds(now())));
-    }
 
     /**
      * @return array{id: int, rewardText: string, businessName: string, brandColor: string|null, status: string, verified: bool, windowSeconds: int, secondsLeft: int, redeemed: array{at: array{day: 'today'|'other', date: string, time: string}, locationName: string|null, liveSeconds: int}|null}
@@ -52,7 +41,7 @@ final readonly class DescribeCustomerReward
                 $redeemed = [
                     'at' => LocalMoment::of($reward->redeemed_at, $location->timezone ?? (string) config('app.timezone')),
                     'locationName' => $location?->name,
-                    'liveSeconds' => self::liveSeconds($reward),
+                    'liveSeconds' => $reward->liveSecondsLeft(),
                 ];
             }
 
@@ -64,7 +53,7 @@ final readonly class DescribeCustomerReward
                 'status' => $reward->status->value,
                 'verified' => $user->hasVerifiedEmail(),
                 'windowSeconds' => OpenRedeemWindow::SECONDS,
-                'secondsLeft' => $until?->isFuture() === true ? (int) ceil(now()->diffInSeconds($until)) : 0,
+                'secondsLeft' => $until?->isFuture() === true ? (int) floor(now()->diffInSeconds($until)) : 0,
                 'redeemed' => $redeemed,
             ];
         });

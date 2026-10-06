@@ -38,7 +38,16 @@ async function signUp(page: Page): Promise<void> {
     await page.locator('[data-test="register-user-button"]').click();
 }
 
-/** The demo customer (DemoSeeder): verified, with a Free mint tea to redeem at Café Hafa, stamper 1's café. */
+/** Gives the demo customer a Free mint tea at Café Hafa, stamper 1's café: each run redeems one. */
+function giveDemoReward(): void {
+    execFileSync(
+        'php',
+        ['artisan', 'punchcard:fake-reward', 'customer@demo.test', '1'],
+        { encoding: 'utf8' },
+    );
+}
+
+/** The demo customer (DemoSeeder): verified, a member at Café Hafa. */
 async function signInAsDemoCustomer(page: Page): Promise<void> {
     await page.goto('/login');
     await page.locator('#email').fill('customer@demo.test');
@@ -47,18 +56,21 @@ async function signInAsDemoCustomer(page: Page): Promise<void> {
     await page.waitForURL((url) => !url.pathname.startsWith('/login'));
 }
 
-/** My rewards, then Redeem on the Café Hafa reward: the redeem screen (C4). */
+/** My rewards, then Redeem on the newest Café Hafa reward: the redeem screen (C4). */
 async function openRedeemScreen(page: Page): Promise<void> {
     await page.goto('/rewards');
     await page
         .getByRole('listitem')
         .filter({ hasText: 'Café Hafa' })
+        .first()
         .getByRole('button')
         .click();
     await expect(page).toHaveURL(/\/rewards\/\d+\/redeem$/);
 }
 
 test.describe('redeeming (CHW-26)', () => {
+    test.beforeAll(() => giveDemoReward());
+
     test.describe('in Arabic', () => {
         test.use({ locale: 'ar-MA' });
 
@@ -105,13 +117,45 @@ test.describe('redeeming (CHW-26)', () => {
 
         test('Redeem, then a tap on the stamper redeems the reward', async ({
             page,
-        }, testInfo) => {
+            context,
+        }) => {
             await signInAsDemoCustomer(page);
+            await page.goto('/rewards');
+            const saved = await page
+                .getByRole('listitem')
+                .filter({ hasText: 'Café Hafa' })
+                .count();
             await openRedeemScreen(page);
             await expect(
                 page.getByRole('heading', { name: 'Tap the stamper now' }),
             ).toBeVisible();
             const redeemScreen = page.url();
+
+            // The tap opens in another tab: the waiting redeem screen sees it land, live.
+            const redeemed = await context.newPage();
+            await redeemed.goto(freshTap());
+            await expect(
+                page.getByText('Show this screen to staff'),
+            ).toBeVisible({ timeout: 10_000 });
+            await redeemed.close();
+
+            await page.goto(redeemScreen);
+            await expect(page.getByText('Already redeemed')).toBeVisible();
+            await page.goto('/rewards');
+            await expect(
+                page.getByRole('listitem').filter({ hasText: 'Café Hafa' }),
+            ).toHaveCount(saved - 1);
+        });
+
+        test('the tap result is the screen to show, live on its first look only', async ({
+            page,
+        }, testInfo) => {
+            giveDemoReward();
+            await signInAsDemoCustomer(page);
+            await openRedeemScreen(page);
+            await expect(
+                page.getByRole('heading', { name: 'Tap the stamper now' }),
+            ).toBeVisible();
 
             await page.goto(freshTap());
 
@@ -133,16 +177,6 @@ test.describe('redeeming (CHW-26)', () => {
             // A reload is no longer the screen to hand anything over on.
             await page.reload();
             await expect(page.getByText('Already redeemed')).toBeVisible();
-
-            // The redeem screen saw it too, and My rewards no longer offers it.
-            await page.goto(redeemScreen);
-            await expect(
-                page.getByRole('heading', { name: 'Free mint tea' }),
-            ).toBeVisible();
-            await page.goto('/rewards');
-            await expect(
-                page.getByRole('listitem').filter({ hasText: 'Café Hafa' }),
-            ).toHaveCount(0);
         });
     });
 });

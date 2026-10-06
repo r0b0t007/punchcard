@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Rewards\CloseRedeemWindow;
 use App\Actions\Rewards\DescribeCustomerReward;
 use App\Actions\Rewards\ListCustomerRewards;
 use App\Actions\Rewards\OpenRedeemWindow;
@@ -25,6 +26,8 @@ use Inertia\Response;
  *   the redeem screen says why.
  * - GET /rewards/{reward}/redeem: the redeem screen (C4): tap the stamper
  *   while the window is open, then the redemption it saw.
+ * - DELETE /rewards/{reward}/redeem: Back from the redeem screen closes the
+ *   window (CloseRedeemWindow), so the next tap stamps again.
  */
 final class RewardController extends Controller
 {
@@ -48,6 +51,16 @@ final class RewardController extends Controller
         }
 
         return to_route('rewards.redeem.show', $request->reward()->id);
+    }
+
+    public function close(CustomerRewardRequest $request, CloseRedeemWindow $closeRedeemWindow): RedirectResponse
+    {
+        $user = $request->user();
+        assert($user instanceof User);
+
+        $closeRedeemWindow->handle($request->reward(), $user);
+
+        return to_route('rewards.index');
     }
 
     public function show(CustomerRewardRequest $request, DescribeCustomerReward $describeCustomerReward): Response

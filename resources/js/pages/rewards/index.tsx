@@ -1,10 +1,8 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import type { CSSProperties } from 'react';
-import { monogramOf } from '@/components/loyalty-card/monogram';
+import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import TapScreen from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { cardInks } from '@/lib/color';
 import { home } from '@/routes';
 import { redeem } from '@/routes/rewards';
 
@@ -56,26 +54,16 @@ export default function MyRewards({ rewards }: { rewards: SavedReward[] }) {
                 {rewards.length > 0 ? (
                     <ul className="flex flex-col gap-3">
                         {rewards.map((reward) => {
-                            const { brand, foreground } = cardInks(
-                                reward.brandColor,
-                            );
-                            const brandVariables = {
-                                '--card-brand': brand,
-                                '--card-brand-foreground': foreground,
-                            } as CSSProperties;
-
                             return (
                                 <li
                                     key={reward.id}
                                     className="flex items-center gap-3.5 rounded-card border border-border bg-card p-4"
                                 >
-                                    <span
-                                        aria-hidden="true"
-                                        style={brandVariables}
-                                        className="grid size-11 shrink-0 place-items-center rounded-full bg-card-brand font-display text-xl font-bold text-card-brand-foreground"
-                                    >
-                                        {monogramOf(reward.businessName)}
-                                    </span>
+                                    <BrandMonogram
+                                        name={reward.businessName}
+                                        brandColor={reward.brandColor}
+                                        className="size-11 text-xl"
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-lg font-semibold">
                                             {reward.rewardText}

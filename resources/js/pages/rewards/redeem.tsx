@@ -1,16 +1,15 @@
-import { Form, Head, Link, usePoll } from '@inertiajs/react';
+import { Form, Head, Link, router, usePoll } from '@inertiajs/react';
 import { ChevronLeft, Mail } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CountdownRing from '@/components/rewards/countdown-ring';
 import RedeemedReward from '@/components/rewards/redeemed-reward';
-import { monogramOf } from '@/components/loyalty-card/monogram';
+import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import TapScreen from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { cardInks } from '@/lib/color';
 import type { LocalMoment } from '@/lib/local-moment';
 import { index as myRewards, redeem } from '@/routes/rewards';
+import { close } from '@/routes/rewards/redeem';
 import { send } from '@/routes/verification';
 
 /** One of the customer's rewards on the redeem screen (DescribeCustomerReward). */
@@ -52,7 +51,11 @@ export default function RewardRedeem({
     const timedOut = reward.secondsLeft === 0 || ringDone;
     const waiting =
         reward.status === 'available' && reward.verified && !timedOut;
-    const onTimeUp = useCallback(() => setRingDone(true), []);
+    const onTimeUp = useCallback(() => {
+        setRingDone(true);
+        // A tap in the last seconds lands between two polls: look once more.
+        router.reload({ only: ['reward'] });
+    }, []);
     const { start, stop } = usePoll(
         2000,
         { only: ['reward'] },
@@ -100,14 +103,21 @@ export default function RewardRedeem({
                 }
             >
                 <div className="-ms-3 -mt-4">
-                    <Button asChild variant="ghost" size="icon">
-                        <Link href={myRewards()} aria-label={t('Back')}>
+                    {/* Back closes the window: the next tap stamps again. */}
+                    <Form {...close.form(reward.id)}>
+                        <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t('Back')}
+                        >
                             <ChevronLeft className="size-6 rtl:-scale-x-100" />
-                        </Link>
-                    </Button>
+                        </Button>
+                    </Form>
                 </div>
                 {reward.status === 'redeemed' && reward.redeemed ? (
                     <RedeemedReward
+                        key={sawRedemption ? 'seen' : 'loaded'}
                         rewardText={reward.rewardText}
                         place={[
                             reward.businessName,
@@ -152,21 +162,13 @@ export default function RewardRedeem({
 
 /** The reward and its café, with the café's monogram in its brand colour (ADR 0007). */
 function RewardChip({ reward }: { reward: CustomerReward }) {
-    const { brand, foreground } = cardInks(reward.brandColor);
-    const brandVariables = {
-        '--card-brand': brand,
-        '--card-brand-foreground': foreground,
-    } as CSSProperties;
-
     return (
         <p className="flex items-center gap-2.5 rounded-full bg-accent py-1.5 ps-1.5 pe-4">
-            <span
-                aria-hidden="true"
-                style={brandVariables}
-                className="grid size-7 place-items-center rounded-full bg-card-brand font-display font-bold text-card-brand-foreground"
-            >
-                {monogramOf(reward.businessName)}
-            </span>
+            <BrandMonogram
+                name={reward.businessName}
+                brandColor={reward.brandColor}
+                className="size-7"
+            />
             <span className="font-medium">
                 {reward.rewardText} · {reward.businessName}
             </span>
