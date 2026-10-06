@@ -88,11 +88,11 @@ async function openRedeemScreen(page: Page): Promise<void> {
 test.describe('redeeming (CHW-26)', () => {
     test.use({ storageState: demoCustomerSession });
 
-    test.beforeAll(async ({ browser }, testInfo) => {
+    test.beforeAll(async ({ browser }) => {
         giveDemoReward();
-        // A context made here gets none of the project's options: the base URL is passed on.
+        // Signed out: the group's storageState is the file this context writes.
         const context = await browser.newContext({
-            baseURL: testInfo.project.use.baseURL,
+            storageState: { cookies: [], origins: [] },
         });
         await signInAsDemoCustomer(await context.newPage());
         await context.storageState({ path: demoCustomerSession });
