@@ -52,6 +52,9 @@ enum TapRejection: string
     /** Nobody signed in to claim the tap before it expired. */
     case Expired = 'expired';
 
+    /** A redeem window was open, but another tap redeemed the reward first: this one hands over nothing. */
+    case AlreadyRedeemed = 'already_redeemed';
+
     /** The tap equivalent of an AddStamps refusal. */
     public static function fromStamp(StampRejection $rejection): self
     {

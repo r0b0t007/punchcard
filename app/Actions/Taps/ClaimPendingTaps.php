@@ -19,8 +19,10 @@ use Throwable;
  * reported and stays pending for the next try, without holding back the
  * newer ones.
  *
- * Then sets the session's result once: a stamp (the newest applied, or one
- * already shown to this customer, so a retry does not hide it), else the tap
+ * Then sets the session's result once: a redemption, else a stamp (the
+ * newest applied, or one already shown to this customer, so a retry does not
+ * hide it; staff must see the redemption, not a stamp tapped after it), else
+ * the tap
  * just received ($received, when it was not pending, unless it only replays a
  * URL: then the pending tap it retried tells the real outcome), else the newest tap
  * applied. Returns it, or null when there was nothing to claim or show.
@@ -32,7 +34,7 @@ final readonly class ClaimPendingTaps
     public function handle(TapSession $session, User $user, ?Tap $received = null): ?Tap
     {
         $shown = $session->shown();
-        $stamped = $shown instanceof Tap && $shown->status === TapStatus::Stamped && $shown->user_id === $user->id ? $shown : null;
+        $best = $shown instanceof Tap && $this->gave($shown) > 0 && $shown->user_id === $user->id ? $shown : null;
         $newest = null;
 
         foreach ($session->pendingTaps() as $waiting) {
@@ -54,17 +56,28 @@ final readonly class ClaimPendingTaps
 
             if ($tap instanceof Tap) {
                 $newest = $tap;
-                $stamped = $tap->status === TapStatus::Stamped ? $tap : $stamped;
+                $gave = $this->gave($tap);
+                $best = $gave > 0 && $gave >= $this->gave($best) ? $tap : $best;
             }
         }
 
         $replayed = $received instanceof Tap && $received->rejection === TapRejection::Replay;
-        $result = $newest instanceof Tap ? ($stamped ?? ($replayed ? $newest : $received) ?? $newest) : $received;
+        $result = $newest instanceof Tap ? ($best ?? ($replayed ? $newest : $received) ?? $newest) : $received;
 
         if ($result instanceof Tap) {
             $session->show($result);
         }
 
         return $result;
+    }
+
+    /** What the tap gave, ranked for the result: a redeemed reward (CHW-26), a stamp, or nothing. */
+    private function gave(?Tap $tap): int
+    {
+        return match ($tap?->status) {
+            TapStatus::Redeemed => 2,
+            TapStatus::Stamped => 1,
+            default => 0,
+        };
     }
 }

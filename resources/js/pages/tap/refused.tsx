@@ -10,6 +10,7 @@ type Reason =
     | 'limit'
     | 'unavailable'
     | 'card'
+    | 'redeemed'
     | 'invalid'
     | 'busy'
     | 'retry';
@@ -25,6 +26,7 @@ export default function TapRefused({ reason }: { reason: Reason }) {
             'This stamper is not available right now. Ask the staff.',
         ),
         card: t("This café's card is not available right now."),
+        redeemed: t('This reward was already redeemed.'),
         invalid: t('This tap could not be read. Touch the stamper again.'),
         busy: t(
             'Too many taps right now. Wait a moment, then touch the stamper again.',

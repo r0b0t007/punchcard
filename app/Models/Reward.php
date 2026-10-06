@@ -14,8 +14,10 @@ use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\VisibleToBusiness;
+use Carbon\CarbonInterface;
 use Database\Factories\RewardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -50,6 +52,8 @@ use LogicException;
  * @property int|null $redeemed_by
  * @property int|null $redeemed_business_id
  * @property int|null $redeemed_location_id
+ * @property Carbon|null $redeem_window_opened_at when the customer's redeem window opened (OpenRedeemWindow)
+ * @property Carbon|null $redeem_window_until when it closes
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -73,11 +77,18 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /** @var array{0: mixed, 1: mixed}|null The enrollment id and its card, looked up once by fillTenantColumns(). */
     private ?array $enrollmentCard = null;
 
+    /** The customer's redeem window (OpenRedeemWindow). */
+    private const array WINDOW_COLUMNS = ['redeem_window_opened_at', 'redeem_window_until'];
+
     /** Redemption fields a new reward cannot have outside bypass(). */
     private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id'];
 
-    /** A reward's outcome: only the redeem Action (after proof of presence) and the expiry job change it, in bypass(). */
-    private const array OUTCOME_COLUMNS = ['status', 'expires_at', ...self::REDEMPTION_COLUMNS];
+    /**
+     * A reward's outcome, and its redeem window: only the redeem Actions (the
+     * window, then the redemption after proof of presence) and the expiry job
+     * change them, in bypass().
+     */
+    private const array OUTCOME_COLUMNS = ['status', 'expires_at', ...self::WINDOW_COLUMNS, ...self::REDEMPTION_COLUMNS];
 
     /**
      * Seeing a reward does not let a business redeem, expire or re-credit it:
@@ -122,7 +133,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
 
         // TenantBuilder passes stored values: enum casts are their strings by now.
         $status = RewardStatus::tryFrom((string) ($values['status'] ?? RewardStatus::Available->value));
-        $redeemed = array_filter(array_intersect_key($values, array_flip(self::REDEMPTION_COLUMNS)), fn (mixed $value): bool => $value !== null);
+        $redeemed = array_filter(array_intersect_key($values, array_flip([...self::REDEMPTION_COLUMNS, ...self::WINDOW_COLUMNS])), fn (mixed $value): bool => $value !== null);
 
         if ($status !== RewardStatus::Available || $redeemed !== []) {
             throw new LogicException('A reward is unlocked available; redeeming it is an update by the redeem Action.');
@@ -161,6 +172,18 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * Whether the redeem window covers a moment (a tap's time): opened before
+     * it and not yet closed at it. Strictly after the opening second: times
+     * keep whole seconds, so a tap in that second may have come just before
+     * "Redeem now", and never counts. Keep in step with redeemWindowOpenAt().
+     */
+    public function isRedeemWindowOpenAt(CarbonInterface $at): bool
+    {
+        return $this->redeem_window_opened_at !== null && $this->redeem_window_until !== null
+            && $at->gt($this->redeem_window_opened_at) && $at->lte($this->redeem_window_until);
+    }
+
+    /**
      * @return BelongsTo<CardEnrollment, $this>
      */
     public function enrollment(): BelongsTo
@@ -193,6 +216,19 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * Rewards whose redeem window covers a moment, as isRedeemWindowOpenAt()
+     * decides it; keep the two in step.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function redeemWindowOpenAt(Builder $query, CarbonInterface $at): void
+    {
+        $query->where('redeem_window_opened_at', '<', $at->copy()->startOfSecond())
+            ->where('redeem_window_until', '>=', $at);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -206,6 +242,8 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
             'unlocked_at' => 'datetime',
             'expires_at' => 'datetime',
             'redeemed_at' => 'datetime',
+            'redeem_window_opened_at' => 'datetime',
+            'redeem_window_until' => 'datetime',
         ];
     }
 

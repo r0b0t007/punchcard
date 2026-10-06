@@ -13,6 +13,9 @@ enum TapStatus: string
     /** It gave its stamp. */
     case Stamped = 'stamped';
 
+    /** It redeemed a reward instead of stamping: the customer had opened a redeem window (CHW-26). */
+    case Redeemed = 'redeemed';
+
     /** Refused when received or when applied, with a TapRejection. */
     case Rejected = 'rejected';
 
