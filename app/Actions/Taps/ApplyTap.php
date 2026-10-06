@@ -141,7 +141,8 @@ final readonly class ApplyTap
     private function finish(Tap $tap, array $outcome): Tap
     {
         return $this->context->bypass(function () use ($tap, $outcome): Tap {
-            $tap->forceFill($outcome)->save();
+            // Done waiting in any session (TapSession): an outcome is final.
+            $tap->forceFill([...$outcome, 'claim_token_hash' => null])->save();
 
             return $tap;
         });

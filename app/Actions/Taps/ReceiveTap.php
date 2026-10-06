@@ -57,6 +57,7 @@ final readonly class ReceiveTap
         ?User $user,
         ?string $ip,
         ?string $userAgent,
+        ?string $claimTokenHash = null,
     ): Tap {
         Outermost::assert('ReceiveTap');
 
@@ -72,7 +73,7 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
-        return DB::transaction(fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request)));
+        return DB::transaction(fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request, $claimTokenHash)));
     }
 
     /**
@@ -85,7 +86,7 @@ final readonly class ReceiveTap
      *
      * @param  array{user_id: int|null, ip: string|null, user_agent: string|null}  $request
      */
-    private function spend(SunMessage $message, #[\SensitiveParameter] string $c, array $request): Tap
+    private function spend(SunMessage $message, #[\SensitiveParameter] string $c, array $request, ?string $claimTokenHash): Tap
     {
         $tag = NfcTag::query()->where('uid', $message->uid)->lock('for no key update')->first();
 
@@ -138,6 +139,8 @@ final readonly class ReceiveTap
             'qty' => $qty,
             'status' => TapStatus::Pending,
             'expires_at' => now()->addMinutes((int) config('punchcard.taps.pending_minutes')),
+            // Waiting in the session that tapped, committed with the spent counter (TapSession).
+            'claim_token_hash' => $claimTokenHash,
         ]);
     }
 

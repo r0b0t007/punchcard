@@ -308,7 +308,7 @@ it('scrubs the IP and user agent from the account\'s taps, deleted or anonymised
     }
 
     $tap = $this->context->bypass(function () use ($user): Tap {
-        $tap = (new Tap)->forceFill(['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay, 'ip' => '203.0.113.7', 'user_agent' => 'Test phone']);
+        $tap = (new Tap)->forceFill(['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay, 'ip' => '203.0.113.7', 'user_agent' => 'Test phone', 'claim_token_hash' => hash('sha256', 'a-session-token')]);
         $tap->save();
 
         return $tap;
@@ -316,5 +316,5 @@ it('scrubs the IP and user agent from the account\'s taps, deleted or anonymised
 
     ($this->deleteAccount)($user)->assertSessionHasNoErrors();
 
-    expect($this->context->bypass(fn (): ?array => Tap::query()->whereKey($tap->id)->first()?->only(['ip', 'user_agent'])))->toBe(['ip' => null, 'user_agent' => null]);
+    expect($this->context->bypass(fn (): ?array => Tap::query()->whereKey($tap->id)->first()?->only(['ip', 'user_agent', 'claim_token_hash'])))->toBe(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
 })->with(['without history' => [false], 'with history' => [true]]);

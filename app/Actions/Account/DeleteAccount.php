@@ -64,7 +64,7 @@ final readonly class DeleteAccount
 
             DB::table('sessions')->where('user_id', $user->id)->delete();
             DB::table('password_reset_tokens')->where('email', $user->email)->delete();
-            Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null]);
+            Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
 
             if (! $this->hasHistory($user) && $this->deleted($user)) {
                 return;

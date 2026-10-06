@@ -17,8 +17,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The NFC tap endpoint (CHW-25, sun-nfc-verification skill). Tap ids live in
- * the session only (TapSession), never in a URL, a form or a redirect; every
+ * The NFC tap endpoint (CHW-25, sun-nfc-verification skill). Tap ids never
+ * appear in a URL, a form or a redirect: a session's waiting taps are found by
+ * its claim token, the result it shows is in the session (TapSession); every
  * response is no-store (NeverCache).
  *
  * - GET /t (rate limited before anything is recorded): TakeTap, then the
@@ -69,7 +70,7 @@ final class TapController extends Controller
         }
 
         // Taps still waiting that could not be applied (reported): reloading tries again.
-        return $session->pending() === []
+        return ! $session->hasPending()
             ? to_route('home')
             : Inertia::render('tap/refused', ['reason' => 'retry']);
     }

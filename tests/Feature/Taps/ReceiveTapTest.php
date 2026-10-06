@@ -48,6 +48,16 @@ beforeEach(function (): void {
     $this->lastCounter = fn (): int => $this->context->bypass(fn (): int => (int) NfcTag::query()->whereKey($this->tag->id)->value('last_counter'));
 });
 
+it('links a pending tap to the session that tapped, with the tap itself, and only a pending one', function (): void {
+    $url = ($this->url)(5);
+    $pending = app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null, 'a-hash');
+    $replay = app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null, 'a-hash');
+
+    expect($pending->claim_token_hash)->toBe('a-hash')
+        ->and($replay->rejection)->toBe(TapRejection::Replay)
+        ->and($replay->claim_token_hash)->toBeNull();
+});
+
 afterEach(function (): void {
     Carbon::setTestNow();
 });

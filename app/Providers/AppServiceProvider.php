@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Actions\Taps\RekeyTapClaimToken;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
@@ -85,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
         $this->registerRateLimiters();
+        $this->rekeyTapClaimTokenAtSignIn();
         $this->trustConfiguredProxies();
     }
 
@@ -102,6 +105,20 @@ class AppServiceProvider extends ServiceProvider
         if ($proxies === '*' || (is_array($proxies) && $proxies !== [])) {
             TrustProxies::at($proxies);
         }
+    }
+
+    /**
+     * A new tap claim token at sign-in (Login fires once the session id is
+     * regenerated), so a session id planted before sign-in can't claim the
+     * taps made later in that browser (TapSession, CHW-142).
+     */
+    private function rekeyTapClaimTokenAtSignIn(): void
+    {
+        Event::listen(Login::class, function (): void {
+            if (request()->hasSession()) {
+                app(RekeyTapClaimToken::class)->handle(request()->session());
+            }
+        });
     }
 
     /**

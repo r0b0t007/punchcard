@@ -82,6 +82,16 @@ it('enrolls the customer on the business\'s card and stamps, once', function ():
         ->and($this->context->bypass(fn (): int => StampEvent::query()->count()))->toBe(1);
 });
 
+it('lets a tap go from the session it waited in once it has an outcome', function (): void {
+    $tap = ($this->tapAt)(5);
+    $this->context->bypass(fn () => $tap->forceFill(['claim_token_hash' => hash('sha256', 'a-token')])->save());
+
+    $applied = ($this->apply)($tap);
+
+    expect($applied->status)->toBe(TapStatus::Stamped)
+        ->and($applied->claim_token_hash)->toBeNull();
+});
+
 it('records a refusal on the tap, and the counter stays spent', function (): void {
     ($this->apply)(($this->tapAt)(5));
 
