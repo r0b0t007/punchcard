@@ -5,14 +5,23 @@ declare(strict_types=1);
 namespace App\Actions\Taps;
 
 use App\Actions\Cards\EnrollCustomer;
+use App\Actions\Rewards\OpenRedeemWindow;
+use App\Actions\Rewards\RedeemPresence;
+use App\Actions\Rewards\RedeemRefused;
+use App\Actions\Rewards\RedeemReward;
 use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampRequest;
 use App\Actions\Stamps\StampResult;
+use App\Enums\RewardStatus;
+use App\Enums\StamperStatus;
 use App\Enums\StampRejection;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Business;
+use App\Models\CardBusiness;
+use App\Models\CardEnrollment;
+use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
@@ -35,6 +44,10 @@ use Illuminate\Support\Facades\DB;
  *   its site open until this commits. An ended stamper, one moved since the
  *   tap (the stamp is given where the tap happened), or a closed site refuses
  *   the tap before anyone is enrolled;
+ * - a customer with a redeem window open at the tap's time (CHW-26) has the
+ *   reward redeemed instead (RedeemReward, the reward locked after the
+ *   stamper), with no stamp; a tap that redeems nothing, refused or beaten
+ *   to it by another tap, is recorded refused. An armed tap stamps first;
  * - the customer is enrolled on the business's card (EnrollCustomer) and
  *   stamped through AddStamps at the tap's own time, so the cooldown and the
  *   daily cap judge the visit, not the later sign-in; both in a savepoint, so
@@ -55,6 +68,7 @@ final readonly class ApplyTap
         private TenantContext $context,
         private EnrollCustomer $enrollCustomer,
         private AddStamps $addStamps,
+        private RedeemReward $redeemReward,
     ) {}
 
     public function handle(Tap $tap, User $user): Tap
@@ -106,6 +120,33 @@ final readonly class ApplyTap
 
         $this->context->set($business->organization, $business);
 
+        // A redeem window open at the tap's time (Redeem now, CHW-26): this tap redeems instead of
+        // stamping. Not on a paused stamper (AddStamps refuses it below), and not an armed tap:
+        // the stamps staff armed were paid for, so they land first and the window stays open.
+        $reward = $stamper->status === StamperStatus::Active && $tap->qty === 1 ? $this->rewardToRedeem($tap, $user) : null;
+
+        if ($reward instanceof Reward) {
+            try {
+                $redeemed = $this->redeemReward->handle($reward, $user, RedeemPresence::tap($tap))->redeemedNow;
+            } catch (RedeemRefused) {
+                $redeemed = false;
+            }
+
+            // Refused, or redeemed meanwhile by another tap: this one hands over nothing.
+            if (! $redeemed) {
+                return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::RedeemRefused, 'reward_id' => $reward->id]);
+            }
+
+            // The card the reward is on, as the customer holds it now, for the result page.
+            return $this->finish($tap, [
+                'user_id' => $user->id,
+                'status' => TapStatus::Redeemed,
+                'reward_id' => $reward->id,
+                'card_id' => $reward->enrollment->card_id,
+                'card_stamps' => $reward->enrollment->current_stamps,
+            ]);
+        }
+
         // The tap keeps the card it is judged on and that card's stamps, refused (AddStamps
         // says which, StampRejected::onCard) or not, for its result page.
         try {
@@ -135,6 +176,33 @@ final readonly class ApplyTap
             'card_id' => $result->enrollment->card_id,
             'card_stamps' => $result->enrollment->current_stamps,
         ]);
+    }
+
+    /**
+     * The customer's available reward whose redeem window covers the tap's
+     * time (opened at most OpenRedeemWindow::SECONDS before the tap and still
+     * open at it, so a tap made before "Redeem now" never counts), on a card
+     * this business honours. The latest window, should two ever be open.
+     */
+    private function rewardToRedeem(Tap $tap, User $user): ?Reward
+    {
+        $at = $tap->created_at;
+
+        if ($at === null) {
+            return null;
+        }
+
+        return $this->context->bypass(fn (): ?Reward => Reward::query()
+            ->with('enrollment:id,card_id,current_stamps')
+            ->where('status', RewardStatus::Available)
+            ->where('redeem_window_until', '>=', $at)
+            ->where('redeem_window_until', '<=', $at->copy()->addSeconds(OpenRedeemWindow::SECONDS))
+            ->whereIn('enrollment_id', CardEnrollment::query()
+                ->select('id')
+                ->where('user_id', $user->id)
+                ->whereIn('card_id', CardBusiness::query()->select('card_id')->where('business_id', $tap->business_id)))
+            ->orderByDesc('redeem_window_until')
+            ->first());
     }
 
     /** @param  array<string, mixed>  $outcome */

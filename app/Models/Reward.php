@@ -50,6 +50,7 @@ use LogicException;
  * @property int|null $redeemed_by
  * @property int|null $redeemed_business_id
  * @property int|null $redeemed_location_id
+ * @property Carbon|null $redeem_window_until the customer's open redeem window (OpenRedeemWindow)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -76,8 +77,12 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /** Redemption fields a new reward cannot have outside bypass(). */
     private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id'];
 
-    /** A reward's outcome: only the redeem Action (after proof of presence) and the expiry job change it, in bypass(). */
-    private const array OUTCOME_COLUMNS = ['status', 'expires_at', ...self::REDEMPTION_COLUMNS];
+    /**
+     * A reward's outcome, and its redeem window: only the redeem Actions (the
+     * window, then the redemption after proof of presence) and the expiry job
+     * change them, in bypass().
+     */
+    private const array OUTCOME_COLUMNS = ['status', 'expires_at', 'redeem_window_until', ...self::REDEMPTION_COLUMNS];
 
     /**
      * Seeing a reward does not let a business redeem, expire or re-credit it:
@@ -122,7 +127,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
 
         // TenantBuilder passes stored values: enum casts are their strings by now.
         $status = RewardStatus::tryFrom((string) ($values['status'] ?? RewardStatus::Available->value));
-        $redeemed = array_filter(array_intersect_key($values, array_flip(self::REDEMPTION_COLUMNS)), fn (mixed $value): bool => $value !== null);
+        $redeemed = array_filter(array_intersect_key($values, array_flip([...self::REDEMPTION_COLUMNS, 'redeem_window_until'])), fn (mixed $value): bool => $value !== null);
 
         if ($status !== RewardStatus::Available || $redeemed !== []) {
             throw new LogicException('A reward is unlocked available; redeeming it is an update by the redeem Action.');
@@ -206,6 +211,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
             'unlocked_at' => 'datetime',
             'expires_at' => 'datetime',
             'redeemed_at' => 'datetime',
+            'redeem_window_until' => 'datetime',
         ];
     }
 

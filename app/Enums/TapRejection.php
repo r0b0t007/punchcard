@@ -52,6 +52,9 @@ enum TapRejection: string
     /** Nobody signed in to claim the tap before it expired. */
     case Expired = 'expired';
 
+    /** A redeem window was open, but RedeemReward refused (an unverified email, a closed site). */
+    case RedeemRefused = 'redeem_refused';
+
     /** The tap equivalent of an AddStamps refusal. */
     public static function fromStamp(StampRejection $rejection): self
     {

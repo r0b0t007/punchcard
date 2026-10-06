@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property TapStatus $status
  * @property TapRejection|null $rejection
  * @property int|null $stamp_event_id
+ * @property int|null $reward_id the reward it redeemed instead of stamping (CHW-26)
  * @property Carbon|null $available_at
  * @property Carbon|null $expires_at
  * @property string|null $ip

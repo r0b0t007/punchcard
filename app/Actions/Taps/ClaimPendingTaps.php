@@ -19,8 +19,9 @@ use Throwable;
  * reported and stays pending for the next try, without holding back the
  * newer ones.
  *
- * Then sets the session's result once: a stamp (the newest applied, or one
- * already shown to this customer, so a retry does not hide it), else the tap
+ * Then sets the session's result once: a stamp or a redemption (the newest
+ * applied, or one already shown to this customer, so a retry does not hide
+ * it), else the tap
  * just received ($received, when it was not pending, unless it only replays a
  * URL: then the pending tap it retried tells the real outcome), else the newest tap
  * applied. Returns it, or null when there was nothing to claim or show.
@@ -32,7 +33,7 @@ final readonly class ClaimPendingTaps
     public function handle(TapSession $session, User $user, ?Tap $received = null): ?Tap
     {
         $shown = $session->shown();
-        $stamped = $shown instanceof Tap && $shown->status === TapStatus::Stamped && $shown->user_id === $user->id ? $shown : null;
+        $stamped = $shown instanceof Tap && $this->gave($shown) && $shown->user_id === $user->id ? $shown : null;
         $newest = null;
 
         foreach ($session->pendingTaps() as $waiting) {
@@ -54,7 +55,7 @@ final readonly class ClaimPendingTaps
 
             if ($tap instanceof Tap) {
                 $newest = $tap;
-                $stamped = $tap->status === TapStatus::Stamped ? $tap : $stamped;
+                $stamped = $this->gave($tap) ? $tap : $stamped;
             }
         }
 
@@ -66,5 +67,11 @@ final readonly class ClaimPendingTaps
         }
 
         return $result;
+    }
+
+    /** The tap gave something: a stamp, or a redeemed reward (CHW-26). */
+    private function gave(Tap $tap): bool
+    {
+        return in_array($tap->status, [TapStatus::Stamped, TapStatus::Redeemed], true);
     }
 }

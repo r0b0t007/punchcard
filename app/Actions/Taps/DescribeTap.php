@@ -28,12 +28,14 @@ use Illuminate\Support\Carbon;
  *   count, so a later visit doesn't mix it with newer stamps) and as it was
  *   before (the stamps that landed animate), the stamps given, any reward
  *   unlocked and when the stamp was given, in the location's time;
+ * - tap/redeemed: the reward the tap redeemed instead of stamping (CHW-26),
+ *   where and when, in the location's time, for staff to glance at;
  * - tap/cooldown: the card the tap was refused on, as the refusal found it,
  *   how many minutes ago (from now) the stamp that caused the cooldown
  *   landed, and when the next stamp is possible (day and time) in the
  *   location's time, or now once passed;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
- *   in the tap log): used, expired, limit, unavailable, card or invalid
+ *   in the tap log): used, expired, limit, unavailable, card, redeem or invalid
  *   (busy, too many taps, comes from the rate limiter).
  *
  * Reads in bypass(): the viewer is a customer, with no tenant. Only what the
@@ -71,6 +73,16 @@ final readonly class DescribeTap
                     'given' => $tap->qty,
                     'rewards' => $rewards,
                     'stampedAt' => $tap->created_at === null ? null : $this->moment($tap->created_at, $timezone),
+                ]];
+            }
+
+            if ($tap->status === TapStatus::Redeemed) {
+                $reward = Reward::query()->find($tap->reward_id);
+
+                return ['component' => 'tap/redeemed', 'props' => [
+                    'card' => $this->card($tap, $card, $location, $tap->card_stamps),
+                    'rewardText' => $reward?->reward_text,
+                    'redeemedAt' => $reward?->redeemed_at === null ? null : $this->moment($reward->redeemed_at, $timezone),
                 ]];
             }
 
@@ -200,6 +212,7 @@ final readonly class DescribeTap
             TapRejection::DailyCap => 'limit',
             TapRejection::RetiredTag, TapRejection::UnassignedTag, TapRejection::StamperDisabled, TapRejection::SiteClosed => 'unavailable',
             TapRejection::CardInactive, TapRejection::NotHonoured, TapRejection::CardMisconfigured => 'card',
+            TapRejection::RedeemRefused => 'redeem',
             default => 'invalid',
         };
     }

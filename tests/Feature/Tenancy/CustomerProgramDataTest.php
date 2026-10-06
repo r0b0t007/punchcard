@@ -121,6 +121,7 @@ describe('writes', function (): void {
         'redeemed' => [['status' => RewardStatus::Redeemed, 'redeemed_at' => now()]],
         'credited to a sibling' => [['redeemed_business_id' => 2]],
         'expired' => [['status' => RewardStatus::Expired]],
+        'with a redeem window open' => [['redeem_window_until' => now()->addMinute()]],
     ]);
 
     it('refuses an enrollment or a reward in another organization', function (string $how): void {
