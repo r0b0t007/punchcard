@@ -15,11 +15,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * "Redeem now" (C3/C4, CHW-26): opens a SECONDS window on one of the
  * customer's available rewards; their next verified tap inside it, at a
- * business that honours the card, redeems it (ApplyTap, RedeemReward). One
- * window per customer: opening one closes any other, with all their rewards
- * locked (in id order), so two opens at once cannot leave two windows.
- * Opening it again (try again) restarts it. Needs a verified email. In
- * bypass(): the customer has no tenant, and the rewards are theirs.
+ * business that honours the card, redeems it (ApplyTap, RedeemReward).
+ *
+ * One window per customer: opening one closes any other, under a lock on the
+ * customer's row (then the reward), so two opens at once cannot leave two.
+ * Opening it again (try again) gives it SECONDS more; while it is still open
+ * it keeps its start, so a tap made under it and claimed later still counts.
+ * Needs a verified email. In bypass(): the customer has no tenant, and the
+ * rewards are theirs.
  */
 final readonly class OpenRedeemWindow
 {
@@ -30,12 +33,12 @@ final readonly class OpenRedeemWindow
     public function handle(Reward $reward, User $user): Reward
     {
         return DB::transaction(fn (): Reward => $this->context->bypass(function () use ($reward, $user): Reward {
-            $own = Reward::query()
-                ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-            $locked = $own->firstWhere('id', $reward->id) ?? throw new RedeemRefused(RedeemRefusal::NotYours);
+            User::query()->whereKey($user->id)->lockForUpdate()->value('id');
+            $locked = Reward::query()->whereKey($reward->id)->lockForUpdate()->firstOrFail();
+
+            if (CardEnrollment::query()->whereKey($locked->enrollment_id)->value('user_id') !== $user->id) {
+                throw new RedeemRefused(RedeemRefusal::NotYours);
+            }
 
             if ($locked->status !== RewardStatus::Available) {
                 throw new RedeemRefused(RedeemRefusal::Unavailable);
@@ -46,10 +49,17 @@ final readonly class OpenRedeemWindow
             }
 
             Reward::query()
-                ->whereKey($own->where('id', '!==', $locked->id)->whereNotNull('redeem_window_until')->modelKeys())
-                ->update(['redeem_window_until' => null]);
+                ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
+                ->whereKeyNot($locked->id)
+                ->whereNotNull('redeem_window_until')
+                ->update(['redeem_window_opened_at' => null, 'redeem_window_until' => null]);
 
-            $locked->forceFill(['redeem_window_until' => now()->addSeconds(self::SECONDS)])->save();
+            $open = $locked->redeem_window_until?->isFuture() === true;
+
+            $locked->forceFill([
+                'redeem_window_opened_at' => $open ? $locked->redeem_window_opened_at : now(),
+                'redeem_window_until' => now()->addSeconds(self::SECONDS),
+            ])->save();
 
             return $locked;
         }));

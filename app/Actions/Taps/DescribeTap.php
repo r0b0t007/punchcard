@@ -35,7 +35,8 @@ use Illuminate\Support\Carbon;
  *   landed, and when the next stamp is possible (day and time) in the
  *   location's time, or now once passed;
  * - tap/refused: a friendly reason, never the raw one (a fraud signal stays
- *   in the tap log): used, expired, limit, unavailable, card, redeem or invalid
+ *   in the tap log): used, expired, limit, unavailable, card, redeemed or
+ *   invalid
  *   (busy, too many taps, comes from the rate limiter).
  *
  * Reads in bypass(): the viewer is a customer, with no tenant. Only what the
@@ -212,7 +213,7 @@ final readonly class DescribeTap
             TapRejection::DailyCap => 'limit',
             TapRejection::RetiredTag, TapRejection::UnassignedTag, TapRejection::StamperDisabled, TapRejection::SiteClosed => 'unavailable',
             TapRejection::CardInactive, TapRejection::NotHonoured, TapRejection::CardMisconfigured => 'card',
-            TapRejection::RedeemRefused => 'redeem',
+            TapRejection::AlreadyRedeemed => 'redeemed',
             default => 'invalid',
         };
     }

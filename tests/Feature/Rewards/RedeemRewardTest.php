@@ -7,6 +7,7 @@ use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
 use App\Actions\Rewards\RedeemReward;
 use App\Actions\Taps\ApplyTap;
+use App\Actions\Taps\ClaimPendingTaps;
 use App\Actions\Taps\DescribeTap;
 use App\Actions\Taps\ReceiveTap;
 use App\Actions\Tenancy\ArchiveLocation;
@@ -24,6 +25,7 @@ use App\Models\Tap;
 use App\Models\User;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
+use App\Support\Taps\TapSession;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
@@ -87,6 +89,7 @@ it('redeems a reward with the next tap inside its window, instead of stamping', 
         ->and($reward->redeemed_business_id)->toBe($this->tenants->a1->id)
         ->and($reward->redeemed_location_id)->toBe($this->stamper->location_id)
         ->and($reward->redeemed_at?->toDateTimeString())->toBe('2026-10-05 10:00:20')
+        ->and($reward->redeem_window_opened_at)->toBeNull()
         ->and($reward->redeem_window_until)->toBeNull()
         ->and(($this->stamps)())->toBe(0);
     Event::assertDispatched(EnrollmentChanged::class, fn (EnrollmentChanged $changed): bool => $changed->rewardIds === [] && $changed->redeemedRewardIds === [$this->reward->id]);
@@ -143,9 +146,30 @@ it('hands over nothing for a tap whose reward another tap redeemed meanwhile', f
 
     expect($raced->done)->toBeTrue()
         ->and($tap->status)->toBe(TapStatus::Rejected)
-        ->and($tap->rejection)->toBe(TapRejection::RedeemRefused)
+        ->and($tap->rejection)->toBe(TapRejection::AlreadyRedeemed)
+        ->and(app(DescribeTap::class)->handle($tap))->toBe(['component' => 'tap/refused', 'props' => ['reason' => 'redeemed']])
         ->and(($this->fresh)($this->reward)->redeemed_business_id)->toBe($this->tenants->a2->id)
         ->and(($this->stamps)())->toBe(0);
+});
+
+it('shows the redemption, not a stamp tapped after it, once the customer signs in', function (): void {
+    $hash = TapSession::hashOf(TapSession::ensureToken(session()->driver()));
+    $receive = function (int $counter) use ($hash): Tap {
+        $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
+        $url = app(FakeTap::class)->build($tag->uid, $counter);
+
+        return app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null, $hash);
+    };
+    app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $redeeming = $receive(5);
+    $this->travel(5)->seconds();
+    $stamping = $receive(6);
+
+    $shown = app(ClaimPendingTaps::class)->handle(app(TapSession::class), $this->customer);
+
+    expect($shown?->id)->toBe($redeeming->id)
+        ->and($shown?->status)->toBe(TapStatus::Redeemed)
+        ->and($this->context->bypass(fn (): ?TapStatus => Tap::query()->findOrFail($stamping->id)->status))->toBe(TapStatus::Stamped);
 });
 
 it('stamps as usual once the window has closed', function (): void {
@@ -182,19 +206,38 @@ it('never redeems on a stamper paused since the tap', function (): void {
         ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available);
 });
 
-it('gives an armed tap its paid stamps first, and redeems with the next tap', function (): void {
+it('gives an armed tap its paid stamps first, and redeems with the next tap', function (int $armedQty): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
-    $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addMinute()])->save());
+    $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => $armedQty, 'armed_until' => now()->addMinute()])->save());
 
     $armed = ($this->tap)(5);
 
     expect($armed->status)->toBe(TapStatus::Stamped)
-        ->and($armed->qty)->toBe(3)
+        ->and($armed->armed)->toBeTrue()
+        ->and($armed->qty)->toBe($armedQty)
         ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available);
 
     $this->travel(10)->seconds();
 
     expect(($this->tap)(6)->status)->toBe(TapStatus::Redeemed);
+})->with(['three stamps' => 3, 'a single stamp' => 1]);
+
+it('keeps the window\'s start when the customer tries again in time, so a tap made under it still counts', function (): void {
+    app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(10)->seconds();
+    $pending = ($this->received)(5);
+    $this->travel(20)->seconds();
+    app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(5)->minutes();
+
+    expect(app(ApplyTap::class)->handle($pending, $this->customer)->status)->toBe(TapStatus::Redeemed);
+
+    $second = $this->context->bypass(fn (): Reward => Reward::factory()->for($this->enrollment, 'enrollment')->create(['milestone' => 2]));
+    app(OpenRedeemWindow::class)->handle($second, $this->customer);
+    $this->travel(2)->minutes();
+    app(OpenRedeemWindow::class)->handle($second, $this->customer);
+
+    expect(($this->fresh)($second)->redeem_window_opened_at?->toDateTimeString())->toBe('2026-10-05 10:07:30');
 });
 
 it('never lets another customer\'s open window touch a tap', function (): void {
@@ -283,17 +326,16 @@ it('takes presence only from a verified tap still waiting for its outcome', func
     RedeemPresence::tap($replayed);
 })->throws(LogicException::class, 'Only a verified tap');
 
-it('refuses the redeem tap of a customer whose email is no longer verified, and keeps the reward', function (): void {
+it('stamps the visit when the redemption is refused, and keeps the reward', function (): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
     $this->customer->forceFill(['email_verified_at' => null])->save();
 
     $tap = ($this->tap)(5);
 
-    expect($tap->status)->toBe(TapStatus::Rejected)
-        ->and($tap->rejection)->toBe(TapRejection::RedeemRefused)
-        ->and(app(DescribeTap::class)->handle($tap))->toBe(['component' => 'tap/refused', 'props' => ['reason' => 'redeem']])
+    expect($tap->status)->toBe(TapStatus::Stamped)
+        ->and($tap->reward_id)->toBeNull()
         ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available)
-        ->and(($this->stamps)())->toBe(0);
+        ->and(($this->stamps)())->toBe(1);
 });
 
 it('keeps one redeem window open per customer', function (): void {
@@ -303,6 +345,8 @@ it('keeps one redeem window open per customer', function (): void {
     app(OpenRedeemWindow::class)->handle($second, $this->customer);
 
     expect(($this->fresh)($this->reward)->redeem_window_until)->toBeNull()
+        ->and(($this->fresh)($this->reward)->redeem_window_opened_at)->toBeNull()
+        ->and(($this->fresh)($second)->redeem_window_opened_at?->toDateTimeString())->toBe('2026-10-05 10:00:00')
         ->and(($this->fresh)($second)->redeem_window_until?->toDateTimeString())->toBe('2026-10-05 10:01:00');
 });
 

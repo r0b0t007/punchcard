@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $user_id
  * @property string|null $claim_token_hash
  * @property int $qty
+ * @property bool $armed it took stamps staff had armed (ReceiveTap)
  * @property TapStatus $status
  * @property TapRejection|null $rejection
  * @property int|null $stamp_event_id
@@ -54,7 +55,7 @@ class Tap extends Model
     }
 
     /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
-    protected $attributes = ['qty' => 1];
+    protected $attributes = ['qty' => 1, 'armed' => false];
 
     /**
      * Rows older than the retention period, personal data included.
@@ -103,6 +104,7 @@ class Tap extends Model
         return [
             'counter' => 'integer',
             'qty' => 'integer',
+            'armed' => 'boolean',
             'card_stamps' => 'integer',
             'status' => TapStatus::class,
             'rejection' => TapRejection::class,

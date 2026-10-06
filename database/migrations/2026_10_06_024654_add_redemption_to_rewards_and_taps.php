@@ -8,23 +8,28 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Redeeming a reward with a tap (CHW-26).
  *
- * - rewards.redeem_window_until: the customer's 60 s redeem window, opened by
- *   "Redeem now"; the next verified tap inside it redeems the reward
- *   (RedeemReward). Not an outcome: it closes again on its own. No foreign
- *   key, so SQLite does not rebuild the table and drop its trigger.
+ * - rewards.redeem_window_opened_at/until: the customer's redeem window,
+ *   opened by "Redeem now" for 60 s; the next verified tap inside it redeems
+ *   the reward (RedeemReward). Not an outcome: it closes again on its own.
+ *   Indexed, as ApplyTap looks for an open one on every tap. No foreign key,
+ *   so SQLite does not rebuild the table and drop its trigger.
  * - taps.reward_id and the status "redeemed": a tap that redeemed a reward
  *   instead of stamping, and which one.
+ * - taps.armed: the tap took stamps staff had armed (paid for), even one,
+ *   so it stamps rather than redeems.
  */
 return new class extends Migration
 {
     public function up(): void
     {
         Schema::table('rewards', function (Blueprint $table): void {
-            $table->timestamp('redeem_window_until')->nullable()->after('redeemed_location_id');
+            $table->timestamp('redeem_window_opened_at')->nullable()->after('redeemed_location_id');
+            $table->timestamp('redeem_window_until')->nullable()->after('redeem_window_opened_at')->index();
         });
 
         Schema::table('taps', function (Blueprint $table): void {
             $table->foreignId('reward_id')->nullable()->after('stamp_event_id')->constrained()->noActionOnDelete();
+            $table->boolean('armed')->default(false)->after('qty');
         });
 
         if (DB::getDriverName() === 'pgsql') {
@@ -50,10 +55,12 @@ return new class extends Migration
 
         Schema::table('taps', function (Blueprint $table): void {
             $table->dropConstrainedForeignId('reward_id');
+            $table->dropColumn('armed');
         });
 
         Schema::table('rewards', function (Blueprint $table): void {
-            $table->dropColumn('redeem_window_until');
+            $table->dropIndex(['redeem_window_until']);
+            $table->dropColumn(['redeem_window_opened_at', 'redeem_window_until']);
         });
     }
 };
