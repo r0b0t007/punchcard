@@ -77,6 +77,9 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     /** @var array{0: mixed, 1: mixed}|null The enrollment id and its card, looked up once by fillTenantColumns(). */
     private ?array $enrollmentCard = null;
 
+    /** A redemption shows live for this long after it (liveSecondsLeft). */
+    public const int LIVE_SECONDS = 120;
+
     /** The customer's redeem window (OpenRedeemWindow). */
     private const array WINDOW_COLUMNS = ['redeem_window_opened_at', 'redeem_window_until'];
 
@@ -172,6 +175,20 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * How long a redemption still shows live, from now: the screen staff hand
+     * the reward over on (tap/redeemed, C4) counts this down, then only says
+     * it was already redeemed. 0 for a reward not redeemed.
+     */
+    public function liveSecondsLeft(): int
+    {
+        if ($this->redeemed_at === null) {
+            return 0;
+        }
+
+        return max(0, self::LIVE_SECONDS - (int) ceil($this->redeemed_at->diffInSeconds(now())));
+    }
+
+    /**
      * Whether the redeem window covers a moment (a tap's time): opened before
      * it and not yet closed at it. Strictly after the opening second: times
      * keep whole seconds, so a tap in that second may have come just before
@@ -213,6 +230,19 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     public function redeemedLocation(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'redeemed_location_id');
+    }
+
+    /**
+     * A customer's own rewards: on their own enrollments (CHW-26). Customers
+     * have no tenant; this is how their reward screens see rewards, in
+     * bypass().
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function ownedBy(Builder $query, User $user): void
+    {
+        $query->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id));
     }
 
     /**

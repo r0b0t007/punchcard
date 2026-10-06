@@ -124,7 +124,8 @@ class AppServiceProvider extends ServiceProvider
     /**
      * The tap endpoint (/t): per client address (ClientAddress) and per signed-in
      * customer, before the tap is received, since every request writes a tap row
-     * (sun-nfc-verification skill).
+     * (sun-nfc-verification skill). The reward screens (CHW-26): the redeem
+     * screen's polling, and opening or closing redeem windows.
      */
     private function registerRateLimiters(): void
     {
@@ -141,6 +142,13 @@ class AppServiceProvider extends ServiceProvider
 
             return $limits;
         });
+
+        // The redeem screen polls every 2 s (C4, CHW-26): its own limit per customer and reward, so
+        // the polling never uses up another route's (a bare throttle:N,M shares one per-user counter).
+        RateLimiter::for('reward-screen', fn (Request $request): Limit => Limit::perMinute(90)
+            ->by('reward-screen:'.$request->user()?->getAuthIdentifier().':'.$request->route('reward')));
+        RateLimiter::for('reward-window', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by('reward-window:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 
     /**

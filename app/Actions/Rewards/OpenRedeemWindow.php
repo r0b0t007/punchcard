@@ -6,7 +6,6 @@ namespace App\Actions\Rewards;
 
 use App\Enums\RedeemRefusal;
 use App\Enums\RewardStatus;
-use App\Models\CardEnrollment;
 use App\Models\Reward;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -34,11 +33,8 @@ final readonly class OpenRedeemWindow
     {
         return DB::transaction(fn (): Reward => $this->context->bypass(function () use ($reward, $user): Reward {
             User::query()->whereKey($user->id)->lockForUpdate()->value('id');
-            $locked = Reward::query()->whereKey($reward->id)->lockForUpdate()->firstOrFail();
-
-            if (CardEnrollment::query()->whereKey($locked->enrollment_id)->value('user_id') !== $user->id) {
-                throw new RedeemRefused(RedeemRefusal::NotYours);
-            }
+            $locked = Reward::query()->ownedBy($user)->whereKey($reward->id)->lockForUpdate()->first()
+                ?? throw new RedeemRefused(RedeemRefusal::NotYours);
 
             if ($locked->status !== RewardStatus::Available) {
                 throw new RedeemRefused(RedeemRefusal::Unavailable);
@@ -49,7 +45,7 @@ final readonly class OpenRedeemWindow
             }
 
             Reward::query()
-                ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
+                ->ownedBy($user)
                 ->whereKeyNot($locked->id)
                 ->whereNotNull('redeem_window_until')
                 ->update(['redeem_window_opened_at' => null, 'redeem_window_until' => null]);

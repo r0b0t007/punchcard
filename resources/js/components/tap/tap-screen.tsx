@@ -1,8 +1,7 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import LoyaltyCard from '@/components/loyalty-card';
 import type { LoyaltyCardProps, StampStyle } from '@/components/loyalty-card';
-import { monogramOf } from '@/components/loyalty-card/monogram';
-import { cardInks } from '@/lib/color';
+import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 
 /** The café's card as a tap result shows it (DescribeTap). */
 export type TapCard = {
@@ -43,21 +42,13 @@ export default function TapScreen({
 
 /** The café the tap happened at: its monogram in the brand colour, name and location (C1). */
 export function TapCafe({ card }: { card: TapCard }) {
-    const { brand, foreground } = cardInks(card.brandColor);
-    const brandVariables = {
-        '--card-brand': brand,
-        '--card-brand-foreground': foreground,
-    } as CSSProperties;
-
     return (
         <div className="flex items-center gap-3">
-            <span
-                aria-hidden="true"
-                style={brandVariables}
-                className="grid size-13 shrink-0 place-items-center rounded-full bg-card-brand font-display text-3xl font-bold text-card-brand-foreground ring-1 ring-border"
-            >
-                {monogramOf(card.businessName)}
-            </span>
+            <BrandMonogram
+                name={card.businessName}
+                brandColor={card.brandColor}
+                className="size-13 text-3xl ring-1 ring-border"
+            />
             <div className="min-w-0">
                 <p className="truncate text-lg font-semibold">
                     {card.businessName}
