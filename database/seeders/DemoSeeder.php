@@ -10,6 +10,7 @@ use App\Enums\BusinessStatus;
 use App\Enums\CardMode;
 use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
+use App\Enums\PlatformRole;
 use App\Enums\RewardStatus;
 use App\Enums\RewardType;
 use App\Enums\StampSource;
@@ -33,6 +34,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
+use Spatie\Permission\Models\Role;
 
 /**
  * Demo data for local development and UI work (CHW-21): an independent café
@@ -49,7 +51,8 @@ use RuntimeException;
  * events, and redeemed rewards name a business and location of the program.
  * Logins (password "password"): owner@cafe.demo.test, staff@cafe.demo.test,
  * hq@franchise.demo.test, owner@a1.demo.test (Tangier), owner@a2.demo.test
- * (Tétouan) and customer@demo.test, a member of both programs.
+ * (Tétouan), customer@demo.test, a member of both programs, and
+ * admin@demo.test, a platform admin (Filament at /admin).
  *
  * Known passwords and rows nothing can delete (the ledger, the tags): it runs
  * only in the local and testing environments, in one transaction.
@@ -118,6 +121,7 @@ final class DemoSeeder extends Seeder
 
         try {
             $customer = $this->user('Salma Bennani', 'customer@demo.test');
+            $this->user('Platform Admin', 'admin@demo.test')->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
 
             return [$this->setUpCafe($customer), $this->setUpFranchise($customer)];
         } finally {

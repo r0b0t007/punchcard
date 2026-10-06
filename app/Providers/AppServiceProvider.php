@@ -3,12 +3,15 @@
 namespace App\Providers;
 
 use App\Actions\Taps\RekeyTapClaimToken;
+use App\Enums\PlatformRole;
+use App\Models\User;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -87,8 +91,22 @@ class AppServiceProvider extends ServiceProvider
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
         $this->registerRateLimiters();
+        $this->letAdminsThroughInFilament();
         $this->rekeyTapClaimTokenAtSignIn();
         $this->trustConfiguredProxies();
+    }
+
+    /**
+     * A platform admin passes every ability, but only inside the Filament panel
+     * (CHW-22): in the app itself they are a customer like anyone, with no
+     * business or organization rights. null leaves every other check to the
+     * policies.
+     */
+    private function letAdminsThroughInFilament(): void
+    {
+        Gate::before(fn (User $user): ?bool => Filament::isServing()
+            && Filament::getCurrentPanel()?->getId() === 'admin'
+            && $user->hasRole(PlatformRole::Admin->value) ? true : null);
     }
 
     /**
