@@ -47,13 +47,30 @@ function giveDemoReward(): void {
     );
 }
 
-/** The demo customer (DemoSeeder): verified, a member at Café Hafa. */
+/**
+ * The demo customer's session (DemoSeeder: verified, a member at Café Hafa),
+ * signed in once per run: Fortify allows 5 sign-ins a minute per email, and a
+ * retried run would otherwise run out. The locale stays the browser's.
+ */
+const demoCustomerSession = 'test-results/demo-customer.json';
+
 async function signInAsDemoCustomer(page: Page): Promise<void> {
     await page.goto('/login');
     await page.locator('#email').fill('customer@demo.test');
     await page.locator('#password').fill('password');
     await page.locator('[data-test="login-button"]').click();
     await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+}
+
+/**
+ * Waits for the ring to tick once: a tap counts only after the second the
+ * window opened (Reward::isRedeemWindowOpenAt), as any real tap does.
+ */
+async function waitForTheWindowToTick(page: Page): Promise<void> {
+    await expect(page.getByRole('timer')).toHaveAttribute(
+        'aria-label',
+        /^([1-9]|[1-4]\d|5[0-8]) seconds? left$/,
+    );
 }
 
 /** My rewards, then Redeem on the newest Café Hafa reward: the redeem screen (C4). */
@@ -69,7 +86,18 @@ async function openRedeemScreen(page: Page): Promise<void> {
 }
 
 test.describe('redeeming (CHW-26)', () => {
-    test.beforeAll(() => giveDemoReward());
+    test.use({ storageState: demoCustomerSession });
+
+    test.beforeAll(async ({ browser }, testInfo) => {
+        giveDemoReward();
+        // A context made here gets none of the project's options: the base URL is passed on.
+        const context = await browser.newContext({
+            baseURL: testInfo.project.use.baseURL,
+        });
+        await signInAsDemoCustomer(await context.newPage());
+        await context.storageState({ path: demoCustomerSession });
+        await context.close();
+    });
 
     test.describe('in Arabic', () => {
         test.use({ locale: 'ar-MA' });
@@ -77,7 +105,6 @@ test.describe('redeeming (CHW-26)', () => {
         test('shows the redeem screen right to left', async ({
             page,
         }, testInfo) => {
-            await signInAsDemoCustomer(page);
             await openRedeemScreen(page);
 
             await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
@@ -98,7 +125,6 @@ test.describe('redeeming (CHW-26)', () => {
         test('shows the redeem screen on the dark theme', async ({
             page,
         }, testInfo) => {
-            await signInAsDemoCustomer(page);
             await openRedeemScreen(page);
 
             await expect(page.locator('html')).toHaveClass(/dark/);
@@ -119,7 +145,6 @@ test.describe('redeeming (CHW-26)', () => {
             page,
             context,
         }) => {
-            await signInAsDemoCustomer(page);
             await page.goto('/rewards');
             const saved = await page
                 .getByRole('listitem')
@@ -130,6 +155,7 @@ test.describe('redeeming (CHW-26)', () => {
                 page.getByRole('heading', { name: 'Tap the stamper now' }),
             ).toBeVisible();
             const redeemScreen = page.url();
+            await waitForTheWindowToTick(page);
 
             // The tap opens in another tab: the waiting redeem screen sees it land, live.
             const redeemed = await context.newPage();
@@ -151,11 +177,11 @@ test.describe('redeeming (CHW-26)', () => {
             page,
         }, testInfo) => {
             giveDemoReward();
-            await signInAsDemoCustomer(page);
             await openRedeemScreen(page);
             await expect(
                 page.getByRole('heading', { name: 'Tap the stamper now' }),
             ).toBeVisible();
+            await waitForTheWindowToTick(page);
 
             await page.goto(freshTap());
 
