@@ -36,7 +36,7 @@ final readonly class RedeemReward
 
     public function handle(Reward $reward, User $user, RedeemPresence $presence): RedeemResult
     {
-        [$result, $enrollment] = DB::transaction(fn (): array => $this->context->bypass(function () use ($reward, $user, $presence): array {
+        $result = DB::transaction(fn (): RedeemResult => $this->context->bypass(function () use ($reward, $user, $presence): RedeemResult {
             $locked = Reward::query()->whereKey($reward->id)->lockForUpdate()->firstOrFail();
             $enrollment = CardEnrollment::query()->findOrFail($locked->enrollment_id);
 
@@ -45,7 +45,7 @@ final readonly class RedeemReward
             }
 
             if ($locked->status === RewardStatus::Redeemed) {
-                return [new RedeemResult($locked, redeemedNow: false), $enrollment];
+                return new RedeemResult($locked, redeemedNow: false);
             }
 
             $this->assertRedeemable($locked, $enrollment, $user, $presence);
@@ -60,11 +60,11 @@ final readonly class RedeemReward
                 'redeem_window_until' => null,
             ])->save();
 
-            return [new RedeemResult($locked, redeemedNow: true), $enrollment];
+            return new RedeemResult($locked, redeemedNow: true);
         }));
 
         if ($result->redeemedNow) {
-            EnrollmentChanged::dispatch($enrollment->id, (int) $enrollment->organization_id, $presence->businessId, [], [$result->reward->id]);
+            EnrollmentChanged::dispatch($result->reward->enrollment_id, $result->reward->organization_id, $presence->businessId, [], [$result->reward->id]);
         }
 
         return $result;
@@ -72,12 +72,10 @@ final readonly class RedeemReward
 
     private function assertRedeemable(Reward $reward, CardEnrollment $enrollment, User $user, RedeemPresence $presence): void
     {
-        $opened = $reward->redeem_window_opened_at;
-        $until = $reward->redeem_window_until;
         $refusal = match (true) {
             $reward->status !== RewardStatus::Available => RedeemRefusal::Unavailable,
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
-            $opened === null || $until === null || $presence->at->lt($opened) || $presence->at->gt($until) => RedeemRefusal::OutsideWindow,
+            ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
             ! CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $presence->businessId)->exists() => RedeemRefusal::NotHonoured,
             ! ArchivedSites::isOpen($presence->businessId, $presence->locationId) => RedeemRefusal::SiteClosed,
             default => null,

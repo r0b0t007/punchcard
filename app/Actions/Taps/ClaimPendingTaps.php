@@ -34,7 +34,7 @@ final readonly class ClaimPendingTaps
     public function handle(TapSession $session, User $user, ?Tap $received = null): ?Tap
     {
         $shown = $session->shown();
-        $stamped = $shown instanceof Tap && $this->gave($shown) > 0 && $shown->user_id === $user->id ? $shown : null;
+        $best = $shown instanceof Tap && $this->gave($shown) > 0 && $shown->user_id === $user->id ? $shown : null;
         $newest = null;
 
         foreach ($session->pendingTaps() as $waiting) {
@@ -56,12 +56,13 @@ final readonly class ClaimPendingTaps
 
             if ($tap instanceof Tap) {
                 $newest = $tap;
-                $stamped = $this->gave($tap) > 0 && $this->gave($tap) >= $this->gave($stamped) ? $tap : $stamped;
+                $gave = $this->gave($tap);
+                $best = $gave > 0 && $gave >= $this->gave($best) ? $tap : $best;
             }
         }
 
         $replayed = $received instanceof Tap && $received->rejection === TapRejection::Replay;
-        $result = $newest instanceof Tap ? ($stamped ?? ($replayed ? $newest : $received) ?? $newest) : $received;
+        $result = $newest instanceof Tap ? ($best ?? ($replayed ? $newest : $received) ?? $newest) : $received;
 
         if ($result instanceof Tap) {
             $session->show($result);

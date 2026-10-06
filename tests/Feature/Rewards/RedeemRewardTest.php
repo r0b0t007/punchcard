@@ -115,6 +115,7 @@ it('redeems with a tap at the window\'s last second, and with a tap inside it cl
 
 it('redeems a reward once: asking again returns the first redemption', function (): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
 
     $first = app(RedeemReward::class)->handle($this->reward, $this->customer, ($this->presence)(5));
     $this->travel(5)->minutes();
@@ -122,13 +123,14 @@ it('redeems a reward once: asking again returns the first redemption', function 
 
     expect($first->redeemedNow)->toBeTrue()
         ->and($again->redeemedNow)->toBeFalse()
-        ->and($again->reward->redeemed_at?->toDateTimeString())->toBe('2026-10-05 10:00:00')
+        ->and($again->reward->redeemed_at?->toDateTimeString())->toBe('2026-10-05 10:00:01')
         ->and($again->reward->redeemed_business_id)->toBe($this->tenants->a1->id)
         ->and($this->context->bypass(fn (): int => Reward::query()->where('status', RewardStatus::Redeemed)->count()))->toBe(1);
 });
 
 it('hands over nothing for a tap whose reward another tap redeemed meanwhile', function (): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
     $atA1 = ($this->received)(5);
     $atA2 = ($this->presence)(5, $this->tenants->stamper($this->tenants->a2));
 
@@ -161,6 +163,7 @@ it('shows the redemption, not a stamp tapped after it, once the customer signs i
         return app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null, $hash);
     };
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
     $redeeming = $receive(5);
     $this->travel(5)->seconds();
     $stamping = $receive(6);
@@ -191,6 +194,15 @@ it('never redeems with a tap made before the window opened', function (): void {
     $applied = app(ApplyTap::class)->handle($pending, $this->customer);
 
     expect($applied->status)->toBe(TapStatus::Stamped)
+        ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available);
+});
+
+it('never counts a tap made in the second the window opened: it may have come just before', function (): void {
+    $pending = ($this->received)(5);
+    app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(10)->seconds();
+
+    expect(app(ApplyTap::class)->handle($pending, $this->customer)->status)->toBe(TapStatus::Stamped)
         ->and(($this->fresh)($this->reward)->status)->toBe(RewardStatus::Available);
 });
 
@@ -252,6 +264,7 @@ it('never lets another customer\'s open window touch a tap', function (): void {
 
 it('redeems a franchise reward at any business that honours the card, and nowhere else', function (): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
 
     $atB1 = ($this->tap)(5, $this->tenants->stamper($this->tenants->b1));
     expect($atB1->status)->toBe(TapStatus::Stamped)
@@ -275,6 +288,7 @@ it('opens a window only on the customer\'s own available reward, with a verified
 
     if ($case === 'redeemed') {
         app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+        $this->travel(1)->seconds();
         app(RedeemReward::class)->handle($this->reward, $this->customer, ($this->presence)(5));
     }
 
@@ -292,6 +306,12 @@ it('redeems only the customer\'s own reward, verified, inside the window, where 
     $presence = $case === 'before the window' ? ($this->presence)(5) : null;
     $this->travel(1)->seconds();
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+
+    if ($case === 'opening second') {
+        $presence = ($this->presence)(5);
+    }
+
+    $this->travel(1)->seconds();
     $user = $case === 'another customer' ? User::factory()->create() : $this->customer;
 
     if ($case === 'too late') {
@@ -314,6 +334,7 @@ it('redeems only the customer\'s own reward, verified, inside the window, where 
     'an unverified email' => ['unverified', RedeemRefusal::Unverified],
     'after the window closed' => ['too late', RedeemRefusal::OutsideWindow],
     'before the window opened' => ['before the window', RedeemRefusal::OutsideWindow],
+    'in the second the window opened' => ['opening second', RedeemRefusal::OutsideWindow],
     'at a business that does not honour the card' => ['not honoured', RedeemRefusal::NotHonoured],
 ]);
 
@@ -352,6 +373,7 @@ it('keeps one redeem window open per customer', function (): void {
 
 it('never redeems at a closed site', function (): void {
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
     $presence = ($this->presence)(5);
     $this->context->bypass(fn () => app(ArchiveLocation::class)->handle($this->tenants->locationOf($this->tenants->a1)));
 
@@ -371,6 +393,7 @@ it('opens and closes redeem windows only through the redeem actions, in bypass()
 it('describes a redeemed tap for its result page', function (): void {
     $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save());
     app(OpenRedeemWindow::class)->handle($this->reward, $this->customer);
+    $this->travel(1)->seconds();
     $tap = ($this->tap)(5);
 
     $screen = app(DescribeTap::class)->handle($tap);

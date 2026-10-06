@@ -32,6 +32,10 @@ return new class extends Migration
             $table->boolean('armed')->default(false)->after('qty');
         });
 
+        // Taps still waiting at deploy: an armed one is known by its stamps (a single armed stamp
+        // can't be told apart, and is taken as a plain tap).
+        DB::table('taps')->where('status', 'pending')->where('qty', '>', 1)->update(['armed' => true]);
+
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(<<<'SQL'
                 alter table taps

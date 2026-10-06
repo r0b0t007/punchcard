@@ -14,8 +14,10 @@ use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\VisibleToBusiness;
+use Carbon\CarbonInterface;
 use Database\Factories\RewardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -170,6 +172,18 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * Whether the redeem window covers a moment (a tap's time): opened before
+     * it and not yet closed at it. Strictly after the opening second: times
+     * keep whole seconds, so a tap in that second may have come just before
+     * "Redeem now", and never counts. Keep in step with redeemWindowOpenAt().
+     */
+    public function isRedeemWindowOpenAt(CarbonInterface $at): bool
+    {
+        return $this->redeem_window_opened_at !== null && $this->redeem_window_until !== null
+            && $at->gt($this->redeem_window_opened_at) && $at->lte($this->redeem_window_until);
+    }
+
+    /**
      * @return BelongsTo<CardEnrollment, $this>
      */
     public function enrollment(): BelongsTo
@@ -199,6 +213,19 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     public function redeemedLocation(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'redeemed_location_id');
+    }
+
+    /**
+     * Rewards whose redeem window covers a moment, as isRedeemWindowOpenAt()
+     * decides it; keep the two in step.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function redeemWindowOpenAt(Builder $query, CarbonInterface $at): void
+    {
+        $query->where('redeem_window_opened_at', '<', $at->copy()->startOfSecond())
+            ->where('redeem_window_until', '>=', $at);
     }
 
     /**
