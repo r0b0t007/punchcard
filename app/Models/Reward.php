@@ -141,6 +141,9 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
         if ($status !== RewardStatus::Available || $redeemed !== []) {
             throw new LogicException('A reward is unlocked available; redeeming it is an update by the redeem Action.');
         }
+
+        // Even by an org admin: a reward stands for a completed card in the ledger (CHW-22).
+        throw new LogicException('A reward is unlocked by the stamp Action (AddStamps), in TenantContext::bypass().');
     }
 
     /** organization_id is the enrollment's, also in bypass(); its card is kept for cardIdFor(). */

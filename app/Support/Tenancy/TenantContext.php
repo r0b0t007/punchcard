@@ -33,7 +33,11 @@ final class TenantContext
 
     private bool $orgAdmin = false;
 
+    private bool $ownsTheAccount = false;
+
     private ?BusinessRole $businessRole = null;
+
+    private ?int $locationId = null;
 
     private int $bypassDepth = 0;
 
@@ -42,15 +46,18 @@ final class TenantContext
      * from the user's memberships. Without them the context grants no rights
      * (fail closed): reads work, while writes to the tenant structure (the
      * organization, its businesses, memberships) that need an owner or org admin
-     * throw. Operational site data (locations, stampers) is authorized by policies.
+     * throw. Operational site data (locations, stampers) is authorized by policies
+     * (CHW-22), which read these rights for the current tenant only.
      * Code acting for no user sets the tenant without rights (queued jobs get the
      * dispatching tenant this way, through QueuedTenant), or uses bypass() when
      * it spans tenants.
      *
      * @param  bool  $orgAdmin  the user administers the organization (organization_user)
      * @param  BusinessRole|null  $businessRole  the user's role in the business (business_user)
+     * @param  int|null  $locationId  the one location a staff member is limited to (business_user)
+     * @param  bool  $ownsTheAccount  the user owns the only business of an independent café or chain: its org admin without an organization_user row
      */
-    public function set(Organization $organization, ?Business $business = null, bool $orgAdmin = false, ?BusinessRole $businessRole = null): void
+    public function set(Organization $organization, ?Business $business = null, bool $orgAdmin = false, ?BusinessRole $businessRole = null, ?int $locationId = null, bool $ownsTheAccount = false): void
     {
         if ($business instanceof Business && (int) $business->organization_id !== (int) $organization->id) {
             throw new LogicException('The business does not belong to the organization.');
@@ -60,6 +67,8 @@ final class TenantContext
         $this->businessId = $business?->id;
         $this->orgAdmin = $orgAdmin;
         $this->businessRole = $business instanceof Business ? $businessRole : null;
+        $this->locationId = $business instanceof Business ? $locationId : null;
+        $this->ownsTheAccount = $business instanceof Business && $ownsTheAccount;
     }
 
     public function clear(): void
@@ -68,10 +77,23 @@ final class TenantContext
         $this->businessId = null;
         $this->orgAdmin = false;
         $this->businessRole = null;
+        $this->locationId = null;
+        $this->ownsTheAccount = false;
     }
 
     /** The user administers the current organization (franchise HQ, or an independent café's owner). */
     public function isOrgAdmin(): bool
+    {
+        return $this->orgAdmin || $this->ownsTheAccount;
+    }
+
+    /**
+     * The user holds an org_admin row here, so they manage the organization's
+     * admins. Owning the account (an independent café's co-owner) runs the
+     * organization but never grants a row: it would outlive their removal
+     * from the business (CHW-22).
+     */
+    public function managesOrgAdmins(): bool
     {
         return $this->orgAdmin;
     }
@@ -86,6 +108,12 @@ final class TenantContext
     public function canManageMembers(): bool
     {
         return $this->orgAdmin || $this->businessRole === BusinessRole::Owner;
+    }
+
+    /** The one location the user works at, when their membership limits them to it; null for the whole business. */
+    public function locationId(): ?int
+    {
+        return $this->locationId;
     }
 
     public function organizationId(): ?int
@@ -138,6 +166,8 @@ final class TenantContext
         $this->businessId = $snapshot->businessId;
         $this->orgAdmin = $snapshot->orgAdmin;
         $this->businessRole = $snapshot->businessRole;
+        $this->locationId = $snapshot->locationId;
+        $this->ownsTheAccount = $snapshot->ownsTheAccount;
         $this->bypassDepth = $snapshot->bypassDepth;
     }
 }

@@ -24,6 +24,7 @@ use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
+use App\Support\Tenancy\SuspendedBusinesses;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -38,9 +39,10 @@ use LogicException;
  * 1. staff must work at the business; a retried request (same idempotency
  *    key at the business) returns the earlier stamp if it is the same stamp
  *    by the same person, or is refused;
- * 2. the card must be active and honoured by the business and the site open
- *    (a correction may still take back, at most, the stamps given there) and, for a tap, the stamper
- *    current and active;
+ * 2. the card must be active and honoured by the business, the site open and
+ *    the business not suspended (SuspendedBusinesses, CHW-22; a correction may
+ *    still take back, at most, the stamps given there) and, for a tap, the
+ *    stamper current and active;
  * 3. stamps that prove presence (tap, scan, manual) keep to the cooldown (per
  *    customer per card) and the daily cap (per customer per card per
  *    business, today where the stamp is given); an armed tap gives what room
@@ -234,7 +236,7 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
-        if (! $request->isCorrection() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null)) {
+        if (! $request->isCorrection() && (! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null) || SuspendedBusinesses::isSuspended($request->businessId))) {
             throw new StampRejected(StampRejection::SiteClosed);
         }
 

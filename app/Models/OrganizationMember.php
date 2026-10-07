@@ -91,7 +91,8 @@ class OrganizationMember extends Pivot implements TenantModel
             return;
         }
 
-        if (! $context->isOrgAdmin() || $context->organizationId() === null || $organizationId !== $context->organizationId()) {
+        // A real org_admin row, not owning an independent café's account (TenantContext::managesOrgAdmins).
+        if (! $context->managesOrgAdmins() || $context->organizationId() === null || $organizationId !== $context->organizationId()) {
             throw new LogicException('Only an org admin of the organization manages its org admins.');
         }
     }

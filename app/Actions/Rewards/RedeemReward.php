@@ -12,6 +12,7 @@ use App\Models\CardEnrollment;
 use App\Models\Reward;
 use App\Models\User;
 use App\Support\Tenancy\ArchivedSites;
+use App\Support\Tenancy\SuspendedBusinesses;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\DB;
  * Redeems a reward (CHW-26, stamp-flow skill) with proof that the customer is
  * at the counter (RedeemPresence): their verified tap inside the redeem window
  * they opened (OpenRedeemWindow), at a business that honours the card (any
- * business of the franchise that does), at an open site. Needs a verified
+ * business of the franchise that does), at an open site of a business not
+ * suspended (SuspendedBusinesses, CHW-22). Needs a verified
  * email: an unverified account collects stamps but never cashes out.
  *
  * With the reward row locked (after the tap and the stamper, in ApplyTap): a
@@ -77,7 +79,7 @@ final readonly class RedeemReward
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
             ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
             ! CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $presence->businessId)->exists() => RedeemRefusal::NotHonoured,
-            ! ArchivedSites::isOpen($presence->businessId, $presence->locationId) => RedeemRefusal::SiteClosed,
+            ! ArchivedSites::isOpen($presence->businessId, $presence->locationId), SuspendedBusinesses::isSuspended($presence->businessId) => RedeemRefusal::SiteClosed,
             default => null,
         };
 

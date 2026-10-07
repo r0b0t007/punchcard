@@ -6,6 +6,7 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
+use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -31,8 +32,11 @@ use App\Support\Tenancy\TenantContext;
  * Franchise HQ keeps working while a franchisee is suspended or archived.
  *
  * The context also carries what the user may do there: org admin rights from
- * an org_admin row in organization_user, the business role from business_user
- * (the role cast makes an unknown value fail closed).
+ * an org_admin row in organization_user, the business role and any one
+ * location a staff member is limited to from business_user (the role cast
+ * makes an unknown value fail closed). The owner of the only business of an
+ * independent café or a chain is its org admin too (CHW-22): there the
+ * business is the account, so they run the card program and the brand.
  */
 final readonly class ResolveTenant
 {
@@ -43,9 +47,9 @@ final readonly class ResolveTenant
         $this->context->clear();
 
         $this->context->bypass(function () use ($user, $choice): void {
-            $roles = BusinessMember::query()->where('user_id', $user->id)->pluck('role', 'business_id');
+            $memberships = BusinessMember::query()->where('user_id', $user->id)->get(['business_id', 'role', 'location_id'])->keyBy('business_id');
             $businesses = Business::query()
-                ->whereIn('id', $roles->keys())
+                ->whereIn('id', $memberships->keys())
                 ->operating()
                 ->with('organization')
                 ->get();
@@ -56,14 +60,17 @@ final readonly class ResolveTenant
 
             [$type, $id] = $this->parseChoice($choice);
 
-            $enter = function (Business $business) use ($roles, $organizations): void {
-                $role = $roles->get($business->id);
+            $enter = function (Business $business) use ($memberships, $organizations): void {
+                $membership = $memberships->get($business->id);
+                $role = $membership?->role;
 
                 $this->context->set(
                     $business->organization,
                     $business,
                     orgAdmin: $organizations->contains('id', $business->organization_id),
                     businessRole: $role instanceof BusinessRole ? $role : null,
+                    locationId: $role === BusinessRole::Staff ? $membership->location_id : null,
+                    ownsTheAccount: $role === BusinessRole::Owner && $this->isTheAccount($business),
                 );
             };
 
@@ -95,6 +102,13 @@ final readonly class ResolveTenant
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
         });
+    }
+
+    /** The business is its organization's only one, and the organization not a franchise (in bypass). */
+    private function isTheAccount(Business $business): bool
+    {
+        return $business->organization->type !== OrganizationType::Franchise
+            && Business::query()->where('organization_id', $business->organization_id)->count() === 1;
     }
 
     /**
