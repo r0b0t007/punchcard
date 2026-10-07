@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Stampers;
 
 use App\Actions\Stampers\Concerns\AssignsTags;
+use App\Enums\StamperStatus;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
@@ -18,7 +19,9 @@ use Illuminate\Support\Facades\DB;
  * docs/runbooks/stamper-keys.md): its assignment ends (one-way) and a new one
  * starts, in one transaction. The tag keeps its counter and keys, so URLs
  * from the old site stay replays and the old holder can never take it back.
- * The new stamper starts active: pausing was the old assignment's choice.
+ * The stamper keeps its label unless a new one is given. Within the business
+ * it keeps its status (a paused stamper stays paused); at another business
+ * it starts active, the pause having been the old business's choice.
  */
 final readonly class MoveStamper
 {
@@ -50,12 +53,17 @@ final readonly class MoveStamper
             $site = $this->siteFor($business, $location);
 
             if ((int) $current->location_id === $site->id) {
-                throw new StamperRefused("Tag {$uid} is already at {$this->describe($site)}.");
+                throw new StamperRefused("Tag {$uid} is already at ".SiteName::of($site).'.');
             }
 
             $current->forceFill(['unassigned_at' => now()])->save();
 
-            return $this->assign($tag, $site, $label);
+            return $this->assign(
+                $tag,
+                $site,
+                $label ?? $current->label,
+                (int) $current->business_id === $site->business_id ? $current->status : StamperStatus::Active,
+            );
         })));
     }
 }

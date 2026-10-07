@@ -168,6 +168,14 @@ describe('registering', function (): void {
         'archived' => ['archived', 'archived'],
     ]);
 
+    it('takes a label up to 255 characters, and a location that is gone is a refusal', function (): void {
+        $gone = (new Location)->forceFill(['id' => 999999999, 'business_id' => $this->tenants->a1->id]);
+
+        expect(fn () => $this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, label: str_repeat('é', 256)))->toThrow(StamperRefused::class, 'at most 255')
+            ->and(fn () => $this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, $gone))->toThrow(StamperRefused::class, 'no longer exists')
+            ->and($this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, label: str_repeat('é', 255))->label)->toBe(str_repeat('é', 255));
+    });
+
     it('counts only open locations when it picks the business\'s only one', function (): void {
         $this->context->bypass(fn () => app(ArchiveLocation::class)->handle(Location::factory()->for($this->tenants->a1)->create(['name' => 'Old kiosk'])));
 
@@ -206,7 +214,23 @@ describe('moving', function (): void {
             ->and(($this->tagOf)($tag->uid)->key_version)->toBe(2);
     });
 
-    it('starts the new stamper active, whatever the old business did with its own', function (): void {
+    it('keeps the stamper\'s label and, within the business, its pause', function (): void {
+        $old = $this->tenants->stamper($this->tenants->a1);
+        $terrace = $this->context->bypass(function () use ($old): Location {
+            $old->forceFill(['label' => 'Counter', 'status' => StamperStatus::Disabled])->save();
+
+            return Location::factory()->for($this->tenants->a1)->create(['name' => 'Terrace']);
+        });
+        $uid = $this->context->bypass(fn (): string => $old->tag()->firstOrFail()->uid);
+
+        $moved = ($this->fresh)($this->move->handle($uid, $this->tenants->a1, $terrace));
+
+        expect($moved->label)->toBe('Counter')
+            ->and($moved->status)->toBe(StamperStatus::Disabled)
+            ->and($moved->location_id)->toBe($terrace->id);
+    });
+
+    it('starts the new stamper active at another business, whatever the old business did with its own', function (): void {
         $old = $this->tenants->stamper($this->tenants->a1);
         $this->context->bypass(fn () => $old->forceFill(['status' => StamperStatus::Disabled])->save());
         $uid = $this->context->bypass(fn (): string => $old->tag()->firstOrFail()->uid);
@@ -320,6 +344,14 @@ describe('the commands', function (): void {
             ->assertSuccessful();
 
         expect(($this->tagOf)('04A1B2C3D4E5F7'))->not->toBeNull();
+    });
+
+    it('finds a business by its slug before its id, so an all-digit slug still works', function (): void {
+        $numbered = $this->context->bypass(fn (): Business => Business::factory()->for($this->tenants->orgB)->create(['name' => 'Café 2024', 'slug' => (string) $this->tenants->a2->id]));
+        $this->context->bypass(fn () => Location::factory()->for($numbered)->create(['name' => 'Kiosk']));
+
+        expect(Artisan::call('punchcard:stamper:register', ['uid' => '04A1B2C3D4E5F6', 'business' => (string) $this->tenants->a2->id]))->toBe(0)
+            ->and(Artisan::output())->toContain('at Café 2024, Kiosk');
     });
 
     it('names the location by id when there are several', function (): void {
