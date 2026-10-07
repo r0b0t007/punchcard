@@ -87,6 +87,12 @@ final class TenantContext
         return $this->orgAdmin || $this->ownsTheAccount;
     }
 
+    /** The user owns the only business of an independent café or chain: the business is the organization. */
+    public function ownsTheAccount(): bool
+    {
+        return $this->ownsTheAccount;
+    }
+
     /**
      * The user holds an org_admin row here, so they manage the organization's
      * admins. Owning the account (an independent café's co-owner) runs the

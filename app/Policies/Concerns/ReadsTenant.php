@@ -33,6 +33,18 @@ trait ReadsTenant
         return $this->tenant()->organizationId() === $organizationId && $this->tenant()->isOrgAdmin();
     }
 
+    /**
+     * The user acts for this organization: its org admin across all its
+     * businesses, or the owner of an independent café's or chain's only
+     * business, where the business is the organization. HQ working inside one
+     * franchisee acts for that franchisee, not for the organization.
+     */
+    private function actsFor(int $organizationId): bool
+    {
+        return $this->administers($organizationId)
+            && ($this->tenant()->businessId() === null || $this->tenant()->ownsTheAccount());
+    }
+
     /** The user sees this business: they work in it, or they administer its organization across all its businesses. */
     private function sees(int $organizationId, int $businessId): bool
     {

@@ -43,10 +43,8 @@ final class BusinessPolicy
     /** The owner pays when each business pays for itself; when the organization pays, see OrganizationPolicy. */
     public function manageBilling(User $user, Business $business): bool
     {
-        $organization = $this->tenant()->bypass(fn (): ?Organization => Organization::query()->find($business->organization_id));
-
         return $this->tenant()->businessId() === $business->id
             && $this->tenant()->businessRole() === BusinessRole::Owner
-            && $organization?->billing_entity === BillingEntity::Business;
+            && $this->tenant()->bypass(fn (): Organization => $business->organization)->billing_entity === BillingEntity::Business;
     }
 }

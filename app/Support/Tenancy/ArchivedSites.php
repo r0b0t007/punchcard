@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\Organization;
@@ -48,11 +49,15 @@ final class ArchivedSites
         }
     }
 
-    public static function isOpen(mixed $businessId, mixed $locationId, bool $lock = false): bool
+    /**
+     * @param  bool  $counter  also closed while the business is suspended (CHW-22): the counter (taps, scans,
+     *                         manual stamps, redemptions) stops; an admin's own writes, and corrections, do not
+     */
+    public static function isOpen(mixed $businessId, mixed $locationId, bool $lock = false, bool $counter = false): bool
     {
         self::assertLockHolds($lock);
 
-        return app(TenantContext::class)->bypass(function () use ($businessId, $locationId, $lock): bool {
+        return app(TenantContext::class)->bypass(function () use ($businessId, $locationId, $lock, $counter): bool {
             if ($lock) {
                 $businessIds = array_unique(array_filter(
                     [$businessId, $locationId === null ? null : Location::query()->whereKey($locationId)->value('business_id')],
@@ -61,7 +66,7 @@ final class ArchivedSites
                 sort($businessIds);
 
                 foreach ($businessIds as $id) {
-                    if (! self::businessOpen($id, $lock)) {
+                    if (! self::businessOpen($id, $lock, $counter)) {
                         return false;
                     }
                 }
@@ -70,7 +75,7 @@ final class ArchivedSites
             }
 
             if ($locationId === null) {
-                return self::businessOpen($businessId, $lock);
+                return self::businessOpen($businessId, $lock, $counter);
             }
 
             $site = Location::query()
@@ -78,15 +83,16 @@ final class ArchivedSites
                 ->join('businesses', 'businesses.id', '=', 'locations.business_id')
                 ->join('organizations', 'organizations.id', '=', 'businesses.organization_id')
                 ->toBase()
-                ->first(['locations.business_id', 'locations.archived_at as location_archived', 'businesses.archived_at as business_archived', 'organizations.archived_at as organization_archived']);
+                ->first(['locations.business_id', 'locations.archived_at as location_archived', 'businesses.archived_at as business_archived', 'businesses.status as business_status', 'organizations.archived_at as organization_archived']);
 
             if ($site === null) {
                 return true;
             }
 
-            $open = $site->location_archived === null && $site->business_archived === null && $site->organization_archived === null;
+            $open = $site->location_archived === null && $site->business_archived === null && $site->organization_archived === null
+                && (! $counter || $site->business_status !== BusinessStatus::Suspended->value);
 
-            return $open && ($businessId === null || (int) $businessId === (int) $site->business_id || self::businessOpen($businessId, $lock));
+            return $open && ($businessId === null || (int) $businessId === (int) $site->business_id || self::businessOpen($businessId, $lock, $counter));
         });
     }
 
@@ -100,8 +106,11 @@ final class ArchivedSites
             ->value('archived_at') === null);
     }
 
-    /** The business and its organization, the business row locked when asked: an organization's archive writes its businesses too. */
-    private static function businessOpen(mixed $businessId, bool $lock): bool
+    /**
+     * The business and its organization, the business row locked when asked: an organization's archive writes its
+     * businesses too. For the counter, a suspended business is closed as well: one read, under the same lock.
+     */
+    private static function businessOpen(mixed $businessId, bool $lock, bool $counter = false): bool
     {
         if ($businessId === null) {
             return true;
@@ -112,9 +121,10 @@ final class ArchivedSites
             ->join('organizations', 'organizations.id', '=', 'businesses.organization_id')
             ->when($lock, fn ($query) => $query->lock('for share of businesses'))
             ->toBase()
-            ->first(['businesses.archived_at as business_archived', 'organizations.archived_at as organization_archived']);
+            ->first(['businesses.archived_at as business_archived', 'businesses.status as business_status', 'organizations.archived_at as organization_archived']);
 
-        return $business === null || ($business->business_archived === null && $business->organization_archived === null);
+        return $business === null || ($business->business_archived === null && $business->organization_archived === null
+            && (! $counter || $business->business_status !== BusinessStatus::Suspended->value));
     }
 
     /** A shared lock outside a transaction ends with its SELECT and protects nothing. */

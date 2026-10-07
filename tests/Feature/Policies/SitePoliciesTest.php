@@ -210,6 +210,21 @@ it('never makes a franchisee the org admin, even the only one so far', function 
         ->and(($this->allowed)($owner, 'update', $only))->toBeTrue();
 });
 
+it('gives HQ working inside a franchisee none of the organization\'s rights there', function (): void {
+    // HQ who also runs A1: inside A1 they act for A1, not for the franchise.
+    $this->tenants->member($this->hq, $this->tenants->a1, BusinessRole::Owner);
+    $inA1 = 'business:'.$this->tenants->a1->id;
+    $orgA = $this->tenants->orgA;
+
+    foreach (['update', 'manageBrand', 'viewNetwork', 'inviteFranchisee'] as $ability) {
+        expect(($this->as)($this->hq, $inA1)->allows($ability, $orgA))->toBeFalse()
+            ->and(($this->as)($this->hq, 'org:'.$orgA->id)->allows($ability, $orgA))->toBeTrue();
+    }
+
+    expect(($this->as)($this->hq, $inA1)->allows('create', [OrganizationMember::class, $orgA]))->toBeFalse()
+        ->and(($this->as)($this->hq, $inA1)->allows('update', $this->tenants->a1))->toBeTrue();
+});
+
 it('runs another franchisee only from across the organization, not from inside a business', function (): void {
     // HQ who also runs A2: working in A2, A1 is not theirs to run.
     $this->tenants->member($this->hq, $this->tenants->a2, BusinessRole::Owner);

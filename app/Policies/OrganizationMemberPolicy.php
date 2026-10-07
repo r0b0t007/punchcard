@@ -23,17 +23,17 @@ final class OrganizationMemberPolicy
 
     public function viewAny(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id) && $this->tenant()->managesOrgAdmins();
+        return $this->actsFor($organization->id) && $this->tenant()->managesOrgAdmins();
     }
 
     public function create(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id) && $this->tenant()->managesOrgAdmins();
+        return $this->actsFor($organization->id) && $this->tenant()->managesOrgAdmins();
     }
 
     public function delete(User $user, OrganizationMember $member): bool
     {
-        return $this->administers($member->organization_id)
+        return $this->actsFor($member->organization_id)
             && $this->tenant()->managesOrgAdmins()
             && $this->tenant()->bypass(fn (): int => OrganizationMember::query()
                 ->where('organization_id', $member->organization_id)

@@ -130,20 +130,10 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
             ArchivedSites::assertOpen($values['redeemed_business_id'] ?? null, $values['redeemed_location_id'] ?? null, 'A redemption', lock: true);
         }
 
-        if (app(TenantContext::class)->isBypassed()) {
-            return;
+        // Even by an org admin, available or not: a reward stands for a completed card in the ledger (CHW-22).
+        if (! app(TenantContext::class)->isBypassed()) {
+            throw new LogicException('A reward is unlocked by the stamp Action (AddStamps), in TenantContext::bypass().');
         }
-
-        // TenantBuilder passes stored values: enum casts are their strings by now.
-        $status = RewardStatus::tryFrom((string) ($values['status'] ?? RewardStatus::Available->value));
-        $redeemed = array_filter(array_intersect_key($values, array_flip([...self::REDEMPTION_COLUMNS, ...self::WINDOW_COLUMNS])), fn (mixed $value): bool => $value !== null);
-
-        if ($status !== RewardStatus::Available || $redeemed !== []) {
-            throw new LogicException('A reward is unlocked available; redeeming it is an update by the redeem Action.');
-        }
-
-        // Even by an org admin: a reward stands for a completed card in the ledger (CHW-22).
-        throw new LogicException('A reward is unlocked by the stamp Action (AddStamps), in TenantContext::bypass().');
     }
 
     /** organization_id is the enrollment's, also in bypass(); its card is kept for cardIdFor(). */

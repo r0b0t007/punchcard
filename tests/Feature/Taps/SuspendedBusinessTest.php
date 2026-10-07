@@ -16,6 +16,7 @@ use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\RedeemRefusal;
 use App\Enums\StampRejection;
+use App\Enums\StampSource;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\NfcTag;
@@ -105,6 +106,15 @@ it('still takes back stamps given at a suspended business', function (): void {
     $this->context->bypass(fn () => app(AddStamps::class)->handle($enrollment, StampRequest::correction($this->tenants->locationOf($this->tenants->a1), $staff, (string) Str::uuid(), 'Double stamp', -1)));
 
     expect($this->context->bypass(fn (): int => (int) StampEvent::query()->sum('qty')))->toBe(0);
+});
+
+it('still gives a system stamp at a suspended business: it follows its own rules', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    ($this->status)(BusinessStatus::Suspended);
+
+    $this->context->bypass(fn () => app(AddStamps::class)->handle($enrollment, StampRequest::system(StampSource::Birthday, $this->tenants->locationOf($this->tenants->a1), (string) Str::uuid())));
+
+    expect(($this->stamps)())->toBe(1);
 });
 
 it('keeps the other franchisees of the card stamping while one is suspended', function (): void {

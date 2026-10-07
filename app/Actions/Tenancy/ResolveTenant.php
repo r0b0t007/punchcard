@@ -6,12 +6,12 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
-use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\User;
+use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -70,7 +70,7 @@ final readonly class ResolveTenant
                     orgAdmin: $organizations->contains('id', $business->organization_id),
                     businessRole: $role instanceof BusinessRole ? $role : null,
                     locationId: $role === BusinessRole::Staff ? $membership->location_id : null,
-                    ownsTheAccount: $role === BusinessRole::Owner && $this->isTheAccount($business),
+                    ownsTheAccount: $role === BusinessRole::Owner && SingleBusinessAccounts::isTheAccount($business->organization_id),
                 );
             };
 
@@ -102,13 +102,6 @@ final readonly class ResolveTenant
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
         });
-    }
-
-    /** The business is its organization's only one, and the organization not a franchise (in bypass). */
-    private function isTheAccount(Business $business): bool
-    {
-        return $business->organization->type !== OrganizationType::Franchise
-            && Business::query()->where('organization_id', $business->organization_id)->count() === 1;
     }
 
     /**

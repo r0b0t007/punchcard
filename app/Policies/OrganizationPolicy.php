@@ -27,24 +27,24 @@ final class OrganizationPolicy
 
     public function update(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id);
+        return $this->actsFor($organization->id);
     }
 
     public function manageBrand(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id);
+        return $this->actsFor($organization->id);
     }
 
     /** Billing is the org admin's when the organization pays for its businesses; otherwise each owner's (BusinessPolicy). */
     public function manageBilling(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id) && $organization->billing_entity === BillingEntity::Organization;
+        return $this->actsFor($organization->id) && $organization->billing_entity === BillingEntity::Organization;
     }
 
     /** The franchise console (B18): HQ only. */
     public function viewNetwork(User $user, Organization $organization): bool
     {
-        return $this->administers($organization->id) && $organization->type === OrganizationType::Franchise;
+        return $this->actsFor($organization->id) && $organization->type === OrganizationType::Franchise;
     }
 
     public function inviteFranchisee(User $user, Organization $organization): bool
