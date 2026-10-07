@@ -14,7 +14,7 @@ Full product spec, feature inventory, data model, screen IDs (C1..C14, B1..B16, 
 - Laravel 13, PHP 8.3+, PostgreSQL (SQLite in-memory for tests); database drivers for cache, sessions and queues (no Redis until ADR 0005 triggers)
 - Inertia 3 + React 19 + TypeScript, Tailwind 4, shadcn/ui (Radix), Wayfinder (typed routes/actions)
 - Fortify auth (registration, email verification, 2FA, passkeys, password confirmation)
-- Filament (super-admin at /admin), spatie/laravel-permission (roles: customer, staff, owner, admin)
+- Filament (super-admin at /admin); roles: owner/staff in `business_user`, org_admin in `organization_user`, the platform `admin` in spatie/laravel-permission (ADR 0006). Policies read `TenantContext`
 - Pest (PHPUnit class tests also run), Larastan level 7, Pint, Rector; vite-plus (`vp`) for lint/format/build
 - Playwright E2E (Chromium, iPhone WebKit, Pixel), GitHub Actions CI
 

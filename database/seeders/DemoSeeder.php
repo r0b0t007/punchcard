@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\Auth\SetPlatformAdmin;
 use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
@@ -49,7 +50,10 @@ use RuntimeException;
  * events, and redeemed rewards name a business and location of the program.
  * Logins (password "password"): owner@cafe.demo.test, staff@cafe.demo.test,
  * hq@franchise.demo.test, owner@a1.demo.test (Tangier), owner@a2.demo.test
- * (Tétouan) and customer@demo.test, a member of both programs.
+ * (Tétouan), customer@demo.test, a member of both programs, and
+ * admin@demo.test, a platform admin (Filament at /admin), whose two-factor
+ * code comes from the secret DEMO_ADMIN_TWO_FACTOR_SECRET in an
+ * authenticator app, or the recovery code demo-admin-recovery.
  *
  * Known passwords and rows nothing can delete (the ledger, the tags): it runs
  * only in the local and testing environments, in one transaction.
@@ -118,6 +122,7 @@ final class DemoSeeder extends Seeder
 
         try {
             $customer = $this->user('Salma Bennani', 'customer@demo.test');
+            app(SetPlatformAdmin::class)->handle($this->admin(), admin: true);
 
             return [$this->setUpCafe($customer), $this->setUpFranchise($customer)];
         } finally {
@@ -369,6 +374,20 @@ final class DemoSeeder extends Seeder
             'location_id' => $location->id,
             'nfc_tag_id' => NfcTag::factory()->create(['uid' => '04'.strtoupper($this->faker->unique()->regexify('[0-9A-F]{12}'))])->id,
             'label' => $label,
+        ]);
+    }
+
+    /** A platform admin needs two-factor authentication: a known secret, as the demo's passwords are known. */
+    private const string DEMO_ADMIN_TWO_FACTOR_SECRET = 'JBSWY3DPEHPK3PXP';
+
+    private function admin(): User
+    {
+        return User::factory()->create([
+            'name' => 'Platform Admin',
+            'email' => 'admin@demo.test',
+            'two_factor_secret' => encrypt(self::DEMO_ADMIN_TWO_FACTOR_SECRET),
+            'two_factor_recovery_codes' => encrypt((string) json_encode(['demo-admin-recovery'])),
+            'two_factor_confirmed_at' => now(),
         ]);
     }
 

@@ -40,7 +40,10 @@ organization  (brand: the card program, brand identity, optional white-label dom
 - **Roles**: `org_admin` (franchisor HQ: card program, brand, org-wide campaigns and reports), `owner` (one business:
   locations, stampers, staff, local stats and campaigns, billing when paid per site), `staff` (stamp, arm, scan, redeem,
   optionally limited to one location), `customer` (global), `admin` (platform). Org roles come from `organization_user`;
-  business roles use spatie/laravel-permission teams keyed by business.
+  business roles from `business_user` (`role`, `location_id`): one source of truth, read through `TenantContext` by the
+  policies. spatie/laravel-permission holds only the platform `admin` role, without teams (amended 2026-10-06, CHW-22).
+  The owner of the only business of a non-franchise organization acts as its org admin; a customer is any user, not a
+  stored role.
 - **Customer data inside a franchise**: staff at any participating site can see a customer's progress on the shared card
   when the customer is present (needed to stamp and redeem). Customer lists, contact details and marketing audiences for a
   franchisee include only customers with a stamp event at that franchisee. The org_admin sees all program members. The
