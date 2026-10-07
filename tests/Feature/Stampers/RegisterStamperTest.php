@@ -88,7 +88,13 @@ describe('registering', function (): void {
         $this->register->handle($typed, $this->tenants->a1);
 
         expect(($this->tagOf)('04A1B2C3D4E5F6'))->not->toBeNull();
-    })->with(['spaces' => '04 a1 b2 c3 d4 e5 f6', 'colons' => '04:A1:B2:C3:D4:E5:F6', 'padded' => "  04A1B2C3D4E5F6\n"]);
+    })->with([
+        'spaces' => '04 a1 b2 c3 d4 e5 f6',
+        'colons' => '04:A1:B2:C3:D4:E5:F6',
+        'padded' => "  04A1B2C3D4E5F6\n",
+        'tabs' => "04\tA1\tB2\tC3\tD4\tE5\tF6",
+        'non-breaking spaces' => "04\u{00A0}A1\u{00A0}B2\u{00A0}C3\u{00A0}D4\u{00A0}E5\u{00A0}F6",
+    ]);
 
     it('refuses anything but a 7-byte NXP uid', function (string $typed, string $reason): void {
         expect(fn () => $this->register->handle($typed, $this->tenants->a1))->toThrow(StamperRefused::class, $reason)
@@ -98,6 +104,7 @@ describe('registering', function (): void {
         'too long' => ['04A1B2C3D4E5F607', '14 hex digits'],
         'not hex' => ['04A1B2C3D4E5G6', '14 hex digits'],
         'not NXP' => ['05A1B2C3D4E5F6', 'start with 04'],
+        'a stray letter, never dropped' => ['04A1B2C3D4E5F6X', '14 hex digits'],
     ]);
 
     it('assigns a known tag that is free again, keeping its counter and key version', function (): void {
@@ -168,12 +175,24 @@ describe('registering', function (): void {
         'archived' => ['archived', 'archived'],
     ]);
 
-    it('takes a label up to 255 characters, and a location that is gone is a refusal', function (): void {
+    it('takes a label up to 255 characters, and a business or location that is gone is a refusal', function (): void {
         $gone = (new Location)->forceFill(['id' => 999999999, 'business_id' => $this->tenants->a1->id]);
+        $goneBusiness = (new Business)->forceFill(['id' => 999999999, 'name' => 'Gone']);
 
         expect(fn () => $this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, label: str_repeat('é', 256)))->toThrow(StamperRefused::class, 'at most 255')
             ->and(fn () => $this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, $gone))->toThrow(StamperRefused::class, 'no longer exists')
+            ->and(fn () => $this->register->handle('04A1B2C3D4E5F6', $goneBusiness))->toThrow(StamperRefused::class, 'no longer exists')
             ->and($this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1, label: str_repeat('é', 255))->label)->toBe(str_repeat('é', 255));
+    });
+
+    it('turns someone registering the same tag at the same moment into a refusal', function (): void {
+        // The other admin's row lands between this one's lock (no tag yet) and its insert.
+        NfcTag::creating(function (NfcTag $tag): void {
+            NfcTag::flushEventListeners();
+            (new NfcTag)->forceFill(['uid' => $tag->uid])->save();
+        });
+
+        expect(fn () => $this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1))->toThrow(StamperRefused::class, 'at the same moment');
     });
 
     it('counts only open locations when it picks the business\'s only one', function (): void {
@@ -230,12 +249,15 @@ describe('moving', function (): void {
             ->and($moved->location_id)->toBe($terrace->id);
     });
 
-    it('starts the new stamper active at another business, whatever the old business did with its own', function (): void {
+    it('starts the stamper active and unlabelled at another business, never carrying the old business\'s site data', function (): void {
         $old = $this->tenants->stamper($this->tenants->a1);
-        $this->context->bypass(fn () => $old->forceFill(['status' => StamperStatus::Disabled])->save());
+        $this->context->bypass(fn () => $old->forceFill(['status' => StamperStatus::Disabled, 'label' => 'A1 Terrace - Maarif'])->save());
         $uid = $this->context->bypass(fn (): string => $old->tag()->firstOrFail()->uid);
 
-        expect(($this->fresh)($this->move->handle($uid, $this->tenants->a2))->status)->toBe(StamperStatus::Active);
+        $moved = ($this->fresh)($this->move->handle($uid, $this->tenants->a2));
+
+        expect($moved->status)->toBe(StamperStatus::Active)
+            ->and($moved->label)->toBeNull();
     });
 
     it('never moves a tag to a suspended or archived business, and leaves it where it was', function (string $state): void {

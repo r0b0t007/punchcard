@@ -10,18 +10,20 @@ use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
 use App\Models\Stamper;
-use App\Support\Nfc\TagUid;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The platform admin moves a tag to another location or business (CHW-138,
  * docs/runbooks/stamper-keys.md): its assignment ends (one-way) and a new one
  * starts, in one transaction. The tag keeps its counter and keys, so URLs
  * from the old site stay replays and the old holder can never take it back.
- * The stamper keeps its label unless a new one is given. Within the business
- * it keeps its status (a paused stamper stays paused); at another business
- * it starts active, the pause having been the old business's choice.
+ *
+ * Within the business the stamper keeps its label (unless a new one is given)
+ * and its status, so a paused stamper stays paused. At another business it
+ * starts active and unlabelled: the label and the pause were the old
+ * business's, and its site data never reaches another tenant. An arming
+ * never follows the tag: staff arm a stamper for the customer standing at
+ * that counter.
  */
 final readonly class MoveStamper
 {
@@ -31,11 +33,7 @@ final readonly class MoveStamper
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
-        $uid = TagUid::normalise($uid);
-
-        return $this->refusingRaces($uid, fn (): Stamper => $this->context->bypass(fn (): Stamper => DB::transaction(function () use ($uid, $business, $location, $label): Stamper {
-            $tag = $this->lockTag($uid);
-
+        return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
             if (! $tag instanceof NfcTag) {
                 throw new StamperRefused("No tag {$uid} is registered: register it first.");
             }
@@ -57,13 +55,11 @@ final readonly class MoveStamper
             }
 
             $current->forceFill(['unassigned_at' => now()])->save();
+            $sameBusiness = (int) $current->business_id === (int) $site->business_id;
 
-            return $this->assign(
-                $tag,
-                $site,
-                $label ?? $current->label,
-                (int) $current->business_id === $site->business_id ? $current->status : StamperStatus::Active,
-            );
-        })));
+            return $sameBusiness
+                ? $this->assign($tag, $site, $label ?? $current->label, $current->status)
+                : $this->assign($tag, $site, $label, StamperStatus::Active);
+        });
     }
 }

@@ -9,9 +9,7 @@ use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
 use App\Models\Stamper;
-use App\Support\Nfc\TagUid;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The platform admin registers an NFC tag and assigns it to a location of a
@@ -29,10 +27,8 @@ final readonly class RegisterStamper
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
-        $uid = TagUid::normalise($uid);
-
-        return $this->refusingRaces($uid, fn (): Stamper => $this->context->bypass(fn (): Stamper => DB::transaction(function () use ($uid, $business, $location, $label): Stamper {
-            $tag = $this->lockTag($uid) ?? $this->newTag($uid);
+        return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
+            $tag ??= $this->newTag($uid);
 
             if ($tag->retired_at !== null) {
                 throw $this->retired($uid);
@@ -45,7 +41,7 @@ final readonly class RegisterStamper
             }
 
             return $this->assign($tag, $this->siteFor($business, $location), $label);
-        })));
+        });
     }
 
     private function newTag(string $uid): NfcTag
