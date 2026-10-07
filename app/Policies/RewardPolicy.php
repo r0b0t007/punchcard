@@ -26,12 +26,6 @@ final class RewardPolicy
 
     public function view(User $user, Reward $reward): bool
     {
-        $businessId = $this->tenant()->businessId();
-
-        $redeemedHere = $businessId !== null && $reward->redeemed_business_id !== null && (int) $reward->redeemed_business_id === $businessId;
-
-        return $this->administers((int) $reward->organization_id)
-            || ($redeemedHere && $this->runs((int) $reward->organization_id, $businessId))
-            || $this->runsWhereSeen((int) $reward->enrollment_id);
+        return $this->managesAndSees(Reward::class, $reward->id);
     }
 }

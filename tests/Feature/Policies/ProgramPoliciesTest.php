@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Auth\Access\Gate as GateContract;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
@@ -85,6 +86,14 @@ it('fixes a card\'s mode and keeps the card once customers hold it', function (s
         // Without rights, nothing about the card's holders.
         ->and((string) ($this->as)($this->ownerA1)->inspect($ability, $this->tenants->cardA)->message())->not->toContain('Customers hold')
         ->and((string) ($this->as)($this->ownerB1)->inspect($ability, $this->tenants->cardA)->message())->not->toContain('Customers hold');
+
+    // A list loaded withExists('enrollments') asks no query per row.
+    $listed = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::query()->withExists('enrollments')->findOrFail($this->tenants->cardA->id));
+    $gate = ($this->as)($this->hq);
+    DB::enableQueryLog();
+
+    expect($gate->allows($ability, $listed))->toBeFalse()
+        ->and(collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, 'card_enrollments')))->toBeEmpty();
 })->with(['changeMode', 'delete']);
 
 it('lets a business see the card it honours, and HQ inside it no more than that', function (): void {
@@ -190,7 +199,7 @@ it('lets anyone working there stamp by hand or take stamps back, as AddStamps de
     expect(($this->as)($terraceStaff, 'business:'.$this->tenants->a1->id)->allows($ability, [$class, $site, $seen]))->toBeTrue();
 })->with(['createManual', 'correct']);
 
-it('gives a manual stamp only on a card honoured there, a correction also where it no longer is', function (): void {
+it('gives a manual stamp only on a card honoured there, a correction also where stamps are left to take back', function (): void {
     // HQ at its own site sees every customer of the program, A2's own card included.
     $this->tenants->member($this->hq, $this->tenants->a1, BusinessRole::Owner);
     $a2Only = $this->context->bypass(function (): LoyaltyCard {
@@ -204,10 +213,25 @@ it('gives a manual stamp only on a card honoured there, a correction also where 
     $site = $this->tenants->locationOf($this->tenants->a1);
 
     expect($gate->allows('createManual', [StampEvent::class, $site, $member]))->toBeFalse()
+        ->and($gate->allows('correct', [StampEvent::class, $site, $member]))->toBeFalse();
+
+    // Stamps given at A1 before the card left it: A1 can still take them back, as AddStamps does.
+    $this->context->bypass(function () use ($a2Only, $member): void {
+        $a2Only->businesses()->attach($this->tenants->a1->id);
+        $this->tenants->stamp($member, $this->tenants->a1);
+        $a2Only->businesses()->detach($this->tenants->a1->id);
+    });
+
+    expect($gate->allows('createManual', [StampEvent::class, $site, $member]))->toBeFalse()
         ->and($gate->allows('correct', [StampEvent::class, $site, $member]))->toBeTrue();
+
+    // Once they are taken back, nothing is left to correct there.
+    $this->tenants->stamp($member, $this->tenants->a1, ['qty' => -1, 'source' => StampSource::Correction, 'reason' => 'Stamped twice']);
+
+    expect($gate->allows('correct', [StampEvent::class, $site, $member]))->toBeFalse();
 });
 
-it('keeps the tap log and the tags to the platform admin, who never deletes a tag or changes the ledger', function (): void {
+it('keeps the tap log and the tags to the platform admin, who never writes the ledger or makes, copies or deletes a tag', function (): void {
     // Platform data: the policies never read the row, so unsaved models will do.
     $tap = new Tap;
     $tag = new NfcTag;
@@ -232,15 +256,23 @@ it('keeps the tap log and the tags to the platform admin, who never deletes a ta
             ->and($filament('update', $tag))->toBeTrue()
             ->and($filament('updateRules', $this->tenants->cardA))->toBeTrue()
             ->and($filament('delete', $unheld))->toBeTrue()
+            ->and($filament('update', $this->tenants->cardA))->toBeTrue()
+            // The tap log moves, is pruned and scrubbed: an admin may fix or erase a row.
+            ->and($filament('update', $tap))->toBeTrue()
+            ->and($filament('delete', $tap))->toBeTrue()
+            ->and($filament('create', NfcTag::class))->toBeFalse()
+            ->and($filament('replicate', $tag))->toBeFalse()
             ->and($filament('delete', $tag))->toBeFalse()
             ->and($filament('deleteAny', NfcTag::class))->toBeFalse()
             ->and($filament('forceDelete', $tag))->toBeFalse()
-            ->and($filament('update', $tap))->toBeFalse()
+            ->and($filament('create', StampEvent::class))->toBeFalse()
+            ->and($filament('replicate', $this->eventAtA2))->toBeFalse()
             ->and($filament('update', $this->eventAtA2))->toBeFalse()
             ->and($filament('delete', $this->eventAtA2))->toBeFalse()
             ->and($filament('deleteAny', StampEvent::class))->toBeFalse()
             ->and($filament('delete', $this->tenants->cardA))->toBeFalse()
-            ->and($filament('changeMode', $this->tenants->cardA))->toBeFalse();
+            ->and($filament('changeMode', $this->tenants->cardA))->toBeFalse()
+            ->and($filament('deleteAny', LoyaltyCard::class))->toBeFalse();
     } finally {
         Filament::setServingStatus(false);
     }

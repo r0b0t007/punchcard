@@ -4,40 +4,23 @@ declare(strict_types=1);
 
 namespace App\Policies\Concerns;
 
-use App\Models\CardBusiness;
 use App\Models\CardEnrollment;
+use App\Models\LoyaltyCard;
+use App\Models\Reward;
 
 /**
  * The card program around the tenant (ADR 0006, CHW-22): which businesses
- * honour a card, and which customers a business has seen. Reads in bypass():
- * the answer must not depend on the caller's own scope.
+ * honour a card (in bypass(), whatever the caller's scope), and which
+ * customers the caller manages (through the caller's own scope).
  */
 trait ReadsProgram
 {
     use ReadsTenant;
 
-    /** The business honours the card (card_business). */
+    /** The business honours the card (LoyaltyCard::honouredBy). */
     private function honours(int $cardId, int $businessId): bool
     {
-        return $this->tenant()->bypass(fn (): bool => CardBusiness::query()
-            ->where('card_id', $cardId)
-            ->where('business_id', $businessId)
-            ->exists());
-    }
-
-    /**
-     * The customer was at the business, by the very rule the tenant scope
-     * uses (CardEnrollment::constrainToBusiness: a stamp proving presence
-     * there), so the policy never drifts from what the scope shows.
-     */
-    private function visited(int $enrollmentId, int $businessId): bool
-    {
-        return $this->tenant()->bypass(function () use ($enrollmentId, $businessId): bool {
-            $query = CardEnrollment::query()->whereKey($enrollmentId);
-            (new CardEnrollment)->constrainToBusiness($query, $businessId);
-
-            return $query->exists();
-        });
+        return $this->tenant()->bypass(fn (): bool => LoyaltyCard::query()->honouredBy($businessId)->whereKey($cardId)->exists());
     }
 
     /** The user manages customers where they work now: the org admin, or the owner of the business. */
@@ -50,14 +33,17 @@ trait ReadsProgram
             && ($this->administers($organizationId) || ($businessId !== null && $this->runs($organizationId, $businessId)));
     }
 
-    /** The user runs the business they work in, and the customer was there. */
-    private function runsWhereSeen(int $enrollmentId): bool
+    /**
+     * The user manages customers where they work, and the tenant scope shows
+     * them this row: the very query TenantScope runs, so a policy never drifts
+     * from what a list shows (the org admin the program, HQ at its own site
+     * included; an owner the customers who were there and the rewards
+     * redeemed there).
+     *
+     * @param  class-string<CardEnrollment|Reward>  $class
+     */
+    private function managesAndSees(string $class, int $id): bool
     {
-        $businessId = $this->tenant()->businessId();
-        $organizationId = $this->tenant()->organizationId();
-
-        return $businessId !== null && $organizationId !== null
-            && $this->runs($organizationId, $businessId)
-            && $this->visited($enrollmentId, $businessId);
+        return $this->managesCustomers() && $class::query()->whereKey($id)->exists();
     }
 }

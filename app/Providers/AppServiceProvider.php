@@ -101,8 +101,10 @@ class AppServiceProvider extends ServiceProvider
      * A platform admin passes every ability, but only inside the Filament panel
      * (CHW-22): in the app itself they are a customer like anyone, with no
      * business or organization rights. Never past App\Policies\Invariants
-     * (a tag deleted, a stamp or tap changed, a held card deleted or remodelled).
-     * null leaves every other check to the policies.
+     * (a stamp written or changed, a tag made or deleted, a held card deleted or
+     * remodelled): there the answer is an explicit false, since Filament allows
+     * an action whose policy has no method for it. null leaves every other
+     * check to the policies.
      */
     private function letAdminsThroughInFilament(): void
     {
@@ -112,7 +114,6 @@ class AppServiceProvider extends ServiceProvider
                 return null;
             }
 
-            // An explicit no: Filament allows an action whose policy has no method for it.
             return ! Invariants::forbid($ability, $arguments);
         });
     }

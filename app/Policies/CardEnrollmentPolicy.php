@@ -29,6 +29,6 @@ final class CardEnrollmentPolicy
 
     public function view(User $user, CardEnrollment $enrollment): bool
     {
-        return $this->administers($enrollment->organization_id) || $this->runsWhereSeen($enrollment->id);
+        return $this->managesAndSees(CardEnrollment::class, $enrollment->id);
     }
 }

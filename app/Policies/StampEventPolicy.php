@@ -39,19 +39,37 @@ final class StampEventPolicy
         return $this->stampsAt($location, $enrollment) && $this->honours($enrollment->card_id, $location->business_id);
     }
 
-    /** Also where the card is no longer honoured: the ledger stays fixable where stamps were given (AddStamps). */
+    /**
+     * Where the card is honoured, or where stamps are left to take back after
+     * it no longer is: the ledger stays fixable where stamps were given, as
+     * AddStamps decides.
+     */
     public function correct(User $user, Location $location, CardEnrollment $enrollment): bool
     {
-        return $this->stampsAt($location, $enrollment);
+        return $this->stampsAt($location, $enrollment)
+            && ($this->honours($enrollment->card_id, $location->business_id) || $this->givenAt($enrollment, $location->business_id) > 0);
     }
 
+    /**
+     * Someone working at the location's business, staff within their site (an
+     * owner or org admin anywhere), on a customer the business can see: the
+     * same scoped check as AddStamps.
+     */
     private function stampsAt(Location $location, CardEnrollment $enrollment): bool
     {
         $limitedTo = $this->tenant()->isOrgAdmin() ? null : $this->tenant()->locationId();
 
-        // The same scoped check as AddStamps: a customer the business can see.
         return $this->worksIn($location->business_id)
             && ($limitedTo === null || $limitedTo === $location->id)
             && CardEnrollment::query()->whereKey($enrollment->id)->exists();
+    }
+
+    /** The customer's stamps on the card given at the business, net of corrections. */
+    private function givenAt(CardEnrollment $enrollment, int $businessId): int
+    {
+        return (int) $this->tenant()->bypass(fn (): mixed => StampEvent::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->where('business_id', $businessId)
+            ->sum('qty'));
     }
 }
