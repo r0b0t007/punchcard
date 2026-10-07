@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stamps;
 
+use App\Enums\BusinessRole;
 use App\Enums\CardMode;
 use App\Enums\OrganizationRole;
 use App\Enums\RewardStatus;
@@ -38,9 +39,11 @@ use LogicException;
  * 1. staff must work at the business; a retried request (same idempotency
  *    key at the business) returns the earlier stamp if it is the same stamp
  *    by the same person, or is refused;
- * 2. the card must be active and honoured by the business and the site open
- *    (a correction may still take back, at most, the stamps given there) and, for a tap, the stamper
- *    current and active;
+ * 2. the card must be active and honoured by the business and the site open,
+ *    for a stamp proving presence also the business not suspended (CHW-22; a
+ *    correction may still take back, at most, the stamps given there, and a
+ *    system stamp follows its own rules) and, for a tap, the stamper current
+ *    and active;
  * 3. stamps that prove presence (tap, scan, manual) keep to the cooldown (per
  *    customer per card) and the daily cap (per customer per card per
  *    business, today where the stamp is given); an armed tap gives what room
@@ -189,7 +192,11 @@ final readonly class AddStamps
         return new StampResult($earlier, $enrollment, array_values($rewards), replayed: true);
     }
 
-    /** Staff stamp where they work: a member of the business (at their location, if limited to one), or an org admin of its organization. */
+    /**
+     * Staff stamp where they work: a member of the business (staff at their
+     * location, if limited to one; an owner anywhere in it, as ResolveTenant
+     * reads the limit), or an org admin of its organization.
+     */
     private function assertStaff(StampRequest $request): void
     {
         if ($request->staffId === null) {
@@ -199,7 +206,7 @@ final readonly class AddStamps
         $member = BusinessMember::query()
             ->where('business_id', $request->businessId)
             ->where('user_id', $request->staffId)
-            ->where(fn ($membership) => $membership->whereNull('location_id')->orWhere('location_id', $request->locationId))
+            ->where(fn ($membership) => $membership->where('role', BusinessRole::Owner)->orWhereNull('location_id')->orWhere('location_id', $request->locationId))
             ->exists()
             || OrganizationMember::query()
                 ->where('user_id', $request->staffId)
@@ -234,7 +241,7 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::NotHonoured);
         }
 
-        if (! $request->isCorrection() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null)) {
+        if (! $request->isCorrection() && ! ArchivedSites::isOpen($request->businessId, $request->locationId, lock: $request->stamperId === null, counter: $request->provesPresence())) {
             throw new StampRejected(StampRejection::SiteClosed);
         }
 

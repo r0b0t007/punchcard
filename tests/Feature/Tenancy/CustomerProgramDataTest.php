@@ -117,7 +117,7 @@ describe('writes', function (): void {
             'enrollment_id' => $this->enrollmentA->id, 'mode' => CardMode::Cyclic, 'milestone' => 9, 'reward_type' => RewardType::Item, 'reward_text' => 'x', 'unlocked_at' => now(),
             ...$values,
         ])->save();
-    })->throws(LogicException::class, 'A reward is unlocked available')->with([
+    })->throws(LogicException::class, 'A reward is unlocked by the stamp Action')->with([
         'redeemed' => [['status' => RewardStatus::Redeemed, 'redeemed_at' => now()]],
         'credited to a sibling' => [['redeemed_business_id' => 2]],
         'expired' => [['status' => RewardStatus::Expired]],

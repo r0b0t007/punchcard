@@ -572,6 +572,15 @@ describe('callers', function (): void {
             ->and(($this->add)(($this->qr)(at: $otherLocation, staff: $limited))->event->location_id)->toBe($otherLocation->id);
     });
 
+    it('limits only staff to a location, never an owner whose row kept one', function (): void {
+        $otherLocation = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create());
+        $promoted = User::factory()->create();
+        // Promoted from staff at the other location: the row keeps its location_id.
+        $this->context->bypass(fn () => $this->tenants->a1->members()->attach($promoted, ['role' => BusinessRole::Owner->value, 'location_id' => $otherLocation->id]));
+
+        expect(($this->add)(($this->qr)(staff: $promoted))->event->location_id)->toBe($this->a1Location->id);
+    });
+
     it('refuses staff who do not work at the business', function (): void {
         ($this->add)(($this->qr)(staff: $this->a2Staff));
     })->throws(LogicException::class, 'staff');

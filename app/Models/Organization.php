@@ -9,6 +9,7 @@ use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
@@ -99,7 +100,7 @@ class Organization extends Model implements TenantModel
         // The org admin changes the organization. The owner of its only business may too
         // (an independent café or a one-company chain); a franchisee never can, not even
         // the first one, since later franchisees share the brand. Staff never can.
-        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || ! $this->ownedByItsOnlyBusiness())) {
+        if (! $context->isOrgAdmin() && ($context->businessRole() !== BusinessRole::Owner || ! SingleBusinessAccounts::isTheAccount($context->organizationId()))) {
             throw new LogicException('Only an org admin can change the organization.');
         }
 
@@ -153,20 +154,6 @@ class Organization extends Model implements TenantModel
             ->using(OrganizationMember::class)
             ->withPivot('id', 'role')
             ->withTimestamps();
-    }
-
-    /**
-     * The current organization is not a franchise and has one business. Reads the
-     * stored type, in bypass(): bulk writes have no loaded model to ask.
-     */
-    private function ownedByItsOnlyBusiness(): bool
-    {
-        $context = app(TenantContext::class);
-
-        return $context->bypass(fn (): bool => Business::query()
-            ->where('organization_id', $context->organizationId())
-            ->whereHas('organization', fn ($organization) => $organization->where('type', '!=', OrganizationType::Franchise))
-            ->count() === 1);
     }
 
     /**

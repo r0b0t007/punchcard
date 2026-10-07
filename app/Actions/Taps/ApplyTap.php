@@ -12,6 +12,7 @@ use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampRequest;
 use App\Actions\Stamps\StampResult;
+use App\Enums\BusinessStatus;
 use App\Enums\RewardStatus;
 use App\Enums\StamperStatus;
 use App\Enums\StampRejection;
@@ -41,8 +42,8 @@ use Illuminate\Support\Facades\DB;
  *   enrollment in AddStamps): an archive ends stampers before closing
  *   anything (CloseSites), so a stamper still current under the lock keeps
  *   its site open until this commits. An ended stamper, one moved since the
- *   tap (the stamp is given where the tap happened), or a closed site refuses
- *   the tap before anyone is enrolled;
+ *   tap (the stamp is given where the tap happened), a closed site, or a
+ *   suspended business (CHW-22) refuses the tap before anyone is enrolled;
  * - a customer with a redeem window open at the tap's time (CHW-26) has the
  *   reward redeemed instead (RedeemReward, the reward locked after the
  *   stamper), with no stamp. A tap beaten to it by another tap hands over
@@ -110,7 +111,7 @@ final readonly class ApplyTap
         // stamper has a clearer reason than "unavailable".
         $refusal = match (true) {
             $stamper->unassigned_at !== null || $stamper->location_id !== $tap->location_id => TapRejection::UnassignedTag,
-            ! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id) => TapRejection::SiteClosed,
+            ! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id), $business->status === BusinessStatus::Suspended => TapRejection::SiteClosed,
             default => null,
         };
 
