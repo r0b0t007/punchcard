@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            // No sign-in page of its own: guests go to Fortify's, which asks for two-factor authentication.
             ->colors([
                 'primary' => Color::Amber,
             ])

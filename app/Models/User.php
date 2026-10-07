@@ -47,15 +47,18 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
-     * The Filament panel at /admin is for platform admins only (CHW-22), with
-     * a verified email; an anonymised account is never one. Business owners
-     * and staff use the app, never the panel.
+     * The Filament panel at /admin is for platform admins only (CHW-22): a
+     * verified email and two-factor authentication confirmed, which Fortify's
+     * sign-in (the panel has none of its own) then always asks for. An
+     * anonymised account is never one. Business owners and staff use the app,
+     * never the panel.
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return $panel->getId() === 'admin'
-            && $this->anonymised_at === null
+            && ! $this->isAnonymised()
             && $this->hasVerifiedEmail()
+            && $this->two_factor_confirmed_at !== null
             && $this->hasRole(PlatformRole::Admin->value);
     }
 

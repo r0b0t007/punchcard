@@ -101,7 +101,7 @@ final readonly class DeleteAccount
     {
         BusinessMember::query()->where('user_id', $user->id)->delete();
         // A deleted row loses its roles with it (HasRoles); a kept one gives them up here.
-        $user->roles()->detach();
+        $user->syncRoles([]);
         CardEnrollment::query()->where('user_id', $user->id)->whereDoesntHave('stampEvents')->whereDoesntHave('rewards')->delete();
         CardEnrollment::query()->where('user_id', $user->id)->update(['referral_code' => null]);
         $user->passkeys()->delete();
