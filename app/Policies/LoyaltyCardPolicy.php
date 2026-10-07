@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\User;
@@ -51,20 +50,21 @@ final class LoyaltyCardPolicy
     /** Mode and tiers: fixed once customers hold the card. */
     public function changeMode(User $user, LoyaltyCard $card): Response
     {
-        return $this->actsFor($card->organization_id) && ! $this->isHeld($card)
-            ? Response::allow()
-            : Response::deny('Customers hold this card: its mode and tiers are fixed.');
+        return $this->unlessHeld($card, __('Customers hold this card: its mode and tiers are fixed.'));
     }
 
     public function delete(User $user, LoyaltyCard $card): Response
     {
-        return $this->actsFor($card->organization_id) && ! $this->isHeld($card)
-            ? Response::allow()
-            : Response::deny('Customers hold this card: switch it off instead.');
+        return $this->unlessHeld($card, __('Customers hold this card: switch it off instead.'));
     }
 
-    private function isHeld(LoyaltyCard $card): bool
+    /** Someone without rights learns nothing about the card's holders. */
+    private function unlessHeld(LoyaltyCard $card, string $reason): Response
     {
-        return $this->tenant()->bypass(fn (): bool => CardEnrollment::query()->where('card_id', $card->id)->exists());
+        if (! $this->actsFor($card->organization_id)) {
+            return Response::deny();
+        }
+
+        return Invariants::isHeld($card) ? Response::deny($reason) : Response::allow();
     }
 }

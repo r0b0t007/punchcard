@@ -28,8 +28,10 @@ final class RewardPolicy
     {
         $businessId = $this->tenant()->businessId();
 
-        return $this->administers($reward->organization_id)
-            || $this->runsWhereSeen($reward->enrollment_id)
-            || ($businessId !== null && $reward->redeemed_business_id === $businessId && $this->runs($reward->organization_id, $businessId));
+        $redeemedHere = $businessId !== null && $reward->redeemed_business_id !== null && (int) $reward->redeemed_business_id === $businessId;
+
+        return $this->administers((int) $reward->organization_id)
+            || ($redeemedHere && $this->runs((int) $reward->organization_id, $businessId))
+            || $this->runsWhereSeen((int) $reward->enrollment_id);
     }
 }

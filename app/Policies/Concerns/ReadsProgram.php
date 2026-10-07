@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Policies\Concerns;
 
-use App\Enums\StampSource;
 use App\Models\CardBusiness;
-use App\Models\StampEvent;
+use App\Models\CardEnrollment;
 
 /**
  * The card program around the tenant (ADR 0006, CHW-22): which businesses
@@ -27,17 +26,18 @@ trait ReadsProgram
     }
 
     /**
-     * The customer was at the business: a stamp proving presence there, as
-     * CardEnrollment::constrainToBusiness decides (a bonus, birthday or
-     * referral stamp does not count).
+     * The customer was at the business, by the very rule the tenant scope
+     * uses (CardEnrollment::constrainToBusiness: a stamp proving presence
+     * there), so the policy never drifts from what the scope shows.
      */
     private function visited(int $enrollmentId, int $businessId): bool
     {
-        return $this->tenant()->bypass(fn (): bool => StampEvent::query()
-            ->where('enrollment_id', $enrollmentId)
-            ->where('business_id', $businessId)
-            ->whereIn('source', StampSource::presenceValues())
-            ->exists());
+        return $this->tenant()->bypass(function () use ($enrollmentId, $businessId): bool {
+            $query = CardEnrollment::query()->whereKey($enrollmentId);
+            (new CardEnrollment)->constrainToBusiness($query, $businessId);
+
+            return $query->exists();
+        });
     }
 
     /** The user manages customers where they work now: the org admin, or the owner of the business. */

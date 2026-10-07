@@ -226,5 +226,7 @@
     "Verify your email to redeem": "Vérifiez votre e-mail pour l’utiliser",
     "We sent a link to your email. Open it, then come back for your :reward.": "Nous vous avons envoyé un lien par e-mail. Ouvrez-le, puis revenez pour votre :reward.",
     "Your :reward is still saved. Try again when you're at the counter.": "Votre :reward reste de côté. Réessayez une fois au comptoir.",
-    "seconds": "secondes"
+    "seconds": "secondes",
+    "Customers hold this card: its mode and tiers are fixed.": "Des clients ont cette carte : son mode et ses paliers ne changent plus.",
+    "Customers hold this card: switch it off instead.": "Des clients ont cette carte : désactivez-la plutôt."
 }

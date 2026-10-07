@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
 
+use function Filament\get_authorization_response;
+
 /*
 |--------------------------------------------------------------------------
 | Program and customer-data policies (CHW-22)
@@ -72,12 +74,17 @@ it('lets the org admin acting for the organization run the card and its rules, n
 })->with(['update', 'updateRules']);
 
 it('fixes a card\'s mode and keeps the card once customers hold it', function (string $ability): void {
+    // The reasons are translated; the app's default locale is French.
+    app()->setLocale('en');
     $unheld = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create());
 
     expect(($this->allowed)($this->hq, $ability, $this->tenants->cardA))->toBeFalse()
         ->and(($this->as)($this->hq)->inspect($ability, $this->tenants->cardA)->message())->toContain('Customers hold this card')
         ->and(($this->allowed)($this->hq, $ability, $unheld))->toBeTrue()
-        ->and(($this->allowed)($this->ownerA1, $ability, $unheld))->toBeFalse();
+        ->and(($this->allowed)($this->ownerA1, $ability, $unheld))->toBeFalse()
+        // Without rights, nothing about the card's holders.
+        ->and((string) ($this->as)($this->ownerA1)->inspect($ability, $this->tenants->cardA)->message())->not->toContain('Customers hold')
+        ->and((string) ($this->as)($this->ownerB1)->inspect($ability, $this->tenants->cardA)->message())->not->toContain('Customers hold');
 })->with(['changeMode', 'delete']);
 
 it('lets a business see the card it honours, and HQ inside it no more than that', function (): void {
@@ -183,6 +190,23 @@ it('lets anyone working there stamp by hand or take stamps back, as AddStamps de
     expect(($this->as)($terraceStaff, 'business:'.$this->tenants->a1->id)->allows($ability, [$class, $site, $seen]))->toBeTrue();
 })->with(['createManual', 'correct']);
 
+it('gives a manual stamp only on a card honoured there, a correction also where it no longer is', function (): void {
+    // HQ at its own site sees every customer of the program, A2's own card included.
+    $this->tenants->member($this->hq, $this->tenants->a1, BusinessRole::Owner);
+    $a2Only = $this->context->bypass(function (): LoyaltyCard {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create();
+        $card->businesses()->attach($this->tenants->a2->id);
+
+        return $card;
+    });
+    $member = $this->tenants->enroll(User::factory()->create(), $a2Only);
+    $gate = ($this->as)($this->hq, 'business:'.$this->tenants->a1->id);
+    $site = $this->tenants->locationOf($this->tenants->a1);
+
+    expect($gate->allows('createManual', [StampEvent::class, $site, $member]))->toBeFalse()
+        ->and($gate->allows('correct', [StampEvent::class, $site, $member]))->toBeTrue();
+});
+
 it('keeps the tap log and the tags to the platform admin, who never deletes a tag or changes the ledger', function (): void {
     // Platform data: the policies never read the row, so unsaved models will do.
     $tap = new Tap;
@@ -196,17 +220,27 @@ it('keeps the tap log and the tags to the platform admin, who never deletes a ta
 
     $admin = User::factory()->withTwoFactor()->create();
     $admin->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
+    $this->actingAs($admin);
     Filament::setCurrentPanel('admin');
     Filament::setServingStatus();
+    $unheld = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgA)->create());
+    // As Filament asks: an action whose policy has no method is allowed unless the Gate says no.
+    $filament = fn (string $action, mixed $model): bool => get_authorization_response($action, $model)->allowed();
 
     try {
-        expect(Gate::forUser($admin)->allows('view', $tap))->toBeTrue()
-            ->and(Gate::forUser($admin)->allows('update', $tag))->toBeTrue()
-            ->and(Gate::forUser($admin)->allows('delete', $tag))->toBeFalse()
-            ->and(Gate::forUser($admin)->allows('update', $tap))->toBeFalse()
-            ->and(Gate::forUser($admin)->allows('update', $this->eventAtA2))->toBeFalse()
-            ->and(Gate::forUser($admin)->allows('delete', $this->eventAtA2))->toBeFalse()
-            ->and(Gate::forUser($admin)->allows('updateRules', $this->tenants->cardA))->toBeTrue();
+        expect($filament('view', $tap))->toBeTrue()
+            ->and($filament('update', $tag))->toBeTrue()
+            ->and($filament('updateRules', $this->tenants->cardA))->toBeTrue()
+            ->and($filament('delete', $unheld))->toBeTrue()
+            ->and($filament('delete', $tag))->toBeFalse()
+            ->and($filament('deleteAny', NfcTag::class))->toBeFalse()
+            ->and($filament('forceDelete', $tag))->toBeFalse()
+            ->and($filament('update', $tap))->toBeFalse()
+            ->and($filament('update', $this->eventAtA2))->toBeFalse()
+            ->and($filament('delete', $this->eventAtA2))->toBeFalse()
+            ->and($filament('deleteAny', StampEvent::class))->toBeFalse()
+            ->and($filament('delete', $this->tenants->cardA))->toBeFalse()
+            ->and($filament('changeMode', $this->tenants->cardA))->toBeFalse();
     } finally {
         Filament::setServingStatus(false);
     }
