@@ -38,7 +38,7 @@ final readonly class KeyDiversifier
 
     private const int KEY_BYTES = 16;
 
-    private const int UID_HEX = 14;
+    private const int UID_HEX = TagUid::BYTES * 2;
 
     /** Wrapped so dumps (dd, VarDumper, var_export, print_r) and serialization never reveal it. */
     private SensitiveParameterValue $masterKey;

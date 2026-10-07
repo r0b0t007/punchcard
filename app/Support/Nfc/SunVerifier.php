@@ -28,7 +28,7 @@ final class SunVerifier
 
     private const int CMAC_HEX = 16;
 
-    private const int UID_BYTES = 7;
+    private const int UID_BYTES = TagUid::BYTES;
 
     /** PICCDataTag: UID mirrored (bit 7), counter mirrored (bit 6), UID length 7 (low nibble). */
     private const int PICC_DATA_TAG = 0xC7;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Actions\Auth\SetPlatformAdmin;
+use App\Actions\Stampers\RegisterStamper;
 use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
@@ -366,15 +367,10 @@ final class DemoSeeder extends Seeder
         ]);
     }
 
-    /** Registers a new tag and assigns it, as the admin action does. */
+    /** Registers a new tag and assigns it, through the platform admin's Action. */
     private function stamper(Business $business, Location $location, string $label): Stamper
     {
-        return Stamper::factory()->create([
-            'business_id' => $business->id,
-            'location_id' => $location->id,
-            'nfc_tag_id' => NfcTag::factory()->create(['uid' => '04'.strtoupper($this->faker->unique()->regexify('[0-9A-F]{12}'))])->id,
-            'label' => $label,
-        ]);
+        return app(RegisterStamper::class)->handle('04'.strtoupper($this->faker->unique()->regexify('[0-9A-F]{12}')), $business, $location, $label);
     }
 
     /** A platform admin needs two-factor authentication: a known secret, as the demo's passwords are known. */
