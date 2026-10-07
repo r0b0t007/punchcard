@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use LogicException;
 
@@ -83,7 +84,7 @@ class LoyaltyCard extends Model implements TenantModel
             // Locking the card first makes a racing first enrollment (its foreign key
             // locks the card too) commit before this check, or wait for the change.
             $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
-                && CardEnrollment::query()->where('card_id', $this->id)->exists());
+                && self::query()->whereKey($this->id)->held()->exists());
 
             if ($held) {
                 throw new LogicException('A card\'s mode and tiers cannot change once customers hold it (or in a bulk update): start a new card.');
@@ -122,6 +123,19 @@ class LoyaltyCard extends Model implements TenantModel
     }
 
     /**
+     * Cards customers hold: their mode and tiers are fixed, and they are
+     * switched off, never deleted. Use it in bypass(), where no tenant scope
+     * hides another business's enrollments.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function held(Builder $query): void
+    {
+        $query->whereHas('enrollments');
+    }
+
+    /**
      * The cards a business honours, in the order a first tap there picks one
      * (CHW-25): an active card first, then the oldest.
      *
@@ -133,6 +147,16 @@ class LoyaltyCard extends Model implements TenantModel
         $query->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($businessId))
             ->orderByDesc('active')
             ->orderBy('id');
+    }
+
+    /**
+     * The customers holding the card.
+     *
+     * @return HasMany<CardEnrollment, $this>
+     */
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(CardEnrollment::class, 'card_id');
     }
 
     /**

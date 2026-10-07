@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Models\User;
+use App\Policies\Invariants;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
@@ -99,14 +100,22 @@ class AppServiceProvider extends ServiceProvider
     /**
      * A platform admin passes every ability, but only inside the Filament panel
      * (CHW-22): in the app itself they are a customer like anyone, with no
-     * business or organization rights. null leaves every other check to the
-     * policies.
+     * business or organization rights. Never past App\Policies\Invariants
+     * (a stamp written or changed, a tag made or deleted, a held card deleted or
+     * remodelled): there the answer is an explicit false, since Filament allows
+     * an action whose policy has no method for it. null leaves every other
+     * check to the policies.
      */
     private function letAdminsThroughInFilament(): void
     {
-        Gate::before(fn (User $user): ?bool => Filament::isServing()
-            && Filament::getCurrentPanel()?->getId() === 'admin'
-            && $user->hasRole(PlatformRole::Admin->value) ? true : null);
+        /** @param  array<int, mixed>  $arguments */
+        Gate::before(function (User $user, string $ability, array $arguments): ?bool {
+            if (! Filament::isServing() || Filament::getCurrentPanel()?->getId() !== 'admin' || ! $user->hasRole(PlatformRole::Admin->value)) {
+                return null;
+            }
+
+            return ! Invariants::forbid($ability, $arguments);
+        });
     }
 
     /**

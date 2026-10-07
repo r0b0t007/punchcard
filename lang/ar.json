@@ -226,5 +226,7 @@
     "Verify your email to redeem": "أكِّد بريدك الإلكتروني لاستخدامها",
     "We sent a link to your email. Open it, then come back for your :reward.": "أرسلنا رابطًا إلى بريدك الإلكتروني. افتحه ثم عُد لتحصل على :reward.",
     "Your :reward is still saved. Try again when you're at the counter.": "ما زالت :reward محفوظة لك. حاول مجددًا عندما تكون عند الكاونتر.",
-    "seconds": "ثانية"
+    "seconds": "ثانية",
+    "Customers hold this card: its mode and tiers are fixed.": "لدى عملاء هذه البطاقة: لم يعد بالإمكان تغيير نمطها ومستوياتها.",
+    "Customers hold this card: switch it off instead.": "لدى عملاء هذه البطاقة: أوقفها بدلًا من ذلك."
 }
