@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
+use App\Models\NfcTag;
+use App\Models\StampEvent;
+use App\Models\Tap;
 use App\Models\User;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Http\ClientAddress;
@@ -99,14 +102,29 @@ class AppServiceProvider extends ServiceProvider
     /**
      * A platform admin passes every ability, but only inside the Filament panel
      * (CHW-22): in the app itself they are a customer like anyone, with no
-     * business or organization rights. null leaves every other check to the
-     * policies.
+     * business or organization rights. Not what must never change: deleting a
+     * tag, editing or deleting a stamp or a tap stays the policy's "no", there
+     * too (CLAUDE.md invariants). null leaves every other check to the policies.
      */
     private function letAdminsThroughInFilament(): void
     {
-        Gate::before(fn (User $user): ?bool => Filament::isServing()
-            && Filament::getCurrentPanel()?->getId() === 'admin'
-            && $user->hasRole(PlatformRole::Admin->value) ? true : null);
+        $neverChanged = [
+            NfcTag::class => ['delete', 'deleteAny', 'forceDelete', 'forceDeleteAny'],
+            StampEvent::class => ['update', 'delete', 'deleteAny', 'forceDelete', 'forceDeleteAny', 'restore'],
+            Tap::class => ['update', 'delete', 'deleteAny', 'forceDelete', 'forceDeleteAny', 'restore'],
+        ];
+
+        /** @param  array<int, mixed>  $arguments */
+        Gate::before(function (User $user, string $ability, array $arguments) use ($neverChanged): ?bool {
+            if (! Filament::isServing() || Filament::getCurrentPanel()?->getId() !== 'admin' || ! $user->hasRole(PlatformRole::Admin->value)) {
+                return null;
+            }
+
+            $subject = $arguments[0] ?? null;
+            $class = is_object($subject) ? $subject::class : (is_string($subject) ? $subject : null);
+
+            return $class !== null && in_array($ability, $neverChanged[$class] ?? [], true) ? null : true;
+        });
     }
 
     /**
