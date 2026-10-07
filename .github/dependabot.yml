@@ -46,4 +46,8 @@ updates:
       # Types follow the Node version CI runs (22), not the newest release.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # @typescript-eslint/parser (used by @shadcn/lint) accepts typescript <6.1, and
+      # TypeScript 7's API is not ready for it yet. Lift this when its peer range allows.
+      - dependency-name: "typescript"
+        versions: [">=6.1.0"]
     open-pull-requests-limit: 5
