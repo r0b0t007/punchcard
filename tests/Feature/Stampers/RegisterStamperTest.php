@@ -196,9 +196,10 @@ describe('registering', function (): void {
     });
 
     it('counts only open locations when it picks the business\'s only one', function (): void {
+        $site = $this->tenants->locationOf($this->tenants->a1);
         $this->context->bypass(fn () => app(ArchiveLocation::class)->handle(Location::factory()->for($this->tenants->a1)->create(['name' => 'Old kiosk'])));
 
-        expect($this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1)->location_id)->toBe($this->tenants->locationOf($this->tenants->a1)->id);
+        expect($this->register->handle('04A1B2C3D4E5F6', $this->tenants->a1)->location_id)->toBe($site->id);
     });
 
     it('needs the location named when the business has several open ones, and refuses one with none', function (): void {
