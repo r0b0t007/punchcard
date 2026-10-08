@@ -8,7 +8,6 @@ use App\Actions\Stampers\RecordRekey;
 use App\Actions\Stampers\StamperRefused;
 use App\Models\Stamper;
 use App\Support\Nfc\TagUid;
-use App\Support\Tenancy\TenantContext;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -29,7 +28,7 @@ use InvalidArgumentException;
 #[Description('Record that an NFC tag was re-provisioned to a new key version')]
 class TagRekeyedCommand extends Command
 {
-    public function handle(TenantContext $context, RecordRekey $recordRekey): int
+    public function handle(RecordRekey $recordRekey): int
     {
         try {
             $uid = TagUid::normalise((string) $this->argument('uid'));
@@ -61,12 +60,12 @@ class TagRekeyedCommand extends Command
             return self::FAILURE;
         }
 
-        $stamperId = $context->bypass(fn (): mixed => Stamper::query()->current()->where('nfc_tag_id', $tag->id)->value('id'));
+        $stamper = $tag->currentStamper;
 
         $this->info("Tag {$uid} is now at key version {$tag->key_version}; its counter ({$tag->last_counter}) is unchanged.");
-        $this->line($stamperId === null
-            ? 'Assign it when it is back in service.'
-            : "Re-enable it with punchcard:stamper:enable {$uid} (stamper #{$stamperId}) and test one tap.");
+        $this->line($stamper instanceof Stamper
+            ? "If you disabled stamper #{$stamper->id} in step 1, re-enable it with punchcard:stamper:enable {$uid} and test one tap; if the business had disabled it, leave it."
+            : 'Assign it when it is back in service.');
 
         return self::SUCCESS;
     }

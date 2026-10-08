@@ -151,7 +151,7 @@ describe('re-keying', function (): void {
         expect(Artisan::call('punchcard:tag:rekeyed', ['uid' => $this->uid, 'version' => '2', '--force' => true]))->toBe(0)
             ->and(Artisan::output())
             ->toContain("Tag {$this->uid} is now at key version 2; its counter (0) is unchanged.")
-            ->toContain("punchcard:stamper:enable {$this->uid} (stamper #{$this->stamper->id})");
+            ->toContain("If you disabled stamper #{$this->stamper->id} in step 1, re-enable it with punchcard:stamper:enable {$this->uid}");
     });
 
     it('refuses the same re-key run twice, as after a dropped session', function (): void {
@@ -181,6 +181,36 @@ describe('disabling and enabling', function (): void {
             ->and(($this->fresh)($this->stamper)->status)->toBe(StamperStatus::Active);
     });
 
+    it('says when the stamper already had that status, so a business\'s own pause is not undone', function (): void {
+        ($this->pause)();
+
+        expect(Artisan::call('punchcard:stamper:disable', ['uid' => $this->uid]))->toBe(0)
+            ->and(Artisan::output())->toContain('was already disabled, perhaps by the business');
+
+        $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Active])->save());
+
+        expect(Artisan::call('punchcard:stamper:enable', ['uid' => $this->uid]))->toBe(0)
+            ->and(Artisan::output())->toContain('was already enabled');
+    });
+
+    it('clears the arming when it disables, so armed stamps never land after it is enabled again', function (): void {
+        $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 5, 'armed_until' => now()->addMinute()])->save());
+
+        app(SetStamperStatus::class)->handle($this->uid, StamperStatus::Disabled);
+        $change = app(SetStamperStatus::class)->handle($this->uid, StamperStatus::Active);
+
+        expect($change->changed())->toBeTrue()
+            ->and(($this->fresh)($this->stamper)->armed_qty)->toBeNull()
+            ->and(($this->fresh)($this->stamper)->armed_until)->toBeNull();
+    });
+
+    it('leaves a live arming alone when it enables a stamper that was enabled', function (): void {
+        $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addMinute()])->save());
+
+        expect(app(SetStamperStatus::class)->handle($this->uid, StamperStatus::Active)->changed())->toBeFalse()
+            ->and(($this->fresh)($this->stamper)->armed_qty)->toBe(3);
+    });
+
     it('refuses a tag that is unknown or has no stamper', function (string $state, string $reason): void {
         $uid = match ($state) {
             'unknown' => '04A1B2C3D4E5F6',
@@ -195,6 +225,12 @@ describe('disabling and enabling', function (): void {
         'free' => ['free', 'is not assigned.'],
         'retired' => ['retired', 'it is retired'],
     ]);
+});
+
+it('knows a tag\'s current stamper among its ended ones', function (): void {
+    $moved = app(MoveStamper::class)->handle($this->uid, $this->tenants->a2);
+
+    expect($this->context->bypass(fn (): ?int => NfcTag::query()->with('currentStamper')->where('uid', $this->uid)->firstOrFail()->currentStamper?->id))->toBe($moved->id);
 });
 
 describe('the tap path', function (): void {

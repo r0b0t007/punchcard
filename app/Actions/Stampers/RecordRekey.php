@@ -27,12 +27,11 @@ final readonly class RecordRekey
 
     public function __construct(private TenantContext $context) {}
 
+    /** @return NfcTag with its current stamper (paused, or none) loaded */
     public function handle(string $uid, int $from): NfcTag
     {
         return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($from): NfcTag {
-            if (! $tag instanceof NfcTag) {
-                throw new StamperRefused("No tag {$uid} is registered.");
-            }
+            $tag = $this->requireTag($tag, $uid);
 
             if ($tag->retired_at !== null) {
                 throw new StamperRefused("Tag {$uid} is retired: a lost or stolen tag is replaced, never re-keyed.");
@@ -46,7 +45,7 @@ final readonly class RecordRekey
                 throw new StamperRefused("Tag {$uid} is at the last key version ({$from}): replace it with a new tag.");
             }
 
-            $current = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
+            $current = $this->lockCurrentStamper($tag);
 
             if ($current instanceof Stamper && $current->status === StamperStatus::Active) {
                 throw new StamperRefused("Disable stamper #{$current->id} first (punchcard:stamper:disable {$uid}), so no tap signed with the old key races the new version.");
@@ -54,7 +53,7 @@ final readonly class RecordRekey
 
             $tag->forceFill(['key_version' => $from + 1])->save();
 
-            return $tag;
+            return $tag->setRelation('currentStamper', $current);
         });
     }
 }

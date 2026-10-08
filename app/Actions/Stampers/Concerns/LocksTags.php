@@ -6,6 +6,7 @@ namespace App\Actions\Stampers\Concerns;
 
 use App\Actions\Stampers\StamperRefused;
 use App\Models\NfcTag;
+use App\Models\Stamper;
 use App\Support\Nfc\TagUid;
 use Closure;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -55,5 +56,21 @@ trait LocksTags
     private function lockTag(string $uid): ?NfcTag
     {
         return NfcTag::query()->where('uid', $uid)->lock('for no key update')->first();
+    }
+
+    /** The locked tag, or a refusal naming the uid; $next says what to do instead. */
+    private function requireTag(?NfcTag $tag, string $uid, string $next = ''): NfcTag
+    {
+        if (! $tag instanceof NfcTag) {
+            throw new StamperRefused("No tag {$uid} is registered{$next}.");
+        }
+
+        return $tag;
+    }
+
+    /** The tag's current stamper, locked FOR UPDATE after the tag: the tap path's order. */
+    private function lockCurrentStamper(NfcTag $tag): ?Stamper
+    {
+        return Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
     }
 }

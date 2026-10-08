@@ -34,7 +34,7 @@ final readonly class RegisterStamper
                 throw $this->retired($uid);
             }
 
-            $current = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->first();
+            $current = $this->lockCurrentStamper($tag);
 
             if ($current instanceof Stamper) {
                 throw new StamperRefused("Tag {$uid} is already assigned (stamper #{$current->id}): move it instead.");

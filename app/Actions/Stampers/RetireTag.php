@@ -26,15 +26,13 @@ final readonly class RetireTag
     public function handle(string $uid): ?Stamper
     {
         return $this->underTagLock($uid, function (?NfcTag $tag, string $uid): ?Stamper {
-            if (! $tag instanceof NfcTag) {
-                throw new StamperRefused("No tag {$uid} is registered.");
-            }
+            $tag = $this->requireTag($tag, $uid);
 
             if ($tag->retired_at !== null) {
                 throw new StamperRefused("Tag {$uid} is already retired.");
             }
 
-            $current = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
+            $current = $this->lockCurrentStamper($tag);
             $current?->forceFill(['unassigned_at' => now()])->save();
             $tag->forceFill(['retired_at' => now()])->save();
 

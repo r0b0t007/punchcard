@@ -34,15 +34,13 @@ final readonly class MoveStamper
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
         return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
-            if (! $tag instanceof NfcTag) {
-                throw new StamperRefused("No tag {$uid} is registered: register it first.");
-            }
+            $tag = $this->requireTag($tag, $uid, ': register it first');
 
             if ($tag->retired_at !== null) {
                 throw $this->retired($uid);
             }
 
-            $current = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
+            $current = $this->lockCurrentStamper($tag);
 
             if (! $current instanceof Stamper) {
                 throw new StamperRefused("Tag {$uid} is not assigned: register it instead.");

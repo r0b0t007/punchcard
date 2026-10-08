@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -54,6 +55,16 @@ class NfcTag extends Model
     public function stampers(): HasMany
     {
         return $this->hasMany(Stamper::class);
+    }
+
+    /**
+     * The assignment that holds the tag now, paused or not (Stamper::current).
+     *
+     * @return HasOne<Stamper, $this>
+     */
+    public function currentStamper(): HasOne
+    {
+        return $this->hasOne(Stamper::class)->whereNull('unassigned_at');
     }
 
     /**
