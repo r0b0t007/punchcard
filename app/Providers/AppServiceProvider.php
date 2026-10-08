@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
+use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
 use App\Models\User;
 use App\Policies\Invariants;
 use App\Support\Auth\ActiveUserProvider;
@@ -28,8 +29,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AppServiceProvider extends ServiceProvider
@@ -93,8 +96,22 @@ class AppServiceProvider extends ServiceProvider
         $this->registerUserProvider();
         $this->registerRateLimiters();
         $this->letAdminsThroughInFilament();
+        $this->runAdminPanelUpdatesAcrossTenants();
         $this->rekeyTapClaimTokenAtSignIn();
         $this->trustConfiguredProxies();
+    }
+
+    /**
+     * Livewire's update route, where the admin panel's table actions, filters
+     * and modals run, with the same bypass as the panel's pages
+     * (PlatformAdminWorksAcrossTenants, which only applies to the platform
+     * admin and to components rendered on a panel page). Livewire keeps its
+     * web middleware and header guard.
+     */
+    private function runAdminPanelUpdatesAcrossTenants(): void
+    {
+        Livewire::setUpdateRoute(fn (array $handle, string $path) => Route::post($path, $handle)
+            ->middleware(['web', PlatformAdminWorksAcrossTenants::class]));
     }
 
     /**

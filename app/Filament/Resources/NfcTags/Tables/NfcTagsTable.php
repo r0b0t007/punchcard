@@ -180,9 +180,11 @@ final class NfcTagsTable
         $location = $data['location'] ?? null;
         $label = $data['label'] ?? null;
 
+        $gone = new StamperRefused('The business or location no longer exists: check it and try again.');
+
         return [
-            Business::query()->findOrFail((int) $data['business']),
-            $location === null ? null : Location::query()->find((int) $location),
+            Business::query()->find((int) $data['business']) ?? throw $gone,
+            $location === null ? null : Location::query()->find((int) $location) ?? throw $gone,
             is_string($label) && $label !== '' ? $label : null,
         ];
     }

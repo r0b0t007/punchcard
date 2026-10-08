@@ -55,10 +55,10 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            // Persistent, so the panel's Livewire updates (table actions) are authenticated and in bypass() too.
+            // Its Livewire updates run in bypass() through Livewire's update route (AppServiceProvider).
             ->authMiddleware([
                 Authenticate::class,
                 PlatformAdminWorksAcrossTenants::class,
-            ], isPersistent: true);
+            ]);
     }
 }

@@ -15,10 +15,14 @@ use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Http\Middleware\Authenticate;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Testing\TestResponse;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Livewire\Mechanisms\HandleRequests\HandleRequests;
 use Spatie\Permission\Models\Role;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -76,8 +80,44 @@ it('shows the platform admin each tag and where it is, and nobody else', functio
     }
 });
 
-it('authenticates the panel\'s Livewire updates and runs them in bypass(), as its pages', function (): void {
-    expect(Livewire::getPersistentMiddleware())->toContain(Authenticate::class, PlatformAdminWorksAcrossTenants::class);
+describe('a real Livewire update', function (): void {
+    beforeEach(function (): void {
+        // The page's own snapshot, as the browser holds it, sent back to Livewire's update route.
+        $this->update = (fn (User $as, string $snapshot): TestResponse => $this->actingAs($as)->withHeaders(['X-Livewire' => '1'])->postJson(app(HandleRequests::class)->getUpdateUri(), [
+            'components' => [[
+                'snapshot' => $snapshot,
+                'updates' => new stdClass,
+                'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+            ]],
+        ]));
+        $this->snapshotFor = function (User $as): string {
+            $html = (string) $this->actingAs($as)->get('/admin/nfc-tags')->assertOk()->getContent();
+            preg_match_all('/wire:snapshot="([^"]+)"/', $html, $found);
+
+            return collect($found[1])
+                ->map(fn (string $snapshot): string => htmlspecialchars_decode($snapshot, ENT_QUOTES))
+                ->first(fn (string $snapshot): bool => str_contains((string) (json_decode($snapshot, true)['memo']['name'] ?? ''), class_basename(ManageNfcTags::class)))
+                ?? throw new RuntimeException('No tag provisioning snapshot on the page.');
+        };
+    });
+
+    it('still lists the tags, since the update runs in bypass() too', function (): void {
+        ($this->update)($this->admin, ($this->snapshotFor)($this->admin))
+            ->assertOk()
+            ->assertSee($this->tag->uid)
+            ->assertSee('A1 site');
+    });
+
+    it('refuses the admin\'s page replayed by anyone else', function (): void {
+        $snapshot = ($this->snapshotFor)($this->admin);
+        $owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
+        $withoutTwoFactor = User::factory()->create();
+        $withoutTwoFactor->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
+
+        foreach ([$owner, $withoutTwoFactor] as $user) {
+            ($this->update)($user, $snapshot)->assertForbidden();
+        }
+    });
 });
 
 it('never puts a tag key on the page', function (): void {
@@ -143,6 +183,52 @@ it('records a re-key only once the admin confirms which keys changed', function 
         ->assertHasFormErrors(['keysChanged' => 'accepted']));
 
     expect(($this->fresh)($this->tag)->key_version)->toBe(1);
+});
+
+it('takes only a location of the business chosen, and refuses one that is gone', function (): void {
+    ($this->screen)(fn (Testable $page) => $page
+        ->callAction(TestAction::make('register')->table(), ['uid' => '04A1B2C3D4E5F6', 'business' => $this->tenants->a2->id, 'location' => $this->tenants->locationOf($this->tenants->b1)->id])
+        ->assertHasFormErrors(['location']));
+
+    expect($this->context->bypass(fn (): bool => NfcTag::query()->where('uid', '04A1B2C3D4E5F6')->exists()))->toBeFalse();
+});
+
+describe('who runs in bypass()', function (): void {
+    beforeEach(function (): void {
+        $this->through = function (User $as, string $route, ?array $paths): string {
+            $request = Request::create('/'.$route, 'POST', $paths === null ? [] : ['components' => array_map(
+                fn (string $path): array => ['snapshot' => json_encode(['memo' => ['path' => $path]])],
+                $paths,
+            )]);
+            $request->setUserResolver(fn (): User => $as);
+            $request->setRouteResolver(fn (): Route => (new Route('POST', $route, []))->name($route === 'admin/nfc-tags' ? 'filament.admin.resources.nfc-tags.index' : 'livewire.update'));
+
+            return (string) app(PlatformAdminWorksAcrossTenants::class)
+                ->handle($request, fn (): Response => new Response($this->context->isBypassed() ? 'bypassed' : 'scoped'))
+                ->getContent();
+        };
+    });
+
+    it('bypasses for the platform admin on the panel, and on updates of panel components only', function (): void {
+        expect(($this->through)($this->admin, 'admin/nfc-tags', null))->toBe('bypassed')
+            ->and(($this->through)($this->admin, 'livewire/update', ['admin/nfc-tags']))->toBe('bypassed')
+            ->and(($this->through)($this->admin, 'livewire/update', ['admin', 'admin/nfc-tags']))->toBe('bypassed')
+            ->and(($this->through)($this->admin, 'livewire/update', ['admin/nfc-tags', 'cards']))->toBe('scoped')
+            ->and(($this->through)($this->admin, 'livewire/update', ['administrator']))->toBe('scoped')
+            ->and(($this->through)($this->admin, 'livewire/update', []))->toBe('scoped')
+            ->and(($this->through)($this->admin, 'livewire/update', null))->toBe('scoped');
+    });
+
+    it('never bypasses for anyone who may not open the panel', function (): void {
+        $withoutTwoFactor = User::factory()->create();
+        $withoutTwoFactor->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
+        $owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
+
+        foreach ([$withoutTwoFactor, $owner] as $user) {
+            expect(($this->through)($user, 'admin/nfc-tags', null))->toBe('scoped')
+                ->and(($this->through)($user, 'livewire/update', ['admin/nfc-tags']))->toBe('scoped');
+        }
+    });
 });
 
 it('shows the free tags alone when asked', function (): void {
