@@ -47,7 +47,7 @@ final readonly class RecordRekey
             $current = $this->lockCurrentStamper($tag);
 
             if ($current instanceof Stamper && $current->status === StamperStatus::Active) {
-                throw new StamperRefused("Disable stamper #{$current->id} first (punchcard:stamper:disable {$uid}), so no tap signed with the old key races the new version.");
+                throw new StamperRefused("Disable stamper #{$current->id} first, so no tap signed with the old key races the new version.");
             }
 
             $tag->forceFill(['key_version' => $from + 1])->save();

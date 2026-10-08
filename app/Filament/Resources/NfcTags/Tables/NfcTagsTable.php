@@ -9,6 +9,7 @@ use App\Actions\Stampers\RecordRekey;
 use App\Actions\Stampers\RegisterStamper;
 use App\Actions\Stampers\RetireTag;
 use App\Actions\Stampers\SetStamperStatus;
+use App\Actions\Stampers\SiteName;
 use App\Actions\Stampers\StamperRefused;
 use App\Enums\StamperStatus;
 use App\Models\Business;
@@ -22,6 +23,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -43,7 +45,7 @@ final class NfcTagsTable
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['currentStamper.business', 'currentStamper.location']))
-            ->defaultSort('updated_at', 'desc')
+            ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('uid')->label('UID')->searchable()->copyable()->fontFamily('mono'),
                 TextColumn::make('key_version')->label('Key version')->numeric(),
@@ -111,11 +113,7 @@ final class NfcTagsTable
             ->modalDescription($disabling
                 ? 'It refuses every tap and its arming is cleared: step 1 of a re-key.'
                 : 'If the business had disabled it before the re-key, leave it disabled.')
-            ->action(fn (NfcTag $record) => self::refusing(function () use ($record, $status): string {
-                $change = app(SetStamperStatus::class)->handle($record->uid, $status);
-
-                return 'Stamper #'.$change->stamper->id.' is '.($status === StamperStatus::Active ? 'enabled' : 'disabled').'.';
-            }));
+            ->action(fn (NfcTag $record) => self::refusing(fn (): string => app(SetStamperStatus::class)->handle($record->uid, $status)->summary()));
     }
 
     private static function rekeyed(): Action
@@ -132,8 +130,10 @@ final class NfcTagsTable
             ])
             ->action(fn (NfcTag $record, array $data) => self::refusing(function () use ($record, $data): string {
                 $tag = app(RecordRekey::class)->handle($record->uid, from: (int) $data['version'] - 1);
+                $stamper = $tag->currentStamper;
 
-                return "Tag {$tag->uid} is now at key version {$tag->key_version}.";
+                return "Tag {$tag->uid} is now at key version {$tag->key_version}; its counter is unchanged."
+                    .($stamper instanceof Stamper ? " If you disabled stamper #{$stamper->id} for the re-key, enable it and test one tap; if the business had disabled it, leave it." : '');
             }));
     }
 
@@ -157,16 +157,18 @@ final class NfcTagsTable
     {
         return [
             Select::make('business')
-                ->options(fn (): array => Business::query()->unarchived()->orderBy('name')->get()
-                    ->mapWithKeys(fn (Business $business): array => [$business->id => "{$business->name} ({$business->slug})"])
-                    ->all())
                 ->searchable()
+                ->getSearchResultsUsing(self::businessesMatching(...))
+                ->getOptionLabelUsing(fn (mixed $value): ?string => ($business = Business::query()->unarchived()->find($value)) instanceof Business ? self::businessLabel($business) : null)
                 ->live()
+                ->afterStateUpdated(fn (Set $set): mixed => $set('location', null))
                 ->required(),
             Select::make('location')
                 ->options(fn (Get $get): array => $get('business') === null ? [] : Location::query()
-                    ->where('business_id', $get('business'))->open()->orderBy('name')->pluck('name', 'id')->all())
-                ->placeholder('Its only open location'),
+                    ->where('business_id', $get('business'))->open()->orderBy('name')->get()
+                    ->mapWithKeys(fn (Location $location): array => [$location->id => SiteName::of($location)])
+                    ->all())
+                ->placeholder('Its only open location (choose one if it has several)'),
             TextInput::make('label')->maxLength(255),
         ];
     }
@@ -180,18 +182,36 @@ final class NfcTagsTable
         $location = $data['location'] ?? null;
         $label = $data['label'] ?? null;
 
-        $gone = new StamperRefused('The business or location no longer exists: check it and try again.');
-
         return [
-            Business::query()->find((int) $data['business']) ?? throw $gone,
-            $location === null ? null : Location::query()->find((int) $location) ?? throw $gone,
+            Business::query()->find((int) $data['business']) ?? throw StamperRefused::siteGone(),
+            $location === null ? null : Location::query()->find((int) $location) ?? throw StamperRefused::siteGone(),
             is_string($label) && $label !== '' ? $label : null,
         ];
     }
 
     private static function where(Stamper $stamper): string
     {
-        return "{$stamper->business->name}, {$stamper->location->name}";
+        return "{$stamper->business->name}, ".SiteName::of($stamper->location);
+    }
+
+    /**
+     * The business picker's search, on the server: open businesses whose name
+     * or slug matches, at most 50, so the modal never loads them all.
+     *
+     * @return array<int, string>
+     */
+    public static function businessesMatching(string $search): array
+    {
+        return Business::query()->unarchived()
+            ->where(fn (Builder $query) => $query->whereLike('name', "%{$search}%")->orWhereLike('slug', "%{$search}%"))
+            ->orderBy('name')->limit(50)->get()
+            ->mapWithKeys(fn (Business $business): array => [$business->id => self::businessLabel($business)])
+            ->all();
+    }
+
+    private static function businessLabel(Business $business): string
+    {
+        return "{$business->name} ({$business->slug})";
     }
 
     /**

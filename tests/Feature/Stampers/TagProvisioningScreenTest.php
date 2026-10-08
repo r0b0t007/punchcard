@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Actions\Tenancy\ArchiveBusiness;
 use App\Enums\BusinessRole;
 use App\Enums\PlatformRole;
 use App\Enums\StamperStatus;
 use App\Filament\Resources\NfcTags\Pages\ManageNfcTags;
+use App\Filament\Resources\NfcTags\Tables\NfcTagsTable;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
 use App\Models\Location;
 use App\Models\NfcTag;
@@ -133,7 +135,7 @@ it('registers a tag, and shows a refusal as it is', function (): void {
     ($this->screen)(fn (Testable $page) => $page
         ->callAction(TestAction::make('register')->table(), ['uid' => '04 a1 b2 c3 d4 e5 f6', 'business' => $this->tenants->a2->id, 'label' => 'Bar'])
         ->assertHasNoFormErrors()
-        ->assertNotified('Registered tag 04A1B2C3D4E5F6 at A2, A2 site.')
+        ->assertNotified('Registered tag 04A1B2C3D4E5F6 at A2, A2 site (#'.$this->tenants->locationOf($this->tenants->a2)->id.').')
         ->callAction(TestAction::make('register')->table(), ['uid' => $this->tag->uid, 'business' => $this->tenants->a2->id])
         ->assertNotified("Tag {$this->tag->uid} is already assigned (stamper #{$this->stamper->id}): move it instead."));
 
@@ -148,17 +150,17 @@ it('registers a tag at the location chosen, when the business has several', func
 
     ($this->screen)(fn (Testable $page) => $page
         ->callAction(TestAction::make('register')->table(), ['uid' => '04A1B2C3D4E5F6', 'business' => $this->tenants->a2->id, 'location' => $terrace->id])
-        ->assertNotified('Registered tag 04A1B2C3D4E5F6 at A2, Terrace.'));
+        ->assertNotified('Registered tag 04A1B2C3D4E5F6 at A2, Terrace (#'.$terrace->id.').'));
 });
 
 it('moves, disables, enables, records a re-key and retires, as the runbook says', function (): void {
     ($this->screen)(fn (Testable $page) => $page
         ->callAction(TestAction::make('move')->table($this->tag), ['business' => $this->tenants->a2->id])
-        ->assertNotified('Moved tag '.$this->tag->uid.' to A2, A2 site.')
+        ->assertNotified('Moved tag '.$this->tag->uid.' to A2, A2 site (#'.$this->tenants->locationOf($this->tenants->a2)->id.').')
         ->callAction(TestAction::make('disable')->table($this->tag))
         ->assertActionHidden(TestAction::make('disable')->table($this->tag))
         ->callAction(TestAction::make('rekeyed')->table($this->tag), ['version' => 2, 'keysChanged' => true])
-        ->assertNotified("Tag {$this->tag->uid} is now at key version 2.")
+        ->assertNotified("Tag {$this->tag->uid} is now at key version 2; its counter is unchanged. If you disabled stamper #".($this->context->bypass(fn () => ($this->fresh)($this->tag)->currentStamper()->value('id'))).' for the re-key, enable it and test one tap; if the business had disabled it, leave it.')
         ->callAction(TestAction::make('enable')->table($this->tag))
         ->assertActionHidden(TestAction::make('enable')->table($this->tag)));
 
@@ -183,6 +185,42 @@ it('records a re-key only once the admin confirms which keys changed', function 
         ->assertHasFormErrors(['keysChanged' => 'accepted']));
 
     expect(($this->fresh)($this->tag)->key_version)->toBe(1);
+});
+
+it('finds a business by name or slug, open ones only', function (): void {
+    $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->tenants->a2));
+
+    expect($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching('a1')))->toBe([$this->tenants->a1->id => "A1 ({$this->tenants->a1->slug})"])
+        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching($this->tenants->b1->slug)))->toHaveKey($this->tenants->b1->id)
+        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching('A2')))->toBe([]);
+
+    ($this->screen)(fn (Testable $page) => $page
+        ->callAction(TestAction::make('register')->table(), ['uid' => '04A1B2C3D4E5F6', 'business' => $this->tenants->a2->id])
+        ->assertHasFormErrors(['business']));
+});
+
+it('keeps the newest tags first, however often the others are tapped', function (): void {
+    $newer = $this->context->bypass(fn (): NfcTag => NfcTag::factory()->create());
+    $this->context->bypass(fn () => NfcTag::query()->whereKey($this->tag->id)->update(['last_counter' => 9, 'updated_at' => now()->addHour()]));
+
+    ($this->screen)(fn (Testable $page) => $page->assertCanSeeTableRecords([$newer, $this->tag], inOrder: true));
+});
+
+it('clears the location when the business changes', function (): void {
+    ($this->screen)(fn (Testable $page) => $page
+        ->mountAction(TestAction::make('register')->table())
+        ->fillForm(['business' => $this->tenants->a2->id, 'location' => $this->tenants->locationOf($this->tenants->a2)->id])
+        ->fillForm(['business' => $this->tenants->b1->id])
+        ->assertSchemaStateSet(['location' => null]));
+});
+
+it('says when the business had already disabled the stamper', function (): void {
+    $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Disabled])->save());
+
+    ($this->screen)(fn (Testable $page) => $page
+        ->callAction(TestAction::make('enable')->table($this->tag))
+        ->callAction(TestAction::make('disable')->table($this->tag))
+        ->assertNotified("Stamper #{$this->stamper->id} at A1, A1 site (#".$this->tenants->locationOf($this->tenants->a1)->id.') is disabled: it refuses every tap, and its arming is cleared.'));
 });
 
 it('takes only a location of the business chosen, and refuses one that is gone', function (): void {

@@ -19,4 +19,21 @@ final readonly class StamperStatusChange
     {
         return $this->previous !== $this->stamper->status;
     }
+
+    /**
+     * What to tell the admin, saying when the stamper already had that status:
+     * the business may have paused it (runbook step 1 asks to note it).
+     */
+    public function summary(): string
+    {
+        $where = "Stamper #{$this->stamper->id} at {$this->stamper->business->name}, ".SiteName::of($this->stamper->location);
+        $disabled = $this->stamper->status === StamperStatus::Disabled;
+
+        return match (true) {
+            ! $this->changed() && $disabled => "{$where} was already disabled, perhaps by the business: leave it disabled after the re-key.",
+            ! $this->changed() => "{$where} was already enabled.",
+            $disabled => "{$where} is disabled: it refuses every tap, and its arming is cleared.",
+            default => "{$where} is enabled.",
+        };
+    }
 }

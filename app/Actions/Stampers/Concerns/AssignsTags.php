@@ -42,7 +42,7 @@ trait AssignsTags
             $business = Business::query()->findOrFail($business->id);
             $location = $location instanceof Location ? Location::query()->findOrFail($location->id) : null;
         } catch (ModelNotFoundException) {
-            throw new StamperRefused('The business or location no longer exists: check it and try again.');
+            throw StamperRefused::siteGone();
         }
 
         if ($location instanceof Location && (int) $location->business_id !== $business->id) {
