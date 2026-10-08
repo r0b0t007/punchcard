@@ -37,17 +37,17 @@ final readonly class RecordRekey
             }
 
             if ($tag->key_version !== $from) {
-                throw new StamperRefused("Tag {$uid} is at key version {$tag->key_version}, not {$from}: this re-key may be recorded already. Check the tag before trying again.");
+                throw new StamperRefused(__('Tag :uid is at key version :version, not :from: this re-key may be recorded already. Check the tag before trying again.', ['uid' => $uid, 'version' => $tag->key_version, 'from' => $from]));
             }
 
             if ($from >= NfcTag::LAST_KEY_VERSION) {
-                throw new StamperRefused("Tag {$uid} is at the last key version ({$from}): replace it with a new tag.");
+                throw new StamperRefused(__('Tag :uid is at the last key version (:version): replace it with a new tag.', ['uid' => $uid, 'version' => $from]));
             }
 
             $current = $this->lockCurrentStamper($tag);
 
             if ($current instanceof Stamper && $current->status === StamperStatus::Active) {
-                throw new StamperRefused("Disable stamper #{$current->id} first, so no tap signed with the old key races the new version.");
+                throw new StamperRefused(__('Disable stamper #:id first, so no tap signed with the old key races the new version.', ['id' => $current->id]));
             }
 
             $tag->forceFill(['key_version' => $from + 1])->save();

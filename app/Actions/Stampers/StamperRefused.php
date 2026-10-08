@@ -12,6 +12,6 @@ final class StamperRefused extends RuntimeException
     /** The business or location chosen was deleted while the admin was choosing it. */
     public static function siteGone(): self
     {
-        return new self('The business or location no longer exists: check it and try again.');
+        return new self(__('The business or location no longer exists: check it and try again.'));
     }
 }

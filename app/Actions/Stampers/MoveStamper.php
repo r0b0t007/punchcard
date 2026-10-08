@@ -34,7 +34,7 @@ final readonly class MoveStamper
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
         return $this->assignUnderTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
-            $tag = $this->requireTag($tag, $uid, ': register it first');
+            $tag = $this->requireTag($tag, $uid, registerFirst: true);
 
             if ($tag->retired_at !== null) {
                 throw $this->retired($uid);
@@ -43,13 +43,13 @@ final readonly class MoveStamper
             $current = $this->lockCurrentStamper($tag);
 
             if (! $current instanceof Stamper) {
-                throw new StamperRefused("Tag {$uid} is not assigned: register it instead.");
+                throw new StamperRefused(__('Tag :uid is not assigned: register it instead.', ['uid' => $uid]));
             }
 
             $site = $this->siteFor($business, $location);
 
             if ((int) $current->location_id === $site->id) {
-                throw new StamperRefused("Tag {$uid} is already at ".SiteName::of($site).'.');
+                throw new StamperRefused(__('Tag :uid is already at :site.', ['uid' => $uid, 'site' => SiteName::of($site)]));
             }
 
             $current->forceFill(['unassigned_at' => now()])->save();

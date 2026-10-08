@@ -24,11 +24,22 @@ class NfcTagResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSignal;
 
-    protected static ?string $navigationLabel = 'Tag provisioning';
-
-    protected static ?string $modelLabel = 'tag';
-
     protected static ?string $recordTitleAttribute = 'uid';
+
+    public static function getNavigationLabel(): string
+    {
+        return __('Tag provisioning');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('tag');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('tags');
+    }
 
     public static function table(Table $table): Table
     {

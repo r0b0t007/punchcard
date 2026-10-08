@@ -32,7 +32,9 @@ final readonly class SetStamperStatus
             $current = $this->lockCurrentStamper($tag);
 
             if (! $current instanceof Stamper) {
-                throw new StamperRefused("Tag {$uid} is not assigned".($tag->retired_at !== null ? ' (it is retired).' : '.'));
+                throw new StamperRefused($tag->retired_at !== null
+                    ? __('Tag :uid is not assigned (it is retired).', ['uid' => $uid])
+                    : __('Tag :uid is not assigned.', ['uid' => $uid]));
             }
 
             $previous = $current->status;

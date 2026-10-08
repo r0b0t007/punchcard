@@ -46,13 +46,13 @@ trait AssignsTags
         }
 
         if ($location instanceof Location && (int) $location->business_id !== $business->id) {
-            throw new StamperRefused(SiteName::of($location)." is not a location of {$business->name}.");
+            throw new StamperRefused(__(':site is not a location of :business.', ['site' => SiteName::of($location), 'business' => $business->name]));
         }
 
         $location ??= $this->onlyOpenLocation($business);
 
         if (! ArchivedSites::isOpen($business->id, $location->id, lock: true, counter: true)) {
-            throw new StamperRefused($this->whyClosed($business, $location) ?? "{$business->name} changed at the same moment: check it and try again.");
+            throw new StamperRefused($this->whyClosed($business, $location) ?? __(':business changed at the same moment: check it and try again.', ['business' => $business->name]));
         }
 
         return $location;
@@ -67,7 +67,7 @@ trait AssignsTags
         $label = trim((string) $label);
 
         if (mb_strlen($label) > self::LABEL_MAX) {
-            throw new StamperRefused('A stamper label is at most '.self::LABEL_MAX.' characters.');
+            throw new StamperRefused(__('A stamper label is at most :max characters.', ['max' => self::LABEL_MAX]));
         }
 
         $stamper = (new Stamper)->forceFill([
@@ -95,7 +95,7 @@ trait AssignsTags
         try {
             return $this->underTagLock($uid, $work);
         } catch (UniqueConstraintViolationException) {
-            throw new StamperRefused('Tag '.TagUid::normalise($uid).' was registered or assigned by someone else at the same moment: check it and try again.');
+            throw new StamperRefused(__('Tag :uid was registered or assigned by someone else at the same moment: check it and try again.', ['uid' => TagUid::normalise($uid)]));
         }
     }
 
@@ -104,9 +104,9 @@ trait AssignsTags
         $open = Location::query()->where('business_id', $business->id)->open()->orderBy('id')->get();
 
         return match ($open->count()) {
-            0 => throw new StamperRefused($this->whyClosed($business, null) ?? "{$business->name} has no open location: add one first."),
+            0 => throw new StamperRefused($this->whyClosed($business, null) ?? __(':business has no open location: add one first.', ['business' => $business->name])),
             1 => $open->firstOrFail(),
-            default => throw new StamperRefused("{$business->name} has {$open->count()} open locations, choose one: ".$open->map(SiteName::of(...))->implode(', ').'.'),
+            default => throw new StamperRefused(__(':business has :count open locations, choose one: :sites.', ['business' => $business->name, 'count' => $open->count(), 'sites' => $open->map(SiteName::of(...))->implode(', ')])),
         };
     }
 
@@ -115,12 +115,14 @@ trait AssignsTags
     {
         $business = Business::query()->with('organization')->find($business->id);
 
-        return match (true) {
-            ! $business instanceof Business => 'The business no longer exists: check it and try again.',
-            $business->archived_at !== null, $business->organization->archived_at !== null => "{$business->name} is archived.",
-            $business->status === BusinessStatus::Suspended => "{$business->name} is suspended: lift the suspension before assigning a stamper.",
-            $location instanceof Location && Location::query()->whereKey($location->id)->value('archived_at') !== null => "{$business->name}, ".SiteName::of($location).' is archived.',
+        $reason = match (true) {
+            ! $business instanceof Business => __('The business no longer exists: check it and try again.'),
+            $business->archived_at !== null, $business->organization->archived_at !== null => __(':business is archived.', ['business' => $business->name]),
+            $business->status === BusinessStatus::Suspended => __(':business is suspended: lift the suspension before assigning a stamper.', ['business' => $business->name]),
+            $location instanceof Location && Location::query()->whereKey($location->id)->value('archived_at') !== null => __(':business, :site is archived.', ['business' => $business->name, 'site' => SiteName::of($location)]),
             default => null,
         };
+
+        return is_string($reason) ? $reason : null;
     }
 }

@@ -32,7 +32,7 @@ class StamperRegisterCommand extends Command
         return $this->onStamperSite(
             $context,
             $registerStamper->handle(...),
-            fn (Stamper $stamper, string $where): string => "Registered tag {$stamper->tag->uid} (key version {$stamper->tag->key_version}) as stamper #{$stamper->id} at {$where}.",
+            fn (Stamper $stamper, string $where): string => __('Registered tag :uid (key version :version) as stamper #:id at :site.', ['uid' => $stamper->tag->uid, 'version' => $stamper->tag->key_version, 'id' => $stamper->id, 'site' => $where]),
         );
     }
 }

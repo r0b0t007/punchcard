@@ -47,19 +47,20 @@ final class NfcTagsTable
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['currentStamper.business', 'currentStamper.location']))
             ->defaultSort('id', 'desc')
             ->columns([
-                TextColumn::make('uid')->label('UID')->searchable()->copyable()->fontFamily('mono'),
-                TextColumn::make('key_version')->label('Key version')->numeric(),
-                TextColumn::make('last_counter')->label('Counter')->numeric(),
-                TextColumn::make('currentStamper.business.name')->label('Business')->placeholder('Unassigned'),
-                TextColumn::make('currentStamper.location.name')->label('Location'),
-                TextColumn::make('currentStamper.label')->label('Label'),
-                TextColumn::make('currentStamper.status')->label('Stamper')->badge(),
-                TextColumn::make('retired_at')->label('Retired')->dateTime()->placeholder('In service'),
-                TextColumn::make('updated_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('uid')->label(__('UID'))->searchable()->copyable()->fontFamily('mono'),
+                TextColumn::make('key_version')->label(__('Key version'))->numeric(),
+                TextColumn::make('last_counter')->label(__('Counter'))->numeric(),
+                TextColumn::make('currentStamper.business.name')->label(__('Business'))->placeholder(__('Unassigned')),
+                TextColumn::make('currentStamper.location.name')->label(__('Location')),
+                TextColumn::make('currentStamper.label')->label(__('Label')),
+                TextColumn::make('currentStamper.status')->label(__('Stamper'))->badge()
+                    ->formatStateUsing(fn (StamperStatus $state): string => $state === StamperStatus::Active ? __('Enabled') : __('Disabled')),
+                TextColumn::make('retired_at')->label(__('Retired'))->dateTime()->placeholder(__('In service')),
+                TextColumn::make('updated_at')->label(__('Updated'))->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                TernaryFilter::make('retired')->nullable()->attribute('retired_at'),
-                Filter::make('unassigned')->query(fn (Builder $query): Builder => $query->whereNull('retired_at')->whereDoesntHave('currentStamper')),
+                TernaryFilter::make('retired')->label(__('Retired'))->nullable()->attribute('retired_at'),
+                Filter::make('unassigned')->label(__('Unassigned'))->query(fn (Builder $query): Builder => $query->whereNull('retired_at')->whereDoesntHave('currentStamper')),
             ])
             ->headerActions([self::register()])
             ->recordActions([
@@ -74,31 +75,32 @@ final class NfcTagsTable
     private static function register(): Action
     {
         return Action::make('register')
-            ->label('Register tag')
+            ->label(__('Register tag'))
             ->authorize(fn (): bool => Gate::allows('register', NfcTag::class))
-            ->modalDescription('Provision the tag first (keys from key version 1, docs/runbooks/stamper-keys.md).')
+            ->modalDescription(__('Provision the tag first (keys from key version 1, docs/runbooks/stamper-keys.md).'))
             ->schema([
-                TextInput::make('uid')->label('UID, as the reader prints it')->required(),
+                TextInput::make('uid')->label(__('UID, as the reader prints it'))->required(),
                 ...self::siteFields(),
             ])
             ->action(fn (array $data) => self::refusing(function () use ($data): string {
                 $stamper = app(RegisterStamper::class)->handle((string) $data['uid'], ...self::site($data));
 
-                return "Registered tag {$stamper->tag->uid} at ".self::where($stamper).'.';
+                return __('Registered tag :uid at :site.', ['uid' => $stamper->tag->uid, 'site' => self::where($stamper)]);
             }));
     }
 
     private static function move(): Action
     {
         return Action::make('move')
+            ->label(__('Move'))
             ->authorize(fn (): bool => Gate::allows('move', NfcTag::class))
             ->visible(fn (NfcTag $record): bool => $record->retired_at === null && $record->currentStamper instanceof Stamper)
-            ->modalDescription('Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.')
+            ->modalDescription(__('Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.'))
             ->schema(self::siteFields())
             ->action(fn (NfcTag $record, array $data) => self::refusing(function () use ($record, $data): string {
                 $stamper = app(MoveStamper::class)->handle($record->uid, ...self::site($data));
 
-                return "Moved tag {$record->uid} to ".self::where($stamper).'.';
+                return __('Moved tag :uid to :site.', ['uid' => $record->uid, 'site' => self::where($stamper)]);
             }));
     }
 
@@ -107,48 +109,53 @@ final class NfcTagsTable
         $disabling = $status === StamperStatus::Disabled;
 
         return Action::make($disabling ? 'disable' : 'enable')
+            ->label($disabling ? __('Disable') : __('Enable'))
             ->authorize(fn (): bool => Gate::allows('setStatus', NfcTag::class))
             ->visible(fn (NfcTag $record): bool => $record->currentStamper instanceof Stamper && $record->currentStamper->status !== $status)
             ->requiresConfirmation()
             ->modalDescription($disabling
-                ? 'It refuses every tap and its arming is cleared: step 1 of a re-key.'
-                : 'If the business had disabled it before the re-key, leave it disabled.')
+                ? __('It refuses every tap and its arming is cleared: step 1 of a re-key.')
+                : __('If the business had disabled it before the re-key, leave it disabled.'))
             ->action(fn (NfcTag $record) => self::refusing(fn (): string => app(SetStamperStatus::class)->handle($record->uid, $status)->summary()));
     }
 
     private static function rekeyed(): Action
     {
         return Action::make('rekeyed')
-            ->label('Record re-key')
+            ->label(__('Record re-key'))
             ->authorize(fn (): bool => Gate::allows('rekey', NfcTag::class))
             ->visible(fn (NfcTag $record): bool => $record->retired_at === null)
-            ->modalDescription('Only once keys 2, 3, 4 and then 0 all changed on the tag, its stamper disabled. The counter is kept.')
+            ->modalDescription(__('Only once keys 2, 3, 4 and then 0 all changed on the tag, its stamper disabled. The counter is kept.'))
             ->fillForm(fn (NfcTag $record): array => ['version' => $record->key_version + 1])
             ->schema([
-                TextInput::make('version')->label('Key version the tag now has')->integer()->minValue(2)->required(),
-                Checkbox::make('keysChanged')->label('Keys 2, 3, 4 and then 0 all changed on the tag to this version')->accepted(),
+                TextInput::make('version')->label(__('Key version the tag now has'))->integer()->minValue(2)->required(),
+                Checkbox::make('keysChanged')->label(__('Keys 2, 3, 4 and then 0 all changed on the tag to this version'))->accepted(),
             ])
             ->action(fn (NfcTag $record, array $data) => self::refusing(function () use ($record, $data): string {
                 $tag = app(RecordRekey::class)->handle($record->uid, from: (int) $data['version'] - 1);
                 $stamper = $tag->currentStamper;
 
-                return "Tag {$tag->uid} is now at key version {$tag->key_version}; its counter is unchanged."
-                    .($stamper instanceof Stamper ? " If you disabled stamper #{$stamper->id} for the re-key, enable it and test one tap; if the business had disabled it, leave it." : '');
+                $done = __('Tag :uid is now at key version :version; its counter is unchanged.', ['uid' => $tag->uid, 'version' => $tag->key_version]);
+
+                return $stamper instanceof Stamper
+                    ? $done.' '.__('If you disabled stamper #:id for the re-key, enable it and test one tap; if the business had disabled it, leave it.', ['id' => $stamper->id])
+                    : $done;
             }));
     }
 
     private static function retire(): Action
     {
         return Action::make('retire')
+            ->label(__('Retire'))
             ->color('danger')
             ->authorize(fn (): bool => Gate::allows('retire', NfcTag::class))
             ->visible(fn (NfcTag $record): bool => $record->retired_at === null)
             ->requiresConfirmation()
-            ->modalDescription('For a lost or stolen tag. It can never be assigned again; register a new tag for its replacement.')
+            ->modalDescription(__('For a lost or stolen tag. It can never be assigned again; register a new tag for its replacement.'))
             ->action(fn (NfcTag $record) => self::refusing(function () use ($record): string {
                 app(RetireTag::class)->handle($record->uid);
 
-                return "Retired tag {$record->uid}.";
+                return __('Retired tag :uid.', ['uid' => $record->uid]);
             }));
     }
 
@@ -157,6 +164,7 @@ final class NfcTagsTable
     {
         return [
             Select::make('business')
+                ->label(__('Business'))
                 ->searchable()
                 ->getSearchResultsUsing(self::businessesMatching(...))
                 ->getOptionLabelUsing(fn (mixed $value): ?string => ($business = Business::query()->unarchived()->find($value)) instanceof Business ? self::businessLabel($business) : null)
@@ -164,12 +172,13 @@ final class NfcTagsTable
                 ->afterStateUpdated(fn (Set $set): mixed => $set('location', null))
                 ->required(),
             Select::make('location')
+                ->label(__('Location'))
                 ->options(fn (Get $get): array => $get('business') === null ? [] : Location::query()
                     ->where('business_id', $get('business'))->open()->orderBy('name')->get()
                     ->mapWithKeys(fn (Location $location): array => [$location->id => SiteName::of($location)])
                     ->all())
-                ->placeholder('Its only open location (choose one if it has several)'),
-            TextInput::make('label')->maxLength(255),
+                ->placeholder(__('Its only open location (choose one if it has several)')),
+            TextInput::make('label')->label(__('Label'))->maxLength(255),
         ];
     }
 

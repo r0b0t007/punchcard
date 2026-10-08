@@ -35,6 +35,8 @@ use Tests\Support\Tenants;
 */
 
 beforeEach(function (): void {
+    // The messages are translated; these tests read them in English, the key (the app's default is French).
+    app()->setLocale('en');
     $this->tenants = Tenants::make();
     $this->context = app(TenantContext::class);
     $this->retire = app(RetireTag::class);

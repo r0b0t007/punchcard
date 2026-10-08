@@ -42,6 +42,8 @@ use Tests\Support\Tenants;
 */
 
 beforeEach(function (): void {
+    // The messages are translated; these tests read them in English, the key (the app's default is French).
+    app()->setLocale('en');
     config(['punchcard.nfc.sun_master_key' => SunVectors::AN10922_MASTER_KEY, 'punchcard.nfc.key_version' => 1]);
     app()->forgetInstance(KeyDiversifier::class);
 
@@ -204,6 +206,20 @@ it('keeps the newest tags first, however often the others are tapped', function 
     $this->context->bypass(fn () => NfcTag::query()->whereKey($this->tag->id)->update(['last_counter' => 9, 'updated_at' => now()->addHour()]));
 
     ($this->screen)(fn (Testable $page) => $page->assertCanSeeTableRecords([$newer, $this->tag], inOrder: true));
+});
+
+it('opens the panel in the admin\'s own language', function (): void {
+    $this->admin->forceFill(['locale' => 'ar'])->save();
+
+    $this->actingAs($this->admin)->get('/admin/nfc-tags')->assertOk()->assertSee('تهيئة الشرائح');
+});
+
+it('speaks the admin\'s language, refusals included', function (): void {
+    app()->setLocale('fr');
+
+    ($this->screen)(fn (Testable $page) => $page
+        ->callAction(TestAction::make('register')->table(), ['uid' => $this->tag->uid, 'business' => $this->tenants->a2->id])
+        ->assertNotified("La puce {$this->tag->uid} est déjà attribuée (borne n° {$this->stamper->id}) : déplacez-la plutôt."));
 });
 
 it('clears the location when the business changes', function (): void {

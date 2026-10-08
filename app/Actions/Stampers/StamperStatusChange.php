@@ -26,14 +26,18 @@ final readonly class StamperStatusChange
      */
     public function summary(): string
     {
-        $where = "Stamper #{$this->stamper->id} at {$this->stamper->business->name}, ".SiteName::of($this->stamper->location);
+        $stamper = __('Stamper #:id at :business, :site', [
+            'id' => $this->stamper->id,
+            'business' => $this->stamper->business->name,
+            'site' => SiteName::of($this->stamper->location),
+        ]);
         $disabled = $this->stamper->status === StamperStatus::Disabled;
 
         return match (true) {
-            ! $this->changed() && $disabled => "{$where} was already disabled, perhaps by the business: leave it disabled after the re-key.",
-            ! $this->changed() => "{$where} was already enabled.",
-            $disabled => "{$where} is disabled: it refuses every tap, and its arming is cleared.",
-            default => "{$where} is enabled.",
+            ! $this->changed() && $disabled => __(':stamper was already disabled, perhaps by the business: leave it disabled after the re-key.', ['stamper' => $stamper]),
+            ! $this->changed() => __(':stamper was already enabled.', ['stamper' => $stamper]),
+            $disabled => __(':stamper is disabled: it refuses every tap, and its arming is cleared.', ['stamper' => $stamper]),
+            default => __(':stamper is enabled.', ['stamper' => $stamper]),
         };
     }
 }

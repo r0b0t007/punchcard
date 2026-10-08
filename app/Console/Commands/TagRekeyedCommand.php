@@ -41,13 +41,13 @@ class TagRekeyedCommand extends Command
         $version = (string) $this->argument('version');
 
         if (! ctype_digit($version) || (int) $version < 2) {
-            $this->error('The version is the key version the tag now has: a whole number, 2 or more.');
+            $this->error(__('The version is the key version the tag now has: a whole number, 2 or more.'));
 
             return self::FAILURE;
         }
 
-        if (! $this->option('force') && ! $this->confirm("Have keys 2, 3, 4 and then 0 all been changed on tag {$uid} to key version {$version}?")) {
-            $this->line('Nothing changed.');
+        if (! $this->option('force') && ! $this->confirm(__('Have keys 2, 3, 4 and then 0 all been changed on tag :uid to key version :version?', ['uid' => $uid, 'version' => $version]))) {
+            $this->line(__('Nothing changed.'));
 
             return self::FAILURE;
         }
@@ -62,10 +62,10 @@ class TagRekeyedCommand extends Command
 
         $stamper = $tag->currentStamper;
 
-        $this->info("Tag {$uid} is now at key version {$tag->key_version}; its counter ({$tag->last_counter}) is unchanged.");
+        $this->info(__('Tag :uid is now at key version :version; its counter (:counter) is unchanged.', ['uid' => $uid, 'version' => $tag->key_version, 'counter' => $tag->last_counter]));
         $this->line($stamper instanceof Stamper
-            ? "If you disabled stamper #{$stamper->id} in step 1, re-enable it with punchcard:stamper:enable {$uid} and test one tap; if the business had disabled it, leave it."
-            : 'Assign it when it is back in service.');
+            ? __('If you disabled stamper #:id in step 1, re-enable it with punchcard:stamper:enable :uid and test one tap; if the business had disabled it, leave it.', ['id' => $stamper->id, 'uid' => $uid])
+            : __('Assign it when it is back in service.'));
 
         return self::SUCCESS;
     }
