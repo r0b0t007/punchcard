@@ -2,6 +2,9 @@ name: e2e
 
 on:
   pull_request:
+  # Also on main: only the base branch's cache is shared with every pull request.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,7 @@ concurrency:
 jobs:
   playwright:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     # The tap flow test (tests/e2e/tap-flow.spec.ts) writes tap URLs with punchcard:fake-tap,
     # which runs in local only (the demo seeder too).
     env:
@@ -54,27 +57,34 @@ jobs:
           npm run build
 
       # The browsers come from Playwright's CDN, and a slow download has run the job past its
-      # timeout. Cache them per Playwright version; on a hit only the system packages install.
+      # timeout. Cache them per Playwright version, saved as soon as they are installed (whatever
+      # the tests do). The install always runs: it skips the browsers the cache restored, so on a
+      # hit it only installs the system packages, and it repairs an incomplete cache.
       - name: Read the Playwright version
         id: playwright
-        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          version=$(npx playwright --version | awk '{print $2}')
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Cache browsers
+      - name: Restore browsers
         id: browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-webkit
 
       - name: Install browsers
-        if: steps.browsers.outputs.cache-hit != 'true'
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Install the browsers' system packages
-        if: steps.browsers.outputs.cache-hit == 'true'
-        timeout-minutes: 10
-        run: npx playwright install-deps chromium webkit
+      - name: Save browsers
+        if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
 
       - name: Run Playwright
         run: npx playwright test
