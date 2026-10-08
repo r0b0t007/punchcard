@@ -2,6 +2,10 @@ name: e2e
 
 on:
   pull_request:
+  # On main only the browser cache is warmed (see the browsers job): only the base branch's cache
+  # is shared with every pull request.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,8 +17,9 @@ concurrency:
 
 jobs:
   playwright:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     # The tap flow test (tests/e2e/tap-flow.spec.ts) writes tap URLs with punchcard:fake-tap,
     # which runs in local only (the demo seeder too).
     env:
@@ -53,7 +58,26 @@ jobs:
           php artisan db:seed --no-interaction
           npm run build
 
+      # The browsers come from Playwright's CDN, and a slow download has run the job past its
+      # timeout. They are restored from the cache main warms (the browsers job), keyed by the
+      # runner image (browsers are built per distro), the Playwright version and the browser list.
+      # The install skips the browsers restored, so on a hit it only installs the system packages.
+      - name: Browser cache key
+        id: browsers-key
+        run: |
+          set -o pipefail
+          version=$(npx playwright --version | awk '{print $2}')
+          test -n "$version" && test -n "$ImageOS"
+          echo "key=playwright-$ImageOS-$version-chromium-webkit" >> "$GITHUB_OUTPUT"
+
+      - name: Restore browsers
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers-key.outputs.key }}
+
       - name: Install browsers
+        timeout-minutes: 15
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run Playwright
@@ -65,3 +89,50 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # Warms the browser cache on main, the only branch whose cache every pull request can read, and
+  # the only place one is saved (a pull request's own cache would only fill the quota). Downloads
+  # only when the key is new: a new runner image, Playwright version or browser list.
+  browsers:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Browser cache key
+        id: browsers-key
+        run: |
+          set -o pipefail
+          version=$(npx playwright --version | awk '{print $2}')
+          test -n "$version" && test -n "$ImageOS"
+          echo "key=playwright-$ImageOS-$version-chromium-webkit" >> "$GITHUB_OUTPUT"
+
+      - name: Look for the cache
+        id: browsers
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers-key.outputs.key }}
+          lookup-only: true
+
+      - name: Download browsers
+        if: steps.browsers.outputs.cache-hit != 'true'
+        timeout-minutes: 15
+        run: npx playwright install chromium webkit
+
+      - name: Save browsers
+        if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers-key.outputs.key }}
