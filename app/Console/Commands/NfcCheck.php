@@ -39,7 +39,7 @@ class NfcCheck extends Command
             return self::FAILURE;
         }
 
-        if (! is_int($version) || $version < 1 || $version > 0xFFFF) {
+        if (! is_int($version) || $version < 1 || $version > KeyDiversifier::MAX_KEY_VERSION) {
             $this->error('NFC_SUN_KEY_VERSION must be a whole number from 1 to 65535.');
 
             return self::FAILURE;

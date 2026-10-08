@@ -38,6 +38,9 @@ final readonly class KeyDiversifier
 
     private const int KEY_BYTES = 16;
 
+    /** Versions are two bytes in the derivation input: 1 to 65535. */
+    public const int MAX_KEY_VERSION = 0xFFFF;
+
     private const int UID_HEX = TagUid::BYTES * 2;
 
     /** Wrapped so dumps (dd, VarDumper, var_export, print_r) and serialization never reveal it. */
@@ -119,7 +122,7 @@ final readonly class KeyDiversifier
 
     private function versionBytes(int $version): string
     {
-        if ($version < 1 || $version > 0xFFFF) {
+        if ($version < 1 || $version > self::MAX_KEY_VERSION) {
             throw new InvalidArgumentException('Key versions are 1 to 65535.');
         }
 

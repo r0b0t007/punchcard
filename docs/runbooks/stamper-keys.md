@@ -32,6 +32,13 @@ near a tag can rewrite its URL (phishing) or lock us out of it. If provisioning 
 0, 3 and 4 from a separate admin master (for example `NFC_TAG_ADMIN_MASTER_KEY`) that only the provisioning
 tool loads. Never send key 0 to a browser.
 
+## Registering a tag
+
+Provision the tag first (keys from `key_version` 1, CHW-16), then register and assign it:
+`php artisan punchcard:stamper:register <uid> <business slug or id> [--location=<id>] [--label=<name>]`.
+A new tag starts at key version 1 and counter 0. A known tag that is free again keeps both. The uid is read as
+the reader prints it (spaces, colons, either case). The commands never print key material.
+
 ## Changing keys on a tag (applies to every rotation below)
 
 - ChangeKey needs the tag's **current** key 0 to authenticate and, for keys 1 to 4, the current value of the
@@ -48,22 +55,29 @@ The tag's uid, `key_version` and `last_counter` live on `nfc_tags` (platform sta
 the tag to a business and location. Database triggers keep a tag from being deleted and its counter and key
 version from going back.
 
-1. Disable the tag's stamper (`status`), so it rejects every tap while you work.
+1. Disable the tag's stamper, so it rejects every tap while you work: `php artisan punchcard:stamper:disable <uid>`.
+   Note whether the business had already disabled it, so step 4 does not turn on a stamper they paused.
 2. Re-provision the tag: keys 2, 3 and 4, then key 0, all derived from `key_version + 1`, authenticating with
    the current version's key 0.
-3. Only after every key has changed, bump the tag's `key_version`. Keep `last_counter` as it is: the tag's
-   read counter keeps counting, and the old value still blocks replays.
-4. Re-enable the stamper and test one tap.
+3. Only after every key has changed, record the version the tag now has:
+   `php artisan punchcard:tag:rekeyed <uid> <new version>`. It asks you to confirm the keys changed, then moves
+   `key_version` from the version before it, so running it again (after a dropped session, say) is refused
+   instead of moving the tag past the keys it holds. It keeps `last_counter`: the tag's read counter keeps
+   counting, and the old value still blocks replays. It refuses while the stamper is still enabled.
+4. Re-enable the stamper (`php artisan punchcard:stamper:enable <uid>`) and test one tap.
 
 Every URL the tag produced before step 2 now fails as `bad_mac`, because its `c` was signed with the old key 2.
 The meta key is unchanged, so those URLs still decrypt.
 
-**Moving a tag to another business or location** needs no new keys: end its stamper's assignment
-(`unassigned_at`, admin only, one-way) and assign the tag again (a new stamper). The tag keeps its counter, so
-URLs from the old site stay replays, and the old business can never reclaim the tag by re-enabling its stamper.
+**Moving a tag to another business or location** needs no new keys:
+`php artisan punchcard:stamper:move <uid> <business slug or id> [--location=<id>] [--label=<name>]` ends its
+stamper's assignment (`unassigned_at`, one-way) and assigns the tag again (a new stamper) in one transaction.
+The tag keeps its counter, so URLs from the old site stay replays, and the old business can never reclaim the
+tag by re-enabling its stamper. Within a business the stamper keeps its label and status; at another business
+it starts active and unlabelled.
 
-A **lost or stolen** tag cannot be re-provisioned: retire it (`nfc_tags.retired_at`, one-way) and assign a
-replacement tag.
+A **lost or stolen** tag cannot be re-provisioned: retire it with `php artisan punchcard:tag:retire <uid>`
+(`nfc_tags.retired_at`, one-way; its assignment ends too) and register a replacement tag.
 
 ## Rotating the meta key (hard cutover)
 

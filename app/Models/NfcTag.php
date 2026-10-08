@@ -39,6 +39,12 @@ class NfcTag extends Model
 
     use IsPlatformData;
 
+    /**
+     * The highest key_version the column holds: unsignedSmallInteger is a
+     * signed smallint on Postgres. Below KeyDiversifier::MAX_KEY_VERSION.
+     */
+    public const int LAST_KEY_VERSION = 32767;
+
     /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
     protected $attributes = ['key_version' => 1, 'last_counter' => 0];
 
