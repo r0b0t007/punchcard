@@ -33,7 +33,7 @@ final readonly class MoveStamper
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
-        return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
+        return $this->assignUnderTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
             $tag = $this->requireTag($tag, $uid, ': register it first');
 
             if ($tag->retired_at !== null) {

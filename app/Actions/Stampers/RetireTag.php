@@ -33,8 +33,9 @@ final readonly class RetireTag
             }
 
             $current = $this->lockCurrentStamper($tag);
-            $current?->forceFill(['unassigned_at' => now()])->save();
-            $tag->forceFill(['retired_at' => now()])->save();
+            $now = now();
+            $current?->forceFill(['unassigned_at' => $now])->save();
+            $tag->forceFill(['retired_at' => $now])->save();
 
             return $current?->load(['business', 'location']);
         });

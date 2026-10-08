@@ -12,8 +12,11 @@ use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
 use App\Models\Stamper;
+use App\Support\Nfc\TagUid;
 use App\Support\Tenancy\ArchivedSites;
+use Closure;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
  * What registering and moving a tag share (CHW-138): the site it goes to and
@@ -79,9 +82,21 @@ trait AssignsTags
         return $stamper->setRelation('tag', $tag)->setRelation('location', $location);
     }
 
-    private function retired(string $uid): StamperRefused
+    /**
+     * underTagLock for the Actions that insert: someone registering or
+     * assigning the same tag at the same moment hits the uid's unique index or
+     * the one-current-assignment index, a refusal to check and retry rather
+     * than a server error.
+     *
+     * @param  Closure(?NfcTag, string): Stamper  $work
+     */
+    private function assignUnderTagLock(string $uid, Closure $work): Stamper
     {
-        return new StamperRefused("Tag {$uid} is retired (lost or stolen): register a new tag for its replacement.");
+        try {
+            return $this->underTagLock($uid, $work);
+        } catch (UniqueConstraintViolationException) {
+            throw new StamperRefused('Tag '.TagUid::normalise($uid).' was registered or assigned by someone else at the same moment: check it and try again.');
+        }
     }
 
     private function onlyOpenLocation(Business $business): Location

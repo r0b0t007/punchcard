@@ -64,7 +64,7 @@ class NfcTag extends Model
      */
     public function currentStamper(): HasOne
     {
-        return $this->hasOne(Stamper::class)->whereNull('unassigned_at');
+        return $this->hasOne(Stamper::class)->current();
     }
 
     /**

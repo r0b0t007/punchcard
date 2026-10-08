@@ -52,7 +52,7 @@ describe('retiring', function (): void {
 
         expect($ended?->id)->toBe($this->stamper->id)
             ->and(($this->tag)()->retired_at)->not->toBeNull()
-            ->and(($this->fresh)($this->stamper)->unassigned_at)->not->toBeNull()
+            ->and(($this->fresh)($this->stamper)->unassigned_at?->equalTo(($this->tag)()->retired_at))->toBeTrue()
             ->and(fn () => app(RegisterStamper::class)->handle($this->uid, $this->tenants->a2))->toThrow(StamperRefused::class, 'retired')
             ->and(fn () => app(MoveStamper::class)->handle($this->uid, $this->tenants->a2))->toThrow(StamperRefused::class, 'retired');
     });

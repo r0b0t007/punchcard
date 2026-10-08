@@ -123,7 +123,7 @@ final readonly class KeyDiversifier
     private function versionBytes(int $version): string
     {
         if ($version < 1 || $version > self::MAX_KEY_VERSION) {
-            throw new InvalidArgumentException('Key versions are 1 to 65535.');
+            throw new InvalidArgumentException('Key versions are 1 to '.self::MAX_KEY_VERSION.'.');
         }
 
         return pack('n', $version);

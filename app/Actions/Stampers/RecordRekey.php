@@ -8,7 +8,6 @@ use App\Actions\Stampers\Concerns\LocksTags;
 use App\Enums\StamperStatus;
 use App\Models\NfcTag;
 use App\Models\Stamper;
-use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -34,14 +33,14 @@ final readonly class RecordRekey
             $tag = $this->requireTag($tag, $uid);
 
             if ($tag->retired_at !== null) {
-                throw new StamperRefused("Tag {$uid} is retired: a lost or stolen tag is replaced, never re-keyed.");
+                throw $this->retired($uid);
             }
 
             if ($tag->key_version !== $from) {
                 throw new StamperRefused("Tag {$uid} is at key version {$tag->key_version}, not {$from}: this re-key may be recorded already. Check the tag before trying again.");
             }
 
-            if ($from >= min(NfcTag::LAST_KEY_VERSION, KeyDiversifier::MAX_KEY_VERSION)) {
+            if ($from >= NfcTag::LAST_KEY_VERSION) {
                 throw new StamperRefused("Tag {$uid} is at the last key version ({$from}): replace it with a new tag.");
             }
 

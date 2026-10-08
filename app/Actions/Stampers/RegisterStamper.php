@@ -27,7 +27,7 @@ final readonly class RegisterStamper
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
-        return $this->underTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
+        return $this->assignUnderTagLock($uid, function (?NfcTag $tag, string $uid) use ($business, $location, $label): Stamper {
             $tag ??= $this->newTag($uid);
 
             if ($tag->retired_at !== null) {

@@ -9,7 +9,6 @@ use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Support\Nfc\TagUid;
 use Closure;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -23,9 +22,7 @@ trait LocksTags
 {
     /**
      * Runs $work under the tag's lock, with the normalised uid; the tag is null
-     * when none has it. Someone registering or assigning the same tag at the
-     * same moment hits the uid's unique index or the one-current-assignment
-     * index: a refusal to check and retry, not a server error.
+     * when none has it.
      *
      * @template T
      *
@@ -40,11 +37,7 @@ trait LocksTags
             throw new StamperRefused($invalid->getMessage(), $invalid->getCode(), previous: $invalid);
         }
 
-        try {
-            return $this->context->bypass(fn (): mixed => DB::transaction(fn (): mixed => $work($this->lockTag($uid), $uid)));
-        } catch (UniqueConstraintViolationException) {
-            throw new StamperRefused("Tag {$uid} was registered or assigned by someone else at the same moment: check it and try again.");
-        }
+        return $this->context->bypass(fn (): mixed => DB::transaction(fn (): mixed => $work($this->lockTag($uid), $uid)));
     }
 
     /**
@@ -68,9 +61,14 @@ trait LocksTags
         return $tag;
     }
 
-    /** The tag's current stamper, locked FOR UPDATE after the tag: the tap path's order. */
+    /** The tag's current stamper (NfcTag::currentStamper), locked FOR UPDATE after the tag: the tap path's order. */
     private function lockCurrentStamper(NfcTag $tag): ?Stamper
     {
-        return Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
+        return $tag->currentStamper()->lockForUpdate()->first();
+    }
+
+    private function retired(string $uid): StamperRefused
+    {
+        return new StamperRefused("Tag {$uid} is retired (lost or stolen): register a new tag for its replacement.");
     }
 }
