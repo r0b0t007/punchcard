@@ -34,8 +34,8 @@ class TagRetireCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->option('force') && ! $this->confirm("Retire tag {$uid} for good? It can never be assigned again.")) {
-            $this->line('Nothing changed.');
+        if (! $this->option('force') && ! $this->confirm(__('Retire tag :uid for good? It can never be assigned again.', ['uid' => $uid]))) {
+            $this->line(__('Nothing changed.'));
 
             return self::FAILURE;
         }
@@ -49,8 +49,13 @@ class TagRetireCommand extends Command
         }
 
         $this->info($ended instanceof Stamper
-            ? "Retired tag {$uid}; its assignment ended (stamper #{$ended->id} at {$ended->business->name}, ".SiteName::of($ended->location).'). Register a new tag for its replacement.'
-            : "Retired tag {$uid}; it had no assignment. Register a new tag for its replacement.");
+            ? __('Retired tag :uid; its assignment ended (stamper #:id at :business, :site). Register a new tag for its replacement.', [
+                'uid' => $uid,
+                'id' => $ended->id,
+                'business' => $ended->business->name,
+                'site' => SiteName::of($ended->location),
+            ])
+            : __('Retired tag :uid; it had no assignment. Register a new tag for its replacement.', ['uid' => $uid]));
 
         return self::SUCCESS;
     }

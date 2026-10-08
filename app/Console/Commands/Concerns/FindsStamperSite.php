@@ -29,7 +29,7 @@ trait FindsStamperSite
         $business = $this->namedBusiness($context);
 
         if (! $business instanceof Business) {
-            $this->error('No business with that slug or id.');
+            $this->error(__('No business with that slug or id.'));
 
             return self::FAILURE;
         }
@@ -37,7 +37,7 @@ trait FindsStamperSite
         $location = $this->namedLocation($context);
 
         if ($location === false) {
-            $this->error('No location with that id.');
+            $this->error(__('No location with that id.'));
 
             return self::FAILURE;
         }

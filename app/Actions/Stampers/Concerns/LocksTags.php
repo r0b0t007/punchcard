@@ -51,11 +51,13 @@ trait LocksTags
         return NfcTag::query()->where('uid', $uid)->lock('for no key update')->first();
     }
 
-    /** The locked tag, or a refusal naming the uid; $next says what to do instead. */
-    private function requireTag(?NfcTag $tag, string $uid, string $next = ''): NfcTag
+    /** The locked tag, or a refusal naming the uid (and, for a move, saying to register it first). */
+    private function requireTag(?NfcTag $tag, string $uid, bool $registerFirst = false): NfcTag
     {
         if (! $tag instanceof NfcTag) {
-            throw new StamperRefused("No tag {$uid} is registered{$next}.");
+            throw new StamperRefused($registerFirst
+                ? __('No tag :uid is registered: register it first.', ['uid' => $uid])
+                : __('No tag :uid is registered.', ['uid' => $uid]));
         }
 
         return $tag;
@@ -69,6 +71,6 @@ trait LocksTags
 
     private function retired(string $uid): StamperRefused
     {
-        return new StamperRefused("Tag {$uid} is retired (lost or stolen): register a new tag for its replacement.");
+        return new StamperRefused(__('Tag :uid is retired (lost or stolen): register a new tag for its replacement.', ['uid' => $uid]));
     }
 }

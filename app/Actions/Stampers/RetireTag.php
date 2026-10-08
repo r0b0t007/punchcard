@@ -29,7 +29,7 @@ final readonly class RetireTag
             $tag = $this->requireTag($tag, $uid);
 
             if ($tag->retired_at !== null) {
-                throw new StamperRefused("Tag {$uid} is already retired.");
+                throw new StamperRefused(__('Tag :uid is already retired.', ['uid' => $uid]));
             }
 
             $current = $this->lockCurrentStamper($tag);

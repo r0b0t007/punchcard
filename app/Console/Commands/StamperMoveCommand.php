@@ -32,7 +32,7 @@ class StamperMoveCommand extends Command
         return $this->onStamperSite(
             $context,
             $moveStamper->handle(...),
-            fn (Stamper $stamper, string $where): string => "Moved tag {$stamper->tag->uid} to stamper #{$stamper->id} at {$where}; its counter and keys are unchanged.",
+            fn (Stamper $stamper, string $where): string => __('Moved tag :uid to stamper #:id at :site; its counter and keys are unchanged.', ['uid' => $stamper->tag->uid, 'id' => $stamper->id, 'site' => $where]),
         );
     }
 }

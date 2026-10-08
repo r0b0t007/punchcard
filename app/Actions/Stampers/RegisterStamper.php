@@ -37,7 +37,7 @@ final readonly class RegisterStamper
             $current = $this->lockCurrentStamper($tag);
 
             if ($current instanceof Stamper) {
-                throw new StamperRefused("Tag {$uid} is already assigned (stamper #{$current->id}): move it instead.");
+                throw new StamperRefused(__('Tag :uid is already assigned (stamper #:id): move it instead.', ['uid' => $uid, 'id' => $current->id]));
             }
 
             return $this->assign($tag, $this->siteFor($business, $location), $label);

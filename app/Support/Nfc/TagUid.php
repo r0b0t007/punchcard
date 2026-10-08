@@ -26,11 +26,11 @@ final class TagUid
         $uid = strtoupper((string) preg_replace('/[\s:\-]+/u', '', $typed));
 
         if (strlen($uid) !== self::BYTES * 2 || ! ctype_xdigit($uid)) {
-            throw new InvalidArgumentException('A tag uid is '.(self::BYTES * 2).' hex digits ('.self::BYTES.' bytes), as a reader prints it, for example 04A1B2C3D4E5F6.');
+            throw new InvalidArgumentException(__('A tag uid is :digits hex digits (:bytes bytes), as a reader prints it, for example 04A1B2C3D4E5F6.', ['digits' => self::BYTES * 2, 'bytes' => self::BYTES]));
         }
 
         if (! str_starts_with($uid, self::NXP)) {
-            throw new InvalidArgumentException('An NTAG 424 DNA uid must start with '.self::NXP.', the NXP manufacturer byte: check the reading.');
+            throw new InvalidArgumentException(__('An NTAG 424 DNA uid must start with :prefix, the NXP manufacturer byte: check the reading.', ['prefix' => self::NXP]));
         }
 
         return $uid;
