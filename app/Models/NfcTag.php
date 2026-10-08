@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -39,6 +40,12 @@ class NfcTag extends Model
 
     use IsPlatformData;
 
+    /**
+     * The highest key_version the column holds: unsignedSmallInteger is a
+     * signed smallint on Postgres. Below KeyDiversifier::MAX_KEY_VERSION.
+     */
+    public const int LAST_KEY_VERSION = 32767;
+
     /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
     protected $attributes = ['key_version' => 1, 'last_counter' => 0];
 
@@ -48,6 +55,16 @@ class NfcTag extends Model
     public function stampers(): HasMany
     {
         return $this->hasMany(Stamper::class);
+    }
+
+    /**
+     * The assignment that holds the tag now, paused or not (Stamper::current).
+     *
+     * @return HasOne<Stamper, $this>
+     */
+    public function currentStamper(): HasOne
+    {
+        return $this->hasOne(Stamper::class)->current();
     }
 
     /**

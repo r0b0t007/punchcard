@@ -162,7 +162,7 @@ final readonly class ReceiveTap
         $version = config('punchcard.nfc.key_version');
 
         if (! is_int($version)) {
-            throw new InvalidArgumentException('NFC_SUN_KEY_VERSION must be a whole number from 1 to 65535 (punchcard:nfc:check).');
+            throw new InvalidArgumentException('NFC_SUN_KEY_VERSION must be a whole number from 1 to '.KeyDiversifier::MAX_KEY_VERSION.' (punchcard:nfc:check).');
         }
 
         return $version;

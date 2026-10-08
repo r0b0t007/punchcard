@@ -17,44 +17,17 @@ use App\Support\Tenancy\ArchivedSites;
 use Closure;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 /**
- * What the platform admin's tag Actions share (CHW-138): the uid, the tag
- * lock, the site a tag goes to and the new assignment. The using class has a
- * TenantContext $context. Everything runs in bypass() and one transaction,
- * locking in the tap path's order: the tag, then its stamper, then the site.
+ * What registering and moving a tag share (CHW-138): the site it goes to and
+ * the new assignment, under the tag's lock (LocksTags), locking in the tap
+ * path's order: the tag, then its stamper, then the site.
  */
 trait AssignsTags
 {
+    use LocksTags;
+
     private const int LABEL_MAX = 255;
-
-    /**
-     * Runs $work under the tag's lock, with the normalised uid; the tag is null
-     * when none has it. Someone registering or assigning the same tag at the
-     * same moment hits the uid's unique index or the one-current-assignment
-     * index: a refusal to check and retry, not a server error.
-     *
-     * @template T
-     *
-     * @param  Closure(?NfcTag, string): T  $work
-     * @return T
-     */
-    private function underTagLock(string $uid, Closure $work): mixed
-    {
-        try {
-            $uid = TagUid::normalise($uid);
-        } catch (InvalidArgumentException $invalid) {
-            throw new StamperRefused($invalid->getMessage(), $invalid->getCode(), previous: $invalid);
-        }
-
-        try {
-            return $this->context->bypass(fn (): mixed => DB::transaction(fn (): mixed => $work($this->lockTag($uid), $uid)));
-        } catch (UniqueConstraintViolationException) {
-            throw new StamperRefused("Tag {$uid} was registered or assigned by someone else at the same moment: check it and try again.");
-        }
-    }
 
     /**
      * The location the tag goes to: the one named, or the business's only open
@@ -86,17 +59,6 @@ trait AssignsTags
     }
 
     /**
-     * FOR NO KEY UPDATE, as ReceiveTap: register, move and taps on the tag
-     * still queue, but a stamp event's foreign key check on the tag (KEY SHARE)
-     * is never blocked, so a tap being applied on the old stamper cannot
-     * deadlock with a move.
-     */
-    private function lockTag(string $uid): ?NfcTag
-    {
-        return NfcTag::query()->where('uid', $uid)->lock('for no key update')->first();
-    }
-
-    /**
      * A new current assignment of the tag; the business pauses or arms it
      * later, an admin ends it. It comes back with its tag and location loaded.
      */
@@ -120,9 +82,21 @@ trait AssignsTags
         return $stamper->setRelation('tag', $tag)->setRelation('location', $location);
     }
 
-    private function retired(string $uid): StamperRefused
+    /**
+     * underTagLock for the Actions that insert: someone registering or
+     * assigning the same tag at the same moment hits the uid's unique index or
+     * the one-current-assignment index, a refusal to check and retry rather
+     * than a server error.
+     *
+     * @param  Closure(?NfcTag, string): Stamper  $work
+     */
+    private function assignUnderTagLock(string $uid, Closure $work): Stamper
     {
-        return new StamperRefused("Tag {$uid} is retired (lost or stolen): register a new tag for its replacement.");
+        try {
+            return $this->underTagLock($uid, $work);
+        } catch (UniqueConstraintViolationException) {
+            throw new StamperRefused('Tag '.TagUid::normalise($uid).' was registered or assigned by someone else at the same moment: check it and try again.');
+        }
     }
 
     private function onlyOpenLocation(Business $business): Location
