@@ -33,7 +33,9 @@ final class TenantProbeJob implements ShouldQueue
     /** Runs the database queue in-process until it is empty, like a worker would. */
     public static function workDatabaseQueue(): void
     {
-        Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--sleep' => 0]);
+        // A worker stops after a job once memory passes --memory (128 MB by default), which the whole suite's
+        // process already has: without room, the second of two queued jobs never runs.
+        Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--sleep' => 0, '--memory' => 4096]);
     }
 
     public function handle(TenantContext $context): void
