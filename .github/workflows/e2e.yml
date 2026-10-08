@@ -53,8 +53,28 @@ jobs:
           php artisan db:seed --no-interaction
           npm run build
 
+      # The browsers come from Playwright's CDN, and a slow download has run the job past its
+      # timeout. Cache them per Playwright version; on a hit only the system packages install.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-webkit
+
       - name: Install browsers
+        if: steps.browsers.outputs.cache-hit != 'true'
+        timeout-minutes: 10
         run: npx playwright install --with-deps chromium webkit
+
+      - name: Install the browsers' system packages
+        if: steps.browsers.outputs.cache-hit == 'true'
+        timeout-minutes: 10
+        run: npx playwright install-deps chromium webkit
 
       - name: Run Playwright
         run: npx playwright test
