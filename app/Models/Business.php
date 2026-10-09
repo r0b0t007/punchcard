@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 use LogicException;
 
@@ -200,6 +201,67 @@ class Business extends Model implements TenantModel
             ->using(BusinessMember::class)
             ->withPivot('id', 'role', 'location_id', 'organization_id')
             ->withTimestamps();
+    }
+
+    /**
+     * The owners among the members.
+     *
+     * @return BelongsToMany<User, $this, BusinessMember>
+     */
+    public function owners(): BelongsToMany
+    {
+        return $this->members()->wherePivot('role', BusinessRole::Owner->value);
+    }
+
+    /**
+     * Every stamper assignment, ended ones included.
+     *
+     * @return HasMany<Stamper, $this>
+     */
+    public function stampers(): HasMany
+    {
+        return $this->hasMany(Stamper::class);
+    }
+
+    /**
+     * The assignments holding a tag now (Stamper::current).
+     *
+     * @return HasMany<Stamper, $this>
+     */
+    public function currentStampers(): HasMany
+    {
+        return $this->stampers()->current();
+    }
+
+    /**
+     * The taps at its stampers (platform data: read in bypass()).
+     *
+     * @return HasMany<Tap, $this>
+     */
+    public function taps(): HasMany
+    {
+        return $this->hasMany(Tap::class);
+    }
+
+    /**
+     * What the platform admin did to this business, newest first (platform data: read in bypass()).
+     *
+     * @return MorphMany<AuditLog, $this>
+     */
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'subject')->latest('id');
+    }
+
+    /**
+     * The latest 20 audit entries, the admin's view of the business (eager
+     * loading keeps the limit per business).
+     *
+     * @return MorphMany<AuditLog, $this>
+     */
+    public function recentAuditLogs(): MorphMany
+    {
+        return $this->auditLogs()->limit(20);
     }
 
     /**
