@@ -359,5 +359,7 @@
     "Verify": "تحقق",
     "When": "متى",
     "business": "محل",
-    "businesses": "محلات"
+    "businesses": "محلات",
+    "None in the last :days days": "لا شيء في آخر :days يومًا",
+    "The latest :count entries.": "آخر :count إدخالًا."
 }

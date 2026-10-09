@@ -18,6 +18,9 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -85,8 +88,9 @@ it('counts each business\'s open sites and stampers, and shows its last tap', fu
     $this->context->bypass(function () use ($stamper): void {
         Location::factory()->for($this->tenants->a2)->create(['name' => 'A2 old site'])->forceFill(['archived_at' => now()])->save();
 
-        foreach (['2026-10-01 09:00:00', '2026-10-03 18:30:00'] as $at) {
-            (new Tap)->forceFill(['nfc_tag_id' => $stamper->nfc_tag_id, 'stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay, 'created_at' => $at])->save();
+        // The later tap was a replayed URL: it says nothing about the business being active.
+        foreach (['2026-10-01 09:00:00' => [TapStatus::Stamped, null], '2026-10-03 18:30:00' => [TapStatus::Rejected, TapRejection::Replay]] as $at => [$status, $rejection]) {
+            (new Tap)->forceFill(['nfc_tag_id' => $stamper->nfc_tag_id, 'stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id, 'status' => $status, 'rejection' => $rejection, 'created_at' => $at])->save();
         }
     });
 
@@ -95,7 +99,7 @@ it('counts each business\'s open sites and stampers, and shows its last tap', fu
         ->assertTableColumnStateSet('open_locations_count', 1, $this->tenants->a2)
         ->assertTableColumnStateSet('current_stampers_count', 1, $this->tenants->a2)
         ->assertTableColumnStateSet('current_stampers_count', 0, $this->tenants->a1)
-        ->assertTableColumnStateSet('taps_max_created_at', '2026-10-03 18:30:00', $this->tenants->a2)
+        ->assertTableColumnStateSet('taps_max_created_at', '2026-10-01 09:00:00', $this->tenants->a2)
         ->assertTableColumnStateSet('taps_max_created_at', null, $this->tenants->a1));
 });
 
@@ -120,8 +124,30 @@ it('verifies, suspends with a reason and reinstates, recording each', function (
         ->toBe(['business.verified', 'business.suspended', 'business.reinstated']);
 });
 
-it('shows a refusal as it is', function (): void {
+it('leaves archived businesses out of the queue and its count, offering them no action', function (): void {
     $this->context->bypass(fn () => $this->tenants->a2->forceFill(['archived_at' => now()])->save());
+
+    ($this->screen)(ListBusinesses::class, function (Testable $page): void {
+        $page->assertCanNotSeeTableRecords([$this->tenants->a2]);
+        expect($page->instance()->getTabs()['queue']->getBadge())->toBeNull();
+
+        $page->set('activeTab', 'all')
+            ->assertCanSeeTableRecords([$this->tenants->a2])
+            ->assertActionHidden(TestAction::make('verify')->table($this->tenants->a2))
+            ->assertActionHidden(TestAction::make('suspend')->table($this->tenants->a2));
+    });
+});
+
+it('shows a refusal as it is, when the business is archived as the admin acts', function (): void {
+    // Archived inside the Action's own transaction, after the page offered verify.
+    $archived = new stdClass;
+    $archived->done = false;
+    Event::listen(TransactionBeginning::class, function () use ($archived): void {
+        if (! $archived->done) {
+            $archived->done = true;
+            DB::table('businesses')->where('id', $this->tenants->a2->id)->update(['archived_at' => now()]);
+        }
+    });
 
     ($this->screen)(ListBusinesses::class, fn (Testable $page) => $page
         ->callAction(TestAction::make('verify')->table($this->tenants->a2))
@@ -140,6 +166,32 @@ it('shows a business\'s people, sites, stampers and history', function (): void 
         ->assertSee('A2 site')
         ->assertSee($uid)
         ->assertSee('business.verified'), ['record' => $this->tenants->a2->getRouteKey()]);
+});
+
+it('offers the next action on the business\'s page once one is done', function (): void {
+    ($this->screen)(ViewBusiness::class, fn (Testable $page) => $page
+        ->callAction('verify')
+        ->assertNotified('A2 is verified.')
+        ->assertActionHidden('verify')
+        ->assertActionVisible('suspend'), ['record' => $this->tenants->a2->getRouteKey()]);
+});
+
+it('loads a business\'s page in the same number of queries, however many stampers it has', function (): void {
+    $queries = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        ($this->screen)(ViewBusiness::class, fn (Testable $page) => $page->assertOk(), ['record' => $this->tenants->a2->getRouteKey()]);
+
+        return count(DB::getQueryLog());
+    };
+
+    $this->tenants->stamper($this->tenants->a2);
+    $queries(); // warms the permission cache
+    $one = $queries();
+    $this->tenants->stamper($this->tenants->a2);
+    $this->tenants->stamper($this->tenants->a2);
+
+    expect($queries())->toBe($one);
 });
 
 it('opens the screen to the platform admin only, its actions too', function (): void {

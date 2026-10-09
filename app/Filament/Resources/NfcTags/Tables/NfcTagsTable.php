@@ -55,8 +55,7 @@ final class NfcTagsTable
                 TextColumn::make('currentStamper.business.name')->label(__('Business'))->placeholder(__('Unassigned')),
                 TextColumn::make('currentStamper.location.name')->label(__('Location')),
                 TextColumn::make('currentStamper.label')->label(__('Label')),
-                TextColumn::make('currentStamper.status')->label(__('Stamper'))->badge()
-                    ->formatStateUsing(fn (StamperStatus $state): string => $state === StamperStatus::Active ? __('Enabled') : __('Disabled')),
+                TextColumn::make('currentStamper.status')->label(__('Stamper'))->badge(),
                 TextColumn::make('retired_at')->label(__('Retired'))->dateTime()->placeholder(__('In service')),
                 TextColumn::make('updated_at')->label(__('Updated'))->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])

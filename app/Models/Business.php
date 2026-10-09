@@ -254,6 +254,17 @@ class Business extends Model implements TenantModel
     }
 
     /**
+     * The latest 20 audit entries, the admin's view of the business (eager
+     * loading keeps the limit per business).
+     *
+     * @return MorphMany<AuditLog, $this>
+     */
+    public function recentAuditLogs(): MorphMany
+    {
+        return $this->auditLogs()->limit(20);
+    }
+
+    /**
      * @return HasMany<Location, $this>
      */
     public function locations(): HasMany

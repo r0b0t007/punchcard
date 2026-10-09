@@ -359,5 +359,7 @@
     "Verify": "Vérifier",
     "When": "Quand",
     "business": "commerce",
-    "businesses": "commerces"
+    "businesses": "commerces",
+    "None in the last :days days": "Aucun ces :days derniers jours",
+    "The latest :count entries.": "Les :count dernières entrées."
 }
