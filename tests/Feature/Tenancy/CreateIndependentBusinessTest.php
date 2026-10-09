@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Actions\Tenancy\ResolveTenant;
+use App\Enums\BusinessCategory;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationRole;
@@ -29,7 +30,7 @@ use Tests\Support\Tenants;
 it('creates the organization, the business and both memberships', function (): void {
     $owner = User::factory()->create();
 
-    $business = app(CreateIndependentBusiness::class)->handle($owner, 'Café Hafa', 'cafe');
+    $business = app(CreateIndependentBusiness::class)->handle($owner, 'Café Hafa', BusinessCategory::Cafe);
 
     app(TenantContext::class)->bypass(function () use ($business, $owner): void {
         $organization = $business->organization;
@@ -38,7 +39,7 @@ it('creates the organization, the business and both memberships', function (): v
             ->and($organization->name)->toBe('Café Hafa')
             ->and($business->status)->toBe(BusinessStatus::Pending)
             ->and($business->plan)->toBeNull()
-            ->and($business->category)->toBe('cafe')
+            ->and($business->category)->toBe(BusinessCategory::Cafe)
             ->and($business->members()->whereKey($owner->id)->first()?->pivot?->role)->toBe(BusinessRole::Owner)
             ->and($business->members()->whereKey($owner->id)->first()?->pivot?->organization_id)->toBe($organization->id)
             ->and($organization->admins()->whereKey($owner->id)->first()?->pivot?->role)->toBe(OrganizationRole::OrgAdmin);

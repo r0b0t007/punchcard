@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BusinessCategory;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\OnboardingStep;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\ArchivedSites;
@@ -41,7 +43,10 @@ use LogicException;
  * @property int $organization_id
  * @property string $name
  * @property string $slug
- * @property string|null $category
+ * @property BusinessCategory|null $category
+ * @property OnboardingStep|null $onboarding_step the wizard step reached (CHW-31); null for the first
+ * @property Carbon|null $onboarded_at when the onboarding wizard finished
+ * @property Carbon|null $qr_stand_opened_at when the owner first opened the printable QR stand
  * @property BusinessStatus $status
  * @property Carbon|null $verified_at
  * @property Carbon|null $suspended_at
@@ -288,7 +293,11 @@ class Business extends Model implements TenantModel
     protected function casts(): array
     {
         return [
+            'category' => BusinessCategory::class,
             'status' => BusinessStatus::class,
+            'onboarding_step' => OnboardingStep::class,
+            'onboarded_at' => 'datetime',
+            'qr_stand_opened_at' => 'datetime',
             'verified_at' => 'datetime',
             'suspended_at' => 'datetime',
             'archived_at' => 'datetime',

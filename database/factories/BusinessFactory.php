@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\BusinessCategory;
 use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\Organization;
@@ -27,7 +28,9 @@ class BusinessFactory extends Factory
             'organization_id' => Organization::factory(),
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
-            'category' => 'cafe',
+            'category' => BusinessCategory::Cafe,
+            // Set up already: only a real sign-up goes through the onboarding wizard.
+            'onboarded_at' => now(),
             'status' => BusinessStatus::Verified,
             'verified_at' => fn (array $attributes): ?CarbonInterface => BusinessStatus::tryFrom(($attributes['status'] ?? null) instanceof BusinessStatus ? $attributes['status']->value : (string) ($attributes['status'] ?? '')) === BusinessStatus::Verified ? now() : null,
         ];

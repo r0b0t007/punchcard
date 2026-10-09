@@ -33,6 +33,7 @@ return [
         'current_password' => 'mot de passe actuel',
         'password_confirmation' => 'confirmation du mot de passe',
         'locale' => 'langue',
+        'business_name' => 'nom du commerce',
         'code' => 'code',
         'recovery_code' => 'code de récupération',
     ],
