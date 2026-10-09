@@ -308,5 +308,12 @@
     "Updated": "Mise à jour",
     "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.": "Au sein du commerce, la borne garde son nom et son état ; dans un autre commerce, elle démarre activée et sans nom.",
     "tag": "puce",
-    "tags": "puces"
+    "tags": "puces",
+    "Pending": "En attente",
+    "Verified": "Vérifié",
+    "Suspended": "Suspendu",
+    ":business is not waiting for verification (it is :status).": ":business n’attend pas de vérification (statut : :status).",
+    "Give a reason for the suspension.": "Indiquez la raison de la suspension.",
+    ":business is already suspended.": ":business est déjà suspendu.",
+    ":business is not suspended.": ":business n’est pas suspendu."
 }

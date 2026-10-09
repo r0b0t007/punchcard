@@ -103,7 +103,8 @@ final readonly class ApplyTap
 
         [$stamper, $business] = $this->context->bypass(fn (): array => [
             Stamper::query()->whereKey($tap->stamper_id)->lockForUpdate()->firstOrFail(),
-            Business::query()->with('organization')->findOrFail($tap->business_id),
+            // FOR SHARE after the stamper, as AddStamps: a suspension committing meanwhile is seen.
+            Business::query()->with('organization')->sharedLock()->findOrFail($tap->business_id),
         ]);
 
         // AddStamps checks a paused stamper and a closed site too; these come first because

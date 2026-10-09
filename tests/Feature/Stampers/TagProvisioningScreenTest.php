@@ -9,6 +9,7 @@ use App\Enums\StamperStatus;
 use App\Filament\Resources\NfcTags\Pages\ManageNfcTags;
 use App\Filament\Resources\NfcTags\Tables\NfcTagsTable;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
+use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
 use App\Models\Stamper;
@@ -190,11 +191,13 @@ it('records a re-key only once the admin confirms which keys changed', function 
 });
 
 it('finds a business by name or slug, open ones only', function (): void {
+    // Searched by full slug and a distinctive name: factory slugs end in random letters that could match "a1".
+    $zephyr = $this->context->bypass(fn (): Business => Business::factory()->for($this->tenants->orgB)->create(['name' => 'Zephyrine Bar']));
     $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->tenants->a2));
 
-    expect($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching('a1')))->toBe([$this->tenants->a1->id => "A1 ({$this->tenants->a1->slug})"])
-        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching($this->tenants->b1->slug)))->toHaveKey($this->tenants->b1->id)
-        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching('A2')))->toBe([]);
+    expect($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching($this->tenants->a1->slug)))->toBe([$this->tenants->a1->id => "A1 ({$this->tenants->a1->slug})"])
+        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching('zephyrine')))->toBe([$zephyr->id => "Zephyrine Bar ({$zephyr->slug})"])
+        ->and($this->context->bypass(fn (): array => NfcTagsTable::businessesMatching($this->tenants->a2->slug)))->toBe([]);
 
     ($this->screen)(fn (Testable $page) => $page
         ->callAction(TestAction::make('register')->table(), ['uid' => '04A1B2C3D4E5F6', 'business' => $this->tenants->a2->id])

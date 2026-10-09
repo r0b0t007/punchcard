@@ -16,6 +16,7 @@ use App\Support\Nfc\KeyDiversifier;
 use App\Support\Nfc\SunMessage;
 use App\Support\Nfc\SunVerificationFailed;
 use App\Support\Nfc\SunVerifier;
+use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -126,6 +127,12 @@ final readonly class ReceiveTap
 
         if ($stamper->status !== StamperStatus::Active) {
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::StamperDisabled]);
+        }
+
+        // Under the business's share lock, after the stamper's (the counter's order): a tap at a
+        // suspended business is refused now, so a reinstatement never applies it later.
+        if (! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id, lock: true, counter: true)) {
+            return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::SiteClosed]);
         }
 
         $armed = $stamper->armed_qty !== null && $stamper->armed_until?->isFuture();

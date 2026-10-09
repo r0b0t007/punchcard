@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stampers;
 
+use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\AssignsTags;
 use App\Models\Business;
 use App\Models\Location;
@@ -23,7 +24,7 @@ final readonly class RegisterStamper
 {
     use AssignsTags;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
@@ -40,7 +41,15 @@ final readonly class RegisterStamper
                 throw new StamperRefused(__('Tag :uid is already assigned (stamper #:id): move it instead.', ['uid' => $uid, 'id' => $current->id]));
             }
 
-            return $this->assign($tag, $this->siteFor($business, $location), $label);
+            $stamper = $this->assign($tag, $this->siteFor($business, $location), $label);
+            $this->recordAudit->handle('tag.registered', $tag, context: [
+                'stamper_id' => $stamper->id,
+                'business_id' => $stamper->business_id,
+                'location_id' => $stamper->location_id,
+                'key_version' => $tag->key_version,
+            ]);
+
+            return $stamper;
         });
     }
 

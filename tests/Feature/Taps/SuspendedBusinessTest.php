@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Admin\ReinstateBusiness;
+use App\Actions\Admin\SuspendBusiness;
 use App\Actions\Rewards\OpenRedeemWindow;
 use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
@@ -27,6 +29,7 @@ use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -59,7 +62,10 @@ beforeEach(function (): void {
 
         return app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null);
     };
-    $this->status = fn (BusinessStatus $status) => $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => $status])->save());
+    // Suspended through the admin's Action (CHW-34), as in production; other statuses set directly.
+    $this->status = fn (BusinessStatus $status) => $status === BusinessStatus::Suspended
+        ? app(SuspendBusiness::class)->handle($this->tenants->a1, 'Under review')
+        : $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => $status])->save());
     $this->stamps = fn (): int => $this->context->bypass(fn (): int => StampEvent::query()->count());
 });
 
@@ -84,6 +90,34 @@ it('refuses a tap at a suspended business, and stamps at a pending one', functio
     'suspended' => [BusinessStatus::Suspended, false],
     'pending' => [BusinessStatus::Pending, true],
 ]);
+
+it('refuses a tap made during a suspension when it arrives, so a reinstatement never applies it', function (): void {
+    ($this->status)(BusinessStatus::Suspended);
+    $tap = ($this->received)(5);
+    app(ReinstateBusiness::class)->handle($this->tenants->a1);
+
+    expect($tap->status)->toBe(TapStatus::Rejected)
+        ->and($tap->rejection)->toBe(TapRejection::SiteClosed);
+
+    app(ApplyTap::class)->handle($tap, $this->customer);
+
+    expect(($this->stamps)())->toBe(0);
+});
+
+it('reads the business under a share lock, after the stamper, when it applies a tap', function (): void {
+    $pending = ($this->received)(5);
+    DB::enableQueryLog();
+
+    app(ApplyTap::class)->handle($pending, $this->customer);
+
+    $queries = collect(DB::getQueryLog())->pluck('query')->values();
+    $stamper = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "stampers"') && str_contains($sql, 'for update'));
+    $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses" where') && str_ends_with(trim($sql), 'for share'));
+
+    expect($stamper)->toBeInt()
+        ->and($business)->toBeInt()
+        ->and($stamper)->toBeLessThan($business);
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
 
 it('refuses a manual stamp at a suspended business', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Staff);
