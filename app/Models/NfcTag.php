@@ -68,7 +68,8 @@ class NfcTag extends Model
     }
 
     /**
-     * Every tap on the tag, rejected ones included.
+     * The taps recorded against the tag: those whose signature verified (a
+     * tap that fails it can't be tied to a tag, so it carries none).
      *
      * @return HasMany<Tap, $this>
      */

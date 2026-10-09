@@ -31,7 +31,7 @@ class StampEventsRelationManager extends RelationManager
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['location', 'stamper', 'staff']))
-            ->defaultSort('id', 'desc')
+            ->defaultSort(fn (Builder $query): Builder => $query->orderByDesc('created_at')->orderByDesc('id'))
             ->columns([
                 HistoryColumns::when(),
                 TextColumn::make('location.name')->label(__('Location')),

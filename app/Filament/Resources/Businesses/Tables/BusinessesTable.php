@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class BusinessesTable
 {
-    /** Platform times, across every site's timezone: shown in UTC, and saying so. */
+    /** Admin times name their zone: UTC for a business across its sites, a site's own zone for one site. */
     public const string DATE_TIME = 'j M Y, H:i T';
 
     public static function configure(Table $table): Table
@@ -66,11 +66,11 @@ final class BusinessesTable
 
     /**
      * Taps the counter took: a rejected one (a replayed or forged URL) says
-     * nothing about the business being active.
+     * nothing about the business or tag being in use (the tag screen too).
      *
      * @param  Builder<Tap>  $taps
      */
-    private static function accepted(Builder $taps): void
+    public static function accepted(Builder $taps): void
     {
         $taps->whereIn('status', [TapStatus::Pending, TapStatus::Stamped, TapStatus::Redeemed]);
     }

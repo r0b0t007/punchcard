@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\Location;
 use Carbon\CarbonInterface;
 
 /**
@@ -14,6 +15,12 @@ use Carbon\CarbonInterface;
  */
 final class LocalMoment
 {
+    /** The timezone a location's moments are shown in: its own, else the app's (a tap or reward with no site). */
+    public static function timezoneOf(?Location $location): string
+    {
+        return $location->timezone ?? (string) config('app.timezone');
+    }
+
     /**
      * @return array{day: 'today'|'other', date: string, time: string}
      */

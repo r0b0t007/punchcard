@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\RelationManagers;
 
-use App\Models\Location;
+use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\Tap;
+use App\Support\LocalMoment;
 use Filament\Tables\Columns\TextColumn;
 
 /**
  * The columns a business's two history tables share. Times are read at the
  * site where it happened (CLAUDE.md: stored in UTC, displayed in the
- * location's timezone), and the location column says which site that is.
+ * location's timezone), naming the zone, and the location column says which
+ * site that is.
  */
 final class HistoryColumns
 {
     public static function when(): TextColumn
     {
         return TextColumn::make('created_at')->label(__('When'))
-            ->dateTime('j M Y, H:i')
-            ->timezone(fn (StampEvent|Tap $record): string => self::timezoneOf($record->location));
+            ->dateTime(BusinessesTable::DATE_TIME)
+            ->timezone(fn (StampEvent|Tap $record): string => LocalMoment::timezoneOf($record->location));
     }
 
     public static function stamper(): TextColumn
@@ -30,10 +32,5 @@ final class HistoryColumns
             ->formatStateUsing(fn (StampEvent|Tap $record): ?string => $record->stamper instanceof Stamper
                 ? $record->stamper->label ?? '#'.$record->stamper->id
                 : null);
-    }
-
-    private static function timezoneOf(?Location $location): string
-    {
-        return $location->timezone ?? (string) config('app.timezone');
     }
 }

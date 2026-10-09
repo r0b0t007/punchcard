@@ -56,7 +56,7 @@ final readonly class DescribeTap
     {
         return $this->context->bypass(function () use ($tap): array {
             $location = Location::query()->select(['id', 'name', 'timezone'])->find($tap->location_id);
-            $timezone = $location->timezone ?? (string) config('app.timezone');
+            $timezone = LocalMoment::timezoneOf($location);
             $card = $tap->card_id !== null
                 ? LoyaltyCard::query()->find($tap->card_id)
                 : LoyaltyCard::query()->honouredBy((int) $tap->business_id)->first();

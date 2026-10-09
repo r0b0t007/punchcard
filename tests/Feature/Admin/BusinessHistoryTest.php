@@ -67,11 +67,13 @@ it('lists a business\'s stamp events, never another\'s, at its location\'s time'
     $here = $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => '2026-10-01 23:30:00']);
     $correction = $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['source' => StampSource::Correction, 'qty' => -1, 'reason' => 'Stamped twice']);
     $elsewhere = $this->tenants->stamp($this->enrollment, $this->tenants->a2);
+    // Recorded last, at an earlier moment (a stamp applied after the fact): listed by time, not id.
+    $earlier = $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => '2026-09-30 10:00:00']);
 
     ($this->history)(StampEventsRelationManager::class, $this->tenants->a1, fn (Testable $table) => $table
-        ->assertCanSeeTableRecords([$correction, $here], inOrder: true)
+        ->assertCanSeeTableRecords([$correction, $here, $earlier], inOrder: true)
         ->assertCanNotSeeTableRecords([$elsewhere])
-        ->assertTableColumnFormattedStateSet('created_at', '2 Oct 2026, 08:30', $here)
+        ->assertTableColumnFormattedStateSet('created_at', '2 Oct 2026, 08:30 JST', $here)
         ->assertTableColumnFormattedStateSet('source', 'QR scan', $here)
         ->assertSee('Stamped twice'));
 });
@@ -83,11 +85,12 @@ it('lists a business\'s rejected taps only, never another\'s, without the IP or 
     $rejected = ($this->tap)($a1, '2026-10-01 23:30:00');
     $stamped = ($this->tap)($a1, '2026-10-02 08:00:00', TapStatus::Stamped, null);
     $elsewhere = ($this->tap)($a2, '2026-10-02 09:00:00');
+    $earlier = ($this->tap)($a1, '2026-09-30 10:00:00');
 
     ($this->history)(RejectedTapsRelationManager::class, $this->tenants->a1, fn (Testable $table) => $table
-        ->assertCanSeeTableRecords([$rejected])
+        ->assertCanSeeTableRecords([$rejected, $earlier], inOrder: true)
         ->assertCanNotSeeTableRecords([$stamped, $elsewhere])
-        ->assertTableColumnFormattedStateSet('created_at', '2 Oct 2026, 08:30', $rejected)
+        ->assertTableColumnFormattedStateSet('created_at', '2 Oct 2026, 08:30 JST', $rejected)
         ->assertTableColumnFormattedStateSet('rejection', 'Replayed URL', $rejected)
         ->assertTableColumnFormattedStateSet('stamper_id', 'Bar', $rejected)
         ->assertDontSee('203.0.113.7')
@@ -105,10 +108,28 @@ it('names the sources and rejections in the admin\'s language', function (): voi
         ->assertTableColumnFormattedStateSet('rejection', 'URL rejouée', $rejected));
 });
 
-it('shows when each tag was last tapped, on the tag screen', function (): void {
+it('shows both tables on the business\'s page', function (): void {
+    $this->actingAs($this->admin)->get('/admin/businesses/'.$this->tenants->a1->getRouteKey())
+        ->assertOk()
+        ->assertSee('Stamp history')
+        ->assertSee('Rejected taps');
+});
+
+it('offers only the reasons a business\'s rejected taps can carry', function (): void {
+    ($this->history)(RejectedTapsRelationManager::class, $this->tenants->a1, function (Testable $table): void {
+        $options = $table->instance()->getTable()->getFilter('rejection')?->getOptions() ?? [];
+
+        expect($options)->toHaveKey(TapRejection::Replay->value)
+            ->and($options)->not->toHaveKey(TapRejection::BadMac->value)
+            ->and($options)->not->toHaveKey(TapRejection::Expired->value);
+    });
+});
+
+it('shows when each tag was last accepted, at its site\'s time, on the tag screen', function (): void {
     $tapped = $this->tenants->stamper($this->tenants->a1);
     $quiet = $this->tenants->stamper($this->tenants->a2);
     ($this->tap)($tapped, '2026-10-01 09:00:00', TapStatus::Stamped, null);
+    // A later replay is no sign the tag is in use.
     ($this->tap)($tapped, '2026-10-03 18:30:00');
 
     $this->actingAs($this->admin);
@@ -116,6 +137,7 @@ it('shows when each tag was last tapped, on the tag screen', function (): void {
     Filament::setServingStatus();
 
     $this->context->bypass(fn () => Livewire::test(ManageNfcTags::class)
-        ->assertTableColumnStateSet('taps_max_created_at', '2026-10-03 18:30:00', $tapped->tag)
+        ->assertTableColumnStateSet('taps_max_created_at', '2026-10-01 09:00:00', $tapped->tag)
+        ->assertTableColumnFormattedStateSet('taps_max_created_at', '1 Oct 2026, 18:00 JST', $tapped->tag)
         ->assertTableColumnStateSet('taps_max_created_at', null, $quiet->tag));
 });
