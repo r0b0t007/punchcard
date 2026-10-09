@@ -34,6 +34,8 @@ return new class extends Migration
 
             $table->index(['subject_type', 'subject_id', 'created_at']);
             $table->index('created_at');
+            // DeleteAccount asks whether a user has entries.
+            $table->index('actor_id');
         });
 
         if (DB::getDriverName() === 'pgsql') {

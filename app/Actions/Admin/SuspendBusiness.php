@@ -37,7 +37,7 @@ final readonly class SuspendBusiness
         }
 
         return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $reason): Business {
-            Stamper::query()->current()->where('business_id', $business->id)->orderBy('id')->lockForUpdate()->get();
+            Stamper::query()->current()->where('business_id', $business->id)->orderBy('id')->lockForUpdate()->pluck('id');
             $locked = $this->lockOpen($business);
 
             if ($locked->status === BusinessStatus::Suspended) {

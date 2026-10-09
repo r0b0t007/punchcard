@@ -34,6 +34,12 @@ final readonly class RecordAudit
         $actor = Auth::user();
         $reason = trim((string) $reason);
 
+        // The actor's row under KEY SHARE: an account deletion (DeleteAccount locks the row) either
+        // waits and then sees this entry, or ran first and this action refuses.
+        if ($actor instanceof User && ! User::query()->whereKey($actor->id)->lock('for key share')->exists()) {
+            throw new LogicException('The account acting no longer exists.');
+        }
+
         return $this->context->bypass(function () use ($action, $subject, $reason, $context, $actor): AuditLog {
             $entry = (new AuditLog)->forceFill([
                 'actor_id' => $actor instanceof User ? $actor->id : null,

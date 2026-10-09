@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Models\Organization;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -28,6 +29,7 @@ class BusinessFactory extends Factory
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
             'category' => 'cafe',
             'status' => BusinessStatus::Verified,
+            'verified_at' => fn (array $attributes): ?CarbonInterface => ($attributes['status'] ?? null) === BusinessStatus::Verified ? now() : null,
         ];
     }
 }

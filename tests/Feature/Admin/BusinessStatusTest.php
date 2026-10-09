@@ -98,6 +98,24 @@ it('reinstates a suspended business to where it was', function (bool $wasVerifie
     'never verified' => [false, BusinessStatus::Pending],
 ]);
 
+it('keeps a business verified before it was suspended verified once reinstated', function (): void {
+    // As every business verified before verified_at existed (the migration fills it) or made by the factory.
+    expect(($this->fresh)()->verified_at)->not->toBeNull();
+
+    app(SuspendBusiness::class)->handle($this->business, 'Under review');
+    app(ReinstateBusiness::class)->handle($this->business);
+
+    expect(($this->fresh)()->status)->toBe(BusinessStatus::Verified);
+});
+
+it('refuses an admin whose account was deleted meanwhile, and records nothing', function (): void {
+    ($this->status)(BusinessStatus::Pending);
+    User::query()->whereKey($this->admin->id)->delete();
+
+    expect(fn () => app(VerifyBusiness::class)->handle($this->business))->toThrow(LogicException::class, 'no longer exists')
+        ->and(($this->audits)())->toBe([]);
+});
+
 it('refuses a change that does not apply, and records nothing', function (string $action, string $state, string $reason): void {
     match ($state) {
         'archived' => $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->business)),
@@ -127,10 +145,10 @@ it('refuses a change that does not apply, and records nothing', function (string
 it('lets no tenant change the verification or suspension dates', function (string $column): void {
     $this->context->set($this->tenants->orgA, $this->business, businessRole: BusinessRole::Owner);
 
-    expect(fn () => $this->business->forceFill([$column => now()])->save())->toThrow(LogicException::class, 'verification');
+    expect(fn () => $this->business->forceFill([$column => now()->subYear()])->save())->toThrow(LogicException::class, 'verification');
 })->with(['verified_at', 'suspended_at']);
 
-it('locks the business\'s stampers, then the business, as a tap does', function (): void {
+it('locks the business\'s stampers, then the business (no key update, so inserts referencing it go on), as a tap does', function (): void {
     $this->tenants->stamper($this->business);
     DB::enableQueryLog();
 
@@ -138,7 +156,7 @@ it('locks the business\'s stampers, then the business, as a tap does', function 
 
     $queries = collect(DB::getQueryLog())->pluck('query')->values();
     $stampers = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "stampers"') && str_contains($sql, 'for update'));
-    $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses"') && str_contains($sql, 'for update'));
+    $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses"') && str_contains($sql, 'for no key update'));
 
     expect($stampers)->toBeInt()
         ->and($business)->toBeInt()
