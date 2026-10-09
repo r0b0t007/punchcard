@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Account;
 
+use App\Models\AuditLog;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\Reward;
@@ -74,7 +75,7 @@ final readonly class DeleteAccount
         }));
     }
 
-    /** Rows kept forever point at this user: stamps or rewards on their cards, stamps they gave or rewards they redeemed as staff. */
+    /** Rows kept forever point at this user: stamps or rewards on their cards, stamps they gave or rewards they redeemed as staff, or what they did as platform admin (the audit log). */
     private function hasHistory(User $user): bool
     {
         $cards = CardEnrollment::query()->where('user_id', $user->id)->select('id');
@@ -82,7 +83,8 @@ final readonly class DeleteAccount
         return StampEvent::query()->where('staff_id', $user->id)->exists()
             || StampEvent::query()->whereIn('enrollment_id', $cards)->exists()
             || Reward::query()->where('redeemed_by', $user->id)->exists()
-            || Reward::query()->whereIn('enrollment_id', $cards)->exists();
+            || Reward::query()->whereIn('enrollment_id', $cards)->exists()
+            || AuditLog::query()->where('actor_id', $user->id)->exists();
     }
 
     /** Deletes the user in a savepoint; false when the ledger refuses after all (history arrived meanwhile). */

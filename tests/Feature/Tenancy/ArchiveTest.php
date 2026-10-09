@@ -23,6 +23,7 @@ use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\Tenants;
 
 /*
@@ -47,6 +48,16 @@ beforeEach(function (): void {
     $this->customer = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
     $this->tenants->stamp($this->customer, $this->tenants->a2);
 });
+
+it('locks the stampers it ends in id order, as a suspension does, so the two never deadlock', function (): void {
+    $this->tenants->stamper($this->tenants->a1);
+    DB::enableQueryLog();
+
+    $this->context->bypass(fn () => app(ArchiveBusiness::class)->handle($this->tenants->a1));
+
+    expect(collect(DB::getQueryLog())->pluck('query')->contains(fn (string $sql): bool => str_contains($sql, 'from "stampers"')
+        && str_contains($sql, 'order by "id" asc') && str_contains($sql, 'for update')))->toBeTrue();
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
 
 describe('locations', function (): void {
     it('lets the owner or an org admin archive a location, and ends its stampers', function (string $who): void {

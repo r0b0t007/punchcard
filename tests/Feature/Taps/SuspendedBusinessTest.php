@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Admin\ReinstateBusiness;
+use App\Actions\Admin\SuspendBusiness;
 use App\Actions\Rewards\OpenRedeemWindow;
 use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
@@ -59,7 +61,10 @@ beforeEach(function (): void {
 
         return app(ReceiveTap::class)->handle($url['e'], $url['c'], null, null, null);
     };
-    $this->status = fn (BusinessStatus $status) => $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => $status])->save());
+    // Suspended through the admin's Action (CHW-34), as in production; other statuses set directly.
+    $this->status = fn (BusinessStatus $status) => $status === BusinessStatus::Suspended
+        ? app(SuspendBusiness::class)->handle($this->tenants->a1, 'Under review')
+        : $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => $status])->save());
     $this->stamps = fn (): int => $this->context->bypass(fn (): int => StampEvent::query()->count());
 });
 
@@ -84,6 +89,19 @@ it('refuses a tap at a suspended business, and stamps at a pending one', functio
     'suspended' => [BusinessStatus::Suspended, false],
     'pending' => [BusinessStatus::Pending, true],
 ]);
+
+it('refuses a tap made during a suspension when it arrives, so a reinstatement never applies it', function (): void {
+    ($this->status)(BusinessStatus::Suspended);
+    $tap = ($this->received)(5);
+    app(ReinstateBusiness::class)->handle($this->tenants->a1);
+
+    expect($tap->status)->toBe(TapStatus::Rejected)
+        ->and($tap->rejection)->toBe(TapRejection::SiteClosed);
+
+    app(ApplyTap::class)->handle($tap, $this->customer);
+
+    expect(($this->stamps)())->toBe(0);
+});
 
 it('refuses a manual stamp at a suspended business', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Staff);

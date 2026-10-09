@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
+use App\Models\Business;
+use App\Models\NfcTag;
 use App\Models\User;
 use App\Policies\Invariants;
 use App\Support\Auth\ActiveUserProvider;
@@ -18,6 +20,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
@@ -92,6 +95,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->nameAuditSubjects();
         $this->carryTenantIntoQueuedJobs();
         $this->registerUserProvider();
         $this->registerRateLimiters();
@@ -202,6 +206,19 @@ class AppServiceProvider extends ServiceProvider
     private function registerUserProvider(): void
     {
         Auth::provider('active-eloquent', fn (Application $app, array $config): ActiveUserProvider => new ActiveUserProvider($app->make(Hasher::class), $config['model']));
+    }
+
+    /**
+     * Stable names for what the audit log points at (CHW-34), so a renamed
+     * class never orphans its history. Not enforced: other morphs (spatie's
+     * role holders) keep their class names.
+     */
+    private function nameAuditSubjects(): void
+    {
+        Relation::morphMap([
+            'business' => Business::class,
+            'nfc_tag' => NfcTag::class,
+        ]);
     }
 
     /**

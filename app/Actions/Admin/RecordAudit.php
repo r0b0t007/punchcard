@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Admin;
+
+use App\Enums\PlatformRole;
+use App\Models\AuditLog;
+use App\Models\User;
+use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use LogicException;
+
+/**
+ * Records what the platform admin did (CHW-34) in the audit log: the action,
+ * its subject, the reason given and any context, with who did it: the
+ * signed-in user's id ("admin #12" for the platform admin, "user #12" for
+ * anyone else; never an email: the log can't be changed, and outlives the
+ * account), or "console" for a command. Callers run it
+ * inside their own transaction, so an action and its record commit, or roll
+ * back, together. Never pass key material in the context.
+ */
+final readonly class RecordAudit
+{
+    public function __construct(private TenantContext $context) {}
+
+    /** @param  array<string, mixed>  $context */
+    public function handle(string $action, Model $subject, ?string $reason = null, array $context = []): AuditLog
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('An audit entry is recorded in its action\'s transaction, so the two commit or roll back together.');
+        }
+
+        $actor = Auth::user();
+        $reason = trim((string) $reason);
+
+        // The actor's row under KEY SHARE: an account deletion (DeleteAccount locks the row) either
+        // waits and then sees this entry, or ran first and this action refuses.
+        if ($actor instanceof User && ! User::query()->whereKey($actor->id)->lock('for key share')->exists()) {
+            throw new LogicException('The account acting no longer exists.');
+        }
+
+        return $this->context->bypass(function () use ($action, $subject, $reason, $context, $actor): AuditLog {
+            $entry = (new AuditLog)->forceFill([
+                'actor_id' => $actor instanceof User ? $actor->id : null,
+                'actor_label' => match (true) {
+                    ! $actor instanceof User => 'console',
+                    $actor->hasRole(PlatformRole::Admin->value) => 'admin #'.$actor->id,
+                    default => 'user #'.$actor->id,
+                },
+                'action' => $action,
+                'subject_type' => $subject->getMorphClass(),
+                'subject_id' => $subject->getKey(),
+                'reason' => $reason === '' ? null : $reason,
+                'context' => $context === [] ? null : $context,
+            ]);
+            $entry->save();
+
+            return $entry;
+        });
+    }
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stampers;
 
+use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\LocksTags;
 use App\Enums\StamperStatus;
 use App\Models\NfcTag;
@@ -24,7 +25,7 @@ final readonly class RecordRekey
 {
     use LocksTags;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
     /** @return NfcTag with its current stamper (paused, or none) loaded */
     public function handle(string $uid, int $from): NfcTag
@@ -51,6 +52,7 @@ final readonly class RecordRekey
             }
 
             $tag->forceFill(['key_version' => $from + 1])->save();
+            $this->recordAudit->handle('tag.rekeyed', $tag, context: ['from' => $from, 'to' => $from + 1]);
 
             return $tag->setRelation('currentStamper', $current);
         });

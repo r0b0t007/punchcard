@@ -33,8 +33,8 @@ use LogicException;
  * organization, and nobody else anything (ADR 0006). Ownership is a
  * business_user membership with role owner.
  *
- * status and plan are not mass assignable: verification and billing actions
- * set them explicitly.
+ * status, plan and the verification dates are not mass assignable: the
+ * admin's verification Actions (CHW-34) and billing set them explicitly.
  *
  * @property int $id
  * @property int $organization_id
@@ -42,6 +42,8 @@ use LogicException;
  * @property string $slug
  * @property string|null $category
  * @property BusinessStatus $status
+ * @property Carbon|null $verified_at
+ * @property Carbon|null $suspended_at
  * @property string|null $plan
  * @property Carbon|null $archived_at
  * @property Carbon|null $created_at
@@ -96,8 +98,9 @@ class Business extends Model implements TenantModel
 
         $status = $values['status'] ?? BusinessStatus::Pending->value;
 
-        if (($status instanceof BusinessStatus ? $status : BusinessStatus::tryFrom((string) $status)) !== BusinessStatus::Pending || ($values['plan'] ?? null) !== null || ($values['archived_at'] ?? null) !== null) {
-            throw new LogicException('A new business starts pending, open and without a plan; verification, billing and admin actions change them, in TenantContext::bypass().');
+        if (($status instanceof BusinessStatus ? $status : BusinessStatus::tryFrom((string) $status)) !== BusinessStatus::Pending || ($values['plan'] ?? null) !== null || ($values['archived_at'] ?? null) !== null
+            || ($values['verified_at'] ?? null) !== null || ($values['suspended_at'] ?? null) !== null) {
+            throw new LogicException('A new business starts pending, unverified, open and without a plan; verification, billing and admin actions change them, in TenantContext::bypass().');
         }
 
         if ($context->organizationId() === null || (int) $values['organization_id'] !== $context->organizationId()) {
@@ -135,7 +138,7 @@ class Business extends Model implements TenantModel
             throw new LogicException('Only the owner or an org admin can change the business.');
         }
 
-        if (array_intersect(array_keys($values), ['status', 'plan', 'archived_at']) !== []) {
+        if (array_intersect(array_keys($values), ['status', 'verified_at', 'suspended_at', 'plan', 'archived_at']) !== []) {
             throw new LogicException('Business status, plan and archiving change through verification, billing and archive actions, in TenantContext::bypass().');
         }
     }
@@ -214,6 +217,8 @@ class Business extends Model implements TenantModel
     {
         return [
             'status' => BusinessStatus::class,
+            'verified_at' => 'datetime',
+            'suspended_at' => 'datetime',
             'archived_at' => 'datetime',
         ];
     }

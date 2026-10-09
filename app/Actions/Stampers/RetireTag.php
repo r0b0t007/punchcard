@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stampers;
 
+use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\LocksTags;
 use App\Models\NfcTag;
 use App\Models\Stamper;
@@ -20,7 +21,7 @@ final readonly class RetireTag
 {
     use LocksTags;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
     /** @return Stamper|null the assignment it ended, with its business and location loaded */
     public function handle(string $uid): ?Stamper
@@ -36,6 +37,7 @@ final readonly class RetireTag
             $now = now();
             $current?->forceFill(['unassigned_at' => $now])->save();
             $tag->forceFill(['retired_at' => $now])->save();
+            $this->recordAudit->handle('tag.retired', $tag, context: $current instanceof Stamper ? ['stamper_id' => $current->id] : []);
 
             return $current?->load(['business', 'location']);
         });

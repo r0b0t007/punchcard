@@ -103,6 +103,7 @@ final readonly class ApplyTap
 
         [$stamper, $business] = $this->context->bypass(fn (): array => [
             Stamper::query()->whereKey($tap->stamper_id)->lockForUpdate()->firstOrFail(),
+            // Unlocked: SuspendBusiness locks every current stamper, so holding this one serialises the tap with it.
             Business::query()->with('organization')->findOrFail($tap->business_id),
         ]);
 

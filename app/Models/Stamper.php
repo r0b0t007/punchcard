@@ -114,6 +114,18 @@ class Stamper extends Model implements TenantModel
     }
 
     /**
+     * Locked FOR UPDATE in id order: the order every Action that locks several
+     * stampers takes them (SuspendBusiness, CloseSites), so they never deadlock.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function inLockOrder(Builder $query): void
+    {
+        $query->orderBy('id')->lockForUpdate();
+    }
+
+    /**
      * @return BelongsTo<NfcTag, $this>
      */
     public function tag(): BelongsTo

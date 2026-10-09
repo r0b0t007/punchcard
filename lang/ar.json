@@ -308,5 +308,12 @@
     "Updated": "آخر تحديث",
     "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.": "داخل النشاط التجاري نفسه يحتفظ جهاز الختم باسمه وحالته؛ وفي نشاط تجاري آخر يبدأ مفعّلًا وبلا اسم.",
     "tag": "شريحة",
-    "tags": "شرائح"
+    "tags": "شرائح",
+    "Pending": "قيد الانتظار",
+    "Verified": "موثَّق",
+    "Suspended": "موقوف",
+    ":business is not waiting for verification (it is :status).": "لا ينتظر :business التوثيق (حالته: :status).",
+    "Give a reason for the suspension.": "اذكر سبب الإيقاف.",
+    ":business is already suspended.": ":business موقوف من قبل.",
+    ":business is not suspended.": ":business غير موقوف."
 }

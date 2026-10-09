@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stampers;
 
+use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\AssignsTags;
 use App\Enums\StamperStatus;
 use App\Models\Business;
@@ -29,7 +30,7 @@ final readonly class MoveStamper
 {
     use AssignsTags;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
     public function handle(string $uid, Business $business, ?Location $location = null, ?string $label = null): Stamper
     {
@@ -55,9 +56,17 @@ final readonly class MoveStamper
             $current->forceFill(['unassigned_at' => now()])->save();
             $sameBusiness = (int) $current->business_id === (int) $site->business_id;
 
-            return $sameBusiness
+            $moved = $sameBusiness
                 ? $this->assign($tag, $site, $label ?? $current->label, $current->status)
                 : $this->assign($tag, $site, $label, StamperStatus::Active);
+            $this->recordAudit->handle('tag.moved', $tag, context: [
+                'from_stamper_id' => $current->id,
+                'stamper_id' => $moved->id,
+                'business_id' => $moved->business_id,
+                'location_id' => $moved->location_id,
+            ]);
+
+            return $moved;
         });
     }
 }

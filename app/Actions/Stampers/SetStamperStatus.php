@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stampers;
 
+use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\LocksTags;
 use App\Enums\StamperStatus;
 use App\Models\NfcTag;
@@ -23,7 +24,7 @@ final readonly class SetStamperStatus
 {
     use LocksTags;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
     public function handle(string $uid, StamperStatus $status): StamperStatusChange
     {
@@ -39,6 +40,10 @@ final readonly class SetStamperStatus
 
             $previous = $current->status;
             $current->forceFill(['status' => $status] + ($status === StamperStatus::Disabled ? ['armed_qty' => null, 'armed_until' => null] : []))->save();
+
+            if ($previous !== $status) {
+                $this->recordAudit->handle($status === StamperStatus::Disabled ? 'stamper.disabled' : 'stamper.enabled', $tag, context: ['stamper_id' => $current->id]);
+            }
 
             return new StamperStatusChange($current->load(['business', 'location']), $previous);
         });
