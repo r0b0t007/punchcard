@@ -10,6 +10,7 @@ use App\Actions\Stampers\RegisterStamper;
 use App\Actions\Stampers\RetireTag;
 use App\Actions\Stampers\SetStamperStatus;
 use App\Actions\Stampers\StamperRefused;
+use App\Enums\PlatformRole;
 use App\Enums\StamperStatus;
 use App\Models\AuditLog;
 use App\Models\NfcTag;
@@ -18,6 +19,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
 
 /*
@@ -68,6 +70,7 @@ it('reads as empty outside bypass(), as platform data', function (): void {
 
 it('names the admin who acted by id, never by email, or the console', function (): void {
     $admin = User::factory()->create(['email' => 'ops@example.test']);
+    $admin->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
     DB::transaction(fn () => app(RecordAudit::class)->handle('business.verified', $this->tenants->a1));
     $this->actingAs($admin);
     DB::transaction(fn () => app(RecordAudit::class)->handle('business.verified', $this->tenants->a2, 'Checked the papers', ['note' => 'fine']));
@@ -78,6 +81,14 @@ it('names the admin who acted by id, never by email, or the console', function (
         ->and($second->actor_id)->toBe($admin->id)
         ->and($second->reason)->toBe('Checked the papers')
         ->and($second->context)->toBe(['note' => 'fine']);
+});
+
+it('never labels someone admin who is not the platform admin', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    DB::transaction(fn () => app(RecordAudit::class)->handle('business.verified', $this->tenants->a1));
+
+    expect(($this->entries)())->toBe([['business.verified', 'business', 'user #'.$user->id]]);
 });
 
 it('keeps an admin who acted, anonymised rather than deleted, so the log still points at them', function (): void {

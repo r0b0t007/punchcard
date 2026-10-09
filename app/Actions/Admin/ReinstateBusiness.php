@@ -8,7 +8,6 @@ use App\Actions\Admin\Concerns\ChangesBusinessStatus;
 use App\Enums\BusinessStatus;
 use App\Models\Business;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The platform admin lifts a business's suspension (CHW-34, A1): it goes back
@@ -23,20 +22,18 @@ final readonly class ReinstateBusiness
 
     public function handle(Business $business): Business
     {
-        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business): Business {
-            $locked = $this->lockOpen($business);
-
-            if ($locked->status !== BusinessStatus::Suspended) {
-                throw new BusinessStatusRefused(__(':business is not suspended.', ['business' => $locked->name]));
-            }
-
-            $locked->forceFill([
+        return $this->transition(
+            $business,
+            function (Business $locked): void {
+                if ($locked->status !== BusinessStatus::Suspended) {
+                    throw new BusinessStatusRefused(__(':business is not suspended.', ['business' => $locked->name]));
+                }
+            },
+            fn (Business $locked): array => [
                 'status' => $locked->verified_at !== null ? BusinessStatus::Verified : BusinessStatus::Pending,
                 'suspended_at' => null,
-            ])->save();
-            $this->recordAudit->handle('business.reinstated', $locked);
-
-            return $locked;
-        }));
+            ],
+            'business.reinstated',
+        );
     }
 }

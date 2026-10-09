@@ -10,12 +10,14 @@ use App\Actions\Tenancy\ArchiveBusiness;
 use App\Actions\Tenancy\ResolveTenant;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\PlatformRole;
 use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\User;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
 
 /*
@@ -36,6 +38,7 @@ beforeEach(function (): void {
     $this->tenants = Tenants::make();
     $this->context = app(TenantContext::class);
     $this->admin = User::factory()->create(['email' => 'ops@example.test']);
+    $this->admin->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
     $this->actingAs($this->admin);
     $this->business = $this->tenants->a1;
     $this->status = fn (BusinessStatus $status) => $this->context->bypass(fn () => $this->business->forceFill(['status' => $status])->save());
@@ -98,6 +101,18 @@ it('reinstates a suspended business to where it was', function (bool $wasVerifie
     'never verified' => [false, BusinessStatus::Pending],
 ]);
 
+it('dates every verified business the factory makes, the status given as a string or not', function (): void {
+    $made = $this->context->bypass(fn (): array => [
+        Business::factory()->for($this->tenants->orgB)->create(['status' => 'verified'])->verified_at,
+        Business::factory()->for($this->tenants->orgB)->create(['status' => BusinessStatus::Verified])->verified_at,
+        Business::factory()->for($this->tenants->orgB)->create(['status' => 'pending'])->verified_at,
+    ]);
+
+    expect($made[0])->not->toBeNull()
+        ->and($made[1])->not->toBeNull()
+        ->and($made[2])->toBeNull();
+});
+
 it('keeps a business verified before it was suspended verified once reinstated', function (): void {
     // As every business verified before verified_at existed (the migration fills it) or made by the factory.
     expect(($this->fresh)()->verified_at)->not->toBeNull();
@@ -155,10 +170,11 @@ it('locks the business\'s stampers, then the business (no key update, so inserts
     app(SuspendBusiness::class)->handle($this->business, 'Fraud under review');
 
     $queries = collect(DB::getQueryLog())->pluck('query')->values();
-    $stampers = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "stampers"') && str_contains($sql, 'for update'));
+    $stampers = $queries->keys()->filter(fn (int $i): bool => str_contains($queries[$i], 'from "stampers"') && str_contains($queries[$i], 'order by "id" asc for update'))->values();
     $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses"') && str_contains($sql, 'for no key update'));
 
-    expect($stampers)->toBeInt()
-        ->and($business)->toBeInt()
-        ->and($stampers)->toBeLessThan($business);
+    // Stampers, the business, then the stampers again: one assigned while the business lock waited is held too.
+    expect($business)->toBeInt()
+        ->and($stampers->first())->toBeLessThan($business)
+        ->and($stampers->last())->toBeGreaterThan($business);
 })->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');

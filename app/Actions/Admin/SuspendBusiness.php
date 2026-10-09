@@ -7,20 +7,20 @@ namespace App\Actions\Admin;
 use App\Actions\Admin\Concerns\ChangesBusinessStatus;
 use App\Enums\BusinessStatus;
 use App\Models\Business;
-use App\Models\Stamper;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The platform admin suspends a business, with a reason (CHW-34, A1): its
- * taps, stamps and redemptions stop and its people lose access (ApplyTap,
- * ArchivedSites with counter, Business::operating), until it is reinstated.
- * Its stampers stay assigned, unlike an archive.
+ * taps, stamps and redemptions stop and its people lose access (ReceiveTap,
+ * ApplyTap, ArchivedSites with counter, Business::operating), until it is
+ * reinstated. Its stampers stay assigned, unlike an archive.
  *
- * Locks the business's current stampers, then the business row, as a tap
- * does (the stamper, then the business, read unlocked): a tap being applied
- * finishes first, and any later one sees the suspension. Recorded in the
- * audit log with the reason.
+ * Locks the business's current stampers, the business row, then the current
+ * stampers again: the business lock waits for a stamper being registered or
+ * moved there (it share-locks the business), so the second pass holds that
+ * one too. Every tap path locks its stamper first, so each tap either commits
+ * before the suspension or sees it, without locking the business itself.
+ * Recorded in the audit log with the reason.
  */
 final readonly class SuspendBusiness
 {
@@ -36,18 +36,17 @@ final readonly class SuspendBusiness
             throw new BusinessStatusRefused(__('Give a reason for the suspension.'));
         }
 
-        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $reason): Business {
-            Stamper::query()->current()->where('business_id', $business->id)->orderBy('id')->lockForUpdate()->pluck('id');
-            $locked = $this->lockOpen($business);
-
-            if ($locked->status === BusinessStatus::Suspended) {
-                throw new BusinessStatusRefused(__(':business is already suspended.', ['business' => $locked->name]));
-            }
-
-            $locked->forceFill(['status' => BusinessStatus::Suspended, 'suspended_at' => now()])->save();
-            $this->recordAudit->handle('business.suspended', $locked, $reason);
-
-            return $locked;
-        }));
+        return $this->transition(
+            $business,
+            function (Business $locked): void {
+                if ($locked->status === BusinessStatus::Suspended) {
+                    throw new BusinessStatusRefused(__(':business is already suspended.', ['business' => $locked->name]));
+                }
+            },
+            fn (): array => ['status' => BusinessStatus::Suspended, 'suspended_at' => now()],
+            'business.suspended',
+            $reason,
+            lockStampers: true,
+        );
     }
 }

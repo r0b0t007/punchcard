@@ -42,13 +42,13 @@ final readonly class CloseSites
     }
 
     /**
-     * Locks them in id order first, as SuspendBusiness does, so the two never deadlock.
+     * Locks them first, in the stampers' lock order, as SuspendBusiness does, so the two never deadlock.
      *
      * @param  'location_id'|'business_id'|'organization_id'  $column
      */
     private function endStampers(string $column, int $id): void
     {
-        $ids = Stamper::query()->current()->where($column, $id)->orderBy('id')->lockForUpdate()->pluck('id');
+        $ids = Stamper::query()->current()->where($column, $id)->inLockOrder()->pluck('id');
         Stamper::query()->whereKey($ids)->update(['unassigned_at' => now()]);
     }
 }

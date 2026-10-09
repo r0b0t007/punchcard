@@ -29,7 +29,7 @@ class BusinessFactory extends Factory
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
             'category' => 'cafe',
             'status' => BusinessStatus::Verified,
-            'verified_at' => fn (array $attributes): ?CarbonInterface => ($attributes['status'] ?? null) === BusinessStatus::Verified ? now() : null,
+            'verified_at' => fn (array $attributes): ?CarbonInterface => BusinessStatus::tryFrom(($attributes['status'] ?? null) instanceof BusinessStatus ? $attributes['status']->value : (string) ($attributes['status'] ?? '')) === BusinessStatus::Verified ? now() : null,
         ];
     }
 }

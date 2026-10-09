@@ -29,7 +29,6 @@ use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -103,21 +102,6 @@ it('refuses a tap made during a suspension when it arrives, so a reinstatement n
 
     expect(($this->stamps)())->toBe(0);
 });
-
-it('reads the business under a share lock, after the stamper, when it applies a tap', function (): void {
-    $pending = ($this->received)(5);
-    DB::enableQueryLog();
-
-    app(ApplyTap::class)->handle($pending, $this->customer);
-
-    $queries = collect(DB::getQueryLog())->pluck('query')->values();
-    $stamper = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "stampers"') && str_contains($sql, 'for update'));
-    $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses" where') && str_ends_with(trim($sql), 'for share'));
-
-    expect($stamper)->toBeInt()
-        ->and($business)->toBeInt()
-        ->and($stamper)->toBeLessThan($business);
-})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
 
 it('refuses a manual stamp at a suspended business', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Staff);

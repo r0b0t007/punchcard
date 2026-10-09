@@ -130,7 +130,8 @@ final readonly class ReceiveTap
         }
 
         // A tap at a suspended business is refused now, so a reinstatement never applies it later.
-        // Unlocked, one query: SuspendBusiness locks this stamper first, so it is already serialised.
+        // Unlocked, one query: SuspendBusiness locks every current stamper (around the business lock, so
+        // one assigned meanwhile too), so holding this one serialises the tap with it.
         if (! ArchivedSites::isOpen($stamper->business_id, $stamper->location_id, counter: true)) {
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::SiteClosed]);
         }

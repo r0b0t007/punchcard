@@ -78,7 +78,7 @@ final readonly class RedeemReward
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
             ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
             ! CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $presence->businessId)->exists() => RedeemRefusal::NotHonoured,
-            ! ArchivedSites::isOpen($presence->businessId, $presence->locationId, lock: true, counter: true) => RedeemRefusal::SiteClosed,
+            ! ArchivedSites::isOpen($presence->businessId, $presence->locationId, lock: $presence->staffId !== null, counter: true) => RedeemRefusal::SiteClosed,
             default => null,
         };
 
