@@ -19,8 +19,8 @@ use Inertia\Response;
  * - GET /business/register: the form, for guests.
  * - POST /business/register: the account and its business
  *   (SignUpBusinessOwner), signed in as Fortify's registration does, then
- *   to the dashboard, which sends a business still to set up into the
- *   onboarding wizard. Throttled per client address (business-signup): each
+ *   to the dashboard (the onboarding wizard takes a business still to set up
+ *   from there, CHW-31 part 2). Throttled per client address (business-signup): each
  *   sign-up creates an organization. A customer registers through Fortify,
  *   unthrottled, and a tap waiting to be claimed (url.intended) is left for
  *   them.

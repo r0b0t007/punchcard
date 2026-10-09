@@ -83,11 +83,26 @@ it('requires a business name, creating nothing without one', function (?string $
         ->and(($this->businesses)())->toBe(0);
 })->with(['missing' => [null], 'blank' => ['   '], 'too long' => [str_repeat('a', 121)]]);
 
-it('validates the account as any registration does, creating nothing when it fails', function (): void {
-    ($this->signUp)(['password_confirmation' => 'something else'])->assertSessionHasErrors('password');
+it('validates the account as any registration does, every error in one round, creating nothing', function (): void {
+    ($this->signUp)(['business_name' => '', 'password_confirmation' => 'something else'])
+        ->assertSessionHasErrors(['business_name', 'password']);
 
     expect(User::query()->count())->toBe(0)
         ->and(($this->businesses)())->toBe(0);
+});
+
+it('refuses a field sent as a list as a validation error, not a crash', function (string $field): void {
+    ($this->signUp)([$field => ['x']])->assertSessionHasErrors($field);
+
+    expect(User::query()->count())->toBe(0);
+})->with(['name', 'email', 'password']);
+
+it('keeps the email as typed when Fortify does not lowercase usernames', function (): void {
+    config(['fortify.lowercase_usernames' => false]);
+
+    ($this->signUp)(['email' => 'Nour@Cafe-Nour.test'])->assertRedirect(route('dashboard'));
+
+    expect(User::query()->sole()->email)->toBe('Nour@Cafe-Nour.test');
 });
 
 it('names the business field in the owner\'s language', function (): void {

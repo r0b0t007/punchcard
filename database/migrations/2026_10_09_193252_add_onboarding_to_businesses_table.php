@@ -42,7 +42,7 @@ return new class extends Migration
     public function down(): void
     {
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement('alter table businesses drop constraint businesses_category_check');
+            DB::statement('alter table businesses drop constraint if exists businesses_category_check');
         }
 
         Schema::table('businesses', function (Blueprint $table): void {
