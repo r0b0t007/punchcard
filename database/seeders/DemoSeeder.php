@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Actions\Auth\SetPlatformAdmin;
 use App\Actions\Stampers\RegisterStamper;
 use App\Actions\Tenancy\CreateIndependentBusiness;
+use App\Enums\BusinessCategory;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\CardMode;
@@ -142,8 +143,8 @@ final class DemoSeeder extends Seeder
         $owner = $this->user('Yasmine Alaoui', 'owner@cafe.demo.test');
         $staff = $this->user('Karim Idrissi', 'staff@cafe.demo.test');
 
-        $business = $this->createIndependentBusiness->handle($owner, 'Café Hafa', 'cafe');
-        $business->forceFill(['status' => BusinessStatus::Verified, 'verified_at' => now()])->save();
+        $business = $this->createIndependentBusiness->handle($owner, 'Café Hafa', BusinessCategory::Cafe);
+        $business->forceFill(['status' => BusinessStatus::Verified, 'verified_at' => now(), 'onboarded_at' => now()])->save();
         $business->members()->attach($staff, ['role' => BusinessRole::Staff->value]);
 
         $terrace = $this->location($business, 'Hafa terrace', 'Avenue Hafa, Tangier');
@@ -330,7 +331,7 @@ final class DemoSeeder extends Seeder
         $business = new Business;
         $business->forceFill([
             'organization_id' => $franchise->id, 'name' => "Atlas Coffee {$city}", 'slug' => 'atlas-coffee-'.Str::slug($city),
-            'category' => 'cafe', 'status' => BusinessStatus::Verified, 'verified_at' => now(),
+            'category' => BusinessCategory::Cafe, 'status' => BusinessStatus::Verified, 'verified_at' => now(), 'onboarded_at' => now(),
         ])->save();
         $business->members()->attach($owner, ['role' => BusinessRole::Owner->value]);
 

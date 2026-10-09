@@ -6,21 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { login } from '@/routes';
 import { useTranslation } from '@/hooks/use-translation';
-import { register as businessRegister } from '@/routes/business';
+import { login, register } from '@/routes';
 import { store } from '@/routes/register';
 
 type Props = {
     passwordRules: string;
 };
 
-export default function Register({ passwordRules }: Props) {
+/** B1 for the pilot (CHW-31): the owner's account and their business's name; the wizard does the rest. */
+export default function RegisterBusiness({ passwordRules }: Props) {
     const { t } = useTranslation();
 
     return (
         <>
-            <Head title={t('Register')} />
+            <Head title={t('Create your business account')} />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -31,21 +31,35 @@ export default function Register({ passwordRules }: Props) {
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="name">{t('Name')}</Label>
+                                <Label htmlFor="business_name">
+                                    {t('Business name')}
+                                </Label>
                                 <Input
-                                    id="name"
+                                    id="business_name"
                                     type="text"
                                     required
                                     autoFocus
                                     tabIndex={1}
+                                    autoComplete="organization"
+                                    name="business_name"
+                                    maxLength={120}
+                                    placeholder={t('Café Hafa')}
+                                />
+                                <InputError message={errors.business_name} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">{t('Your name')}</Label>
+                                <Input
+                                    id="name"
+                                    type="text"
+                                    required
+                                    tabIndex={2}
                                     autoComplete="name"
                                     name="name"
                                     placeholder={t('Full name')}
                                 />
-                                <InputError
-                                    message={errors.name}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.name} />
                             </div>
 
                             <div className="grid gap-2">
@@ -56,7 +70,7 @@ export default function Register({ passwordRules }: Props) {
                                     id="email"
                                     type="email"
                                     required
-                                    tabIndex={2}
+                                    tabIndex={3}
                                     autoComplete="email"
                                     name="email"
                                     placeholder="email@example.com"
@@ -71,7 +85,7 @@ export default function Register({ passwordRules }: Props) {
                                 <PasswordInput
                                     id="password"
                                     required
-                                    tabIndex={3}
+                                    tabIndex={4}
                                     autoComplete="new-password"
                                     name="password"
                                     placeholder={t('Password')}
@@ -87,7 +101,7 @@ export default function Register({ passwordRules }: Props) {
                                 <PasswordInput
                                     id="password_confirmation"
                                     required
-                                    tabIndex={4}
+                                    tabIndex={5}
                                     autoComplete="new-password"
                                     name="password_confirmation"
                                     placeholder={t('Confirm password')}
@@ -101,28 +115,25 @@ export default function Register({ passwordRules }: Props) {
                             <Button
                                 type="submit"
                                 className="mt-2 w-full"
-                                tabIndex={5}
-                                data-test="register-user-button"
+                                tabIndex={6}
+                                data-test="register-business-button"
                             >
                                 {processing && <Spinner />}
-                                {t('Create account')}
+                                {t('Create business account')}
                             </Button>
                         </div>
 
                         <div className="grid gap-1 text-center text-sm text-muted-foreground">
                             <p>
                                 {t('Already have an account?')}{' '}
-                                <TextLink href={login()} tabIndex={6}>
+                                <TextLink href={login()} tabIndex={7}>
                                     {t('Log in')}
                                 </TextLink>
                             </p>
                             <p>
-                                {t('Own a business?')}{' '}
-                                <TextLink
-                                    href={businessRegister()}
-                                    tabIndex={7}
-                                >
-                                    {t('Create a business account')}
+                                {t('Collecting stamps?')}{' '}
+                                <TextLink href={register()} tabIndex={8}>
+                                    {t('Create a customer account')}
                                 </TextLink>
                             </p>
                         </div>
@@ -133,7 +144,7 @@ export default function Register({ passwordRules }: Props) {
     );
 }
 
-Register.layout = {
-    title: 'Create an account',
-    description: 'Enter your details below to create your account',
+RegisterBusiness.layout = {
+    title: 'Create your business account',
+    description: 'Set up your loyalty card in a few minutes',
 };

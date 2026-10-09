@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenancy;
 
+use App\Enums\BusinessCategory;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationRole;
@@ -36,7 +37,7 @@ final readonly class CreateIndependentBusiness
 
     public function __construct(private TenantContext $context) {}
 
-    public function handle(User $owner, string $name, ?string $category = null): Business
+    public function handle(User $owner, string $name, ?BusinessCategory $category = null): Business
     {
         return $this->context->bypass(fn (): Business => DB::transaction(function () use ($owner, $name, $category): Business {
             /** @var Organization $organization */
