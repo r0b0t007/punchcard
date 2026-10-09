@@ -6,6 +6,8 @@ namespace App\Filament\Resources\Businesses;
 
 use App\Filament\Resources\Businesses\Pages\ListBusinesses;
 use App\Filament\Resources\Businesses\Pages\ViewBusiness;
+use App\Filament\Resources\Businesses\RelationManagers\RejectedTapsRelationManager;
+use App\Filament\Resources\Businesses\RelationManagers\StampEventsRelationManager;
 use App\Filament\Resources\Businesses\Schemas\BusinessInfolist;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
@@ -59,6 +61,14 @@ class BusinessResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return BusinessInfolist::configure($schema);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            StampEventsRelationManager::class,
+            RejectedTapsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

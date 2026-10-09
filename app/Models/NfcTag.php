@@ -68,6 +68,16 @@ class NfcTag extends Model
     }
 
     /**
+     * Every tap on the tag, rejected ones included.
+     *
+     * @return HasMany<Tap, $this>
+     */
+    public function taps(): HasMany
+    {
+        return $this->hasMany(Tap::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -94,6 +95,22 @@ class Tap extends Model
     public function isPending(): bool
     {
         return $this->status === TapStatus::Pending;
+    }
+
+    /**
+     * @return BelongsTo<Stamper, $this>
+     */
+    public function stamper(): BelongsTo
+    {
+        return $this->belongsTo(Stamper::class);
+    }
+
+    /**
+     * @return BelongsTo<Location, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     /**

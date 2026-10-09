@@ -13,6 +13,7 @@ use App\Actions\Stampers\SiteName;
 use App\Actions\Stampers\StamperRefused;
 use App\Enums\StamperStatus;
 use App\Filament\Concerns\NotifiesRefusals;
+use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
@@ -33,7 +34,8 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * The tag provisioning table (CHW-138, A2): each tag, its key version,
- * counter and current stamper, and the runbook's actions
+ * counter, current stamper and last tap (any tap, rejected ones included:
+ * it shows the tag is being reached), and the runbook's actions
  * (docs/runbooks/stamper-keys.md). Each action is authorized by its own
  * ability on NfcTag, which only the platform admin passes (Gate::before in
  * the admin panel), calls the same Action as its command, and shows a
@@ -46,7 +48,7 @@ final class NfcTagsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['currentStamper.business', 'currentStamper.location']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['currentStamper.business', 'currentStamper.location'])->withMax('taps', 'created_at'))
             ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('uid')->label(__('UID'))->searchable()->copyable()->fontFamily('mono'),
@@ -56,6 +58,8 @@ final class NfcTagsTable
                 TextColumn::make('currentStamper.location.name')->label(__('Location')),
                 TextColumn::make('currentStamper.label')->label(__('Label')),
                 TextColumn::make('currentStamper.status')->label(__('Stamper'))->badge(),
+                TextColumn::make('taps_max_created_at')->label(__('Last tap'))->dateTime(BusinessesTable::DATE_TIME)
+                    ->placeholder(__('None in the last :days days', ['days' => config('punchcard.taps.retention_days')])),
                 TextColumn::make('retired_at')->label(__('Retired'))->dateTime()->placeholder(__('In service')),
                 TextColumn::make('updated_at')->label(__('Updated'))->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
