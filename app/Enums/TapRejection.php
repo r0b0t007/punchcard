@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use Filament\Support\Contracts\HasLabel;
+
 /**
  * Why a stamper tap was refused. Each rejected tap is recorded with one of
  * these for the owner's fraud view, so the values are stable identifiers.
  */
-enum TapRejection: string
+enum TapRejection: string implements HasLabel
 {
     /** The tap URL is not a well-formed SUN message. */
     case Malformed = 'malformed';
@@ -54,6 +56,28 @@ enum TapRejection: string
 
     /** A redeem window was open, but another tap redeemed the reward first: this one hands over nothing. */
     case AlreadyRedeemed = 'already_redeemed';
+
+    /** What the platform admin reads (A1); never shown to the person tapping. */
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::Malformed => __('Malformed URL'),
+            self::UnknownTag => __('Unknown tag'),
+            self::BadMac => __('Signature check failed'),
+            self::Replay => __('Replayed URL'),
+            self::RetiredTag => __('Retired tag'),
+            self::UnassignedTag => __('Unassigned tag'),
+            self::StamperDisabled => __('Stamper disabled'),
+            self::Cooldown => __('Cooldown'),
+            self::DailyCap => __('Daily cap reached'),
+            self::CardInactive => __('Card inactive'),
+            self::NotHonoured => __('Card not honoured here'),
+            self::SiteClosed => __('Site closed'),
+            self::CardMisconfigured => __('Card misconfigured'),
+            self::Expired => __('Expired before sign-in'),
+            self::AlreadyRedeemed => __('Reward already redeemed'),
+        };
+    }
 
     /** The tap equivalent of an AddStamps refusal. */
     public static function fromStamp(StampRejection $rejection): self

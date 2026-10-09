@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use Filament\Support\Contracts\HasLabel;
+
 /** How a stamp event came about (stamp-flow skill). */
-enum StampSource: string
+enum StampSource: string implements HasLabel
 {
     /** A verified SUN tap on a stamper: the tag and counter are recorded. */
     case Nfc = 'nfc';
@@ -24,6 +26,19 @@ enum StampSource: string
 
     /** A correction taking earlier stamps back (qty always negative), with a reason. */
     case Correction = 'correction';
+
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::Nfc => __('Tap'),
+            self::Qr => __('QR scan'),
+            self::Manual => __('By hand'),
+            self::Bonus => __('Bonus'),
+            self::Birthday => __('Birthday'),
+            self::Referral => __('Referral'),
+            self::Correction => __('Correction'),
+        };
+    }
 
     /**
      * Sources that prove the customer was at the business (a tap, a staff scan,

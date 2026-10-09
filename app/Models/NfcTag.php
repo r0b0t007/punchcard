@@ -68,6 +68,17 @@ class NfcTag extends Model
     }
 
     /**
+     * The taps recorded against the tag: those whose signature verified (a
+     * tap that fails it can't be tied to a tag, so it carries none).
+     *
+     * @return HasMany<Tap, $this>
+     */
+    public function taps(): HasMany
+    {
+        return $this->hasMany(Tap::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

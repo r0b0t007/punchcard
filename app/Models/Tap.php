@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -91,9 +92,37 @@ class Tap extends Model
             ->where('expires_at', '>', now()->subDay());
     }
 
+    /**
+     * Taps the counter took (waiting, stamped or redeemed): a rejected one (a
+     * replayed or forged URL) says nothing about a business or tag being in use.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function accepted(Builder $query): void
+    {
+        $query->whereIn('status', [TapStatus::Pending, TapStatus::Stamped, TapStatus::Redeemed]);
+    }
+
     public function isPending(): bool
     {
         return $this->status === TapStatus::Pending;
+    }
+
+    /**
+     * @return BelongsTo<Stamper, $this>
+     */
+    public function stamper(): BelongsTo
+    {
+        return $this->belongsTo(Stamper::class);
+    }
+
+    /**
+     * @return BelongsTo<Location, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     /**

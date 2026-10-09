@@ -39,7 +39,7 @@ final readonly class DescribeCustomerReward
             if ($reward->redeemed_at !== null) {
                 $location = Location::query()->find($reward->redeemed_location_id, ['id', 'name', 'timezone']);
                 $redeemed = [
-                    'at' => LocalMoment::of($reward->redeemed_at, $location->timezone ?? (string) config('app.timezone')),
+                    'at' => LocalMoment::of($reward->redeemed_at, LocalMoment::timezoneOf($location)),
                     'locationName' => $location?->name,
                     'liveSeconds' => $reward->liveSecondsLeft(),
                 ];

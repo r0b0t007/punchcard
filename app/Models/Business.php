@@ -234,6 +234,16 @@ class Business extends Model implements TenantModel
     }
 
     /**
+     * Its stamp ledger (append-only).
+     *
+     * @return HasMany<StampEvent, $this>
+     */
+    public function stampEvents(): HasMany
+    {
+        return $this->hasMany(StampEvent::class);
+    }
+
+    /**
      * The taps at its stampers (platform data: read in bypass()).
      *
      * @return HasMany<Tap, $this>
