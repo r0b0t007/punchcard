@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -42,15 +43,14 @@ final readonly class ListCustomerRewards
             $locationOf = StampEvent::query()
                 ->whereKey($rewards->pluck('stamp_event_id')->filter()->all())
                 ->pluck('location_id', 'id');
-            $timezoneOf = Location::query()->whereKey($locationOf->unique()->all())->pluck('timezone', 'id');
-            $timezones = $locationOf->map(fn (int $locationId): ?string => $timezoneOf->get($locationId));
+            $locations = Location::query()->whereKey($locationOf->unique()->all())->get(['id', 'timezone'])->keyBy('id');
 
             return array_values($rewards->map(fn (Reward $reward): array => [
                 'id' => $reward->id,
                 'rewardText' => $reward->reward_text,
                 'businessName' => $organizations->get($reward->organization_id)->name ?? '',
                 'brandColor' => $organizations->get($reward->organization_id)?->brand_color,
-                'unlockedOn' => $reward->unlocked_at->copy()->setTimezone((string) ($timezones->get($reward->stamp_event_id) ?? config('app.timezone')))->format('Y-m-d'),
+                'unlockedOn' => $reward->unlocked_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($locationOf->get($reward->stamp_event_id))))->format('Y-m-d'),
             ])->all());
         });
     }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\RelationManagers;
 
-use App\Filament\Resources\Businesses\Tables\BusinessesTable;
+use App\Filament\AdminTime;
 use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\Tap;
@@ -22,7 +22,7 @@ final class HistoryColumns
     public static function when(): TextColumn
     {
         return TextColumn::make('created_at')->label(__('When'))
-            ->dateTime(BusinessesTable::DATE_TIME)
+            ->dateTime(AdminTime::FORMAT)
             ->timezone(fn (StampEvent|Tap $record): string => LocalMoment::timezoneOf($record->location));
     }
 

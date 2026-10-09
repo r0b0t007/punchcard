@@ -47,7 +47,7 @@ beforeEach(function (): void {
     $this->counter->next = 1;
     $this->tap = fn (Stamper $stamper, string $at, TapStatus $status = TapStatus::Rejected, ?TapRejection $rejection = TapRejection::Replay): Tap => $this->context->bypass(fn (): Tap => tap((new Tap)->forceFill([
         'nfc_tag_id' => $stamper->nfc_tag_id, 'stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id,
-        'status' => $status, 'rejection' => $rejection, 'counter' => $this->counter->next++, 'ip' => '203.0.113.7', 'user_agent' => 'Test phone', 'created_at' => $at,
+        'status' => $status, 'rejection' => $rejection, 'counter' => $rejection === TapRejection::Replay ? null : $this->counter->next++, 'ip' => '203.0.113.7', 'user_agent' => 'Test phone', 'created_at' => $at,
     ]))->save());
 
     $this->history = function (string $manager, Business $business, Closure $then): void {
@@ -93,6 +93,7 @@ it('lists a business\'s rejected taps only, never another\'s, without the IP or 
         ->assertTableColumnFormattedStateSet('created_at', '2 Oct 2026, 08:30 JST', $rejected)
         ->assertTableColumnFormattedStateSet('rejection', 'Replayed URL', $rejected)
         ->assertTableColumnFormattedStateSet('stamper_id', 'Bar', $rejected)
+        ->assertTableColumnStateSet('counter', null, $rejected)
         ->assertDontSee('203.0.113.7')
         ->assertDontSee('Test phone'));
 });
@@ -120,12 +121,13 @@ it('offers only the reasons a business\'s rejected taps can carry', function ():
         $options = $table->instance()->getTable()->getFilter('rejection')?->getOptions() ?? [];
 
         expect($options)->toHaveKey(TapRejection::Replay->value)
+            ->and($options)->toHaveKey(TapRejection::UnassignedTag->value)
             ->and($options)->not->toHaveKey(TapRejection::BadMac->value)
             ->and($options)->not->toHaveKey(TapRejection::Expired->value);
     });
 });
 
-it('shows when each tag was last accepted, at its site\'s time, on the tag screen', function (): void {
+it('shows when each tag was last accepted, in UTC, on the tag screen', function (): void {
     $tapped = $this->tenants->stamper($this->tenants->a1);
     $quiet = $this->tenants->stamper($this->tenants->a2);
     ($this->tap)($tapped, '2026-10-01 09:00:00', TapStatus::Stamped, null);
@@ -138,6 +140,6 @@ it('shows when each tag was last accepted, at its site\'s time, on the tag scree
 
     $this->context->bypass(fn () => Livewire::test(ManageNfcTags::class)
         ->assertTableColumnStateSet('taps_max_created_at', '2026-10-01 09:00:00', $tapped->tag)
-        ->assertTableColumnFormattedStateSet('taps_max_created_at', '1 Oct 2026, 18:00 JST', $tapped->tag)
+        ->assertTableColumnFormattedStateSet('taps_max_created_at', '1 Oct 2026, 09:00 UTC', $tapped->tag)
         ->assertTableColumnStateSet('taps_max_created_at', null, $quiet->tag));
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\Businesses\Schemas;
 
 use App\Enums\BusinessRole;
+use App\Filament\AdminTime;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
 use App\Models\Location;
@@ -25,7 +26,7 @@ final class BusinessInfolist
 {
     public static function configure(Schema $schema): Schema
     {
-        $at = BusinessesTable::DATE_TIME;
+        $at = AdminTime::FORMAT;
 
         return $schema->columns(1)->components([
             Section::make(__('Business'))->columns(3)->schema([

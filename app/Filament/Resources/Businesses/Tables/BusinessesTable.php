@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\Tables;
 
-use App\Enums\TapStatus;
+use App\Filament\AdminTime;
 use App\Filament\Resources\Businesses\Actions\BusinessStatusActions;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\Tap;
+use App\Support\Tenancy\PlatformBuilder;
 use App\Support\Tenancy\TenantBuilder;
 use Carbon\CarbonInterface;
 use Filament\Tables\Columns\TextColumn;
@@ -23,9 +24,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class BusinessesTable
 {
-    /** Admin times name their zone: UTC for a business across its sites, a site's own zone for one site. */
-    public const string DATE_TIME = 'j M Y, H:i T';
-
     public static function configure(Table $table): Table
     {
         return $table
@@ -43,11 +41,11 @@ final class BusinessesTable
                 TextColumn::make('owners.email')->label(__('Owners'))->searchable()->listWithLineBreaks()->placeholder(__('None')),
                 TextColumn::make('open_locations_count')->label(__('Open sites'))->numeric(),
                 TextColumn::make('current_stampers_count')->label(__('Stampers'))->numeric(),
-                TextColumn::make('taps_max_created_at')->label(__('Last tap'))->dateTime(self::DATE_TIME)
+                TextColumn::make('taps_max_created_at')->label(__('Last tap'))->dateTime(AdminTime::FORMAT)
                     ->placeholder(__('None in the last :days days', ['days' => config('punchcard.taps.retention_days')])),
-                TextColumn::make('archived')->label(__('Archived'))->dateTime(self::DATE_TIME)->placeholder(__('No'))
+                TextColumn::make('archived')->label(__('Archived'))->dateTime(AdminTime::FORMAT)->placeholder(__('No'))
                     ->state(fn (Business $record): ?CarbonInterface => self::archivedAt($record)),
-                TextColumn::make('created_at')->label(__('Created'))->dateTime(self::DATE_TIME)->sortable(),
+                TextColumn::make('created_at')->label(__('Created'))->dateTime(AdminTime::FORMAT)->sortable(),
             ])
             ->recordActions(BusinessStatusActions::all());
     }
@@ -64,14 +62,9 @@ final class BusinessesTable
         $locations->open();
     }
 
-    /**
-     * Taps the counter took: a rejected one (a replayed or forged URL) says
-     * nothing about the business or tag being in use (the tag screen too).
-     *
-     * @param  Builder<Tap>  $taps
-     */
-    public static function accepted(Builder $taps): void
+    /** @param  PlatformBuilder<Tap>  $taps */
+    private static function accepted(PlatformBuilder $taps): void
     {
-        $taps->whereIn('status', [TapStatus::Pending, TapStatus::Stamped, TapStatus::Redeemed]);
+        $taps->accepted();
     }
 }
