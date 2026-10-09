@@ -7,7 +7,6 @@ use App\Actions\Fortify\ResetUserPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -88,14 +87,6 @@ class FortifyServiceProvider extends ServiceProvider
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
-        });
-
-        // Each business sign-up creates an organization (CHW-31): a few per hour from one address.
-        // Fortify's registration route takes no limiter of its own, so it gets one once the routes exist.
-        RateLimiter::for('register', fn (Request $request) => Limit::perHour(10)->by((string) $request->ip()));
-        $this->app->booted(function (): void {
-            Route::getRoutes()->refreshNameLookups();
-            Route::getRoutes()->getByName('register.store')?->middleware('throttle:register');
         });
 
         RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(10)->by(

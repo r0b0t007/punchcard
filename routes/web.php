@@ -16,8 +16,11 @@ if (app()->environment('local')) {
     Route::inertia('dev/components', 'dev/components')->name('dev.components');
 }
 
-// Business sign-up (CHW-31): the account and its business in one form, posted to Fortify's registration.
-Route::get('business/register', [BusinessRegistrationController::class, 'create'])->middleware('guest')->name('business.register');
+// Business sign-up (CHW-31): the account and its business in one form; customers register through Fortify.
+Route::middleware('guest')->group(function (): void {
+    Route::get('business/register', [BusinessRegistrationController::class, 'create'])->name('business.register');
+    Route::post('business/register', [BusinessRegistrationController::class, 'store'])->middleware('throttle:business-signup')->name('business.register.store');
+});
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');

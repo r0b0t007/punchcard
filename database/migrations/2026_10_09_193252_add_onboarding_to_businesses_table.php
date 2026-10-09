@@ -12,8 +12,10 @@ use Illuminate\Support\Facades\Schema;
  * already were set up by hand, so they count as onboarded and never enter
  * the wizard.
  *
- * The category becomes one of App\Enums\BusinessCategory: an unknown value
- * is kept as "other", and Postgres refuses any other from now on.
+ * The category becomes one of App\Enums\BusinessCategory: a stored value is
+ * trimmed and lowercased ("Cafe " is a café), one still unknown becomes
+ * "other" (no business has gone live yet, so nothing real is lost), and
+ * Postgres refuses any other from now on.
  */
 return new class extends Migration
 {
@@ -29,6 +31,7 @@ return new class extends Migration
         });
 
         DB::table('businesses')->update(['onboarded_at' => DB::raw('coalesce(created_at, current_timestamp)')]);
+        DB::table('businesses')->whereNotNull('category')->update(['category' => DB::raw('lower(trim(category))')]);
         DB::table('businesses')->whereNotNull('category')->whereNotIn('category', self::CATEGORIES)->update(['category' => 'other']);
 
         if (DB::getDriverName() === 'pgsql') {

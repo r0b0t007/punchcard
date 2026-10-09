@@ -33,6 +33,7 @@ return [
         'current_password' => 'كلمة المرور الحالية',
         'password_confirmation' => 'تأكيد كلمة المرور',
         'locale' => 'اللغة',
+        'business_name' => 'اسم المحل',
         'code' => 'الرمز',
         'recovery_code' => 'رمز الاسترداد',
     ],

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { login, register } from '@/routes';
-import { store } from '@/routes/register';
+import { store } from '@/routes/business/register';
 
 type Props = {
     passwordRules: string;
