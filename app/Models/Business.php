@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -277,6 +278,16 @@ class Business extends Model implements TenantModel
     public function recentAuditLogs(): MorphMany
     {
         return $this->auditLogs()->limit(20);
+    }
+
+    /**
+     * The first site still open: the one the onboarding wizard sets up (CHW-31).
+     *
+     * @return HasOne<Location, $this>
+     */
+    public function firstLocation(): HasOne
+    {
+        return $this->hasOne(Location::class)->open()->oldest('id');
     }
 
     /**

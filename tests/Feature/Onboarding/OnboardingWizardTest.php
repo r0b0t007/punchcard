@@ -16,6 +16,7 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\Support\Tenants;
 
@@ -104,7 +105,10 @@ describe('the business step', function (): void {
         expect($business->category)->toBe(BusinessCategory::Barber)
             ->and($business->onboarding_step)->toBe(OnboardingStep::Location)
             ->and($this->context->bypass(fn (): bool => $business->members()->whereKey($customer->id)->wherePivot('role', BusinessRole::Owner->value)->exists()))->toBeTrue()
-            ->and(session(SetTenant::SESSION_KEY))->toBe('business:'.$business->id);
+            ->and(session(SetTenant::SESSION_KEY))->toBeNull();
+
+        // The wizard works in it from the next step on, without the session's tenant choice.
+        $this->get(route('onboarding.step', 'location'))->assertOk();
     });
 
     it('resumes the unfinished business instead of starting a second', function (): void {
@@ -240,4 +244,67 @@ it('leaves a business that finished setup as it is', function (): void {
     $business = ($this->fresh)($this->business);
     expect($business->onboarded_at?->toDateTimeString())->toBe($finishedAt)
         ->and($business->archived_at)->toBeNull();
+});
+
+it('never saves a step past the one reached, even by a request that skips the pages', function (): void {
+    $this->actingAs($this->owner)->put(route('onboarding.location'), ['name' => 'Marshan', 'address' => 'Tanger', 'timezone' => 'Africa/Casablanca'])
+        ->assertRedirect(route('onboarding.step', 'business'));
+    $this->post(route('onboarding.logo.skip'))->assertRedirect(route('onboarding.step', 'business'));
+
+    expect(($this->fresh)($this->business)->onboarding_step)->toBeNull()
+        ->and($this->context->bypass(fn (): int => Location::query()->where('business_id', $this->business->id)->count()))->toBe(0);
+});
+
+it('keeps the dashboard of an owner who runs a set-up business while starting another', function (): void {
+    $this->context->bypass(fn () => $this->business->forceFill(['onboarded_at' => now()])->save());
+    app(CreateIndependentBusiness::class)->handle($this->owner, 'Café Nour 2');
+
+    $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
+    $this->get(route('onboarding.show'))->assertRedirect(route('onboarding.step', 'business'));
+    $this->get(route('onboarding.step', 'business'))->assertInertia(fn ($page) => $page->where('business.name', 'Café Nour 2'));
+});
+
+it('leaves the tenant chosen in the session as it was', function (): void {
+    $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => 'org:5']);
+
+    $this->get(route('onboarding.step', 'business'))->assertOk();
+    $this->post(route('onboarding.cancel'))->assertRedirect(route('dashboard'));
+
+    expect(session(SetTenant::SESSION_KEY))->toBe('org:5');
+});
+
+it('deletes the stored logo when the step fails, leaving the old one', function (): void {
+    Storage::fake('public');
+    ($this->step)($this->business, OnboardingStep::Logo);
+    Business::updating(fn () => throw new RuntimeException('The step could not be saved.'));
+
+    $this->actingAs($this->owner)->post(route('onboarding.logo'), ['logo' => UploadedFile::fake()->image('logo.png', 400, 400)])->assertServerError();
+
+    expect(Storage::disk('public')->allFiles())->toBe([])
+        ->and($this->context->bypass(fn (): ?string => Organization::query()->findOrFail($this->business->organization_id)->logo_path))->toBeNull();
+});
+
+it('closes only the business when its organization is not the wizard\'s own', function (): void {
+    $this->context->bypass(fn () => Organization::query()->whereKey($this->business->organization_id)->update(['type' => 'chain']));
+
+    $this->actingAs($this->owner)->post(route('onboarding.cancel'))->assertRedirect(route('dashboard'));
+
+    expect(($this->fresh)($this->business)->archived_at)->not->toBeNull()
+        ->and($this->context->bypass(fn (): mixed => Organization::query()->findOrFail($this->business->organization_id)->archived_at))->toBeNull();
+});
+
+it('locks the organization while swapping its logo, on Postgres', function (): void {
+    Storage::fake('public');
+    ($this->step)($this->business, OnboardingStep::Logo);
+    DB::enableQueryLog();
+
+    $this->actingAs($this->owner)->post(route('onboarding.logo'), ['logo' => UploadedFile::fake()->image('logo.png', 400, 400)]);
+
+    expect(collect(DB::getQueryLog())->pluck('query')->contains(fn (string $sql): bool => str_contains($sql, 'from "organizations"') && str_ends_with(trim($sql), 'for update')))->toBeTrue();
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
+
+it('moves a business on only from the step it reached', function (): void {
+    app(CompleteStep::class)->handle($this->business, OnboardingStep::Logo);
+
+    expect(($this->fresh)($this->business)->onboarding_step)->toBeNull();
 });

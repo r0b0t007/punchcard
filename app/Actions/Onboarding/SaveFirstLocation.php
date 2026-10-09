@@ -22,7 +22,7 @@ final readonly class SaveFirstLocation
     public function handle(Business $business, string $name, string $address, string $timezone): Location
     {
         return DB::transaction(function () use ($business, $name, $address, $timezone): Location {
-            $location = Location::query()->where('business_id', $business->id)->open()->oldest('id')->first()
+            $location = $business->firstLocation()->first()
                 ?? new Location(['organization_id' => $business->organization_id, 'business_id' => $business->id]);
 
             $location->fill(['name' => $name, 'address' => $address, 'timezone' => $timezone])->save();

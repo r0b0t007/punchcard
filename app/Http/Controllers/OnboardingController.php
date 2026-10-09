@@ -11,13 +11,11 @@ use App\Actions\Onboarding\SaveLogoStep;
 use App\Enums\BusinessCategory;
 use App\Enums\OnboardingStep;
 use App\Http\Middleware\ResolveOnboardingBusiness;
-use App\Http\Middleware\SetTenant;
 use App\Http\Requests\Onboarding\BusinessDetailsRequest;
 use App\Http\Requests\Onboarding\FirstLocationRequest;
 use App\Http\Requests\Onboarding\LogoRequest;
 use App\Http\Requests\Onboarding\OnboardingRequest;
 use App\Models\Business;
-use App\Models\Location;
 use App\Models\User;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
@@ -36,6 +34,7 @@ use Inertia\Response;
  *   sends back to the current one. With no business yet, only the first.
  * - POST /onboarding/business, PUT /onboarding/location, POST
  *   /onboarding/logo (and /onboarding/logo/skip): save a step.
+ *   A step past the one reached is never saved: back to the current one.
  * - POST /onboarding/cancel: close the business being set up (CancelSetup).
  */
 final class OnboardingController extends Controller
@@ -72,21 +71,22 @@ final class OnboardingController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $business = $saveBusinessStep->handle(
+        $saveBusinessStep->handle(
             $user,
             ResolveOnboardingBusiness::of($request),
             $request->string('name')->toString(),
-            $request->enum('category', BusinessCategory::class) ?? BusinessCategory::Other,
+            BusinessCategory::from($request->string('category')->toString()),
         );
-
-        // A business just started: the wizard (and the dashboard after it) works in it from now on.
-        $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
 
         return $this->toStep(OnboardingStep::Location);
     }
 
     public function saveLocation(FirstLocationRequest $request, SaveFirstLocation $saveFirstLocation): RedirectResponse
     {
+        if (($ahead = $this->ahead($request, OnboardingStep::Location)) instanceof RedirectResponse) {
+            return $ahead;
+        }
+
         $saveFirstLocation->handle(
             $this->business($request),
             $request->string('name')->toString(),
@@ -99,6 +99,10 @@ final class OnboardingController extends Controller
 
     public function saveLogo(LogoRequest $request, SaveLogoStep $saveLogoStep): RedirectResponse
     {
+        if (($ahead = $this->ahead($request, OnboardingStep::Logo)) instanceof RedirectResponse) {
+            return $ahead;
+        }
+
         $saveLogoStep->handle($this->business($request), $request->file('logo'));
 
         return $this->toStep(OnboardingStep::Card);
@@ -106,6 +110,10 @@ final class OnboardingController extends Controller
 
     public function skipLogo(OnboardingRequest $request, SaveLogoStep $saveLogoStep): RedirectResponse
     {
+        if (($ahead = $this->ahead($request, OnboardingStep::Logo)) instanceof RedirectResponse) {
+            return $ahead;
+        }
+
         $saveLogoStep->handle($this->business($request), null);
 
         return $this->toStep(OnboardingStep::Card);
@@ -117,7 +125,6 @@ final class OnboardingController extends Controller
 
         if ($business instanceof Business) {
             $cancelSetup->handle($business);
-            $request->session()->forget(SetTenant::SESSION_KEY);
         }
 
         return to_route('dashboard');
@@ -133,6 +140,17 @@ final class OnboardingController extends Controller
     private function business(Request $request): Business
     {
         return ResolveOnboardingBusiness::of($request) ?? abort(404);
+    }
+
+    /**
+     * Back to the step reached when the request saves a later one: steps are
+     * done in order, even by a request that skips the pages.
+     */
+    private function ahead(Request $request, OnboardingStep $step): ?RedirectResponse
+    {
+        $reached = $this->reached(ResolveOnboardingBusiness::of($request));
+
+        return $step->position() > $reached->position() ? $this->toStep($reached) : null;
     }
 
     private function toStep(OnboardingStep $step): RedirectResponse
@@ -152,9 +170,7 @@ final class OnboardingController extends Controller
     /** @return array<string, mixed> */
     private function locationProps(?Business $business): array
     {
-        $location = $business instanceof Business
-            ? Location::query()->where('business_id', $business->id)->open()->oldest('id')->first()
-            : null;
+        $location = $business?->firstLocation;
 
         return [
             'location' => [

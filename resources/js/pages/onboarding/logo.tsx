@@ -1,5 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,13 +16,26 @@ type Props = {
 /** Step 3 (CHW-31, B2): the logo on the card, the QR stand and the Wallet pass. It can wait. */
 export default function OnboardingLogo({ logoUrl }: Props) {
     const { t } = useTranslation();
-    const [preview, setPreview] = useState<string | null>(logoUrl);
+    // The file picked, as a blob URL freed once it is replaced or the page is left.
+    const [picked, setPicked] = useState<string | null>(null);
+    const preview = picked ?? logoUrl;
+
+    useEffect(
+        () => () => {
+            if (picked) {
+                URL.revokeObjectURL(picked);
+            }
+        },
+        [picked],
+    );
 
     return (
         <>
             <Head title={t('Logo')} />
             <Form
                 {...save.form()}
+                // A file the server refused is not the logo: back to the saved one.
+                onError={() => setPicked(null)}
                 disableWhileProcessing
                 className="flex flex-col gap-6"
             >
@@ -52,10 +65,10 @@ export default function OnboardingLogo({ logoUrl }: Props) {
                                     accept="image/png,image/jpeg,image/webp"
                                     onChange={(event) => {
                                         const file = event.target.files?.[0];
-                                        setPreview(
+                                        setPicked(
                                             file
                                                 ? URL.createObjectURL(file)
-                                                : logoUrl,
+                                                : null,
                                         );
                                     }}
                                 />

@@ -14,8 +14,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The onboarding wizard's tenant (alias `onboarding`, CHW-31): the business
- * the user is setting up (FindUnfinishedBusiness), chosen in the session and
- * entered, so its owner works in it even with other businesses elsewhere.
+ * the user is setting up (FindUnfinishedBusiness), entered for the wizard's
+ * own requests, so its owner works in it even with other businesses
+ * elsewhere. The tenant switcher's choice in the session is left as it is.
  * No wizard route names a business: this is the only one it can reach. With
  * none to finish, the wizard starts one; the tenant is resolved as anywhere
  * else.
@@ -46,11 +47,7 @@ final readonly class ResolveOnboardingBusiness
         $user = $request->user();
         $business = $this->findUnfinishedBusiness->handle($user);
 
-        if ($business instanceof Business) {
-            $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
-        }
-
-        $choice = $request->session()->get(SetTenant::SESSION_KEY);
+        $choice = $business instanceof Business ? 'business:'.$business->id : $request->session()->get(SetTenant::SESSION_KEY);
         $this->resolveTenant->handle($user, is_string($choice) ? $choice : null);
         $request->attributes->set(self::ATTRIBUTE, $business);
 
