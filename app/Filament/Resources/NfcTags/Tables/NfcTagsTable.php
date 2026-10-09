@@ -12,6 +12,7 @@ use App\Actions\Stampers\SetStamperStatus;
 use App\Actions\Stampers\SiteName;
 use App\Actions\Stampers\StamperRefused;
 use App\Enums\StamperStatus;
+use App\Filament\Concerns\NotifiesRefusals;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
@@ -21,7 +22,6 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Tables\Columns\TextColumn;
@@ -41,6 +41,8 @@ use Illuminate\Support\Facades\Gate;
  */
 final class NfcTagsTable
 {
+    use NotifiesRefusals;
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -231,10 +233,6 @@ final class NfcTagsTable
      */
     private static function refusing(Closure $run): void
     {
-        try {
-            Notification::make()->success()->title($run())->send();
-        } catch (StamperRefused $refused) {
-            Notification::make()->danger()->title($refused->getMessage())->send();
-        }
+        self::notifying($run, StamperRefused::class);
     }
 }
