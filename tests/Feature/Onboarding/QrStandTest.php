@@ -43,7 +43,7 @@ it('shows the owner a stand whose QR leads to the business\'s join page', functi
         ->assertInertia(fn ($page) => $page->component('business/qr-stand')
             ->where('businessName', 'B1')
             ->where('joinUrl', $joinUrl)
-            ->where('qrSvg', $expected));
+            ->where('qrCode', 'data:image/svg+xml;base64,'.base64_encode($expected)));
 });
 
 it('ticks the checklist the first time the owner opens it', function (): void {

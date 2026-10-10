@@ -21,4 +21,10 @@ final class JoinQrCode
     {
         return (new Writer(new ImageRenderer(new RendererStyle(320, 1), new SvgImageBackEnd)))->writeString($url);
     }
+
+    /** The SVG as a data URL, for an <img>: no markup is injected into the page. */
+    public static function dataUrl(string $url): string
+    {
+        return 'data:image/svg+xml;base64,'.base64_encode(self::svg($url));
+    }
 }

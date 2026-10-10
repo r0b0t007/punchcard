@@ -40,7 +40,7 @@ final class QrStandController extends Controller
             'businessName' => $business->name,
             'logoUrl' => $logo === null ? null : Storage::disk('public')->url($logo),
             'joinUrl' => $joinUrl,
-            'qrSvg' => JoinQrCode::svg($joinUrl),
+            'qrCode' => JoinQrCode::dataUrl($joinUrl),
         ]);
     }
 }

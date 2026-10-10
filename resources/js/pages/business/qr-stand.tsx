@@ -8,8 +8,8 @@ type Props = {
     businessName: string;
     logoUrl: string | null;
     joinUrl: string;
-    /** Made on the server from the app's own link (JoinQrCode): no user input. */
-    qrSvg: string;
+    /** The QR code as an SVG data URL, made on the server from the app's own link (JoinQrCode). */
+    qrCode: string;
 };
 
 /**
@@ -20,7 +20,7 @@ export default function QrStand({
     businessName,
     logoUrl,
     joinUrl,
-    qrSvg,
+    qrCode,
 }: Props) {
     const { t } = useTranslation();
 
@@ -54,11 +54,10 @@ export default function QrStand({
                     <h1 className="font-display text-3xl font-bold text-balance">
                         {businessName}
                     </h1>
-                    <div
-                        className="size-64 [&_svg]:size-full"
-                        role="img"
-                        aria-label={t('QR code to join the loyalty card')}
-                        dangerouslySetInnerHTML={{ __html: qrSvg }}
+                    <img
+                        src={qrCode}
+                        alt={t('QR code to join the loyalty card')}
+                        className="size-64"
                     />
                     <p className="text-xl font-semibold text-balance">
                         {t('Scan to get your loyalty card')}
