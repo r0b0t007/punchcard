@@ -15,6 +15,7 @@ use App\Models\LoyaltyCard;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\Tap;
+use App\Support\Cards\CustomerCard;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
@@ -120,16 +121,7 @@ final readonly class DescribeTap
             return null;
         }
 
-        return [
-            'businessName' => $business->name,
-            'locationName' => $location?->name,
-            'cardName' => $card->name,
-            'stampsRequired' => $card->stamps_required,
-            'stampsCollected' => $stamps ?? 0,
-            'rewardText' => $card->reward_text,
-            'brandColor' => $business->organization->brand_color,
-            'stampStyle' => $card->stamp_style,
-        ];
+        return CustomerCard::of($business, $card, $location, $stamps ?? 0);
     }
 
     /**
