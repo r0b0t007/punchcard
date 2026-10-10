@@ -436,5 +436,17 @@
     "Your logo": "Votre logo",
     "Your stamper goes here. You can add more locations later.": "Votre borne sera installée ici. Vous pourrez ajouter d’autres sites plus tard.",
     "The business you are setting up is closed. Your account stays, and you can start again at any time.": "Le commerce en cours de configuration est fermé. Votre compte reste actif et vous pouvez recommencer à tout moment.",
-    "PNG, JPEG or WebP, up to 2 MB, at least 128 pixels wide.": "PNG, JPEG ou WebP, 2 Mo maximum, au moins 128 pixels de large."
+    "PNG, JPEG or WebP, up to 2 MB, at least 128 pixels wide.": "PNG, JPEG ou WebP, 2 Mo maximum, au moins 128 pixels de large.",
+    "City": "Ville",
+    "Customers already hold this card: change it in the card builder.": "Des clients ont déjà cette carte : modifiez-la dans l’éditeur de cartes.",
+    "Finish setup": "Terminer la configuration",
+    "Phone": "Téléphone",
+    "Postal code": "Code postal",
+    "Recipient": "Destinataire",
+    "Reward": "Récompense",
+    "Stamps to earn it": "Tampons pour l’obtenir",
+    "What customers earn, and after how many stamps.": "Ce que vos clients gagnent, et après combien de tampons.",
+    "Where should we send your stamper?": "Où devons-nous envoyer votre borne ?",
+    "Your loyalty card": "Votre carte de fidélité",
+    "We send your free starter kit to this address.": "Nous envoyons votre kit de démarrage offert à cette adresse."
 }

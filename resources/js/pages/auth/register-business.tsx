@@ -42,6 +42,7 @@ export default function RegisterBusiness({ passwordRules }: Props) {
                                     tabIndex={1}
                                     autoComplete="organization"
                                     name="business_name"
+                                    dir="auto"
                                     maxLength={120}
                                     placeholder={t('Café Hafa')}
                                 />
