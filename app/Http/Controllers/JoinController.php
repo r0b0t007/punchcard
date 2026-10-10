@@ -17,9 +17,12 @@ use Inertia\Response;
 /**
  * The join page (CHW-31), the QR stand's link. Never cached (NeverCache).
  *
- * - GET /j/{slug} (throttled per client address): the business's card.
- *   Signed out, the visitor signs in or registers and comes back here
- *   (url.intended), unless a tap already waits to be claimed there.
+ * - GET /j/{slug} (throttled): the business's card. Viewing it changes
+ *   nothing, so a glance never decides where a later sign-in lands.
+ * - GET /j/{slug}/register and /j/{slug}/login (signed out): the page's
+ *   "Continue with email" and "I already have an account": come back here
+ *   after signing in (url.intended), unless a tap waits to be claimed,
+ *   whose stamp comes first; then on to Fortify's page.
  * - POST /j/{slug} (signed in, throttled per customer): add the card to
  *   theirs (JoinCard), then back to the page.
  *
@@ -32,15 +35,24 @@ final class JoinController extends Controller
         $business = $this->business($find, $slug);
         $customer = $request->user();
 
-        // Back here after signing in, replacing any page left behind, except a tap waiting to be claimed: its stamp comes first.
-        if (! $customer instanceof User && $request->session()->get('url.intended') !== route('taps.claim')) {
-            redirect()->setIntendedUrl(route('join.show', $business->slug));
-        }
-
         return Inertia::render('join/show', [
             'slug' => $business->slug,
             ...$describe->handle($business, $customer instanceof User ? $customer : null),
         ]);
+    }
+
+    public function register(Request $request, string $slug, FindJoinableBusiness $find): RedirectResponse
+    {
+        $this->comeBack($request, $this->business($find, $slug));
+
+        return to_route('register');
+    }
+
+    public function login(Request $request, string $slug, FindJoinableBusiness $find): RedirectResponse
+    {
+        $this->comeBack($request, $this->business($find, $slug));
+
+        return to_route('login');
     }
 
     public function store(Request $request, string $slug, FindJoinableBusiness $find, JoinCard $joinCard): RedirectResponse
@@ -51,6 +63,20 @@ final class JoinController extends Controller
         $joinCard->handle($business, $customer);
 
         return to_route('join.show', $business->slug);
+    }
+
+    /**
+     * Back to this join page after signing in, unless a tap waits to be
+     * claimed: compared by path, as the tap may have set it on another host.
+     */
+    private function comeBack(Request $request, Business $business): void
+    {
+        $intended = $request->session()->get('url.intended');
+        $claim = parse_url(route('taps.claim'), PHP_URL_PATH);
+
+        if (! is_string($intended) || parse_url($intended, PHP_URL_PATH) !== $claim) {
+            redirect()->setIntendedUrl(route('join.show', $business->slug));
+        }
     }
 
     private function business(FindJoinableBusiness $find, string $slug): Business

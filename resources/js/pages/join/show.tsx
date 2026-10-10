@@ -6,8 +6,11 @@ import TapScreen, {
 import type { TapCard } from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { login, register } from '@/routes';
-import { store } from '@/routes/join';
+import {
+    login as joinLogin,
+    register as joinRegister,
+    store,
+} from '@/routes/join';
 import { index as rewards } from '@/routes/rewards';
 import type { Auth } from '@/types';
 
@@ -48,10 +51,14 @@ export default function JoinShow({ slug, card, available, joined }: Props) {
     ) : (
         <>
             <Button asChild size="lg">
-                <Link href={register()}>{t('Continue with email')}</Link>
+                <Link href={joinRegister(slug)}>
+                    {t('Continue with email')}
+                </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-                <Link href={login()}>{t('I already have an account')}</Link>
+                <Link href={joinLogin(slug)}>
+                    {t('I already have an account')}
+                </Link>
             </Button>
             <p className="text-center text-sm text-muted-foreground">
                 {t('No app download needed.')}

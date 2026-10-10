@@ -7,8 +7,8 @@ namespace App\Actions\Onboarding;
 use App\Models\Business;
 
 /**
- * The owner opened the printable QR stand (CHW-31): "Print your QR stand"
- * is ticked on the setup checklist, the first time only. Runs in the
+ * The owner printed the QR stand (CHW-31, its Print button): "Print your QR
+ * stand" is ticked on the setup checklist, the first time only. Runs in the
  * business's tenant, as its owner.
  */
 final readonly class MarkQrStandOpened

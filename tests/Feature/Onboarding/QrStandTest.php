@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
@@ -32,6 +33,9 @@ beforeEach(function (): void {
     $this->stand = fn (User $as) => $this->actingAs($as)
         ->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])
         ->get(route('business.qr-stand'));
+    $this->print = fn (User $as) => $this->actingAs($as)
+        ->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])
+        ->post(route('business.qr-stand.printed'));
     $this->openedAt = fn (): mixed => $this->context->bypass(fn (): mixed => Business::query()->findOrFail($this->tenants->b1->id)->qr_stand_opened_at);
 });
 
@@ -46,16 +50,26 @@ it('shows the owner a stand whose QR leads to the business\'s join page', functi
             ->where('qrCode', 'data:image/svg+xml;base64,'.base64_encode($expected)));
 });
 
-it('ticks the checklist the first time the owner opens it', function (): void {
+it('ticks the checklist when the owner prints it, the first time only; viewing it changes nothing', function (): void {
+    ($this->stand)($this->owner)->assertOk();
+    expect(($this->openedAt)())->toBeNull();
+
     $this->travelTo(now()->subDay());
-    ($this->stand)($this->owner);
+    ($this->print)($this->owner)->assertRedirect(route('business.qr-stand'));
     $first = ($this->openedAt)();
     $this->travelBack();
 
-    ($this->stand)($this->owner);
+    ($this->print)($this->owner);
 
     expect($first)->not->toBeNull()
         ->and(($this->openedAt)()?->toDateTimeString())->toBe($first?->toDateTimeString());
+});
+
+it('sends an owner still setting up back to the wizard', function (): void {
+    $owner = User::factory()->create();
+    app(CreateIndependentBusiness::class)->handle($owner, 'Café Neuf');
+
+    $this->actingAs($owner)->get(route('business.qr-stand'))->assertRedirect(route('onboarding.show'));
 });
 
 it('is the owner\'s: staff and customers can\'t open it', function (): void {
@@ -63,6 +77,7 @@ it('is the owner\'s: staff and customers can\'t open it', function (): void {
 
     ($this->stand)($staff)->assertForbidden();
     ($this->stand)(User::factory()->create())->assertForbidden();
+    ($this->print)($staff)->assertForbidden();
 
     expect(($this->openedAt)())->toBeNull();
 });

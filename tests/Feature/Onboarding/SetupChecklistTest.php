@@ -30,10 +30,11 @@ beforeEach(function (): void {
     $this->tenants = Tenants::make();
     $this->context = app(TenantContext::class);
     $this->owner = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
-    // A verified tap on the stamper, refused or not: it is in the tap log under the business.
-    $this->tap = fn (Stamper $stamper) => $this->context->bypass(fn () => (new Tap)->forceFill([
+    // A tap on the stamper the counter took (a signed-out first tap waits for sign-in).
+    $this->tap = fn (Stamper $stamper, TapStatus $status = TapStatus::Pending, ?TapRejection $rejection = null) => $this->context->bypass(fn () => (new Tap)->forceFill([
         'nfc_tag_id' => $stamper->nfc_tag_id, 'stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id,
-        'status' => TapStatus::Rejected, 'rejection' => TapRejection::Cooldown, 'counter' => 1,
+        'status' => $status, 'rejection' => $rejection, 'counter' => $rejection === TapRejection::Replay ? null : 1,
+        'expires_at' => $status === TapStatus::Pending ? now()->addMinutes(30) : null,
     ])->save());
     $this->checklist = fn (?User $as = null) => $this->actingAs($as ?? $this->owner)
         ->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])
@@ -80,4 +81,12 @@ it('reads only the owner\'s business: what happens at another never ticks it', f
     ($this->checklist)()->assertInertia(fn ($page) => $page
         ->where('checklist.stamperPlaced', false)
         ->where('checklist.staffInvited', false));
+});
+
+it('never counts a replayed URL or a tap on a disabled stamper as the stamper placed', function (): void {
+    $stamper = $this->tenants->stamper($this->tenants->b1);
+    ($this->tap)($stamper, TapStatus::Rejected, TapRejection::Replay);
+    ($this->tap)($stamper, TapStatus::Rejected, TapRejection::StamperDisabled);
+
+    ($this->checklist)()->assertInertia(fn ($page) => $page->where('checklist.stamperPlaced', false));
 });

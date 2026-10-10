@@ -13,9 +13,10 @@ use App\Support\Tenancy\TenantContext;
 /**
  * The setup checklist on the owner's dashboard (CHW-31, B2): what is left
  * before the first customers, each item ticked by what happened. The QR
- * stand was opened to print; the stamper is placed once it has been tapped,
- * whatever the tap gave (a verified tap is the business's in the tap log; a
- * stamp by hand proves nothing about it); staff are invited once one has
+ * stand was printed; the stamper is placed once the counter has accepted a
+ * tap on it (Tap::accepted: waiting, stamped or redeemed; a replayed URL or
+ * a tap on a disabled stamper doesn't say it's at the till, and a stamp by
+ * hand proves nothing about it); staff are invited once one has
  * joined (invitations, CHW-146). Read in the business's tenant.
  */
 final readonly class DescribeChecklist
@@ -29,7 +30,7 @@ final readonly class DescribeChecklist
     {
         return [
             'qrStand' => $business->qr_stand_opened_at !== null,
-            'stamperPlaced' => $this->context->bypass(fn (): bool => Tap::query()->where('business_id', $business->id)->exists()),
+            'stamperPlaced' => $this->context->bypass(fn (): bool => Tap::query()->where('business_id', $business->id)->accepted()->exists()),
             'staffInvited' => BusinessMember::query()->where('business_id', $business->id)->where('role', BusinessRole::Staff)->exists(),
         ];
     }

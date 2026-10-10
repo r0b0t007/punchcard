@@ -196,7 +196,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
 
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
-        RateLimiter::for('join-page', fn (Request $request): Limit => Limit::perMinute(60)->by('join-page:'.ClientAddress::rateLimitKey($request->ip())));
+        // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
+        // generous cap per client address all the same.
+        RateLimiter::for('join-page', fn (Request $request): array => [
+            Limit::perMinute(60)->by('join-page:session:'.($request->hasSession() ? $request->session()->getId() : ClientAddress::rateLimitKey($request->ip()))),
+            Limit::perMinute(600)->by('join-page:address:'.ClientAddress::rateLimitKey($request->ip())),
+        ]);
         // Adding a card from a join page (CHW-31): a few a minute per customer.
         RateLimiter::for('join', fn (Request $request): Limit => Limit::perMinute(10)->by('join:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 

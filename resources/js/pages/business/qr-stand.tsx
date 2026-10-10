@@ -1,8 +1,9 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { dashboard } from '@/routes';
+import { printed } from '@/routes/business/qr-stand';
 
 type Props = {
     businessName: string;
@@ -33,7 +34,20 @@ export default function QrStand({
                     <Button variant="secondary" asChild>
                         <Link href={dashboard()}>{t('Back')}</Link>
                     </Button>
-                    <Button className="flex-1" onClick={() => window.print()}>
+                    <Button
+                        className="flex-1"
+                        onClick={() =>
+                            // Records the print (the checklist), then opens the print dialog.
+                            router.post(
+                                printed.url(),
+                                {},
+                                {
+                                    preserveScroll: true,
+                                    onSuccess: () => window.print(),
+                                },
+                            )
+                        }
+                    >
                         {t('Print')}
                     </Button>
                 </div>
