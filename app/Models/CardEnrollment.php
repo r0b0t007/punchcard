@@ -14,6 +14,7 @@ use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\VisibleToBusiness;
 use Database\Factories\CardEnrollmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -109,6 +110,18 @@ class CardEnrollment extends Model implements TenantModel, VisibleToBusiness
     public function fillTenantColumns(): void
     {
         $this->fillOrganizationFrom(LoyaltyCard::class, 'card_id');
+    }
+
+    /**
+     * The card used last first (its last stamp, else when it was joined),
+     * the order CardChoice prefers among the cards a customer holds.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function lastUsedFirst(Builder $query): void
+    {
+        $query->orderByRaw('coalesce(last_stamp_at, created_at) desc')->orderByDesc('id');
     }
 
     /**

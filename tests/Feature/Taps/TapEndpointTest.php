@@ -394,6 +394,19 @@ it('shows a card the stamp completed as full, next to its reward', function (): 
     expect(($this->lastTap)()->card_stamps)->toBe(0);
 });
 
+it('never shows an older tap past the slots of a card made shorter since (CHW-32)', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 8, 'lifetime_stamps' => 8])->save());
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+    $this->context->bypass(fn () => $this->tenants->cardA->refresh()->forceFill(['stamps_required' => 5])->save());
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page
+        ->component('tap/stamped')
+        ->where('card.stampsRequired', 5)
+        ->where('card.stampsCollected', 5)
+        ->where('stampsBefore', 5));
+});
+
 it('takes one tap request at a time per session', function (string $route): void {
     expect(Route::getRoutes()->getByName($route)?->locksFor())->toBe(10);
 })->with(['taps.receive', 'taps.claim', 'taps.result']);

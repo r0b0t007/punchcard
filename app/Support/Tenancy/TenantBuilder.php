@@ -312,7 +312,14 @@ final class TenantBuilder extends Builder
             throw new LogicException('Tenant writes need a TenantModel.');
         }
 
-        $this->model->assertTenantWrite($operation, $columns);
+        $guard = fn () => $this->model->assertTenantWrite($operation, $columns);
+
+        // The model learns whether this is its own save (setKeysForSaveQuery) or a write reaching other rows.
+        if (method_exists($this->model, 'guardTenantWrite')) {
+            $this->model->guardTenantWrite($this->expectingModelWrite ? $this->modelWriteKey : null, $guard);
+        } else {
+            $guard();
+        }
     }
 
     /**

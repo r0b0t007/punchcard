@@ -127,13 +127,14 @@ final readonly class DescribeTap
     /**
      * The card's stamps before this tap, so only the slots it filled animate:
      * a cyclic card the stamp completed carried the rest over (one card's
-     * worth per reward); a progressive card never resets.
+     * worth per reward); a progressive card never resets. Read with the
+     * card's count today, never past its slots (a card made shorter since).
      */
     private function stampsBefore(Tap $tap, ?LoyaltyCard $card, int $rewards): int
     {
         $carried = $card?->mode === CardMode::Cyclic ? $card->stamps_required * $rewards : 0;
 
-        return max(0, (int) $tap->card_stamps + $carried - $tap->qty);
+        return max(0, min((int) $tap->card_stamps + $carried - $tap->qty, $card->stamps_required ?? 0));
     }
 
     /**

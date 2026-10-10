@@ -41,7 +41,8 @@ use LogicException;
  * @property RewardType $reward_type
  * @property int|null $reward_value
  * @property string $reward_text
- * @property array<string, string>|null $colors
+ * @property array{brand?: string, foreground?: string}|null $colors the brand colour and the text colour stored for it (Contrast::readableForeground, CHW-32)
+ * @property array{hours?: string, phone?: string, links?: list<array{label: string, url: string}>}|null $info what customers read with the card (CHW-32)
  * @property string|null $icon
  * @property string|null $terms
  * @property int $cooldown_min
@@ -52,7 +53,7 @@ use LogicException;
  */
 #[Fillable([
     'organization_id', 'name', 'stamps_required', 'mode', 'tiers', 'stamp_style', 'banner_path', 'reward_type',
-    'reward_value', 'reward_text', 'colors', 'icon', 'terms', 'cooldown_min', 'daily_cap', 'active',
+    'reward_value', 'reward_text', 'colors', 'icon', 'terms', 'info', 'cooldown_min', 'daily_cap', 'active',
 ])]
 #[UseEloquentBuilder(TenantBuilder::class)]
 class LoyaltyCard extends Model implements TenantModel
@@ -79,14 +80,11 @@ class LoyaltyCard extends Model implements TenantModel
     public function assertTenantWrite(string $operation, array $values): void
     {
         $this->assertProgramWrite($operation, $values);
+        $this->heldUnderLock = null;
+        $this->assertStampsNotRaisedWhileHeld($values);
 
         if (array_key_exists('mode', $values) || array_key_exists('tiers', $values)) {
-            // Locking the card first makes a racing first enrollment (its foreign key
-            // locks the card too) commit before this check, or wait for the change.
-            $held = ! $this->exists || app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
-                && self::query()->whereKey($this->id)->held()->exists());
-
-            if ($held) {
+            if (! $this->exists || $this->heldUnderLock()) {
                 throw new LogicException('A card\'s mode and tiers cannot change once customers hold it (or in a bulk update): start a new card.');
             }
 
@@ -96,6 +94,60 @@ class LoyaltyCard extends Model implements TenantModel
                 array_key_exists('tiers', $values) ? $values['tiers'] : $this->getRawOriginal('tiers'),
             );
         }
+    }
+
+    /**
+     * A card's stamp count may be lowered at any time: nothing is taken from
+     * anyone, and a customer who now has enough is paid with their next stamp
+     * (AddStamps). Raising it once customers hold the card would move their
+     * goal, so it is refused, also in bypass(): start a new card instead
+     * (CHW-32).
+     *
+     * Only a loaded card's save changes it: the value written is the one set
+     * on that card. A bulk write can't tell which cards are held; increment()
+     * writes a delta; a query built from a loaded card writes other cards.
+     * The new count is compared with the stored one under a row lock, so a
+     * stale copy of the card can't raise it, and a racing first enrollment
+     * commits before the check or waits for the change.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function assertStampsNotRaisedWhileHeld(array $values): void
+    {
+        if (! array_key_exists('stamps_required', $values)) {
+            return;
+        }
+
+        $saving = $this->isOwnTenantWrite() && $this->isDirty('stamps_required')
+            && (int) $this->getAttributes()['stamps_required'] === (int) $values['stamps_required'];
+
+        if (! $saving) {
+            throw new LogicException('A card\'s stamp count changes only by saving that one card (not in bulk, by increment() or by a query built from a card), so whether customers hold it is checked.');
+        }
+
+        $stored = app(TenantContext::class)->bypass(fn (): mixed => self::query()->whereKey($this->id)->lockForUpdate()->value('stamps_required'));
+
+        if ((int) $values['stamps_required'] <= (int) $stored) {
+            return;
+        }
+
+        if ($this->heldUnderLock()) {
+            throw new LogicException('A card\'s stamp count can be lowered, never raised, once customers hold it: start a new card.');
+        }
+    }
+
+    /** Whether customers hold the card, read once per write (assertTenantWrite clears it). */
+    private ?bool $heldUnderLock = null;
+
+    /**
+     * Whether customers hold this card, the row locked first: a racing first
+     * enrollment (its foreign key locks the card too) commits before the
+     * check, or waits for the change. Once per write, however many rules ask.
+     */
+    private function heldUnderLock(): bool
+    {
+        return $this->heldUnderLock ??= app(TenantContext::class)->bypass(fn (): bool => self::query()->whereKey($this->id)->lockForUpdate()->exists()
+            && self::query()->whereKey($this->id)->held()->exists());
     }
 
     /**
@@ -186,6 +238,7 @@ class LoyaltyCard extends Model implements TenantModel
             'reward_type' => RewardType::class,
             'reward_value' => 'integer',
             'colors' => 'array',
+            'info' => 'array',
             'cooldown_min' => 'integer',
             'daily_cap' => 'integer',
             'active' => 'boolean',

@@ -8,6 +8,7 @@ use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\TenantScope;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
@@ -29,6 +30,33 @@ use LogicException;
  */
 trait GuardsTenantWrites
 {
+    /** The key the write being guarded targets when it is a loaded model's own save; null otherwise. */
+    private mixed $tenantWriteTarget = null;
+
+    /**
+     * Runs a write's guard knowing what it targets (TenantBuilder): the key of
+     * the model saving itself, or null for a bulk write or a query built from
+     * a model, which may reach any row in the tenant.
+     *
+     * @internal
+     */
+    public function guardTenantWrite(mixed $target, Closure $guard): void
+    {
+        $this->tenantWriteTarget = $target;
+
+        try {
+            $guard();
+        } finally {
+            $this->tenantWriteTarget = null;
+        }
+    }
+
+    /** Whether the write being guarded is this loaded model saving itself, not a query reaching other rows. */
+    protected function isOwnTenantWrite(): bool
+    {
+        return $this->exists && $this->tenantWriteTarget !== null;
+    }
+
     /**
      * @param  Builder<static>  $query
      */
