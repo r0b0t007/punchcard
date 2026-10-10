@@ -32,7 +32,7 @@ final readonly class DescribeJoinPage
             // The card a tap or joining would use (CardChoice): until it is active, nothing is available.
             $honoured = LoyaltyCard::query()->honouredBy($business->id)->get()->keyBy('id');
             $held = $customer instanceof User
-                ? CardEnrollment::query()->whereIn('card_id', $honoured->keys())->where('user_id', $customer->id)->get()->keyBy('card_id')
+                ? CardEnrollment::query()->whereIn('card_id', $honoured->keys())->where('user_id', $customer->id)->lastUsedFirst()->get()->keyBy('card_id')
                 : collect();
             $card = $honoured->get(CardChoice::pick($honoured->keys()->all(), $held->keys()->all(), $honoured->where('active', true)->keys()->all()));
             $enrollment = $card instanceof LoyaltyCard ? $held->get($card->id) : null;
@@ -42,7 +42,7 @@ final readonly class DescribeJoinPage
             }
 
             return [
-                'card' => CustomerCard::of($business, $card, stamps: min($enrollment->current_stamps ?? 0, $card->stamps_required)),
+                'card' => CustomerCard::of($business, $card, stamps: $enrollment->current_stamps ?? 0),
                 'available' => true,
                 'joined' => $enrollment instanceof CardEnrollment,
             ];

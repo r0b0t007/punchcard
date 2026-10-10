@@ -49,7 +49,7 @@ final readonly class EnrollCustomer
 
             // A running card the customer holds here comes first, so a tap never splits their progress;
             // one they hold that is paused gives way to the card the business runs now (CHW-148).
-            $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->get()->keyBy('card_id');
+            $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->lastUsedFirst()->get()->keyBy('card_id');
             $card = (int) CardChoice::pick($cards, $held->keys()->all(), $honoured->where('active', true)->modelKeys());
 
             if ($held->has($card)) {

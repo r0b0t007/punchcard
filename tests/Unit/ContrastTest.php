@@ -56,3 +56,9 @@ it('reads hex colours as the browser does: no trailing newline, the pure fallbac
         ->and(Contrast::isHex('#aabbcc'))->toBeTrue()
         ->and(Contrast::readableForeground('#808080'))->toBe('#000000');
 });
+
+it('fills stamps with the text colour the card stores, as the preview does', function (): void {
+    expect(Contrast::stampColor('#FFFFFF', '#000000'))->toBe('#000000')
+        ->and(Contrast::stampColor('#FFFFFF', 'nope'))->toBe('#241A13')
+        ->and(Contrast::stampColor('#3B2A20', '#FFFFFF'))->toBe('#F2A541');
+});

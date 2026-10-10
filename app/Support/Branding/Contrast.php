@@ -41,12 +41,19 @@ final class Contrast
         return self::ratio($preferred, $background) >= 4.5 ? $preferred : self::best(['#FFFFFF', '#000000'], $background);
     }
 
-    /** Filled stamps: saffron when it stands out (3:1, the non-text rule), else the card's text colour. */
-    public static function stampColor(string $brand): string
+    /**
+     * Filled stamps: saffron when it stands out (3:1, the non-text rule), else
+     * the card's text colour: the one it stores, so stamps and text never differ.
+     */
+    public static function stampColor(string $brand, ?string $foreground = null): string
     {
         $background = self::isHex($brand) ? $brand : self::ESPRESSO;
 
-        return self::ratio(self::SAFFRON, $background) >= 3 ? self::SAFFRON : self::readableForeground($background);
+        if (self::ratio(self::SAFFRON, $background) >= 3) {
+            return self::SAFFRON;
+        }
+
+        return $foreground !== null && self::isHex($foreground) ? $foreground : self::readableForeground($background);
     }
 
     /**

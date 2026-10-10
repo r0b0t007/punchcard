@@ -61,7 +61,7 @@ it('never raises the stamp count of a card customers hold, whoever writes', func
 
 it('refuses a bulk change of the stamp count: it can\'t tell which cards are held', function (): void {
     $this->context->bypass(fn () => LoyaltyCard::query()->whereKey($this->card->id)->update(['stamps_required' => 8]));
-})->throws(LogicException::class, 'one card at a time');
+})->throws(LogicException::class, 'only by saving that one card');
 
 it('keeps the stamp style to the known ones on Postgres', function (): void {
     expect(fn () => DB::transaction(fn () => DB::table('loyalty_cards')->where('id', $this->card->id)->update(['stamp_style' => 'skull'])))
@@ -76,7 +76,7 @@ it('never raises it by increment(), nor through a query built from a loaded card
         'increment' => $loaded->increment('stamps_required', 5),
         'query from a card' => $loaded->newQuery()->update(['stamps_required' => 12]),
     });
-})->throws(LogicException::class, 'one card at a time')->with(['increment', 'query from a card']);
+})->throws(LogicException::class, 'only by saving that one card')->with(['increment', 'query from a card']);
 
 it('never raises it from a stale copy that still has the old count', function (): void {
     $this->tenants->enroll(User::factory()->create(), $this->card);
@@ -94,4 +94,20 @@ it('never lets a query built from a card write its count over other cards', func
 
     // The loaded card keeps its own 10: only the other, held card would be raised.
     $this->context->bypass(fn () => $loaded->newQuery()->update(['stamps_required' => 10]));
-})->throws(LogicException::class, 'one card at a time');
+})->throws(LogicException::class, 'only by saving that one card');
+
+it('never lets a card with an unsaved lower count write it over other cards through a query', function (): void {
+    $short = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::factory()->for($this->tenants->orgB)->create(['stamps_required' => 5]));
+    $this->tenants->enroll(User::factory()->create(), $short);
+    $loaded = $this->context->bypass(fn (): LoyaltyCard => LoyaltyCard::query()->findOrFail($this->card->id));
+    $loaded->stamps_required = 8;
+
+    // A lowering for the loaded card, a raise for the other, held one.
+    $this->context->bypass(fn () => $loaded->newQuery()->update(['stamps_required' => 8]));
+})->throws(LogicException::class, 'only by saving that one card');
+
+it('changes the stamp count and the mode of an unheld card in one save', function (): void {
+    $this->context->bypass(fn () => LoyaltyCard::query()->findOrFail($this->card->id)->forceFill(['stamps_required' => 12, 'mode' => 'progressive', 'tiers' => [['stamps' => 5, 'reward' => 'Coffee'], ['stamps' => 12, 'reward' => 'Cake']]])->save());
+
+    expect(($this->required)())->toBe(12);
+});

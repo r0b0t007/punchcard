@@ -75,3 +75,14 @@ it('keeps a customer on the paused card they hold when none runs, not another pa
 
     expect(app(EnrollCustomer::class)->handle($this->business, $other)?->card_id)->toBe($newer->id);
 });
+
+it('keeps a customer moved to the new card on it when the old one runs again', function (): void {
+    ($this->pause)($this->old);
+    $new = ($this->addCard)('New card');
+    $moved = app(EnrollCustomer::class)->handle($this->business, $this->customer);
+    $this->context->bypass(fn () => $moved?->forceFill(['current_stamps' => 4, 'lifetime_stamps' => 4, 'last_stamp_at' => now()])->save());
+    $this->context->bypass(fn () => $this->old->forceFill(['active' => true])->save());
+
+    expect(app(EnrollCustomer::class)->handle($this->business, $this->customer)?->card_id)->toBe($new->id)
+        ->and(app(DescribeJoinPage::class)->handle($this->business, $this->customer)['card']['cardName'])->toBe('New card');
+});
