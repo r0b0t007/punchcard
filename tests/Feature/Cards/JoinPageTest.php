@@ -131,7 +131,7 @@ it('shows the card the customer holds there, as a tap would use it', function ()
     ($this->page)()->assertInertia(fn ($page) => $page->where('joined', true)->where('card.cardName', 'Second card'));
 });
 
-it('offers nothing while the card a tap would use is switched off, as a tap would be refused', function (): void {
+it('offers a customer holding a paused card the card the business runs now (CHW-148)', function (): void {
     $this->context->bypass(function (): void {
         $old = LoyaltyCard::factory()->for($this->tenants->orgB)->create(['name' => 'Old card', 'active' => false]);
         $old->businesses()->attach($this->business->id);
@@ -139,10 +139,11 @@ it('offers nothing while the card a tap would use is switched off, as a tap woul
     });
 
     $this->actingAs($this->customer);
-    ($this->page)()->assertInertia(fn ($page) => $page->where('available', false)->where('joined', false));
+    ($this->page)()->assertInertia(fn ($page) => $page->where('available', true)->where('joined', false)->where('card.cardName', 'B card'));
     $this->post(route('join.store', $this->business->slug));
 
-    expect(($this->enrollments)())->toBe(1);
+    expect(($this->enrollments)())->toBe(2);
+    ($this->page)()->assertInertia(fn ($page) => $page->where('joined', true)->where('card.cardName', 'B card'));
 });
 
 it('brings a visitor back to this page, not one left behind earlier', function (): void {
