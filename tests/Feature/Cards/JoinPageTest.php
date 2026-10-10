@@ -106,7 +106,18 @@ it('leaves a tap waiting to be claimed its sign-in redirect', function (): void 
     expect(session('url.intended'))->toBe(route('taps.claim'));
 });
 
-it('counts the customer joined when they hold any card the business honours, switched off or not', function (): void {
+it('shows the card the customer holds there, as a tap would use it', function (): void {
+    $this->context->bypass(function (): void {
+        $second = LoyaltyCard::factory()->for($this->tenants->orgB)->create(['name' => 'Second card']);
+        $second->businesses()->attach($this->business->id);
+        CardEnrollment::factory()->for($second, 'card')->for($this->customer)->create();
+    });
+
+    $this->actingAs($this->customer);
+    ($this->page)()->assertInertia(fn ($page) => $page->where('joined', true)->where('card.cardName', 'Second card'));
+});
+
+it('offers nothing while the card a tap would use is switched off, as a tap would be refused', function (): void {
     $this->context->bypass(function (): void {
         $old = LoyaltyCard::factory()->for($this->tenants->orgB)->create(['name' => 'Old card', 'active' => false]);
         $old->businesses()->attach($this->business->id);
@@ -114,7 +125,18 @@ it('counts the customer joined when they hold any card the business honours, swi
     });
 
     $this->actingAs($this->customer);
-    ($this->page)()->assertInertia(fn ($page) => $page->where('joined', true)->where('card.cardName', 'Old card'));
+    ($this->page)()->assertInertia(fn ($page) => $page->where('available', false)->where('joined', false));
+    $this->post(route('join.store', $this->business->slug));
+
+    expect(($this->enrollments)())->toBe(1);
+});
+
+it('brings a visitor back to this page, not one left behind earlier', function (): void {
+    $this->withSession(['url.intended' => route('dashboard')]);
+
+    ($this->page)()->assertOk();
+
+    expect(session('url.intended'))->toBe(route('join.show', $this->business->slug));
 });
 
 it('limits how often one address opens join pages', function (): void {

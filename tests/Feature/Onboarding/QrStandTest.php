@@ -37,7 +37,7 @@ beforeEach(function (): void {
 
 it('shows the owner a stand whose QR leads to the business\'s join page', function (): void {
     $joinUrl = route('join.show', $this->tenants->b1->slug);
-    $expected = (new Writer(new ImageRenderer(new RendererStyle(320, 1), new SvgImageBackEnd)))->writeString($joinUrl);
+    $expected = (new Writer(new ImageRenderer(new RendererStyle(320, 4), new SvgImageBackEnd)))->writeString($joinUrl);
 
     ($this->stand)($this->owner)->assertOk()
         ->assertInertia(fn ($page) => $page->component('business/qr-stand')

@@ -23,7 +23,7 @@ void createInertiaApp({
                 name.startsWith('rewards/') ||
                 // The join page and the printable QR stand (CHW-31): full screen.
                 name.startsWith('join/') ||
-                name.startsWith('business/'):
+                name === 'business/qr-stand':
                 return I18nLayout;
             case name.startsWith('auth/'):
                 return [I18nLayout, AuthLayout];

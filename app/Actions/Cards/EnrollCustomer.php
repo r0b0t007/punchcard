@@ -8,6 +8,7 @@ use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\User;
+use App\Support\Cards\CardChoice;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -48,14 +49,11 @@ final readonly class EnrollCustomer
 
             // A card the customer already holds here comes first, so a tap never splits their progress.
             $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->get()->keyBy('card_id');
+            $card = (int) CardChoice::pick($cards, $held->keys()->all());
 
-            foreach ($cards as $cardId) {
-                if ($held->has($cardId)) {
-                    return $held->get($cardId);
-                }
+            if ($held->has($card)) {
+                return $held->get($card);
             }
-
-            $card = $cards[0];
 
             for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
                 $existing = CardEnrollment::query()->where('card_id', $card)->where('user_id', $user->id)->first();

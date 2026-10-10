@@ -32,8 +32,8 @@ final class JoinController extends Controller
         $business = $this->business($find, $slug);
         $customer = $request->user();
 
-        // Back here after signing in, unless a tap is waiting to be claimed: its stamp comes first.
-        if (! $customer instanceof User && ! $request->session()->has('url.intended')) {
+        // Back here after signing in, replacing any page left behind, except a tap waiting to be claimed: its stamp comes first.
+        if (! $customer instanceof User && $request->session()->get('url.intended') !== route('taps.claim')) {
             redirect()->setIntendedUrl(route('join.show', $business->slug));
         }
 

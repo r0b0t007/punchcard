@@ -14,7 +14,8 @@ type Props = {
 
 /**
  * The printable QR stand (CHW-31): the business's name and logo and a QR
- * code to its join page, for a customer without NFC. The buttons don't print.
+ * code to its join page, for a customer without NFC. It prints dark on
+ * white whatever the theme; the buttons don't print.
  */
 export default function QrStand({
     businessName,
@@ -27,7 +28,7 @@ export default function QrStand({
     return (
         <>
             <Head title={t('QR stand')} />
-            <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center gap-8 bg-background p-6 text-foreground print:max-w-none print:p-0">
+            <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center gap-8 bg-background p-6 text-foreground print:max-w-none print:bg-white print:p-0 print:text-black">
                 <div className="flex w-full gap-3 print:hidden">
                     <Button variant="secondary" asChild>
                         <Link href={dashboard()}>{t('Back')}</Link>
@@ -62,13 +63,13 @@ export default function QrStand({
                     <p className="text-xl font-semibold text-balance">
                         {t('Scan to get your loyalty card')}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground print:text-black">
                         {t(
                             'Then tap the stamper at the counter for your stamps.',
                         )}
                     </p>
                     <p
-                        className="text-xs break-all text-muted-foreground"
+                        className="text-xs break-all text-muted-foreground print:text-black"
                         dir="ltr"
                     >
                         {joinUrl}
