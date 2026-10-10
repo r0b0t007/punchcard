@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\BusinessRole;
 use App\Support\Locales;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -44,6 +46,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+            ],
+            // What the sidebar offers in the tenant being worked in: the cards page to whoever runs the program or the business (CHW-32).
+            'nav' => fn (): array => [
+                'cards' => app(TenantContext::class)->isOrgAdmin() || app(TenantContext::class)->businessRole() === BusinessRole::Owner,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,

@@ -11,8 +11,8 @@ use App\Models\LoyaltyCard;
 /**
  * A business's card as a customer screen shows it (the TapCard type in
  * resources/js/components/tap/tap-screen.tsx): the tap results (DescribeTap)
- * and the join page (CHW-31). The brand colour is the organization's
- * (ADR 0007). Pass the business with its organization loaded. The stamps
+ * and the join page (CHW-31). The brand colour is the card's, else the
+ * organization's (ADR 0007, CHW-32). Pass the business with its organization loaded. The stamps
  * shown never pass the card's slots: a card made shorter (CHW-32) shows a
  * customer above the new count, or an older tap, as a full card.
  */
@@ -30,7 +30,7 @@ final class CustomerCard
             'stampsRequired' => $card->stamps_required,
             'stampsCollected' => max(0, min($stamps, $card->stamps_required)),
             'rewardText' => $card->reward_text,
-            'brandColor' => $business->organization->brand_color,
+            'brandColor' => $card->brandColor() ?? $business->organization->brand_color,
             'stampStyle' => $card->stamp_style,
         ];
     }

@@ -12,6 +12,7 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            nav: { cards: boolean };
             sidebarOpen: boolean;
             locale: string;
             dir: TextDirection;

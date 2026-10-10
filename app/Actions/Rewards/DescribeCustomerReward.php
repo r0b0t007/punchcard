@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Rewards;
 
+use App\Models\CardEnrollment;
 use App\Models\Location;
+use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\User;
@@ -33,6 +35,7 @@ final readonly class DescribeCustomerReward
     {
         return $this->context->bypass(function () use ($reward, $user): array {
             $organization = Organization::query()->find($reward->organization_id, ['id', 'name', 'brand_color']);
+            $card = LoyaltyCard::query()->whereKey(CardEnrollment::query()->whereKey($reward->enrollment_id)->select('card_id'))->first(['id', 'colors']);
             $until = $reward->redeem_window_until;
             $redeemed = null;
 
@@ -49,7 +52,7 @@ final readonly class DescribeCustomerReward
                 'id' => $reward->id,
                 'rewardText' => $reward->reward_text,
                 'businessName' => $organization->name ?? '',
-                'brandColor' => $organization?->brand_color,
+                'brandColor' => $card?->brandColor() ?? $organization?->brand_color,
                 'status' => $reward->status->value,
                 'verified' => $user->hasVerifiedEmail(),
                 'windowSeconds' => OpenRedeemWindow::SECONDS,

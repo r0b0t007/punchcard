@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BusinessRegistrationController;
+use App\Http\Controllers\CardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
@@ -33,6 +34,12 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function (): void {
     Route::middleware(RedirectToOnboarding::class)->group(function (): void {
         Route::get('business/qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');
         Route::post('business/qr-stand/printed', [QrStandController::class, 'printed'])->name('business.qr-stand.printed');
+        // The cards and the card builder's saves (CHW-32); {card} resolves in the tenant.
+        Route::get('cards', [CardController::class, 'index'])->name('cards.index');
+        Route::post('cards', [CardController::class, 'store'])->name('cards.store');
+        Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
+        Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');
+        Route::post('cards/{card}/banner', [CardController::class, 'banner'])->whereNumber('card')->name('cards.banner');
     });
 });
 

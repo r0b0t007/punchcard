@@ -8,6 +8,7 @@ use App\Enums\CardMode;
 use App\Enums\RewardType;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Branding\Contrast;
 use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use LogicException;
 
 /**
@@ -199,6 +201,19 @@ class LoyaltyCard extends Model implements TenantModel
         $query->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($businessId))
             ->orderByDesc('active')
             ->orderBy('id');
+    }
+
+    /** The card's own brand colour (CHW-32), or null: it then shows its organization's (ADR 0007). */
+    public function brandColor(): ?string
+    {
+        $brand = $this->colors['brand'] ?? null;
+
+        return is_string($brand) && Contrast::isHex($brand) ? $brand : null;
+    }
+
+    public function bannerUrl(): ?string
+    {
+        return $this->banner_path === null ? null : Storage::disk('public')->url($this->banner_path);
     }
 
     /**
