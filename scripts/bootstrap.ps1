@@ -45,6 +45,7 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
 
 Step 'Database'
 Run 'php artisan migrate --ansi'
+Run 'php artisan storage:link --ansi'
 
 Step 'Frontend'
 Run 'npm install'

@@ -39,6 +39,7 @@ fi
 
 step "Database"
 php artisan migrate --ansi
+php artisan storage:link --ansi
 
 step "Frontend"
 npm install

@@ -236,7 +236,10 @@ test.describe('in English, light', () => {
         await expect(
             page.getByRole('heading', { name: /^Already stamped/ }),
         ).toBeVisible();
-        await expect(page.getByText('Next stamp available at')).toBeVisible();
+        // "tomorrow at" when the cooldown ends after midnight (a run in the last minutes of the day).
+        await expect(
+            page.getByText(/^Next stamp available (tomorrow )?at$/),
+        ).toBeVisible();
     });
 });
 

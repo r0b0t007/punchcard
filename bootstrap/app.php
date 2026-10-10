@@ -6,6 +6,7 @@ use App\Http\Middleware\GiveSessionTapToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\NeverCache;
+use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SetTenant;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -36,7 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // A changed password (or a deleted, anonymised account) signs out every other device.
         $middleware->authenticateSessions();
 
-        $middleware->alias(['tenant' => SetTenant::class]);
+        $middleware->alias(['tenant' => SetTenant::class, 'onboarding' => ResolveOnboardingBusiness::class]);
 
         // The tenant must be set before route model bindings resolve, so another
         // tenant's {location} or {business} is a 404 instead of an unscoped lookup.

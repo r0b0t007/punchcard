@@ -5,6 +5,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
+use App\Http\Middleware\RedirectToOnboarding;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -23,7 +24,8 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    // An owner still setting up goes to the onboarding wizard instead (CHW-31).
+    Route::inertia('dashboard', 'dashboard')->middleware(RedirectToOnboarding::class)->name('dashboard');
 });
 
 // The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
@@ -47,4 +49,5 @@ Route::middleware(['auth', NeverCache::class])->group(function (): void {
     Route::delete('rewards/{reward}/redeem', [RewardController::class, 'close'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem.close');
 });
 
+require __DIR__.'/onboarding.php';
 require __DIR__.'/settings.php';

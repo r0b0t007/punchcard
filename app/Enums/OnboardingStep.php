@@ -17,12 +17,15 @@ enum OnboardingStep: string
     case Card = 'card';
     case Shipping = 'shipping';
 
+    /** Where the step comes in the wizard, from 0. */
+    public function position(): int
+    {
+        return (int) array_search($this, self::cases(), true);
+    }
+
     /** The step after this one; null after the last. */
     public function next(): ?self
     {
-        $steps = self::cases();
-        $index = array_search($this, $steps, true);
-
-        return $steps[$index + 1] ?? null;
+        return self::cases()[$this->position() + 1] ?? null;
     }
 }
