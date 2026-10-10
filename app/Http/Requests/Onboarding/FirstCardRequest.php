@@ -11,8 +11,8 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The wizard's card step (CHW-31): LoyaltyCardPolicy::create in the
- * business's organization. A card of 5 to 50 stamps, as the database checks.
+ * The wizard's card step (CHW-31): LoyaltyCardPolicy::update on the card
+ * the business honours, or ::create in its organization for a first one. A card of 5 to 50 stamps, as the database checks.
  */
 class FirstCardRequest extends FormRequest
 {
@@ -20,7 +20,15 @@ class FirstCardRequest extends FormRequest
     {
         $business = ResolveOnboardingBusiness::of($this);
 
-        return $business instanceof Business && $this->user()?->can('create', [LoyaltyCard::class, $business->organization]) === true;
+        if (! $business instanceof Business) {
+            return false;
+        }
+
+        $card = LoyaltyCard::query()->honouredBy($business->id)->first();
+
+        return $card instanceof LoyaltyCard
+            ? $this->user()?->can('update', $card) === true
+            : $this->user()?->can('create', [LoyaltyCard::class, $business->organization]) === true;
     }
 
     /**

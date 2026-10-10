@@ -28,8 +28,14 @@ export default function OnboardingCard({
 }: Props) {
     const { t } = useTranslation();
     const [rewardText, setRewardText] = useState(card.rewardText);
-    const [stampsRequired, setStampsRequired] = useState(card.stampsRequired);
-    const previewStamps = Math.min(Math.max(stampsRequired || 10, 5), 50);
+    // What the owner typed, as typed; the preview takes a whole number from 5 to 50.
+    const [stampsRequired, setStampsRequired] = useState(
+        String(card.stampsRequired),
+    );
+    const typed = Number.parseInt(stampsRequired, 10);
+    const previewStamps = Number.isNaN(typed)
+        ? card.stampsRequired
+        : Math.min(Math.max(typed, 5), 50);
 
     return (
         <>
@@ -76,12 +82,11 @@ export default function OnboardingCard({
                                 required
                                 min={5}
                                 max={50}
+                                step={1}
                                 inputMode="numeric"
                                 value={stampsRequired}
                                 onChange={(event) =>
-                                    setStampsRequired(
-                                        event.target.valueAsNumber,
-                                    )
+                                    setStampsRequired(event.target.value)
                                 }
                             />
                             <InputError message={errors.stamps_required} />

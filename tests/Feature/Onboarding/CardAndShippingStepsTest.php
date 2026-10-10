@@ -173,7 +173,8 @@ it('locks the business before looking for its card or kit, so two tabs make one 
 
     $queries = collect(DB::getQueryLog())->pluck('query')->values();
     $business = $queries->search(fn (string $sql): bool => str_contains($sql, 'from "businesses"') && str_contains($sql, 'for no key update'));
-    $lookup = $queries->search(fn (string $sql): bool => str_starts_with($sql, 'select') && str_contains($sql, "from \"{$table}\""));
+    // The Action's lookup, locked: the Form Request reads the same row unlocked earlier, to authorize.
+    $lookup = $queries->search(fn (string $sql): bool => str_contains($sql, "from \"{$table}\"") && str_ends_with(trim($sql), 'for update'));
 
     expect($business)->toBeInt()
         ->and($lookup)->toBeInt()
@@ -182,3 +183,33 @@ it('locks the business before looking for its card or kit, so two tabs make one 
     'card' => ['card', 'loyalty_cards', ['reward_text' => 'Free coffee', 'stamps_required' => 10]],
     'kit' => ['shipping', 'kit_orders', ['recipient_name' => 'Salma', 'phone' => '+212612345678', 'address' => '12 rue de la Plage', 'city' => 'Tanger']],
 ])->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
+
+it('passes a card customers hold through when nothing changed, keeping the business\'s name', function (): void {
+    $this->actingAs($this->owner)->put(route('onboarding.card'), ['reward_text' => 'Free mint tea', 'stamps_required' => 8]);
+    $card = ($this->cards)()[0];
+    $this->context->bypass(function () use ($card): void {
+        CardEnrollment::factory()->for($card, 'card')->for(User::factory()->create())->create();
+        $this->business->forceFill(['name' => 'Hafa Coffee', 'onboarding_step' => OnboardingStep::Card])->save();
+    });
+
+    $this->put(route('onboarding.card'), ['reward_text' => 'Free mint tea', 'stamps_required' => 8])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('onboarding.step', 'shipping'));
+
+    expect(($this->cards)()[0]->name)->toBe('Hafa Coffee');
+});
+
+it('corrects the requested kit order rather than adding one', function (): void {
+    $this->context->bypass(function (): void {
+        KitOrder::factory()->for($this->business)->create(['city' => 'Tétouan']);
+        $this->business->forceFill(['onboarding_step' => OnboardingStep::Shipping])->save();
+    });
+
+    $this->actingAs($this->owner)->put(route('onboarding.shipping'), [
+        'recipient_name' => 'Salma', 'phone' => '+212612345678', 'address' => '12 rue de la Plage', 'city' => 'Tanger', 'postal_code' => '',
+    ])->assertRedirect(route('dashboard'));
+
+    $order = $this->context->bypass(fn (): KitOrder => KitOrder::query()->where('business_id', $this->business->id)->sole());
+    expect($order->city)->toBe('Tanger')
+        ->and($order->postal_code)->toBeNull();
+});

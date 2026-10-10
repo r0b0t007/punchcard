@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Kits;
 
-use App\Enums\KitOrderStatus;
 use App\Models\Business;
 use App\Models\KitOrder;
 use App\Support\Tenancy\TenantContext;
@@ -31,7 +30,7 @@ final readonly class RequestKit
 
             $order = KitOrder::query()
                 ->where('business_id', $business->id)
-                ->where('status', KitOrderStatus::Requested)
+                ->requested()
                 ->lockForUpdate()
                 ->first()
                 ?? new KitOrder;

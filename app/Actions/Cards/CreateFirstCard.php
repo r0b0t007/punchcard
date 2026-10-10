@@ -9,7 +9,6 @@ use App\Enums\RewardType;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +17,8 @@ use Illuminate\Validation\ValidationException;
  * card with a free item, in its organization's program, honoured by the
  * business. The full card builder is CHW-32. Done again, it updates that
  * card, until customers hold it: then their stamps count on it as it is, and
- * the card builder changes it. Runs in the business's tenant, as its org
+ * the card builder changes it (the same values again pass, and the card
+ * keeps the business's name). Runs in the business's tenant, as its org
  * admin (an independent owner is): LoyaltyCard's guard decides.
  */
 final readonly class CreateFirstCard
@@ -32,11 +32,7 @@ final readonly class CreateFirstCard
             // here, then finds the card this one made, instead of making a second.
             $this->context->bypass(fn (): Business => Business::query()->lock('for no key update')->findOrFail($business->id));
 
-            $card = LoyaltyCard::query()
-                ->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($business->id))
-                ->oldest('id')
-                ->lockForUpdate()
-                ->first();
+            $card = LoyaltyCard::query()->honouredBy($business->id)->lockForUpdate()->first();
 
             if (! $card instanceof LoyaltyCard) {
                 $card = (new LoyaltyCard)->forceFill([
@@ -53,13 +49,16 @@ final readonly class CreateFirstCard
                 return $card;
             }
 
-            if ($this->context->bypass(fn (): bool => LoyaltyCard::query()->whereKey($card->id)->held()->exists())) {
+            $rulesChange = $card->reward_text !== $rewardText || $card->stamps_required !== $stampsRequired;
+
+            if ($rulesChange && $this->context->bypass(fn (): bool => LoyaltyCard::query()->whereKey($card->id)->held()->exists())) {
                 throw ValidationException::withMessages([
                     'reward_text' => __('Customers already hold this card: change it in the card builder.'),
                 ]);
             }
 
-            $card->forceFill(['reward_text' => $rewardText, 'stamps_required' => $stampsRequired])->save();
+            // The card carries the business's name, also after the business step is done again.
+            $card->forceFill(['name' => $business->name, ...$rulesChange ? ['reward_text' => $rewardText, 'stamps_required' => $stampsRequired] : []])->save();
 
             return $card;
         });

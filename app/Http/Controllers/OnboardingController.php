@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Onboarding\CancelSetup;
+use App\Actions\Onboarding\DescribeCardStep;
+use App\Actions\Onboarding\DescribeShippingStep;
 use App\Actions\Onboarding\SaveBusinessStep;
 use App\Actions\Onboarding\SaveCardStep;
 use App\Actions\Onboarding\SaveFirstLocation;
 use App\Actions\Onboarding\SaveLogoStep;
 use App\Actions\Onboarding\SaveShippingStep;
 use App\Enums\BusinessCategory;
-use App\Enums\KitOrderStatus;
 use App\Enums\OnboardingStep;
 use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetTenant;
@@ -22,11 +23,8 @@ use App\Http\Requests\Onboarding\KitShippingRequest;
 use App\Http\Requests\Onboarding\LogoRequest;
 use App\Http\Requests\Onboarding\OnboardingRequest;
 use App\Models\Business;
-use App\Models\KitOrder;
-use App\Models\LoyaltyCard;
 use App\Models\User;
 use DateTimeZone;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -227,16 +225,13 @@ final class OnboardingController extends Controller
             return [];
         }
 
-        $card = LoyaltyCard::query()->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($business->id))->oldest('id')->first();
+        $step = app(DescribeCardStep::class)->handle($business);
 
         return [
             'businessName' => $business->name,
             'logoUrl' => $this->logoUrl($business),
             'brandColor' => $business->organization->brand_color,
-            'card' => [
-                'rewardText' => $card->reward_text ?? ($business->category ?? BusinessCategory::Other)->defaultReward(),
-                'stampsRequired' => $card->stamps_required ?? 10,
-            ],
+            'card' => ['rewardText' => $step['rewardText'], 'stampsRequired' => $step['stampsRequired']],
         ];
     }
 
@@ -247,18 +242,12 @@ final class OnboardingController extends Controller
             return [];
         }
 
-        $order = KitOrder::query()->where('business_id', $business->id)->where('status', KitOrderStatus::Requested)->first();
-        $user = $request->user();
+        /** @var User $owner */
+        $owner = $request->user();
+        $step = app(DescribeShippingStep::class)->handle($business, $owner);
+        unset($step['order']);
 
-        return [
-            'kit' => [
-                'recipientName' => $order->recipient_name ?? ($user instanceof User ? $user->name : null),
-                'phone' => $order?->phone,
-                'address' => $order->address ?? $business->firstLocation?->address,
-                'city' => $order?->city,
-                'postalCode' => $order?->postal_code,
-            ],
-        ];
+        return ['kit' => $step];
     }
 
     private function logoUrl(Business $business): ?string

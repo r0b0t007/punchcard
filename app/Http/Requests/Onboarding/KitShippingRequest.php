@@ -11,8 +11,8 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The wizard's shipping step (CHW-31): KitOrderPolicy::create for the
- * business. A phone number the courier can call: digits, spaces and the
+ * The wizard's shipping step (CHW-31): KitOrderPolicy::update on the
+ * business's requested order, or ::create for a first one. A phone number the courier can call: digits, spaces and the
  * usual separators, with an optional leading +.
  */
 class KitShippingRequest extends FormRequest
@@ -21,7 +21,15 @@ class KitShippingRequest extends FormRequest
     {
         $business = ResolveOnboardingBusiness::of($this);
 
-        return $business instanceof Business && $this->user()?->can('create', [KitOrder::class, $business]) === true;
+        if (! $business instanceof Business) {
+            return false;
+        }
+
+        $order = KitOrder::query()->where('business_id', $business->id)->requested()->first();
+
+        return $order instanceof KitOrder
+            ? $this->user()?->can('update', $order) === true
+            : $this->user()?->can('create', [KitOrder::class, $business]) === true;
     }
 
     /**
@@ -43,14 +51,14 @@ class KitShippingRequest extends FormRequest
      */
     public function shipping(): array
     {
-        $postalCode = $this->string('postal_code')->trim()->toString();
+        $postalCode = $this->input('postal_code');
 
         return [
             'recipient_name' => $this->string('recipient_name')->toString(),
             'phone' => $this->string('phone')->toString(),
             'address' => $this->string('address')->toString(),
             'city' => $this->string('city')->toString(),
-            'postal_code' => $postalCode === '' ? null : $postalCode,
+            'postal_code' => is_string($postalCode) ? $postalCode : null,
         ];
     }
 }

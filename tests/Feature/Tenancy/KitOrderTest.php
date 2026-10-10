@@ -7,6 +7,7 @@ use App\Enums\BusinessRole;
 use App\Models\KitOrder;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Tests\Support\Tenants;
@@ -49,8 +50,14 @@ it('shows a franchisee its own kit orders, the org admin the organization\'s, ne
 it('never lets a franchisee change another franchisee\'s or organization\'s order', function (string $other): void {
     $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
-    expect(KitOrder::query()->whereKey($this->orders[$other]->id)->update(['city' => 'Elsewhere']))->toBe(0);
+    expect(fn () => KitOrder::query()->findOrFail($this->orders[$other]->id))->toThrow(ModelNotFoundException::class);
 })->with(['a2', 'b1']);
+
+it('refuses bulk writes outside bypass(), even to the owner\'s own order', function (): void {
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+
+    KitOrder::query()->whereKey($this->orders['a1']->id)->update(['city' => 'Elsewhere']);
+})->throws(LogicException::class, 'one at a time');
 
 it('lets the owner fix the address, never the status', function (): void {
     $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);

@@ -13,7 +13,9 @@ use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\KitOrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -89,9 +91,25 @@ class KitOrder extends Model implements TenantModel
             throw new LogicException('A kit order\'s status moves with fulfilment, in TenantContext::bypass().');
         }
 
-        if ($this->exists && $this->getRawOriginal('status') !== KitOrderStatus::Requested->value) {
+        // A bulk write can't tell a requested order from one fulfilment has: the owner corrects one loaded order.
+        if (! $this->exists) {
+            throw new LogicException('A kit order is corrected one at a time (RequestKit); bulk writes are fulfilment\'s, in TenantContext::bypass().');
+        }
+
+        if ($this->getRawOriginal('status') !== KitOrderStatus::Requested->value) {
             throw new LogicException('Only a requested kit order can be corrected: fulfilment has it now.');
         }
+    }
+
+    /**
+     * Orders still only requested: the one a business may correct.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function requested(Builder $query): void
+    {
+        $query->where('status', KitOrderStatus::Requested);
     }
 
     /**
