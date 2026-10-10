@@ -14,10 +14,10 @@ use App\Support\Tenancy\TenantContext;
 
 /**
  * What a join page shows (CHW-31): the card a tap or joining would use
- * there (CardChoice: one the signed-in customer holds, else the first
- * honoured), with their stamps. Switched off, nothing is available: a tap
- * on it would be refused too. With
- * no active card, nothing is available to join yet. Read across tenants.
+ * there (CardChoice: a running card the signed-in customer holds, else the
+ * card the business runs now), with their stamps. With no card running,
+ * nothing is available to join yet, as a tap would be refused. Read across
+ * tenants.
  */
 final readonly class DescribeJoinPage
 {
@@ -34,7 +34,7 @@ final readonly class DescribeJoinPage
             $held = $customer instanceof User
                 ? CardEnrollment::query()->whereIn('card_id', $honoured->keys())->where('user_id', $customer->id)->get()->keyBy('card_id')
                 : collect();
-            $card = $honoured->get(CardChoice::pick($honoured->keys()->all(), $held->keys()->all()));
+            $card = $honoured->get(CardChoice::pick($honoured->keys()->all(), $held->keys()->all(), $honoured->where('active', true)->keys()->all()));
             $enrollment = $card instanceof LoyaltyCard ? $held->get($card->id) : null;
 
             if (! $card instanceof LoyaltyCard || ! $card->active) {

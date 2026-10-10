@@ -16,13 +16,12 @@ use RuntimeException;
 
 /**
  * Finds or creates a customer's card at a business (CHW-25): the first tap at
- * a café enrolls the customer on its card. A card the customer already holds
- * among those the business honours comes first (their progress never
- * splits); otherwise the business's honoured card, an active one first, the
- * oldest if it has several (one card per business for the MVP); null when it
- * honours none. A switched-off card
- * is still returned, so AddStamps refuses it as inactive (ApplyTap's
- * savepoint drops the new enrollment). A new enrollment gets an unguessable
+ * a café enrolls the customer on its card. Which card is CardChoice's: a
+ * running card the customer holds there (their progress never splits), else
+ * the card the business runs now, even if they hold a paused one (CHW-148;
+ * its stamps stay on it); null when it honours none. With no card running,
+ * a switched-off one is still returned, so AddStamps refuses it as inactive
+ * (ApplyTap's savepoint drops a new enrollment). A new enrollment gets an unguessable
  * referral code. Two first taps racing for the same card meet on
  * unique(card_id, user_id), and the loser takes the winner's enrollment. Runs
  * in bypass(): the customer has no tenant.
@@ -41,15 +40,17 @@ final readonly class EnrollCustomer
     public function handle(Business $business, User $user): ?CardEnrollment
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
-            $cards = LoyaltyCard::query()->honouredBy($business->id)->pluck('id')->all();
+            $honoured = LoyaltyCard::query()->honouredBy($business->id)->get(['id', 'active']);
+            $cards = $honoured->modelKeys();
 
             if ($cards === []) {
                 return null;
             }
 
-            // A card the customer already holds here comes first, so a tap never splits their progress.
+            // A running card the customer holds here comes first, so a tap never splits their progress;
+            // one they hold that is paused gives way to the card the business runs now (CHW-148).
             $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->get()->keyBy('card_id');
-            $card = (int) CardChoice::pick($cards, $held->keys()->all());
+            $card = (int) CardChoice::pick($cards, $held->keys()->all(), $honoured->where('active', true)->modelKeys());
 
             if ($held->has($card)) {
                 return $held->get($card);

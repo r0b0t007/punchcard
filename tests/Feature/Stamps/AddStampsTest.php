@@ -255,6 +255,26 @@ describe('cyclic cards', function (): void {
             ->and($result->enrollment->only(['current_stamps', 'completed_count']))->toBe(['current_stamps' => 7, 'completed_count' => 0]);
     });
 
+    it('pays a card made shorter with the next stamp, removing nothing (CHW-32)', function (): void {
+        ($this->add)(($this->qr)(9));
+        ($this->card)(['stamps_required' => 8]);
+
+        $result = ($this->add)(($this->qr)(1, null, null, null));
+
+        expect($result->rewards)->toHaveCount(1)
+            ->and($result->enrollment->only(['current_stamps', 'completed_count']))->toBe(['current_stamps' => 2, 'completed_count' => 1]);
+    });
+
+    it('pays one reward per full card with the next stamp after a big cut (CHW-32)', function (): void {
+        ($this->add)(($this->qr)(9));
+        ($this->card)(['stamps_required' => 5]);
+
+        $result = ($this->add)(($this->qr)(1));
+
+        expect($result->rewards)->toHaveCount(2)
+            ->and($result->enrollment->current_stamps)->toBe(0);
+    });
+
     it('unlocks one reward per full card in a single add', function (): void {
         $result = ($this->add)(($this->qr)(21));
 
