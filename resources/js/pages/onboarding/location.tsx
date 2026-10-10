@@ -38,6 +38,7 @@ export default function OnboardingLocation({ location, timezones }: Props) {
                             <Input
                                 id="name"
                                 name="name"
+                                dir="auto"
                                 required
                                 autoFocus
                                 maxLength={120}
@@ -51,6 +52,7 @@ export default function OnboardingLocation({ location, timezones }: Props) {
                             <Input
                                 id="address"
                                 name="address"
+                                dir="auto"
                                 required
                                 maxLength={255}
                                 autoComplete="street-address"

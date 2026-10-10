@@ -38,6 +38,7 @@ export default function OnboardingBusiness({ business, categories }: Props) {
                             <Input
                                 id="name"
                                 name="name"
+                                dir="auto"
                                 required
                                 autoFocus
                                 maxLength={120}

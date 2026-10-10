@@ -15,5 +15,7 @@ Route::middleware(['auth', 'verified', 'onboarding'])->prefix('onboarding')->nam
     Route::put('location', [OnboardingController::class, 'saveLocation'])->name('location');
     Route::post('logo', [OnboardingController::class, 'saveLogo'])->name('logo');
     Route::post('logo/skip', [OnboardingController::class, 'skipLogo'])->name('logo.skip');
+    Route::put('card', [OnboardingController::class, 'saveCard'])->name('card');
+    Route::put('shipping', [OnboardingController::class, 'saveShipping'])->name('shipping');
     Route::post('cancel', [OnboardingController::class, 'cancel'])->name('cancel');
 });

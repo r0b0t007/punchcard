@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Onboarding\CancelSetup;
+use App\Actions\Onboarding\DescribeCardStep;
+use App\Actions\Onboarding\DescribeShippingStep;
 use App\Actions\Onboarding\SaveBusinessStep;
+use App\Actions\Onboarding\SaveCardStep;
 use App\Actions\Onboarding\SaveFirstLocation;
 use App\Actions\Onboarding\SaveLogoStep;
+use App\Actions\Onboarding\SaveShippingStep;
 use App\Enums\BusinessCategory;
 use App\Enums\OnboardingStep;
 use App\Http\Middleware\ResolveOnboardingBusiness;
+use App\Http\Middleware\SetTenant;
 use App\Http\Requests\Onboarding\BusinessDetailsRequest;
+use App\Http\Requests\Onboarding\FirstCardRequest;
 use App\Http\Requests\Onboarding\FirstLocationRequest;
+use App\Http\Requests\Onboarding\KitShippingRequest;
 use App\Http\Requests\Onboarding\LogoRequest;
 use App\Http\Requests\Onboarding\OnboardingRequest;
 use App\Models\Business;
@@ -33,7 +40,9 @@ use Inertia\Response;
  * - GET /onboarding/{step}: a step done or the current one; a later step
  *   sends back to the current one. With no business yet, only the first.
  * - POST /onboarding/business, PUT /onboarding/location, POST
- *   /onboarding/logo (and /onboarding/logo/skip): save a step.
+ *   /onboarding/logo (and /onboarding/logo/skip), PUT /onboarding/card: save
+ *   a step. PUT /onboarding/shipping saves the last one: the business is set
+ *   up, and the dashboard works in it.
  *   A step past the one reached is never saved: back to the current one.
  * - POST /onboarding/cancel: close the business being set up (CancelSetup).
  */
@@ -62,7 +71,8 @@ final class OnboardingController extends Controller
                 OnboardingStep::Business => $this->businessProps($business),
                 OnboardingStep::Location => $this->locationProps($business),
                 OnboardingStep::Logo => $this->logoProps($business),
-                default => [],
+                OnboardingStep::Card => $this->cardProps($business),
+                OnboardingStep::Shipping => $this->shippingProps($business, $request),
             },
         ]);
     }
@@ -117,6 +127,32 @@ final class OnboardingController extends Controller
         $saveLogoStep->handle($this->business($request), null);
 
         return $this->toStep(OnboardingStep::Card);
+    }
+
+    public function saveCard(FirstCardRequest $request, SaveCardStep $saveCardStep): RedirectResponse
+    {
+        if (($ahead = $this->ahead($request, OnboardingStep::Card)) instanceof RedirectResponse) {
+            return $ahead;
+        }
+
+        $saveCardStep->handle($this->business($request), $request->string('reward_text')->toString(), $request->integer('stamps_required'));
+
+        return $this->toStep(OnboardingStep::Shipping);
+    }
+
+    public function saveShipping(KitShippingRequest $request, SaveShippingStep $saveShippingStep): RedirectResponse
+    {
+        if (($ahead = $this->ahead($request, OnboardingStep::Shipping)) instanceof RedirectResponse) {
+            return $ahead;
+        }
+
+        $business = $this->business($request);
+        $saveShippingStep->handle($business, $request->shipping());
+
+        // Set up: the dashboard works in this business from now on (the tenant switcher can change it).
+        $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
+
+        return to_route('dashboard');
     }
 
     public function cancel(OnboardingRequest $request, CancelSetup $cancelSetup): RedirectResponse
@@ -183,10 +219,47 @@ final class OnboardingController extends Controller
     }
 
     /** @return array<string, mixed> */
+    private function cardProps(?Business $business): array
+    {
+        if (! $business instanceof Business) {
+            return [];
+        }
+
+        $step = app(DescribeCardStep::class)->handle($business);
+
+        return [
+            'businessName' => $business->name,
+            'logoUrl' => $this->logoUrl($business),
+            'brandColor' => $business->organization->brand_color,
+            'card' => ['rewardText' => $step['rewardText'], 'stampsRequired' => $step['stampsRequired']],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function shippingProps(?Business $business, Request $request): array
+    {
+        if (! $business instanceof Business) {
+            return [];
+        }
+
+        /** @var User $owner */
+        $owner = $request->user();
+        $step = app(DescribeShippingStep::class)->handle($business, $owner);
+        unset($step['order']);
+
+        return ['kit' => $step];
+    }
+
+    private function logoUrl(Business $business): ?string
+    {
+        $path = $business->organization->logo_path;
+
+        return $path === null ? null : Storage::disk('public')->url($path);
+    }
+
+    /** @return array<string, mixed> */
     private function logoProps(?Business $business): array
     {
-        $path = $business?->organization->logo_path;
-
-        return ['logoUrl' => $path === null ? null : Storage::disk('public')->url($path)];
+        return ['logoUrl' => $business instanceof Business ? $this->logoUrl($business) : null];
     }
 }

@@ -23,8 +23,9 @@ class ListBusinesses extends ListRecords
     public function getTabs(): array
     {
         return [
-            'queue' => $this->status(__('Verification queue'), BusinessStatus::Pending)
-                ->badge(Business::query()->unarchived()->where('status', BusinessStatus::Pending)->count() ?: null),
+            // Only businesses that finished setup (CHW-31): one still in the onboarding wizard has nothing to verify yet.
+            'queue' => $this->status(__('Verification queue'), BusinessStatus::Pending, setUpOnly: true)
+                ->badge(Business::query()->unarchived()->where('status', BusinessStatus::Pending)->whereNotNull('onboarded_at')->count() ?: null),
             'verified' => $this->status(__('Verified'), BusinessStatus::Verified),
             'suspended' => $this->status(__('Suspended'), BusinessStatus::Suspended),
             'all' => Tab::make(__('All')),
@@ -36,10 +37,10 @@ class ListBusinesses extends ListRecords
         return 'queue';
     }
 
-    private function status(string $label, BusinessStatus $status): Tab
+    private function status(string $label, BusinessStatus $status, bool $setUpOnly = false): Tab
     {
-        return Tab::make($label)->modifyQueryUsing(function (TenantBuilder $query) use ($status): void {
-            $this->unarchived($query)->where('status', $status);
+        return Tab::make($label)->modifyQueryUsing(function (TenantBuilder $query) use ($status, $setUpOnly): void {
+            $this->unarchived($query)->where('status', $status)->when($setUpOnly, fn (TenantBuilder $setUp) => $setUp->whereNotNull('onboarded_at'));
         });
     }
 
