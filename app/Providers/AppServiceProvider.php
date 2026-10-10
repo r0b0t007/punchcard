@@ -195,6 +195,16 @@ class AppServiceProvider extends ServiceProvider
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
 
+        // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
+        // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
+        // generous cap per client address all the same.
+        RateLimiter::for('join-page', fn (Request $request): array => [
+            Limit::perMinute(60)->by('join-page:session:'.($request->hasSession() ? $request->session()->getId() : ClientAddress::rateLimitKey($request->ip()))),
+            Limit::perMinute(600)->by('join-page:address:'.ClientAddress::rateLimitKey($request->ip())),
+        ]);
+        // Adding a card from a join page (CHW-31): a few a minute per customer.
+        RateLimiter::for('join', fn (Request $request): Limit => Limit::perMinute(10)->by('join:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
         // The redeem screen polls every 2 s (C4, CHW-26): its own limit per customer and reward, so
         // the polling never uses up another route's (a bare throttle:N,M shares one per-user counter).
         RateLimiter::for('reward-screen', fn (Request $request): Limit => Limit::perMinute(90)

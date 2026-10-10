@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use LogicException;
 
 /**
@@ -154,6 +155,12 @@ class Organization extends Model implements TenantModel
             ->using(OrganizationMember::class)
             ->withPivot('id', 'role')
             ->withTimestamps();
+    }
+
+    /** The logo's public URL (UpdateLogo stores it on the public disk); null without one. */
+    public function logoUrl(): ?string
+    {
+        return $this->logo_path === null ? null : Storage::disk('public')->url($this->logo_path);
     }
 
     /**

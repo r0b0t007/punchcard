@@ -20,7 +20,10 @@ void createInertiaApp({
                 name.startsWith('dev/') ||
                 name.startsWith('tap/') ||
                 // The customer's reward screens: full screen, like the tap screens (CHW-26).
-                name.startsWith('rewards/'):
+                name.startsWith('rewards/') ||
+                // The join page and the printable QR stand (CHW-31): full screen.
+                name.startsWith('join/') ||
+                name === 'business/qr-stand':
                 return I18nLayout;
             case name.startsWith('auth/'):
                 return [I18nLayout, AuthLayout];

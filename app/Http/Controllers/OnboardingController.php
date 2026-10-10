@@ -27,7 +27,6 @@ use App\Models\User;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -229,7 +228,7 @@ final class OnboardingController extends Controller
 
         return [
             'businessName' => $business->name,
-            'logoUrl' => $this->logoUrl($business),
+            'logoUrl' => $business->organization->logoUrl(),
             'brandColor' => $business->organization->brand_color,
             'card' => ['rewardText' => $step['rewardText'], 'stampsRequired' => $step['stampsRequired']],
         ];
@@ -250,16 +249,9 @@ final class OnboardingController extends Controller
         return ['kit' => $step];
     }
 
-    private function logoUrl(Business $business): ?string
-    {
-        $path = $business->organization->logo_path;
-
-        return $path === null ? null : Storage::disk('public')->url($path);
-    }
-
     /** @return array<string, mixed> */
     private function logoProps(?Business $business): array
     {
-        return ['logoUrl' => $business instanceof Business ? $this->logoUrl($business) : null];
+        return ['logoUrl' => $business?->organization->logoUrl()];
     }
 }

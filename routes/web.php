@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\BusinessRegistrationController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
@@ -23,9 +26,24 @@ Route::middleware('guest')->group(function (): void {
     Route::post('business/register', [BusinessRegistrationController::class, 'store'])->middleware('throttle:business-signup')->name('business.register.store');
 });
 
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'tenant'])->group(function (): void {
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
-    Route::inertia('dashboard', 'dashboard')->middleware(RedirectToOnboarding::class)->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
+    // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
+    Route::middleware(RedirectToOnboarding::class)->group(function (): void {
+        Route::get('business/qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');
+        Route::post('business/qr-stand/printed', [QrStandController::class, 'printed'])->name('business.qr-stand.printed');
+    });
+});
+
+// The join page (CHW-31): the QR stand's link, public; adding the card takes a signed-in customer. Never cached.
+Route::middleware(NeverCache::class)->group(function (): void {
+    Route::get('j/{slug}', [JoinController::class, 'show'])->middleware('throttle:join-page')->name('join.show');
+    Route::middleware(['guest', 'throttle:join-page'])->group(function (): void {
+        Route::get('j/{slug}/register', [JoinController::class, 'register'])->name('join.register');
+        Route::get('j/{slug}/login', [JoinController::class, 'login'])->name('join.login');
+    });
+    Route::post('j/{slug}', [JoinController::class, 'store'])->middleware(['auth', 'throttle:join'])->name('join.store');
 });
 
 // The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
