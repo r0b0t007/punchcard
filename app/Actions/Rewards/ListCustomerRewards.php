@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Rewards;
 
 use App\Enums\RewardStatus;
+use App\Models\CardEnrollment;
 use App\Models\Location;
+use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\StampEvent;
@@ -34,11 +36,14 @@ final readonly class ListCustomerRewards
                 ->where('status', RewardStatus::Available)
                 ->latest('unlocked_at')
                 ->latest('id')
-                ->get(['id', 'organization_id', 'reward_text', 'unlocked_at', 'stamp_event_id']);
+                ->get(['id', 'organization_id', 'enrollment_id', 'reward_text', 'unlocked_at', 'stamp_event_id']);
             $organizations = Organization::query()
                 ->whereKey($rewards->pluck('organization_id')->unique()->all())
                 ->get(['id', 'name', 'brand_color'])
                 ->keyBy('id');
+            // The card's own colour, else its organization's (ADR 0007, CHW-32).
+            $cardOf = CardEnrollment::query()->whereKey($rewards->pluck('enrollment_id')->unique()->all())->pluck('card_id', 'id');
+            $cards = LoyaltyCard::query()->whereKey($cardOf->unique()->all())->get(['id', 'colors'])->keyBy('id');
             // The day it was unlocked where it was: the location of the stamp that unlocked it.
             $locationOf = StampEvent::query()
                 ->whereKey($rewards->pluck('stamp_event_id')->filter()->all())
@@ -49,7 +54,7 @@ final readonly class ListCustomerRewards
                 'id' => $reward->id,
                 'rewardText' => $reward->reward_text,
                 'businessName' => $organizations->get($reward->organization_id)->name ?? '',
-                'brandColor' => $organizations->get($reward->organization_id)?->brand_color,
+                'brandColor' => $cards->get($cardOf->get($reward->enrollment_id))?->brandColor() ?? $organizations->get($reward->organization_id)?->brand_color,
                 'unlockedOn' => $reward->unlocked_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($locationOf->get($reward->stamp_event_id))))->format('Y-m-d'),
             ])->all());
         });

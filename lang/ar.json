@@ -472,5 +472,21 @@
     "Progressive": "تدريجية",
     "Free item": "منتج مجاني",
     "% off": "% خصم",
-    "Fixed amount": "مبلغ ثابت"
+    "Fixed amount": "مبلغ ثابت",
+    "Cards": "البطاقات",
+    "Your head office manages these cards. Ask them to change one.": "يدير مقرك الرئيسي هذه البطاقات. اطلب منه تعديل إحداها.",
+    "No cards yet.": "لا توجد بطاقات بعد.",
+    ":reward every :count stamps": ":reward كل :count طوابع",
+    ":mode, up to :count stamps": ":mode، حتى :count طابعًا",
+    "Running": "نشطة",
+    "Paused": "متوقفة",
+    "New customers get this card": "يحصل العملاء الجدد على هذه البطاقة",
+    "Customers hold it": "لدى عملاء هذه البطاقة",
+    "Honoured at :businesses": "مقبولة في :businesses",
+    "Pause": "إيقاف مؤقت",
+    "Publish": "نشر",
+    "The last tier needs at least 5 stamps.": "يحتاج المستوى الأخير إلى 5 طوابع على الأقل.",
+    "Customers hold this card: its stamps can be lowered, never raised. Start a new card instead.": "لدى عملاء هذه البطاقة: يمكن تقليل طوابعها، لا زيادتها أبدًا. أنشئ بطاقة جديدة بدلًا من ذلك.",
+    "Pause the only card running at :businesses?": "إيقاف البطاقة الوحيدة النشطة في :businesses مؤقتًا؟",
+    "Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.": "سيتم رفض النقرات هناك ولن يتمكن أحد من الانضمام حتى تعمل بطاقة هناك من جديد. تبقى الطوابع المجمعة عليها."
 }

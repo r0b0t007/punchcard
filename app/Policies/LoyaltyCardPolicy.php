@@ -23,6 +23,16 @@ final class LoyaltyCardPolicy
 {
     use ReadsProgram;
 
+    /** The cards page (B7): whoever runs the program, or the business being worked in (a franchisee's owner, read only). */
+    public function viewAny(): bool
+    {
+        $organizationId = $this->tenant()->organizationId();
+        $businessId = $this->tenant()->businessId();
+
+        return $organizationId !== null
+            && ($this->actsFor($organizationId) || ($businessId !== null && $this->runs($organizationId, $businessId)));
+    }
+
     public function view(User $user, LoyaltyCard $card): bool
     {
         $businessId = $this->tenant()->businessId();

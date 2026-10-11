@@ -472,5 +472,21 @@
     "Progressive": "Progressive",
     "Free item": "Article offert",
     "% off": "% de remise",
-    "Fixed amount": "Montant fixe"
+    "Fixed amount": "Montant fixe",
+    "Cards": "Cartes",
+    "Your head office manages these cards. Ask them to change one.": "Votre siège gère ces cartes. Demandez-lui pour en modifier une.",
+    "No cards yet.": "Pas encore de carte.",
+    ":reward every :count stamps": ":reward tous les :count tampons",
+    ":mode, up to :count stamps": ":mode, jusqu'à :count tampons",
+    "Running": "En cours",
+    "Paused": "En pause",
+    "New customers get this card": "Les nouveaux clients reçoivent cette carte",
+    "Customers hold it": "Des clients l'ont",
+    "Honoured at :businesses": "Acceptée chez :businesses",
+    "Pause": "Mettre en pause",
+    "Publish": "Publier",
+    "The last tier needs at least 5 stamps.": "Le dernier palier demande au moins 5 tampons.",
+    "Customers hold this card: its stamps can be lowered, never raised. Start a new card instead.": "Des clients ont cette carte : ses tampons peuvent baisser, jamais augmenter. Créez plutôt une nouvelle carte.",
+    "Pause the only card running at :businesses?": "Mettre en pause la seule carte en cours à :businesses ?",
+    "Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.": "Les taps y seront refusés et personne ne pourra rejoindre tant qu’aucune carte n’y sera en cours. Les tampons déjà collectés restent dessus."
 }

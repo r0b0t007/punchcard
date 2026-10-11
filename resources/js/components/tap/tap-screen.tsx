@@ -12,6 +12,8 @@ export type TapCard = {
     stampsCollected: number;
     rewardText: string;
     brandColor: string | null;
+    /** The text colour the card stores for its own brand colour (CHW-32). */
+    brandForeground?: string | null;
     stampStyle: StampStyle | null;
 };
 
@@ -47,6 +49,7 @@ export function TapCafe({ card }: { card: TapCard }) {
             <BrandMonogram
                 name={card.businessName}
                 brandColor={card.brandColor}
+                brandForeground={card.brandForeground}
                 className="size-13 text-3xl ring-1 ring-border"
             />
             <div className="min-w-0">
@@ -79,6 +82,7 @@ export function TapLoyaltyCard({
             stampsCollected={card.stampsCollected}
             rewardText={card.rewardText}
             brandColor={card.brandColor}
+            brandForeground={card.brandForeground}
             stampStyle={card.stampStyle ?? undefined}
             {...states}
         />

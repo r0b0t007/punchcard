@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\LoyaltyCard;
 use App\Support\Locales;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -44,6 +45,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+            ],
+            // What the sidebar offers in the tenant being worked in: the cards page to whoever runs the program or the business (CHW-32).
+            'nav' => fn (): array => [
+                'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,

@@ -8,6 +8,7 @@ use App\Enums\CardMode;
 use App\Enums\RewardType;
 use App\Models\Concerns\ChangedOnlyByOrgAdmin;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Branding\Contrast;
 use App\Support\Cards\ProgressiveTiers;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
@@ -201,6 +202,22 @@ class LoyaltyCard extends Model implements TenantModel
             ->orderBy('id');
     }
 
+    /** The card's own brand colour (CHW-32), or null: it then shows its organization's (ADR 0007). */
+    public function brandColor(): ?string
+    {
+        $brand = $this->colors['brand'] ?? null;
+
+        return is_string($brand) && Contrast::isHex($brand) ? $brand : null;
+    }
+
+    /** The text colour stored for the card's own brand colour (SaveCard), or null with no colour of its own. */
+    public function brandForeground(): ?string
+    {
+        $foreground = $this->colors['foreground'] ?? null;
+
+        return $this->brandColor() !== null && is_string($foreground) && Contrast::isHex($foreground) ? $foreground : null;
+    }
+
     /**
      * The customers holding the card.
      *
@@ -224,6 +241,17 @@ class LoyaltyCard extends Model implements TenantModel
             ->using(CardBusiness::class)
             ->withPivot('id', 'organization_id')
             ->withTimestamps();
+    }
+
+    /**
+     * The businesses honouring the card that still operate
+     * (Business::operating), by name: the cards page lists them (CHW-32).
+     *
+     * @return BelongsToMany<Business, $this, CardBusiness>
+     */
+    public function operatingBusinesses(): BelongsToMany
+    {
+        return $this->businesses()->operating()->orderBy('name');
     }
 
     /**

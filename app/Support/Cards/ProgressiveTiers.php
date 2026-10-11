@@ -18,7 +18,7 @@ final class ProgressiveTiers
      * The tiers, lowest first; throws when they are malformed. Takes the cast
      * array or the stored JSON.
      *
-     * @return list<array{stamps: int, reward: string}>
+     * @return non-empty-list<array{stamps: int, reward: string}>
      */
     public static function parse(mixed $tiers): array
     {
