@@ -22,14 +22,15 @@ final class LocalMoment
     }
 
     /**
+     * @param  CarbonInterface|null  $now  the moment "today" is told against: the clock, unless the caller reads at another moment
      * @return array{day: 'today'|'other', date: string, time: string}
      */
-    public static function of(CarbonInterface $at, string $timezone): array
+    public static function of(CarbonInterface $at, string $timezone, ?CarbonInterface $now = null): array
     {
         $local = $at->copy()->setTimezone($timezone);
 
         return [
-            'day' => $local->isSameDay(now($timezone)) ? 'today' : 'other',
+            'day' => $local->isSameDay(($now ?? now())->copy()->setTimezone($timezone)) ? 'today' : 'other',
             'date' => $local->format('Y-m-d'),
             'time' => $local->format('H:i'),
         ];

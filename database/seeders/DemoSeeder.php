@@ -408,6 +408,11 @@ final class DemoSeeder extends Seeder
      */
     private function users(int $count): array
     {
+        // range(1, 0) is [1, 0]: no one is no one.
+        if ($count < 1) {
+            return [];
+        }
+
         return array_map(fn (): User => $this->user($this->faker->name(), $this->faker->unique()->safeEmail()), range(1, $count));
     }
 }

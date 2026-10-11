@@ -1,5 +1,6 @@
 import type { DashboardStats } from '@/components/dashboard/types';
 import { useTranslation } from '@/hooks/use-translation';
+import { calendarDate } from '@/lib/local-moment';
 
 /** Bar width and gap in the chart's own units: 30 bars fill 300. */
 const STEP = 10;
@@ -16,14 +17,8 @@ export default function VisitsChart({
 }) {
     const { t, locale } = useTranslation();
     const highest = Math.max(1, ...days.map((day) => day.visits));
-    // A calendar date: format it in UTC so no timezone shifts the day.
-    const format = new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'short',
-        timeZone: 'UTC',
-    });
     const dateOf = (date: string) =>
-        format.format(new Date(`${date}T00:00:00Z`));
+        calendarDate(locale, date, { day: 'numeric', month: 'short' });
     const visitsOn = (day: DashboardStats['visitsPerDay'][number]) =>
         t(':count visit on :date|:count visits on :date', {
             date: dateOf(day.date),

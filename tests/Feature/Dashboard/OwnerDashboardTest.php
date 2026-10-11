@@ -246,6 +246,26 @@ it('counts only the business it is asked for, even read at the organization leve
         ->and($stats['recentStamps'])->toHaveCount(1);
 });
 
+it('keeps the business\'s days once all its locations are archived', function (): void {
+    $customer = ($this->customer)($this->tenants->cardB);
+    // 11 Oct 00:30 local (UTC+1), still 10 Oct in UTC.
+    ($this->stampAt)($customer, $this->tenants->b1, '2026-10-10 23:30:00');
+    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->b1)->forceFill(['archived_at' => now()])->save());
+
+    expect(($this->stats)($this->tenants->b1)['visitsPerDay'][29])->toBe(['date' => '2026-10-11', 'visits' => 1]);
+});
+
+it('says "today" against the moment it is asked for, not the clock', function (): void {
+    $customer = ($this->customer)($this->tenants->cardB);
+    ($this->stampAt)($customer, $this->tenants->b1, '2026-10-01 10:00:00');
+    $this->context->set($this->context->bypass(fn () => $this->tenants->orgB->fresh()), $this->tenants->b1, orgAdmin: true);
+
+    $stats = app(DescribeDashboard::class)->handle($this->tenants->b1, null, CarbonImmutable::parse('2026-10-01 18:00:00', 'UTC'));
+
+    expect($stats['recentStamps'][0]['at']['day'])->toBe('today')
+        ->and($stats['visitsPerDay'][29])->toBe(['date' => '2026-10-01', 'visits' => 1]);
+});
+
 it('shows staff no figures, and HQ at the organization level a note instead', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1);
     $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);

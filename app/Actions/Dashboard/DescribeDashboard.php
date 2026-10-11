@@ -34,9 +34,13 @@ use Carbon\CarbonImmutable;
  *
  * Only this business's events count, so a franchisee never sees its
  * sibling's customers (ADR 0006): rewards are filtered on where they were
- * redeemed, as an org admin's reward scope spans the organization. A fixed
- * number of queries, however many stamps: the days are counted in PHP from
- * the ordered events against local midnights, with no date per row.
+ * redeemed, as an org admin's reward scope spans the organization.
+ *
+ * A fixed number of queries, however many stamps: the days are counted in
+ * PHP from the ordered events against local midnights, with no date per row.
+ * The window's presence stamps are plucked twice and read once more as a
+ * subquery: the tenant guards allow neither toBase() nor a raw join, and
+ * plucking skips loading thousands of models.
  */
 final readonly class DescribeDashboard
 {
@@ -59,7 +63,9 @@ final readonly class DescribeDashboard
     {
         $locations = Location::query()->where('business_id', $business->id)->open()->orderBy('id')->get(['id', 'name', 'timezone']);
         $location = $locations->firstWhere('id', $locationId);
-        $timezone = LocalMoment::timezoneOf($location ?? $locations->first());
+        // With every location archived, the business keeps its days: its first location's, archived or not.
+        $timezone = LocalMoment::timezoneOf($location ?? $locations->first()
+            ?? Location::query()->where('business_id', $business->id)->orderBy('id')->first(['id', 'timezone']));
         $today = $now->setTimezone($timezone)->startOfDay();
         // Local midnights as stored UTC times: day $k runs from $midnights[$k] to $midnights[$k + 1]; days 0 to 29 are the previous window.
         $midnights = array_map(fn (int $day): string => $today->addDays($day)->utc()->format('Y-m-d H:i:s'), range(1 - 2 * self::DAYS, 1));
@@ -82,7 +88,7 @@ final readonly class DescribeDashboard
                 'date' => $today->addDays($day - self::DAYS + 1)->format('Y-m-d'),
                 'visits' => $current['perDay'][$day] ?? 0,
             ], range(0, self::DAYS - 1)),
-            'recentStamps' => $this->recentStamps($business, $location?->id),
+            'recentStamps' => $this->recentStamps($business, $location?->id, $now),
             'topCustomers' => $this->topCustomers($visits, $timezone),
             'locations' => array_values($locations->map(fn (Location $open): array => ['id' => $open->id, 'name' => $open->name])->all()),
             'location' => $location?->id,
@@ -196,7 +202,7 @@ final readonly class DescribeDashboard
      *
      * @return list<array{id: int, customer: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>
      */
-    private function recentStamps(Business $business, ?int $locationId): array
+    private function recentStamps(Business $business, ?int $locationId, CarbonImmutable $now): array
     {
         return array_values(StampEvent::query()
             ->where('business_id', $business->id)
@@ -213,7 +219,7 @@ final readonly class DescribeDashboard
                 'source' => $event->source->value,
                 'sourceLabel' => $event->source->getLabel(),
                 'qty' => $event->qty,
-                'at' => LocalMoment::of($event->created_at, LocalMoment::timezoneOf($event->location)),
+                'at' => LocalMoment::of($event->created_at, LocalMoment::timezoneOf($event->location), $now),
             ])
             ->all());
     }

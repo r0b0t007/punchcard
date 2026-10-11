@@ -1,6 +1,6 @@
 import type { DashboardStats } from '@/components/dashboard/types';
 import { useTranslation } from '@/hooks/use-translation';
-import { momentLabel } from '@/lib/local-moment';
+import { calendarDate, momentLabel } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 
 /** The latest stamps here, newest first; a correction shows as a minus. */
@@ -68,12 +68,6 @@ export function TopCustomers({
     customers: DashboardStats['topCustomers'];
 }) {
     const { t, locale } = useTranslation();
-    // A calendar date: format it in UTC so no timezone shifts the day.
-    const format = new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'short',
-        timeZone: 'UTC',
-    });
 
     if (customers.length === 0) {
         return (
@@ -94,9 +88,10 @@ export function TopCustomers({
                         <p className="truncate font-medium">{customer.name}</p>
                         <p className="text-xs text-muted-foreground">
                             {t('Last visit :date', {
-                                date: format.format(
-                                    new Date(`${customer.lastVisit}T00:00:00Z`),
-                                ),
+                                date: calendarDate(locale, customer.lastVisit, {
+                                    day: 'numeric',
+                                    month: 'short',
+                                }),
                             })}
                         </p>
                     </div>

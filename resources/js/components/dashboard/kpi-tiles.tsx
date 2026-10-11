@@ -34,10 +34,27 @@ function numberFormats(locale: string) {
     };
 }
 
+/** Built once per locale: Intl formatters are costly to construct. */
+const numberFormatsByLocale = new Map<
+    string,
+    ReturnType<typeof numberFormats>
+>();
+
+function numberFormatsFor(locale: string): ReturnType<typeof numberFormats> {
+    let formats = numberFormatsByLocale.get(locale);
+
+    if (!formats) {
+        formats = numberFormats(locale);
+        numberFormatsByLocale.set(locale, formats);
+    }
+
+    return formats;
+}
+
 /** B3's KPI tiles: 2 by 2 on a phone, 4 across on a wide screen. */
 export default function KpiTiles({ kpis }: { kpis: DashboardStats['kpis'] }) {
     const { t, locale } = useTranslation();
-    const formats = numberFormats(locale);
+    const formats = numberFormatsFor(locale);
 
     return (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

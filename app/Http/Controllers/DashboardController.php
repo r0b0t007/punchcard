@@ -29,9 +29,10 @@ final class DashboardController extends Controller
         $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
 
         return Inertia::render('dashboard', [
-            // Whoever runs the business (BusinessPolicy::update), as for the QR stand it links to.
-            'checklist' => $business instanceof Business && Gate::allows('update', $business) ? $describeChecklist->handle($business) : null,
-            'stats' => $business instanceof Business && Gate::allows('viewStats', $business)
+            // Whoever runs the business (BusinessPolicy::update), as for the QR stand it links to. Closures: the
+            // location filter's partial reload asks for the stats alone.
+            'checklist' => fn (): ?array => $business instanceof Business && Gate::allows('update', $business) ? $describeChecklist->handle($business) : null,
+            'stats' => fn (): ?array => $business instanceof Business && Gate::allows('viewStats', $business)
                 ? $describeDashboard->handle($business, $request->integer('location') ?: null, CarbonImmutable::now())
                 : null,
             'atOrganization' => ! $business instanceof Business && $context->organizationId() !== null,
