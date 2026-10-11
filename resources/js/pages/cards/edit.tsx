@@ -108,14 +108,11 @@ export default function CardsEdit({ card, fields, preview }: Props) {
         stamps_required: String(fields.stamps_required),
         reward_type: fields.reward_type,
         reward_value: rewardValue,
-
         reward_text: fields.reward_text,
-        tiers: fields.tiers.map(
-            (tier): TierField => ({
-                stamps: String(tier.stamps),
-                reward: tier.reward,
-            }),
-        ),
+        tiers: fields.tiers.map((tier): TierField => ({
+            stamps: String(tier.stamps),
+            reward: tier.reward,
+        })),
         brand_color: fields.brand_color,
         stamp_style: fields.stamp_style,
         info: fields.info,
