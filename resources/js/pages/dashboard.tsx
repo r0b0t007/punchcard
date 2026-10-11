@@ -1,36 +1,40 @@
 import { Head } from '@inertiajs/react';
+import OwnerDashboard from '@/components/dashboard/owner-dashboard';
+import type { DashboardStats } from '@/components/dashboard/types';
 import SetupChecklist from '@/components/setup-checklist';
 import type { Checklist } from '@/components/setup-checklist';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import { useTranslation } from '@/hooks/use-translation';
 import { dashboard } from '@/routes';
 
+/**
+ * The dashboard: the setup checklist (CHW-31) and the owner dashboard
+ * (CHW-33, B3 lite) for whoever runs the business. At the organization
+ * level, a note: dashboards are per business until the network view (B18).
+ */
 export default function Dashboard({
     checklist,
+    stats,
+    atOrganization,
 }: {
     checklist: Checklist | null;
+    stats: DashboardStats | null;
+    atOrganization: boolean;
 }) {
     const { t } = useTranslation();
 
     return (
         <>
             <Head title={t('Dashboard')} />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {checklist ? <SetupChecklist checklist={checklist} /> : null}
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full" />
-                    </div>
-                </div>
-                <div className="relative min-h-screen flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-                    <PlaceholderPattern className="absolute inset-0 size-full" />
-                </div>
+                {atOrganization ? (
+                    <p className="text-sm text-muted-foreground">
+                        {t(
+                            'Each business has its own dashboard. A view of your whole network is coming.',
+                        )}
+                    </p>
+                ) : null}
+                {stats ? <OwnerDashboard stats={stats} /> : null}
             </div>
         </>
     );

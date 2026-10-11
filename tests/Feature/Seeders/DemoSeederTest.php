@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoSeeder;
+use Database\Seeders\DemoVolumeSeeder;
 
 /*
 |--------------------------------------------------------------------------
@@ -216,4 +217,19 @@ it('seeds only in the local and testing environments', function (string $environ
 
     expect(fn () => app($seeder)->run())->toThrow(RuntimeException::class, 'only in the local and testing environments')
         ->and(User::query()->count())->toBe(0);
-})->with(['production', 'staging', 'prod'])->with([DemoSeeder::class, DatabaseSeeder::class]);
+})->with(['production', 'staging', 'prod'])->with([DemoSeeder::class, DatabaseSeeder::class, DemoVolumeSeeder::class]);
+
+it('gives the café more customers when asked, to measure the dashboard\'s speed', function (): void {
+    app(DemoSeeder::class)->run(cafeCustomers: 24);
+
+    $enrollments = app(TenantContext::class)->bypass(fn (): int => CardEnrollment::query()
+        ->whereIn('card_id', LoyaltyCard::query()->whereIn('organization_id', Organization::query()->where('slug', 'cafe-hafa')->select('id'))->select('id'))
+        ->count());
+
+    expect($enrollments)->toBe(24);
+});
+
+it('refuses a café without its demo customer', function (): void {
+    expect(fn () => app(DemoSeeder::class)->run(cafeCustomers: 0))->toThrow(InvalidArgumentException::class)
+        ->and(User::query()->count())->toBe(0);
+});
