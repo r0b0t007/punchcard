@@ -227,6 +227,53 @@ it('lists the organization\'s cards for whoever runs it, marking held ones and t
             ->where('cards.2.active', false)
             ->where('cards.2.held', false)
             ->where('cards.2.forNewCustomers', false));
+
+    ($this->inB1)()->patch(route('cards.status', $this->tenants->cardB->id), ['active' => false]);
+    ($this->inB1)()->patch(route('cards.status', $newer->id), ['active' => false]);
+    // With no card running, none is marked: taps are refused.
+    ($this->inB1)()->get(route('cards.index'))
+        ->assertInertia(fn ($page) => $page->where('cards.0.forNewCustomers', false)
+            ->where('cards.1.forNewCustomers', false)
+            ->where('cards.2.forNewCustomers', false));
+});
+
+it('names the businesses where a card is the only one running, among those still operating', function (): void {
+    $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $inOrgA = fn () => ($this->as)($hq, 'org:'.$this->tenants->orgA->id);
+    // A3 honoured the card, then closed.
+    $this->context->bypass(function (): void {
+        $a3 = Business::factory()->for($this->tenants->orgA)->create(['name' => 'A3']);
+        $this->tenants->cardA->businesses()->attach($a3->id);
+        $a3->forceFill(['archived_at' => now()])->save();
+    });
+    $atA2 = $this->context->bypass(function (): LoyaltyCard {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create(['name' => 'A2 only']);
+        $card->businesses()->attach($this->tenants->a2->id);
+
+        return $card;
+    });
+
+    $inOrgA()->get(route('cards.index'))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('cards.0.id', $this->tenants->cardA->id)
+            ->where('cards.0.businesses', ['A1', 'A2'])
+            ->where('cards.0.onlyRunningAt', ['A1'])
+            ->where('cards.1.id', $atA2->id)
+            ->where('cards.1.onlyRunningAt', []));
+
+    $inOrgA()->patch(route('cards.status', $atA2->id), ['active' => false]);
+    $inOrgA()->get(route('cards.index'))
+        ->assertInertia(fn ($page) => $page->where('cards.0.onlyRunningAt', ['A1', 'A2'])
+            ->where('cards.1.onlyRunningAt', null));
+});
+
+it('shows each card in its own colours, else its organization\'s colour', function (): void {
+    $this->context->bypass(fn () => $this->tenants->orgB->forceFill(['brand_color' => '#112233'])->save());
+    $listed = fn () => ($this->inB1)()->get(route('cards.index'));
+
+    $listed()->assertInertia(fn ($page) => $page->where('cards.0.brandColor', '#112233')->where('cards.0.brandForeground', null));
+
+    $this->context->bypass(fn () => LoyaltyCard::query()->findOrFail($this->tenants->cardB->id)->forceFill(['colors' => ['brand' => '#0F4C81', 'foreground' => '#FBF6EE']])->save());
+    $listed()->assertInertia(fn ($page) => $page->where('cards.0.brandColor', '#0F4C81')->where('cards.0.brandForeground', '#FBF6EE'));
 });
 
 it('shows a franchisee\'s owner its cards read only, nothing about who holds them; staff get nothing', function (): void {
@@ -273,8 +320,10 @@ it('shows customers the card\'s own brand colour, else the organization\'s', fun
 
     expect(CustomerCard::of($business, $card)['brandColor'])->toBe('#112233');
 
+    expect(CustomerCard::of($business, $card)['brandForeground'])->toBeNull();
+
     $card->colors = ['brand' => '#0F4C81', 'foreground' => '#FBF6EE'];
-    expect(CustomerCard::of($business, $card)['brandColor'])->toBe('#0F4C81');
+    expect(CustomerCard::of($business, $card))->brandColor->toBe('#0F4C81')->brandForeground->toBe('#FBF6EE');
 });
 
 it('offers the cards page in the sidebar to owners and org admins, never to staff', function (): void {

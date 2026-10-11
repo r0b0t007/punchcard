@@ -2,9 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\BusinessRole;
+use App\Models\LoyaltyCard;
 use App\Support\Locales;
-use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -49,7 +48,7 @@ class HandleInertiaRequests extends Middleware
             ],
             // What the sidebar offers in the tenant being worked in: the cards page to whoever runs the program or the business (CHW-32).
             'nav' => fn (): array => [
-                'cards' => app(TenantContext::class)->isOrgAdmin() || app(TenantContext::class)->businessRole() === BusinessRole::Owner,
+                'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,

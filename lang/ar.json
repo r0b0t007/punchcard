@@ -487,6 +487,6 @@
     "Publish": "نشر",
     "The last tier needs at least 5 stamps.": "يحتاج المستوى الأخير إلى 5 طوابع على الأقل.",
     "Customers hold this card: its stamps can be lowered, never raised. Start a new card instead.": "لدى عملاء هذه البطاقة: يمكن تقليل طوابعها، لا زيادتها أبدًا. أنشئ بطاقة جديدة بدلًا من ذلك.",
-    "Pause your only running card?": "إيقاف بطاقتك النشطة الوحيدة مؤقتًا؟",
-    "Taps will be refused and nobody can join until you publish a card again. Stamps already collected stay on it.": "سيتم رفض النقرات ولن يتمكن أحد من الانضمام حتى تنشر بطاقة من جديد. تبقى الطوابع المجمعة عليها."
+    "Pause the only card running at :businesses?": "إيقاف البطاقة الوحيدة النشطة في :businesses مؤقتًا؟",
+    "Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.": "سيتم رفض النقرات هناك ولن يتمكن أحد من الانضمام حتى تعمل بطاقة هناك من جديد. تبقى الطوابع المجمعة عليها."
 }

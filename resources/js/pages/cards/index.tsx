@@ -31,8 +31,10 @@ type CardRow = {
     stampsRequired: number;
     active: boolean;
     brandColor: string | null;
+    brandForeground: string | null;
     held: boolean | null;
     businesses: string[] | null;
+    onlyRunningAt: string[] | null;
     forNewCustomers: boolean;
 };
 
@@ -70,15 +72,7 @@ export default function CardsIndex({
                     <ul className="grid gap-4 md:grid-cols-2">
                         {cards.map((card) => (
                             <li key={card.id}>
-                                <CardItem
-                                    card={card}
-                                    canManage={canManage}
-                                    lastRunning={
-                                        card.active &&
-                                        cards.filter((other) => other.active)
-                                            .length === 1
-                                    }
-                                />
+                                <CardItem card={card} canManage={canManage} />
                             </li>
                         ))}
                     </ul>
@@ -88,15 +82,7 @@ export default function CardsIndex({
     );
 }
 
-function CardItem({
-    card,
-    canManage,
-    lastRunning,
-}: {
-    card: CardRow;
-    canManage: boolean;
-    lastRunning: boolean;
-}) {
+function CardItem({ card, canManage }: { card: CardRow; canManage: boolean }) {
     const { t } = useTranslation();
     const setActive = (active: boolean) =>
         router.patch(status.url(card.id), { active }, { preserveScroll: true });
@@ -108,6 +94,7 @@ function CardItem({
                     <BrandMonogram
                         name={card.name}
                         brandColor={card.brandColor}
+                        brandForeground={card.brandForeground}
                         className="size-10 text-sm"
                     />
                     <div className="flex min-w-0 flex-col gap-1">
@@ -155,8 +142,8 @@ function CardItem({
                                 })}
                             </p>
                         ) : null}
-                        {lastRunning ? (
-                            // Pausing the last running card stops every tap: ask first.
+                        {card.onlyRunningAt && card.onlyRunningAt.length > 0 ? (
+                            // Pausing the only card running somewhere stops taps there: ask first.
                             <Dialog>
                                 <DialogTrigger asChild>
                                     <Button variant="secondary" size="sm">
@@ -165,11 +152,19 @@ function CardItem({
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogTitle>
-                                        {t('Pause your only running card?')}
+                                        {t(
+                                            'Pause the only card running at :businesses?',
+                                            {
+                                                businesses:
+                                                    card.onlyRunningAt.join(
+                                                        ', ',
+                                                    ),
+                                            },
+                                        )}
                                     </DialogTitle>
                                     <DialogDescription>
                                         {t(
-                                            'Taps will be refused and nobody can join until you publish a card again. Stamps already collected stay on it.',
+                                            'Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.',
                                         )}
                                     </DialogDescription>
                                     <DialogFooter>

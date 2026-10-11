@@ -487,6 +487,6 @@
     "Publish": "Publier",
     "The last tier needs at least 5 stamps.": "Le dernier palier demande au moins 5 tampons.",
     "Customers hold this card: its stamps can be lowered, never raised. Start a new card instead.": "Des clients ont cette carte : ses tampons peuvent baisser, jamais augmenter. Créez plutôt une nouvelle carte.",
-    "Pause your only running card?": "Mettre en pause votre seule carte en cours ?",
-    "Taps will be refused and nobody can join until you publish a card again. Stamps already collected stay on it.": "Les taps seront refusés et personne ne pourra rejoindre tant que vous ne publierez pas de carte. Les tampons déjà collectés restent dessus."
+    "Pause the only card running at :businesses?": "Mettre en pause la seule carte en cours à :businesses ?",
+    "Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.": "Les taps y seront refusés et personne ne pourra rejoindre tant qu’aucune carte n’y sera en cours. Les tampons déjà collectés restent dessus."
 }

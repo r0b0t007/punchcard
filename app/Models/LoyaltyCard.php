@@ -24,7 +24,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 use LogicException;
 
 /**
@@ -211,9 +210,12 @@ class LoyaltyCard extends Model implements TenantModel
         return is_string($brand) && Contrast::isHex($brand) ? $brand : null;
     }
 
-    public function bannerUrl(): ?string
+    /** The text colour stored for the card's own brand colour (SaveCard), or null with no colour of its own. */
+    public function brandForeground(): ?string
     {
-        return $this->banner_path === null ? null : Storage::disk('public')->url($this->banner_path);
+        $foreground = $this->colors['foreground'] ?? null;
+
+        return $this->brandColor() !== null && is_string($foreground) && Contrast::isHex($foreground) ? $foreground : null;
     }
 
     /**
@@ -239,6 +241,17 @@ class LoyaltyCard extends Model implements TenantModel
             ->using(CardBusiness::class)
             ->withPivot('id', 'organization_id')
             ->withTimestamps();
+    }
+
+    /**
+     * The businesses honouring the card that still operate
+     * (Business::operating), by name: the cards page lists them (CHW-32).
+     *
+     * @return BelongsToMany<Business, $this, CardBusiness>
+     */
+    public function operatingBusinesses(): BelongsToMany
+    {
+        return $this->businesses()->operating()->orderBy('name');
     }
 
     /**

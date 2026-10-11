@@ -11,7 +11,6 @@ use App\Actions\Cards\UpdateCardBanner;
 use App\Http\Requests\Cards\CardBannerRequest;
 use App\Http\Requests\Cards\CardRequest;
 use App\Http\Requests\Cards\CardStatusRequest;
-use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Support\Tenancy\TenantContext;
@@ -24,10 +23,10 @@ use Inertia\Response;
 /**
  * The organization's cards (CHW-32): B7, and the card builder's saves.
  *
- * - GET /cards: the cards (ListCards). Whoever runs the program
- *   (LoyaltyCardPolicy::create) manages them; a franchisee's owner
- *   (BusinessPolicy::update) sees its business's cards, read only; staff
- *   get a 403.
+ * - GET /cards: the cards (ListCards, LoyaltyCardPolicy::viewAny). Whoever
+ *   runs the program (LoyaltyCardPolicy::create) manages them; a
+ *   franchisee's owner sees its business's cards, read only; staff get a
+ *   403.
  * - POST /cards, PUT /cards/{card}: a new card (paused) or the changes
  *   (SaveCard, CardRequest).
  * - PATCH /cards/{card}/status: publish or pause (SetCardActive).
@@ -39,13 +38,10 @@ final class CardController extends Controller
 {
     public function index(TenantContext $context, ListCards $listCards): Response
     {
-        $organization = $context->organizationId() === null ? null : Organization::query()->find($context->organizationId());
-        $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
-        $managesProgram = $organization instanceof Organization && Gate::allows('create', [LoyaltyCard::class, $organization]);
+        Gate::authorize('viewAny', LoyaltyCard::class);
 
-        if (! $managesProgram && (! $business instanceof Business || ! Gate::allows('update', $business))) {
-            abort(403);
-        }
+        $organization = $context->organizationId() === null ? null : Organization::query()->find($context->organizationId());
+        $managesProgram = $organization instanceof Organization && Gate::allows('create', [LoyaltyCard::class, $organization]);
 
         return Inertia::render('cards/index', [
             'cards' => $listCards->handle($managesProgram),

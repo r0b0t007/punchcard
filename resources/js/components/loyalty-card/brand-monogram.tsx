@@ -11,13 +11,15 @@ import { monogramOf } from './monogram';
 export default function BrandMonogram({
     name,
     brandColor,
+    brandForeground,
     className,
 }: {
     name: string;
     brandColor: string | null;
+    brandForeground?: string | null;
     className?: string;
 }) {
-    const { brand, foreground } = cardInks(brandColor);
+    const { brand, foreground } = cardInks(brandColor, brandForeground);
     // Runtime colours enter the UI only as CSS variables (design-tokens skill).
     const brandVariables = {
         '--card-brand': brand,
