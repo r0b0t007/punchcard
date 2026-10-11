@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Cards\DescribeCardBuilder;
 use App\Actions\Cards\ListCards;
 use App\Actions\Cards\SaveCard;
 use App\Actions\Cards\SetCardActive;
@@ -13,6 +14,7 @@ use App\Http\Requests\Cards\CardRequest;
 use App\Http\Requests\Cards\CardStatusRequest;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Support\Branding\Contrast;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
@@ -27,8 +29,11 @@ use Inertia\Response;
  *   runs the program (LoyaltyCardPolicy::create) manages them; a
  *   franchisee's owner sees its business's cards, read only; staff get a
  *   403.
- * - POST /cards, PUT /cards/{card}: a new card (paused) or the changes
- *   (SaveCard, CardRequest).
+ * - GET /cards/create, /cards/{card}/edit: the card builder (B6,
+ *   DescribeCardBuilder), for whoever runs the program.
+ * - POST /cards, PUT /cards/{card}: a new card (paused, unless published)
+ *   or the changes (SaveCard, CardRequest), with a warning when only pure
+ *   white or black text reads on the card's colour (Contrast::isWeak).
  * - PATCH /cards/{card}/status: publish or pause (SetCardActive).
  * - POST /cards/{card}/banner: the card's banner (UpdateCardBanner).
  *
@@ -49,14 +54,28 @@ final class CardController extends Controller
         ]);
     }
 
+    public function create(TenantContext $context, DescribeCardBuilder $describeCardBuilder): Response
+    {
+        $organization = $context->organizationId() === null ? null : Organization::query()->find($context->organizationId());
+        abort_unless($organization instanceof Organization, 403);
+        Gate::authorize('create', [LoyaltyCard::class, $organization]);
+
+        return Inertia::render('cards/edit', $describeCardBuilder->handle($organization, null));
+    }
+
+    public function edit(LoyaltyCard $card, DescribeCardBuilder $describeCardBuilder): Response
+    {
+        Gate::authorize('update', $card);
+
+        return Inertia::render('cards/edit', $describeCardBuilder->handle(Organization::query()->whereKey($card->organization_id)->firstOrFail(), $card));
+    }
+
     public function store(CardRequest $request, SaveCard $saveCard): RedirectResponse
     {
         $organization = $request->organization();
         assert($organization instanceof Organization);
 
-        $saveCard->handle($organization, null, $request->validated());
-
-        return to_route('cards.index');
+        return $this->saved($saveCard->handle($organization, null, $request->validated(), $request->boolean('publish')), $request->boolean('publish'));
     }
 
     public function update(CardRequest $request, LoyaltyCard $card, SaveCard $saveCard): RedirectResponse
@@ -64,9 +83,7 @@ final class CardController extends Controller
         $organization = $request->organization();
         assert($organization instanceof Organization);
 
-        $saveCard->handle($organization, $card, $request->validated());
-
-        return to_route('cards.index');
+        return $this->saved($saveCard->handle($organization, $card, $request->validated(), $request->boolean('publish')), $request->boolean('publish'));
     }
 
     public function status(CardStatusRequest $request, LoyaltyCard $card, SetCardActive $setCardActive): RedirectResponse
@@ -84,5 +101,19 @@ final class CardController extends Controller
         $updateCardBanner->handle($card, $banner);
 
         return back();
+    }
+
+    /** Back to the cards, saying so; a colour only pure white or black reads on gets a warning instead. */
+    private function saved(LoyaltyCard $card, bool $published): RedirectResponse
+    {
+        $brand = $card->brandColor();
+
+        Inertia::flash('toast', $brand !== null && Contrast::isWeak($brand)
+            ? ['type' => 'warning', 'message' => $published
+                ? __('Card published. Only pure white or black text reads on its colour: a darker or lighter shade will look better.')
+                : __('Card saved. Only pure white or black text reads on its colour: a darker or lighter shade will look better.')]
+            : ['type' => 'success', 'message' => $published ? __('Card published.') : __('Card saved.')]);
+
+        return to_route('cards.index');
     }
 }

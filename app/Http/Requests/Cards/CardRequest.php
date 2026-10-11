@@ -23,7 +23,8 @@ use Illuminate\Validation\Validator;
  * a reward). A progressive card takes its stamps and reward from its top
  * tier, which needs 5 to 50 stamps; the other mode's fields the form still
  * holds are left out. Links are http(s) only: they show to
- * customers.
+ * customers. With publish, the card runs once saved ("Publish" in the
+ * builder, not "Save draft").
  */
 class CardRequest extends FormRequest
 {
@@ -78,6 +79,7 @@ class CardRequest extends FormRequest
             'terms' => ['nullable', 'string', 'max:2000'],
             'cooldown_min' => ['required', 'integer', 'between:0,1440'],
             'daily_cap' => ['nullable', 'integer', 'between:1,100'],
+            'publish' => ['sometimes', 'boolean'],
         ];
     }
 

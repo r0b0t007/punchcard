@@ -1,4 +1,5 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Pencil, Plus } from 'lucide-react';
 import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
-import { index, status } from '@/routes/cards';
+import { create, edit, index, status } from '@/routes/cards';
 
 type CardRow = {
     id: number;
@@ -40,8 +41,8 @@ type CardRow = {
 
 /**
  * B7: the organization's cards, running first. Whoever runs the program
- * publishes or pauses them; a franchisee's owner only sees the cards its
- * business honours (HQ manages them).
+ * makes, edits (B6), publishes or pauses them; a franchisee's owner only
+ * sees the cards its business honours (HQ manages them).
  */
 export default function CardsIndex({
     cards,
@@ -56,7 +57,14 @@ export default function CardsIndex({
         <>
             <Head title={t('Cards')} />
             <div className="flex flex-col gap-4 p-4">
-                {canManage ? null : (
+                {canManage ? (
+                    <Button asChild className="self-start">
+                        <Link href={create()}>
+                            <Plus />
+                            {t('New card')}
+                        </Link>
+                    </Button>
+                ) : (
                     <p className="text-sm text-muted-foreground">
                         {t(
                             'Your head office manages these cards. Ask them to change one.',
@@ -142,57 +150,70 @@ function CardItem({ card, canManage }: { card: CardRow; canManage: boolean }) {
                                 })}
                             </p>
                         ) : null}
-                        {card.onlyRunningAt && card.onlyRunningAt.length > 0 ? (
-                            // Pausing the only card running somewhere stops taps there: ask first.
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button variant="secondary" size="sm">
-                                        {t('Pause')}
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogTitle>
-                                        {t(
-                                            'Pause the only card running at :businesses?',
-                                            {
-                                                businesses:
-                                                    card.onlyRunningAt.join(
-                                                        ', ',
-                                                    ),
-                                            },
-                                        )}
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                        {t(
-                                            'Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.',
-                                        )}
-                                    </DialogDescription>
-                                    <DialogFooter>
-                                        <DialogClose asChild>
-                                            <Button variant="secondary">
-                                                {t('Cancel')}
-                                            </Button>
-                                        </DialogClose>
-                                        <DialogClose asChild>
-                                            <Button
-                                                variant="destructive"
-                                                onClick={() => setActive(false)}
-                                            >
-                                                {t('Pause')}
-                                            </Button>
-                                        </DialogClose>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                        ) : (
-                            <Button
-                                variant={card.active ? 'secondary' : 'default'}
-                                size="sm"
-                                onClick={() => setActive(!card.active)}
-                            >
-                                {card.active ? t('Pause') : t('Publish')}
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={edit(card.id)}>
+                                    <Pencil />
+                                    {t('Edit')}
+                                </Link>
                             </Button>
-                        )}
+                            {card.onlyRunningAt &&
+                            card.onlyRunningAt.length > 0 ? (
+                                // Pausing the only card running somewhere stops taps there: ask first.
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="secondary" size="sm">
+                                            {t('Pause')}
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogTitle>
+                                            {t(
+                                                'Pause the only card running at :businesses?',
+                                                {
+                                                    businesses:
+                                                        card.onlyRunningAt.join(
+                                                            ', ',
+                                                        ),
+                                                },
+                                            )}
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            {t(
+                                                'Taps there will be refused and nobody can join until a card runs there again. Stamps already collected stay on it.',
+                                            )}
+                                        </DialogDescription>
+                                        <DialogFooter>
+                                            <DialogClose asChild>
+                                                <Button variant="secondary">
+                                                    {t('Cancel')}
+                                                </Button>
+                                            </DialogClose>
+                                            <DialogClose asChild>
+                                                <Button
+                                                    variant="destructive"
+                                                    onClick={() =>
+                                                        setActive(false)
+                                                    }
+                                                >
+                                                    {t('Pause')}
+                                                </Button>
+                                            </DialogClose>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            ) : (
+                                <Button
+                                    variant={
+                                        card.active ? 'secondary' : 'default'
+                                    }
+                                    size="sm"
+                                    onClick={() => setActive(!card.active)}
+                                >
+                                    {card.active ? t('Pause') : t('Publish')}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </CardFooter>
             ) : null}

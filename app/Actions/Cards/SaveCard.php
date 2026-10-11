@@ -24,7 +24,8 @@ use Illuminate\Validation\ValidationException;
  * - A brand colour is stored with the text colour that reads on it
  *   (Contrast, ADR 0007); without one, the card shows the organization's.
  * - A new card starts paused, a draft, honoured by every operating business
- *   of the organization: publishing it (SetCardActive) offers it there.
+ *   of the organization: publishing it ($publish, or SetCardActive later)
+ *   offers it there. Saving never pauses a running card.
  * - Once customers hold the card, its mode and tiers are fixed and its
  *   stamps count only goes down (LoyaltyCard's guard): the form gets the
  *   reason instead of an error. The card is locked first, so a first
@@ -39,13 +40,17 @@ final readonly class SaveCard
     /**
      * @param  array<string, mixed>  $fields  CardRequest::validated()
      */
-    public function handle(Organization $organization, ?LoyaltyCard $card, array $fields): LoyaltyCard
+    public function handle(Organization $organization, ?LoyaltyCard $card, array $fields, bool $publish = false): LoyaltyCard
     {
         $attributes = $this->attributes($fields);
 
+        if ($publish) {
+            $attributes['active'] = true;
+        }
+
         return DB::transaction(function () use ($organization, $card, $attributes): LoyaltyCard {
             if (! $card instanceof LoyaltyCard) {
-                $card = (new LoyaltyCard)->forceFill([...$attributes, 'organization_id' => $organization->id, 'active' => false]);
+                $card = (new LoyaltyCard)->forceFill(['active' => false, ...$attributes, 'organization_id' => $organization->id]);
                 $card->save();
 
                 $businesses = $this->context->bypass(fn (): array => Business::query()

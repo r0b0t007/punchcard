@@ -10,3 +10,12 @@ export function cn(...inputs: ClassValue[]) {
 export function toUrl(url: NonNullable<InertiaLinkProps['href']>): string {
     return typeof url === 'string' ? url : url.url;
 }
+
+/**
+ * dir for a field people type in, either script: auto once it holds text,
+ * else the page's own direction, so an empty field and its placeholder
+ * follow an Arabic page (auto reads an empty field as left to right).
+ */
+export function typedDir(value: string): 'auto' | undefined {
+    return value === '' ? undefined : 'auto';
+}
