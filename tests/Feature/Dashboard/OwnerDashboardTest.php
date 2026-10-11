@@ -34,10 +34,12 @@ use Tests\Support\Tenants;
 
 beforeEach(function (): void {
     app()->setLocale('en');
-    // 12:00 in Casablanca (UTC+1): the window is 12 Sept 00:00 to now, local.
+    // 12:00 local: the window is 12 Sept 00:00 to now. The sites keep UTC+1 all year (Africa/Lagos): Morocco's
+    // own offsets move with each tz database release (2026.3 puts Casablanca at UTC+0 in October 2026).
     $this->travelTo(CarbonImmutable::parse('2026-10-11 11:00:00', 'UTC'));
     $this->tenants = Tenants::make();
     $this->context = app(TenantContext::class);
+    $this->context->bypass(fn () => Location::query()->update(['timezone' => 'Africa/Lagos']));
     $this->as = fn (User $user, string $tenant) => $this->actingAs($user)->withSession([SetTenant::SESSION_KEY => $tenant]);
     $this->owner = $this->tenants->admin($this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner), $this->tenants->orgB);
     $this->customer = fn (LoyaltyCard $card): CardEnrollment => $this->tenants->enroll(User::factory()->create(), $card);
@@ -85,9 +87,9 @@ it('counts a customer\'s presence stamps on one local day as one visit, whatever
 it('cuts the 30 days at local midnight in the business\'s timezone', function (): void {
     $inside = ($this->customer)($this->tenants->cardB);
     $before = ($this->customer)($this->tenants->cardB);
-    // 12 Sept 00:30 in Casablanca: the window's first day.
+    // 12 Sept 00:30 local (UTC+1): the window's first day.
     ($this->stampAt)($inside, $this->tenants->b1, '2026-09-11 23:30:00');
-    // 11 Sept 23:30 in Casablanca: the previous window.
+    // 11 Sept 23:30 local: the previous window.
     ($this->stampAt)($before, $this->tenants->b1, '2026-09-11 22:30:00');
 
     $stats = ($this->stats)($this->tenants->b1);
