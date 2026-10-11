@@ -3,6 +3,7 @@ import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import TapScreen from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { calendarDate } from '@/lib/local-moment';
 import { home } from '@/routes';
 import { redeem } from '@/routes/rewards';
 
@@ -22,12 +23,6 @@ type SavedReward = {
  */
 export default function MyRewards({ rewards }: { rewards: SavedReward[] }) {
     const { t, locale } = useTranslation();
-    // A calendar date: format it in UTC so no timezone shifts the day.
-    const since = new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'short',
-        timeZone: 'UTC',
-    });
 
     return (
         <>
@@ -71,10 +66,13 @@ export default function MyRewards({ rewards }: { rewards: SavedReward[] }) {
                                         <p className="text-sm text-muted-foreground">
                                             {t(':business · since :date', {
                                                 business: reward.businessName,
-                                                date: since.format(
-                                                    new Date(
-                                                        `${reward.unlockedOn}T00:00:00Z`,
-                                                    ),
+                                                date: calendarDate(
+                                                    locale,
+                                                    reward.unlockedOn,
+                                                    {
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                    },
                                                 ),
                                             })}
                                         </p>

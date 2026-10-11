@@ -3,6 +3,7 @@ import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { calendarDate } from '@/lib/local-moment';
 import { home } from '@/routes';
 
 /** When the next stamp is possible, in the location's time (DescribeTap). */
@@ -62,13 +63,11 @@ export default function TapCooldown({
         switch (next.day) {
             case 'later':
                 return t('Next stamp available on :date at', {
-                    // A calendar date: format it in UTC so no timezone shifts the day.
-                    date: new Intl.DateTimeFormat(locale, {
+                    date: calendarDate(locale, next.date, {
                         weekday: 'long',
                         day: 'numeric',
                         month: 'long',
-                        timeZone: 'UTC',
-                    }).format(new Date(`${next.date}T00:00:00Z`)),
+                    }),
                 });
             case 'tomorrow':
                 return t('Next stamp available tomorrow at');

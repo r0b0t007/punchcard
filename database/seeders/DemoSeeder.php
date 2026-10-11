@@ -34,6 +34,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use LogicException;
 use RuntimeException;
 
@@ -71,6 +72,9 @@ final class DemoSeeder extends Seeder
     /** Repeatable values; seeded only while run() works, then reseeded randomly (Faker seeds mt_rand, which fake() shares). */
     private readonly Generator $faker;
 
+    /** How many customers the café has: 20, or more to measure speed (DemoVolumeSeeder). */
+    private int $cafeCustomers = 20;
+
     /** @var array<int, int> Each tag's last SUN counter, by tag id. */
     private array $tagCounters = [];
 
@@ -89,10 +93,16 @@ final class DemoSeeder extends Seeder
         }
     }
 
-    public function run(): void
+    /** @param  int  $cafeCustomers  20 for the demo; DemoVolumeSeeder asks for more */
+    public function run(int $cafeCustomers = 20): void
     {
         self::assertDemoEnvironment();
 
+        if ($cafeCustomers < 1) {
+            throw new InvalidArgumentException('The café needs at least one customer: the demo customer.');
+        }
+
+        $this->cafeCustomers = $cafeCustomers;
         $this->faker->seed(2026);
 
         try {
@@ -158,7 +168,7 @@ final class DemoSeeder extends Seeder
 
         $members = [];
 
-        foreach ([$customer, ...$this->users(19)] as $member) {
+        foreach ([$customer, ...$this->users($this->cafeCustomers - 1)] as $member) {
             $visitedAt = [];
             $first = $this->faker->numberBetween(0, 2);
 
@@ -398,6 +408,11 @@ final class DemoSeeder extends Seeder
      */
     private function users(int $count): array
     {
+        // range(1, 0) is [1, 0]: no one is no one.
+        if ($count < 1) {
+            return [];
+        }
+
         return array_map(fn (): User => $this->user($this->faker->name(), $this->faker->unique()->safeEmail()), range(1, $count));
     }
 }

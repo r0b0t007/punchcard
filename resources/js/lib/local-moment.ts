@@ -7,6 +7,33 @@ export type LocalMoment = {
     time: string;
 };
 
+/** One formatter per locale and options: building an Intl formatter is costly. */
+const calendarFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A calendar date (Y-m-d) in the locale, with Latin digits as everywhere in
+ * the app (Morocco writes Arabic with them). Formatted in UTC, so no
+ * timezone shifts the day.
+ */
+export function calendarDate(
+    locale: string,
+    date: string,
+    options: Intl.DateTimeFormatOptions,
+): string {
+    const key = `${locale}|${JSON.stringify(options)}`;
+    let format = calendarFormats.get(key);
+
+    if (!format) {
+        format = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
+            ...options,
+            timeZone: 'UTC',
+        });
+        calendarFormats.set(key, format);
+    }
+
+    return format.format(new Date(`${date}T00:00:00Z`));
+}
+
 /**
  * "… at 10:42" today, "… on Monday 5 October at 10:42" another day: the
  * caller words each (its own t() calls, so the keys stay findable), this
@@ -25,13 +52,11 @@ export function momentLabel(
     }
 
     return words.other(
-        // A calendar date: format it in UTC so no timezone shifts the day.
-        new Intl.DateTimeFormat(locale, {
+        calendarDate(locale, moment.date, {
             weekday: 'long',
             day: 'numeric',
             month: 'long',
-            timeZone: 'UTC',
-        }).format(new Date(`${moment.date}T00:00:00Z`)),
+        }),
         moment.time,
     );
 }
