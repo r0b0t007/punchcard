@@ -24,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  * - A brand colour is stored with the text colour that reads on it
  *   (Contrast, ADR 0007); without one, the card shows the organization's.
  * - A new card starts paused, a draft, honoured by every operating business
- *   of the organization: publishing it (SetCardActive) offers it there.
+ *   of the organization. Publishing ($publish here, or the cards page)
+ *   goes through SetCardActive, inside the save's transaction: a refused
+ *   change publishes nothing. Saving never pauses a running card.
  * - Once customers hold the card, its mode and tiers are fixed and its
  *   stamps count only goes down (LoyaltyCard's guard): the form gets the
  *   reason instead of an error. The card is locked first, so a first
@@ -34,16 +36,16 @@ use Illuminate\Validation\ValidationException;
  */
 final readonly class SaveCard
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private SetCardActive $setCardActive) {}
 
     /**
      * @param  array<string, mixed>  $fields  CardRequest::validated()
      */
-    public function handle(Organization $organization, ?LoyaltyCard $card, array $fields): LoyaltyCard
+    public function handle(Organization $organization, ?LoyaltyCard $card, array $fields, bool $publish = false): LoyaltyCard
     {
         $attributes = $this->attributes($fields);
 
-        return DB::transaction(function () use ($organization, $card, $attributes): LoyaltyCard {
+        return DB::transaction(function () use ($organization, $card, $attributes, $publish): LoyaltyCard {
             if (! $card instanceof LoyaltyCard) {
                 $card = (new LoyaltyCard)->forceFill([...$attributes, 'organization_id' => $organization->id, 'active' => false]);
                 $card->save();
@@ -51,6 +53,10 @@ final readonly class SaveCard
                 $businesses = $this->context->bypass(fn (): array => Business::query()
                     ->where('organization_id', $organization->id)->operating()->orderBy('id')->pluck('id')->all());
                 $card->businesses()->attach($businesses);
+
+                if ($publish) {
+                    $this->setCardActive->handle($card, true);
+                }
 
                 return $card;
             }
@@ -64,6 +70,10 @@ final readonly class SaveCard
             }
 
             $locked->forceFill($attributes)->save();
+
+            if ($publish) {
+                $this->setCardActive->handle($locked, true);
+            }
 
             return $locked;
         });

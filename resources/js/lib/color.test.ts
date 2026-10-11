@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+    BRAND_SWATCHES,
     cardInks,
     contrastRatio,
+    isWeakBrand,
     readableForeground,
     stampColor,
 } from '@/lib/color';
@@ -91,5 +93,19 @@ describe('cardInks', () => {
             foreground: '#FBF6EE',
             stamp: '#F2A541',
         });
+    });
+});
+
+describe('isWeakBrand', () => {
+    it('matches Contrast::isWeak on the server', () => {
+        expect(isWeakBrand('#808080')).toBe(true);
+        expect(isWeakBrand('#3B2A20')).toBe(false);
+        expect(isWeakBrand('#FFE8D6')).toBe(false);
+    });
+
+    it('never flags a builder swatch', () => {
+        for (const swatch of BRAND_SWATCHES) {
+            expect(isWeakBrand(swatch.hex)).toBe(false);
+        }
     });
 });

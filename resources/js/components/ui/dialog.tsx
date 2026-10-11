@@ -104,7 +104,8 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      // pe-6: a long title wraps before the close button at its end; leading-snug keeps wrapped lines apart.
+      className={cn("pe-6 text-lg leading-snug font-semibold", className)}
       {...props}
     />
   )

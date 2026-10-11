@@ -11,6 +11,21 @@ export const INK = '#241A13';
 export const ESPRESSO = '#3B2A20';
 export const SAFFRON = '#F2A541';
 
+/**
+ * The card builder's swatches (B6): each reads with punchcard's cream or ink
+ * (never isWeakBrand). Labels are English translation keys.
+ */
+export const BRAND_SWATCHES = [
+    { label: 'Espresso', hex: '#3B2A20' },
+    { label: 'Terracotta', hex: '#A63D2A' },
+    { label: 'Olive', hex: '#4F5D2F' },
+    { label: 'Teal', hex: '#0F5E63' },
+    { label: 'Navy', hex: '#1F3A5F' },
+    { label: 'Plum', hex: '#5E2750' },
+    { label: 'Saffron', hex: SAFFRON },
+    { label: 'Mint', hex: '#CFE8D8' },
+] as const;
+
 /** WCAG 2.x contrast ratio between two hex colours (#rgb or #rrggbb), 1 to 21. */
 export function contrastRatio(a: string, b: string): number {
     const [lighter, darker] = [luminance(a), luminance(b)].sort(
@@ -53,6 +68,22 @@ export function stampColor(brand: string, foreground?: string): string {
     return foreground && isHex(foreground)
         ? foreground
         : readableForeground(background);
+}
+
+/**
+ * A colour only pure white or black reads on: neither cream nor ink reaches
+ * 4.5:1, so its text just passes AA. The builder suggests a darker or lighter
+ * shade; the server warns the same on save (Contrast::isWeak).
+ */
+export function isWeakBrand(brand: string): boolean {
+    const background = isHex(brand) ? brand : ESPRESSO;
+
+    return (
+        Math.max(
+            contrastRatio(CREAM, background),
+            contrastRatio(INK, background),
+        ) < 4.5
+    );
 }
 
 export function isHex(value: string): boolean {

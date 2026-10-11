@@ -36,6 +36,8 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function (): void {
         Route::post('business/qr-stand/printed', [QrStandController::class, 'printed'])->name('business.qr-stand.printed');
         // The cards and the card builder's saves (CHW-32); {card} resolves in the tenant.
         Route::get('cards', [CardController::class, 'index'])->name('cards.index');
+        Route::get('cards/create', [CardController::class, 'create'])->name('cards.create');
+        Route::get('cards/{card}/edit', [CardController::class, 'edit'])->whereNumber('card')->name('cards.edit');
         Route::post('cards', [CardController::class, 'store'])->name('cards.store');
         Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
         Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');

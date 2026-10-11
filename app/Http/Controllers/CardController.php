@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Cards\DescribeCardBuilder;
+use App\Actions\Cards\DescribeCardSaved;
 use App\Actions\Cards\ListCards;
 use App\Actions\Cards\SaveCard;
 use App\Actions\Cards\SetCardActive;
@@ -27,8 +29,11 @@ use Inertia\Response;
  *   runs the program (LoyaltyCardPolicy::create) manages them; a
  *   franchisee's owner sees its business's cards, read only; staff get a
  *   403.
- * - POST /cards, PUT /cards/{card}: a new card (paused) or the changes
- *   (SaveCard, CardRequest).
+ * - GET /cards/create, /cards/{card}/edit: the card builder (B6,
+ *   DescribeCardBuilder), for whoever runs the program.
+ * - POST /cards, PUT /cards/{card}: a new card (paused, unless published)
+ *   or the changes (SaveCard, CardRequest), with a warning when only pure
+ *   white or black text reads on the card's colour (DescribeCardSaved).
  * - PATCH /cards/{card}/status: publish or pause (SetCardActive).
  * - POST /cards/{card}/banner: the card's banner (UpdateCardBanner).
  *
@@ -40,7 +45,7 @@ final class CardController extends Controller
     {
         Gate::authorize('viewAny', LoyaltyCard::class);
 
-        $organization = $context->organizationId() === null ? null : Organization::query()->find($context->organizationId());
+        $organization = $context->organization();
         $managesProgram = $organization instanceof Organization && Gate::allows('create', [LoyaltyCard::class, $organization]);
 
         return Inertia::render('cards/index', [
@@ -49,22 +54,40 @@ final class CardController extends Controller
         ]);
     }
 
-    public function store(CardRequest $request, SaveCard $saveCard): RedirectResponse
+    public function create(TenantContext $context, DescribeCardBuilder $describeCardBuilder): Response
+    {
+        $organization = $context->organization();
+        abort_unless($organization instanceof Organization, 403);
+        Gate::authorize('create', [LoyaltyCard::class, $organization]);
+
+        return Inertia::render('cards/edit', $describeCardBuilder->handle($organization, null));
+    }
+
+    public function edit(LoyaltyCard $card, DescribeCardBuilder $describeCardBuilder): Response
+    {
+        Gate::authorize('update', $card);
+
+        return Inertia::render('cards/edit', $describeCardBuilder->handle(Organization::query()->whereKey($card->organization_id)->firstOrFail(), $card));
+    }
+
+    public function store(CardRequest $request, SaveCard $saveCard, DescribeCardSaved $describeCardSaved): RedirectResponse
     {
         $organization = $request->organization();
         assert($organization instanceof Organization);
 
-        $saveCard->handle($organization, null, $request->validated());
+        $card = $saveCard->handle($organization, null, $request->validated(), $request->boolean('publish'));
+        Inertia::flash('toast', $describeCardSaved->handle($organization, $card, $request->boolean('publish')));
 
         return to_route('cards.index');
     }
 
-    public function update(CardRequest $request, LoyaltyCard $card, SaveCard $saveCard): RedirectResponse
+    public function update(CardRequest $request, LoyaltyCard $card, SaveCard $saveCard, DescribeCardSaved $describeCardSaved): RedirectResponse
     {
         $organization = $request->organization();
         assert($organization instanceof Organization);
 
-        $saveCard->handle($organization, $card, $request->validated());
+        $saved = $saveCard->handle($organization, $card, $request->validated(), $request->boolean('publish'));
+        Inertia::flash('toast', $describeCardSaved->handle($organization, $saved, $request->boolean('publish')));
 
         return to_route('cards.index');
     }

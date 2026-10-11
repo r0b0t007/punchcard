@@ -127,6 +127,12 @@ final class TenantContext
         return $this->organizationId;
     }
 
+    /** The organization worked in, read fresh; null outside a tenant. */
+    public function organization(): ?Organization
+    {
+        return $this->organizationId === null ? null : Organization::query()->find($this->organizationId);
+    }
+
     public function businessId(): ?int
     {
         return $this->businessId;
