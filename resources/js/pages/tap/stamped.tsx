@@ -1,10 +1,12 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
+import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
+import { cards } from '@/routes/app';
 import { index as myRewards, redeem } from '@/routes/rewards';
 
 /** A reward this stamp unlocked, and where it stands now (DescribeTap). */
@@ -68,7 +70,16 @@ export default function TapStamped({
                                 </Link>
                             </Button>
                         </>
-                    ) : null
+                    ) : (
+                        <>
+                            <WalletPlaceholders />
+                            <Button asChild size="lg">
+                                <Link href={cards()}>
+                                    {t('See all my cards')}
+                                </Link>
+                            </Button>
+                        </>
+                    )
                 }
             >
                 {stampedAt ? (

@@ -73,7 +73,8 @@ return [
     |
     */
 
-    'home' => '/dashboard',
+    // Customers land on My cards; /app sends whoever runs or works in a business to the dashboard (CHW-27).
+    'home' => '/app',
 
     /*
     |--------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import type { TapCard } from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import type { LocalMoment } from '@/lib/local-moment';
-import { home } from '@/routes';
+import { cards } from '@/routes/app';
 import { index as myRewards } from '@/routes/rewards';
 
 /**
@@ -38,7 +38,7 @@ export default function TapRedeemed({
                 actions={
                     <>
                         <Button asChild size="lg">
-                            <Link href={home()}>{t('Done')}</Link>
+                            <Link href={cards()}>{t('Done')}</Link>
                         </Button>
                         <Button asChild size="lg" variant="link">
                             <Link href={myRewards()}>{t('My rewards')}</Link>

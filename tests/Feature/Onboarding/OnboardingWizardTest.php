@@ -46,13 +46,13 @@ describe('who goes to the wizard', function (): void {
         $this->actingAs($this->owner)->get(route('dashboard'))->assertRedirect(route('onboarding.show'));
     });
 
-    it('leaves customers and owners of set-up businesses on the dashboard', function (): void {
+    it('leaves owners of set-up businesses on the dashboard, and sends customers to their cards, never the wizard', function (): void {
         $tenants = Tenants::make();
         $owner = $tenants->member(User::factory()->create(), $tenants->a1, BusinessRole::Owner);
 
-        foreach ([User::factory()->create(), $owner] as $user) {
-            $this->actingAs($user)->get(route('dashboard'))->assertOk();
-        }
+        $this->actingAs($owner)->get(route('dashboard'))->assertOk();
+        // A customer's home is My cards (CHW-27).
+        $this->actingAs(User::factory()->create())->get(route('dashboard'))->assertRedirect(route('app.cards'));
     });
 
     it('asks for a verified email first', function (): void {

@@ -70,7 +70,7 @@ it('creates the account, its organization and a pending business it owns, not ye
 });
 
 it('creates no business when a customer registers, whatever the form sends', function (): void {
-    $this->post(route('register.store'), [...$this->account, 'business_name' => 'Café Nour'])->assertRedirect(route('dashboard', absolute: false));
+    $this->post(route('register.store'), [...$this->account, 'business_name' => 'Café Nour'])->assertRedirect(route('app.cards', absolute: false));
 
     expect(User::query()->where('email', 'nour@cafe-nour.test')->exists())->toBeTrue()
         ->and(($this->businesses)())->toBe(0);

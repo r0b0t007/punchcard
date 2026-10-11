@@ -7,6 +7,7 @@ namespace App\Support\Cards;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
+use App\Models\Organization;
 
 /**
  * A business's card as a customer screen shows it (the TapCard type in
@@ -24,14 +25,33 @@ final class CustomerCard
      */
     public static function of(Business $business, LoyaltyCard $card, ?Location $location = null, int $stamps = 0): array
     {
+        return self::shape($business->name, $location?->name, $card, $business->organization->brand_color, $stamps);
+    }
+
+    /**
+     * The card as a whole program shows it, under its organization's name
+     * (My cards, CHW-27): a franchise's card is held at every franchisee.
+     *
+     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
+     */
+    public static function ofProgram(Organization $organization, LoyaltyCard $card, int $stamps = 0): array
+    {
+        return self::shape($organization->name, null, $card, $organization->brand_color, $stamps);
+    }
+
+    /**
+     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
+     */
+    private static function shape(string $name, ?string $locationName, LoyaltyCard $card, ?string $organizationColor, int $stamps): array
+    {
         return [
-            'businessName' => $business->name,
-            'locationName' => $location?->name,
+            'businessName' => $name,
+            'locationName' => $locationName,
             'cardName' => $card->name,
             'stampsRequired' => $card->stamps_required,
             'stampsCollected' => max(0, min($stamps, $card->stamps_required)),
             'rewardText' => $card->reward_text,
-            'brandColor' => $card->brandColor() ?? $business->organization->brand_color,
+            'brandColor' => $card->brandColor() ?? $organizationColor,
             'brandForeground' => $card->brandForeground(),
             'stampStyle' => $card->stamp_style,
         ];

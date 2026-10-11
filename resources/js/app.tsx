@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
+import CustomerLayout from '@/layouts/customer-layout';
 import I18nLayout from '@/layouts/i18n-layout';
 import OnboardingLayout from '@/layouts/onboarding-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -16,10 +17,13 @@ void createInertiaApp({
     // direction from the page props.
     layout: (name) => {
         switch (true) {
+            // The customer's home and rewards (CHW-27): full screen with the bottom tab bar.
+            case name.startsWith('app/') || name === 'rewards/index':
+                return [I18nLayout, CustomerLayout];
             case name === 'welcome' ||
                 name.startsWith('dev/') ||
                 name.startsWith('tap/') ||
-                // The customer's reward screens: full screen, like the tap screens (CHW-26).
+                // The redeem screen: full screen, like the tap screens (CHW-26).
                 name.startsWith('rewards/') ||
                 // The join page and the printable QR stand (CHW-31): full screen.
                 name.startsWith('join/') ||

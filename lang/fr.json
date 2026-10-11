@@ -576,5 +576,22 @@
     "Visits per day": "Visites par jour",
     "Visits per day, last 30 days": "Visites par jour, 30 derniers jours",
     "Your regulars show here once customers visit.": "Vos habitués s’affichent ici dès que les clients passent.",
-    ":change vs the 30 days before": ":change par rapport aux 30 jours précédents"
+    ":change vs the 30 days before": ":change par rapport aux 30 jours précédents",
+    ":count reward ready|:count rewards ready": ":count récompense prête|:count récompenses prêtes",
+    "Add to Apple Wallet": "Ajouter à Apple Wallet",
+    "Add to Google Wallet": "Ajouter à Google Wallet",
+    "At a café that uses punchcard, hold your phone to the stamper at the counter: your first stamp starts your card.": "Dans un café qui utilise punchcard, approchez votre téléphone du tampon au comptoir : votre premier tampon démarre votre carte.",
+    "Hello": "Bonjour",
+    "Hello :name": "Bonjour :name",
+    "Last visit :count day ago|Last visit :count days ago": "Dernière visite il y a :count jour|Dernière visite il y a :count jours",
+    "Last visit today": "Dernière visite aujourd’hui",
+    "Main": "Principal",
+    "My cards": "Mes cartes",
+    "No cards yet": "Pas encore de carte",
+    "No visit yet": "Pas encore de visite",
+    "Paused by the café": "Mise en pause par le café",
+    "Rewards": "Récompenses",
+    "See all my cards": "Voir toutes mes cartes",
+    "Wallet passes are coming soon.": "Les cartes Wallet arrivent bientôt.",
+    "Your loyalty cards": "Vos cartes de fidélité"
 }
