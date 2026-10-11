@@ -75,12 +75,18 @@ const whole = (typed: string, fallback: number) => {
     return Number.isNaN(value) ? fallback : value;
 };
 
-/** An amount typed in dirhams ("12,50" or "12.5"), in centimes; as typed when it isn't one, for the server to refuse. */
+/** An amount typed in dirhams ("12", "12.5" or "12,50"), in centimes; anything else as typed, for the server to refuse. */
 const centimes = (typed: string) => {
-    const amount = Number.parseFloat(typed.replace(',', '.'));
+    const amount = typed.trim();
 
-    return Number.isNaN(amount) ? typed : String(Math.round(amount * 100));
+    return /^\d+(?:[.,]\d{1,2})?$/.test(amount)
+        ? String(Math.round(Number(amount.replace(',', '.')) * 100))
+        : typed;
 };
+
+/** The reward value the server stores for what is typed: none for a free item, centimes for an amount, else the percent. */
+const storedRewardValue = (type: RewardType, typed: string) =>
+    type === 'item' ? null : type === 'fixed' ? centimes(typed) : typed.trim();
 
 /**
  * B6: the card builder. The form, and a live preview of the card as
@@ -152,16 +158,18 @@ export default function CardsEdit({ card, fields, preview }: Props) {
         !progressive &&
         (data.reward_type !== fields.reward_type ||
             data.reward_text.trim() !== fields.reward_text ||
-            (data.reward_type !== 'item' &&
-                data.reward_value.trim() !== rewardValue));
+            storedRewardValue(data.reward_type, data.reward_value) !==
+                (fields.reward_value === null
+                    ? null
+                    : String(fields.reward_value)));
 
     const save = (publish: boolean) => {
         form.transform((typed) => ({
             ...typed,
-            reward_value:
-                typed.reward_type === 'fixed'
-                    ? centimes(typed.reward_value)
-                    : typed.reward_value,
+            reward_value: storedRewardValue(
+                typed.reward_type,
+                typed.reward_value,
+            ),
             publish,
         }));
         form.submit(card ? update(card.id) : store(), { preserveScroll: true });
@@ -213,9 +221,12 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                 </div>
 
                 <form
-                    onSubmit={(event: FormEvent) => {
+                    onSubmit={(event: FormEvent<HTMLFormElement>) => {
                         event.preventDefault();
-                        save(false);
+                        // Both buttons submit, so the browser checks the fields first; Publish says so.
+                        const submitter = (event.nativeEvent as SubmitEvent)
+                            .submitter;
+                        save(submitter?.dataset.publish === 'true');
                     }}
                     className="flex min-w-0 flex-1 flex-col gap-8"
                 >
@@ -720,9 +731,9 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                                     {t('Save draft')}
                                 </Button>
                                 <Button
-                                    type="button"
+                                    type="submit"
+                                    data-publish="true"
                                     disabled={processing}
-                                    onClick={() => save(true)}
                                 >
                                     {processing && <Spinner />}
                                     {t('Publish')}

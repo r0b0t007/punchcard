@@ -44,9 +44,7 @@ class CardRequest extends FormRequest
     /** The organization being worked in, a new card's. */
     public function organization(): ?Organization
     {
-        $organizationId = app(TenantContext::class)->organizationId();
-
-        return $organizationId === null ? null : Organization::query()->find($organizationId);
+        return app(TenantContext::class)->organization();
     }
 
     /**
@@ -63,7 +61,7 @@ class CardRequest extends FormRequest
             'mode' => ['required', Rule::enum(CardMode::class)],
             'stamps_required' => ['exclude_if:mode,progressive', $cyclic, 'nullable', 'integer', 'between:5,50'],
             'reward_type' => ['exclude_if:mode,progressive', $cyclic, 'nullable', Rule::enum(RewardType::class)],
-            'reward_value' => ['exclude_if:mode,progressive', $valued, 'nullable', 'integer', 'min:1', $this->input('reward_type') === RewardType::Percent->value ? 'max:100' : 'max:100000000'],
+            'reward_value' => ['exclude_if:mode,progressive', 'exclude_if:reward_type,item', $valued, 'nullable', 'integer', 'min:1', $this->input('reward_type') === RewardType::Percent->value ? 'max:100' : 'max:100000000'],
             'reward_text' => ['exclude_if:mode,progressive', $cyclic, 'nullable', 'string', 'max:120'],
             'tiers' => ['exclude_unless:mode,progressive', Rule::requiredIf(fn (): bool => $this->input('mode') === CardMode::Progressive->value), 'nullable', 'array', 'min:1', 'max:10'],
             'tiers.*.stamps' => ['required', 'integer', 'between:1,50', 'distinct'],

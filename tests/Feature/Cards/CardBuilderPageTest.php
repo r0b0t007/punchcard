@@ -172,6 +172,22 @@ it('warns after saving a colour only pure white or black text reads on', functio
         ->assertInertiaFlash('toast.type', 'success');
 });
 
+it('warns about the organization\'s colour too, when the card shows it', function (): void {
+    $this->context->bypass(fn () => $this->tenants->orgB->forceFill(['brand_color' => '#808080'])->save());
+
+    ($this->inB1)()->post(route('cards.store'), ($this->fields)())
+        ->assertInertiaFlash('toast.type', 'warning');
+    ($this->inB1)()->post(route('cards.store'), ($this->fields)(['brand_color' => '#3B2A20']))
+        ->assertInertiaFlash('toast.type', 'success');
+});
+
+it('ignores the value a free item\'s form still holds from another reward type', function (): void {
+    ($this->inB1)()->post(route('cards.store'), ($this->fields)(['reward_type' => 'item', 'reward_value' => '12.5']))
+        ->assertSessionHasNoErrors();
+
+    expect(($this->newest)()->reward_value)->toBeNull();
+});
+
 it('refuses a publish flag that is not a yes or no', function (): void {
     ($this->inB1)()->post(route('cards.store'), ($this->fields)(['publish' => 'soon']))->assertSessionHasErrors('publish');
 });

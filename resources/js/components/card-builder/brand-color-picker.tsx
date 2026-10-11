@@ -3,10 +3,8 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
-import { BRAND_SWATCHES, ESPRESSO } from '@/lib/color';
+import { BRAND_SWATCHES, ESPRESSO, isHex } from '@/lib/color';
 import { cn } from '@/lib/utils';
-
-const HEX = /^#[0-9a-f]{6}$/i;
 
 /**
  * The card's colour (B6): the organization's (null, "Default"), one of the
@@ -90,7 +88,8 @@ export default function BrandColorPicker({
                             const typed = event.target.value.trim();
                             setCustom(typed);
 
-                            if (HEX.test(typed)) {
+                            // #rrggbb only, as the server takes it.
+                            if (isHex(typed) && typed.length === 7) {
                                 onChange(typed.toUpperCase());
                             }
                         }}
