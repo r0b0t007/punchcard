@@ -1,4 +1,4 @@
-import { Form } from '@inertiajs/react';
+import { Form, router } from '@inertiajs/react';
 import { useRef } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/heading';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
+import { forgetOfflineCards } from '@/lib/offline-cards';
 
 export default function DeleteUser() {
     const passwordInput = useRef<HTMLInputElement>(null);
@@ -63,6 +64,11 @@ export default function DeleteUser() {
                                 preserveScroll: true,
                             }}
                             onError={() => passwordInput.current?.focus()}
+                            onSuccess={() => {
+                                // Nothing of the account stays on the phone (CHW-35).
+                                router.clearHistory();
+                                void forgetOfflineCards();
+                            }}
                             resetOnSuccess
                             className="space-y-6"
                         >

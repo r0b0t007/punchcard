@@ -5,6 +5,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PwaHead from '@/components/pwa-head';
 import ServiceWorker from '@/components/service-worker';
 import { createI18n, I18nContext } from '@/hooks/use-translation';
+import { keepOnlyCardsOf } from '@/lib/offline-cards';
+import type { User } from '@/types/auth';
 
 /**
  * Outermost persistent layout of every page (see app.tsx). It reads the
@@ -18,7 +20,9 @@ import { createI18n, I18nContext } from '@/hooks/use-translation';
  * English keys.
  */
 export default function I18nLayout({ children }: { children: ReactNode }) {
-    const { locale, dir, translations, pwa } = usePage().props;
+    const { locale, dir, translations, pwa, auth } = usePage().props;
+    // A guest's page has no user, whatever the shared type says.
+    const userId = (auth.user as User | null)?.id ?? null;
 
     // Stable while the locale is unchanged (the client reuses the cached once
     // prop), so t() keeps its identity across visits.
@@ -41,6 +45,11 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
     if (Boolean(pwa) && !registersServiceWorker) {
         setRegistersServiceWorker(true);
     }
+
+    // The cards kept on the phone are only ever the signed-in customer's (CHW-35).
+    useEffect(() => {
+        void keepOnlyCardsOf(userId);
+    }, [userId]);
 
     // A visit without its translations (e.g. a history entry whose once prop
     // is gone) renders the English keys; fetch the set once per locale.

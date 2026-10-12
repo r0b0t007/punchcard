@@ -60,6 +60,12 @@ async function cdp(page: Page): Promise<CDPSession> {
     return session;
 }
 
+function offlineDatabases(page: Page): Promise<string[]> {
+    return page.evaluate(async () =>
+        (await indexedDB.databases()).map((database) => database.name ?? ''),
+    );
+}
+
 async function installabilityErrors(page: Page): Promise<string[]> {
     const session = await cdp(page);
     const { installabilityErrors } = await session.send(
@@ -172,6 +178,57 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     ).send('Page.getAppManifest');
     expect(parsed?.scope).toBeDefined();
     expect(new URL(parsed?.scope ?? '', page.url()).pathname).toBe('/business');
+});
+
+test('a sign-out leaves no cards on the phone, not even behind Back', async ({
+    page,
+}) => {
+    const hello = page.getByRole('heading', { level: 1, name: /^Hello/ });
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/app');
+    await expect(hello).toBeVisible();
+    await expect
+        .poll(() => offlineDatabases(page))
+        .toContain('punchcard-offline');
+
+    // Signed out from Settings, reached in the same page (Inertia keeps My cards in its history).
+    await page
+        .getByRole('navigation', { name: 'Main' })
+        .getByRole('link', { name: 'Profile' })
+        .click();
+    await page.waitForURL(/\/settings\//);
+    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+    await page.getByRole('button', { name: /Yasmine Alaoui/ }).click();
+    await page.getByRole('menuitem', { name: 'Log out' }).click();
+    await page.waitForURL((url) => url.pathname === '/');
+    await expect
+        .poll(() => offlineDatabases(page))
+        .not.toContain('punchcard-offline');
+
+    // Back asks the server again, which sends a guest to sign in: the cards are neither shown nor kept.
+    await page.goBack();
+    await page.goBack();
+    await page.waitForURL(/\/login$/);
+    await expect(hello).toHaveCount(0);
+    expect(await offlineDatabases(page)).not.toContain('punchcard-offline');
+});
+
+test('the cards kept are dropped when the session ended elsewhere', async ({
+    page,
+}) => {
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/app');
+    await expect
+        .poll(() => offlineDatabases(page))
+        .toContain('punchcard-offline');
+
+    // The session ends without this phone signing out (it expired, or the password changed elsewhere).
+    await page.context().clearCookies();
+    await page.goto('/login');
+
+    await expect
+        .poll(() => offlineDatabases(page))
+        .not.toContain('punchcard-offline');
 });
 
 test('the marketing site is no app and registers no service worker', async ({

@@ -56,6 +56,36 @@ test.skip(
     'The customer screens are phone screens.',
 );
 
+/** The snapshot My cards keeps in IndexedDB for offline use (offline-cards.ts), if any. */
+function offlineSnapshot(page: Page): Promise<unknown> {
+    return page.evaluate(
+        () =>
+            new Promise((resolve) => {
+                const open = indexedDB.open('punchcard-offline');
+                open.onerror = () => resolve(undefined);
+                open.onsuccess = () => {
+                    const database = open.result;
+
+                    if (!database.objectStoreNames.contains('snapshots')) {
+                        database.close();
+                        resolve(undefined);
+
+                        return;
+                    }
+
+                    const get = database
+                        .transaction('snapshots')
+                        .objectStore('snapshots')
+                        .get('my-cards');
+                    get.onsuccess = () => {
+                        database.close();
+                        resolve(get.result);
+                    };
+                };
+            }),
+    );
+}
+
 async function attach(page: Page, testInfo: TestInfo, name: string) {
     await testInfo.attach(name, {
         body: await page.screenshot({ fullPage: true }),
@@ -131,6 +161,15 @@ test.describe('in English, light', () => {
         ).toHaveAttribute('aria-current', 'page');
         await expectNothingOffTheSides(page);
         await attach(page, testInfo, 'my-cards-light');
+
+        // Kept on the phone for when it is offline (CHW-35): the cards shown, in the language shown.
+        await expect
+            .poll(() => offlineSnapshot(page))
+            .toMatchObject({
+                firstName: 'Salma',
+                locale: 'en',
+                cards: [{}, {}],
+            });
     });
 
     test('shows a card in full', async ({ page }, testInfo) => {
