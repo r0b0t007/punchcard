@@ -7,6 +7,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cards } from '@/routes/app';
+import { show } from '@/routes/app/cards';
 import { index as myRewards, redeem } from '@/routes/rewards';
 
 /** A reward this stamp unlocked, and where it stands now (DescribeTap). */
@@ -28,6 +29,7 @@ export default function TapStamped({
     stampedAt,
     stampsBefore,
     fresh,
+    enrollmentId,
 }: {
     card: TapCard | null;
     given: number;
@@ -35,6 +37,8 @@ export default function TapStamped({
     stampedAt: LocalMoment | null;
     stampsBefore: number;
     fresh: boolean;
+    /** The customer's copy of the card, for "See this card" (C6). */
+    enrollmentId: number | null;
 }) {
     const { t, locale } = useTranslation();
     const added = t(':count stamp added|:count stamps added', {
@@ -73,7 +77,22 @@ export default function TapStamped({
                     ) : (
                         <>
                             <WalletPlaceholders />
-                            <Button asChild size="lg">
+                            {enrollmentId !== null ? (
+                                <Button asChild size="lg">
+                                    <Link href={show(enrollmentId)}>
+                                        {t('See this card')}
+                                    </Link>
+                                </Button>
+                            ) : null}
+                            <Button
+                                asChild
+                                size="lg"
+                                variant={
+                                    enrollmentId !== null
+                                        ? 'outline'
+                                        : 'default'
+                                }
+                            >
                                 <Link href={cards()}>
                                     {t('See all my cards')}
                                 </Link>

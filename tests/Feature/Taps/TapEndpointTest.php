@@ -779,3 +779,14 @@ it('works in Arabic, right to left', function (): void {
     $this->withCookie('locale', 'ar')->get(route('taps.result'))
         ->assertInertia(fn (Assert $page): Assert => $page->component('tap/pending')->where('locale', 'ar')->where('dir', 'rtl'));
 });
+
+it('links the stamp and cooldown screens to the customer\'s card (CHW-27)', function (): void {
+    $this->actingAs($this->customer)->get(($this->tapUrl)(5));
+    $enrollment = $this->context->bypass(fn (): int => (int) CardEnrollment::query()->where('user_id', $this->customer->id)->value('id'));
+
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('enrollmentId', $enrollment));
+
+    $this->travel(5)->minutes();
+    $this->get(($this->tapUrl)(6));
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/cooldown')->where('enrollmentId', $enrollment));
+});

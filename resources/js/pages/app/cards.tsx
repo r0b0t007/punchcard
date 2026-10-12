@@ -4,6 +4,7 @@ import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/use-translation';
+import { show } from '@/routes/app/cards';
 import { index as rewards } from '@/routes/rewards';
 
 type MyCard = {
@@ -83,10 +84,18 @@ export default function MyCards({
                     <ul className="flex flex-col gap-6">
                         {cards.map((myCard) => (
                             <li key={myCard.id} className="flex flex-col gap-2">
-                                <TapLoyaltyCard
-                                    card={myCard.card}
-                                    logoUrl={myCard.logoUrl}
-                                />
+                                <Link
+                                    href={show(myCard.id)}
+                                    aria-label={t('Open :card', {
+                                        card: `${myCard.card.businessName}, ${myCard.card.cardName}`,
+                                    })}
+                                    className="rounded-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    <TapLoyaltyCard
+                                        card={myCard.card}
+                                        logoUrl={myCard.logoUrl}
+                                    />
+                                </Link>
                                 <div className="flex flex-wrap items-center gap-2 px-1 text-sm text-muted-foreground">
                                     <span>
                                         {myCard.lastVisitDaysAgo === null

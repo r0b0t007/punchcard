@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Cards;
 
+use App\Enums\CardMode;
 use App\Models\Business;
+use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
@@ -27,6 +29,15 @@ final class CustomerCard
     {
         // The organization is read only for a card without its own colour.
         return self::shape($business->name, $location?->name, $card, $card->brandColor() ?? $business->organization->brand_color, $stamps);
+    }
+
+    /**
+     * The stamps a customer's copy of the card shows: a progressive card's
+     * lifetime stamps, a cyclic card's since its last reward (CHW-27).
+     */
+    public static function stampsOf(LoyaltyCard $card, CardEnrollment $enrollment): int
+    {
+        return $card->mode === CardMode::Progressive ? $enrollment->lifetime_stamps : $enrollment->current_stamps;
     }
 
     /**

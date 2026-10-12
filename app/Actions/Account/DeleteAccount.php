@@ -7,6 +7,7 @@ namespace App\Actions\Account;
 use App\Models\AuditLog;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
+use App\Models\Follow;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\Tap;
@@ -28,7 +29,7 @@ use LogicException;
  *   reward they redeemed as staff): the user is anonymised. The row and its
  *   id stay, so the ledger, counters, rewards and redemption records stay
  *   true, but nothing in it identifies the person (name, email, password,
- *   2FA, locale, passkeys, sessions, reset tokens, referral codes, cards with
+ *   2FA, locale, passkeys, sessions, reset tokens, referral codes, follows, cards with
  *   nothing on them) and nobody can sign in to it again; the email is free to
  *   sign up with again. The new email is unguessable (and the domain refused
  *   at signup), so nobody can take it first and block the deletion. Changing
@@ -107,6 +108,8 @@ final readonly class DeleteAccount
         CardEnrollment::query()->where('user_id', $user->id)->whereDoesntHave('stampEvents')->whereDoesntHave('rewards')->delete();
         CardEnrollment::query()->where('user_id', $user->id)->update(['referral_code' => null]);
         $user->passkeys()->delete();
+        // Consent to offers is the person's, not the ledger's (CHW-27).
+        Follow::query()->where('user_id', $user->id)->delete();
 
         $user->forceFill([
             'name' => 'Deleted user',
