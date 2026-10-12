@@ -27,11 +27,11 @@ The `pwa:customer` / `pwa:business` route middleware (`UsePwa`) picks the manife
 
 - Tooling: `vite-plugin-pwa` (Workbox, `injectManifest` strategy). Confirm compatibility with the project's Vite/vite-plus version before adding it; pin the version.
 - Precache the app shell only (the app entry and its static imports). Register after the page has loaded (`immediate: false`), never while a tap or join page loads. Runtime caching (`resources/js/sw-routes.ts`):
-    - `GET /api/me/cards`: network-first, fall back to cache (offline card view). Cleared on sign-out (`Clear-Site-Data`), as it holds one customer's cards.
     - Fonts: cache-first once a page used them (only the subsets it shows).
     - Images/logos: stale-while-revalidate, capped entries.
     - **Never cache** `/t`, auth routes, any POST/PATCH/DELETE, `/business/*` data.
-- Store the last-known cards in IndexedDB for the offline C5 screen; show "offline, last updated <time>".
+- The last-known cards live in IndexedDB only (`resources/js/lib/offline-cards.ts`): My cards saves them from its props, with the language kept apart; the offline C5 screen shows them with "offline, last updated <time>". There is no `/api/me/cards` cache (dropped in the review of #70).
+- They are only ever the signed-in customer's: sign-out and account deletion drop them and clear Inertia's (encrypted) history; `keepOnlyCardsOf` in the outer layout drops them on any page seen by someone else or a guest. No `Clear-Site-Data`: its "storage" resets the theme and removes the service worker.
 - Page loads and writes skip the worker's start-up where the browser can (static routing, `NETWORK_ROUTES`): the tap must stay fast.
 - Version the SW; on update show a "New version, reload" toast rather than reloading mid-action.
 
