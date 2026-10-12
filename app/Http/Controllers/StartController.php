@@ -30,6 +30,6 @@ final class StartController extends Controller
             default => route('app.cards'),
         };
 
-        return redirect()->to($request->getQueryString() === null ? $home : $home.'?'.$request->getQueryString());
+        return redirect()->to(url()->query($home, $request->query()));
     }
 }

@@ -14,8 +14,9 @@ class DashboardTest extends TestCase
 
     public function test_guests_are_redirected_to_the_login_page(): void
     {
+        // punchcard Pro's own sign-in, inside its scope (CHW-151).
         $response = $this->get(route('dashboard'));
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('business.login'));
     }
 
     public function test_whoever_works_in_a_business_can_visit_the_dashboard(): void

@@ -14,6 +14,7 @@ use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
 use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
 Route::inertia('/', 'welcome')->name('home');
 
@@ -87,10 +88,17 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::delete('rewards/{reward}/redeem', [RewardController::class, 'close'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem.close');
 });
 
-// The business app's addresses before it moved under /business (CHW-151), for good, query string and all.
-Route::get('{path}', MovedToBusinessController::class)
-    ->where('path', 'dashboard|cards|cards/create|cards/[0-9]+/edit|onboarding|onboarding/[a-z-]+')
+// The business app's addresses before it moved under /business (CHW-151), for good: pages, and the saves of a page
+// loaded before the move, with their query string, method and form.
+Route::any('{path}', MovedToBusinessController::class)
+    ->where('path', 'dashboard|cards(?:/.*)?|onboarding(?:/.*)?')
     ->name('business.moved');
+
+// punchcard Pro's sign-in, inside its scope: opening the app signed out never leaves it. The form posts to Fortify's
+// /login, without a page load.
+Route::get('business/login', [AuthenticatedSessionController::class, 'create'])
+    ->middleware(['guest', 'pwa:business'])
+    ->name('business.login');
 
 require __DIR__.'/onboarding.php';
 require __DIR__.'/settings.php';

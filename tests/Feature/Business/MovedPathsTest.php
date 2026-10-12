@@ -6,6 +6,8 @@ use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\User;
+use Illuminate\Routing\Route as RouteDefinition;
+use Illuminate\Support\Facades\Route;
 use Tests\Support\Tenants;
 
 /*
@@ -14,8 +16,10 @@ use Tests\Support\Tenants;
 |--------------------------------------------------------------------------
 |
 | Every page of punchcard Pro sits under /business, the scope of its
-| manifest, so a tap (/t) or a join link (/j) never opens in it. The old
-| addresses answer with a permanent redirect, query string and all.
+| manifest, so a tap (/t) or a join link (/j) never opens in it, and its
+| sign-in page too, so opening the app signed out stays in it. The old
+| addresses answer with a permanent redirect, query string, method and
+| form data kept.
 |
 */
 
@@ -50,6 +54,23 @@ it('puts the onboarding wizard under /business too', function (): void {
         ->assertSee('<link rel="manifest" href="/manifest-business.webmanifest" data-pwa>', escape: false);
 });
 
+it('signs a guest in without leaving the app', function (): void {
+    $this->get('/business')->assertRedirect('/business/login');
+    $this->get('/business/cards')->assertRedirect('/business/login');
+
+    $this->get('/business/login')->assertOk()
+        ->assertSee('<link rel="manifest" href="/manifest-business.webmanifest" data-pwa>', escape: false)
+        ->assertInertia(fn ($page) => $page->component('auth/login'));
+
+    // The form posts to Fortify's /login, then back to the page the guest asked for last.
+    $this->post(route('login.store'), ['email' => $this->owner->email, 'password' => 'password'])
+        ->assertRedirect('/business/cards');
+});
+
+it('keeps sending a guest of the customer\'s pages to the usual sign-in', function (string $path): void {
+    $this->get($path)->assertRedirect(route('login'));
+})->with(['/app', '/app/cards/1', '/rewards']);
+
 it('sends the old addresses to the new ones for good, with their query string', function (string $old, string $new): void {
     $card = $this->tenants->cardB;
 
@@ -65,10 +86,33 @@ it('sends the old addresses to the new ones for good, with their query string', 
     'a wizard step' => ['/onboarding/location', '/business/onboarding/location'],
 ]);
 
-it('leaves the customer\'s addresses where they are', function (string $path): void {
-    $this->get($path)->assertStatus(302)->assertRedirect(route('login'));
-})->with(['/app', '/app/cards/1', '/rewards']);
+it('sends a page loaded before the move on with its saves, method and form kept', function (string $method, string $old, string $new): void {
+    $this->call($method, $old, ['name' => 'Kept'])
+        ->assertStatus(308)
+        ->assertRedirect($new);
+})->with([
+    'a new card' => ['POST', '/cards', '/business/cards'],
+    'a card saved' => ['PUT', '/cards/5', '/business/cards/5'],
+    'a card paused' => ['PATCH', '/cards/5/status', '/business/cards/5/status'],
+    'a wizard step saved' => ['PUT', '/onboarding/location', '/business/onboarding/location'],
+]);
 
 it('keeps unknown addresses unknown', function (string $path): void {
     $this->get($path)->assertNotFound();
-})->with(['/cards/abc/edit', '/dashboard/extra', '/onboarding/a/b']);
+})->with(['/dashboard/extra', '/cardsx', '/onboardingx']);
+
+it('keeps everything under /business for punchcard Pro', function (): void {
+    $outsideTheApp = ['business.register', 'business.register.store'];
+
+    $routes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (RouteDefinition $route): bool => str_starts_with($route->uri(), 'business'));
+
+    expect($routes)->not->toBeEmpty();
+
+    foreach ($routes as $route) {
+        // A /businesses… page would fall in punchcard Pro's scope (/business) too.
+        expect($route->uri() === 'business' || str_starts_with($route->uri(), 'business/'))->toBeTrue($route->uri())
+            ->and(in_array('pwa:business', $route->gatherMiddleware(), true) || in_array($route->getName(), $outsideTheApp, true))
+            ->toBeTrue("{$route->uri()} is in punchcard Pro's scope but not its page");
+    }
+});

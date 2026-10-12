@@ -56,13 +56,14 @@ it('forgets the app on the next request', function (): void {
         ->assertInertia(fn ($page) => $page->where('pwa', null));
 });
 
-it('describes both apps in valid manifests whose icons exist', function (string $app, string $startUrl, string $scope): void {
+it('describes both apps in valid manifests whose icons exist', function (string $app, string $id, string $startUrl, string $scope): void {
     $manifest = json_decode((string) file_get_contents(public_path("manifest-{$app}.webmanifest")), true, flags: JSON_THROW_ON_ERROR);
 
     expect($manifest)->toHaveKeys(['id', 'name', 'short_name', 'start_url', 'scope', 'display', 'theme_color', 'background_color', 'icons'])
         ->and($manifest['short_name'])->toBe(UsePwa::APPS[$app])
         ->and($manifest['theme_color'])->toBe(UsePwa::THEME_COLOR)
-        ->and($manifest['id'])->toBe($startUrl)
+        // The app's identity on every phone it is installed on: never changed once shipped, wherever start_url moves.
+        ->and($manifest['id'])->toBe($id)
         ->and($manifest['start_url'])->toBe($startUrl)
         ->and($manifest['scope'])->toBe($scope)
         // A start_url outside the scope makes the browser drop the scope.
@@ -74,15 +75,14 @@ it('describes both apps in valid manifests whose icons exist', function (string 
         expect(public_path(ltrim($icon['src'], '/')))->toBeFile();
     }
 })->with([
-    'customer' => ['customer', '/app', '/'],
-    'business' => ['business', '/business', '/business'],
+    'customer' => ['customer', '/app', '/app', '/'],
+    'business' => ['business', '/business', '/business', '/business'],
 ]);
 
 it('keeps taps, join links and the customer\'s pages out of punchcard Pro (CHW-151)', function (string $path): void {
-    $scope = fn (string $app): string => json_decode((string) file_get_contents(public_path("manifest-{$app}.webmanifest")), true, flags: JSON_THROW_ON_ERROR)['scope'];
+    $scope = json_decode((string) file_get_contents(public_path('manifest-business.webmanifest')), true, flags: JSON_THROW_ON_ERROR)['scope'];
 
-    expect(str_starts_with($path, $scope('business')))->toBeFalse()
-        ->and(str_starts_with($path, $scope('customer')))->toBeTrue();
+    expect(str_starts_with($path, $scope))->toBeFalse();
 })->with(['/t?e=00&c=00', '/t/result', '/j/cafe-hafa', '/app', '/app/cards/1', '/rewards']);
 
 it('knows no app but its two', function (): void {
