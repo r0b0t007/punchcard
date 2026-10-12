@@ -157,11 +157,14 @@ final readonly class Tenants
         return ['organization' => $organization, 'business' => $business, 'org_admin' => $orgAdmin, 'role' => $role?->value];
     }
 
-    /** The location of a business, read inside bypass(). */
+    /**
+     * The location of a business, read inside bypass(): its oldest, the one it
+     * was made with, whatever locations a test adds (Postgres has no row order).
+     */
     public function locationOf(Business $business): Location
     {
         return app(TenantContext::class)->bypass(
-            fn (): Location => Location::query()->where('business_id', $business->id)->firstOrFail(),
+            fn (): Location => Location::query()->where('business_id', $business->id)->oldest('id')->firstOrFail(),
         );
     }
 }
