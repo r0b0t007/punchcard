@@ -43,6 +43,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // A signed-in user on a guest page (login, register) goes home, as after signing in (StartController, CHW-27).
         $middleware->redirectUsersTo('/start');
 
+        // A guest of punchcard Pro signs in inside its scope (CHW-151), everyone else on the usual page.
+        $middleware->redirectGuestsTo(fn (Request $request): string => $request->is('business', 'business/*') ? route('business.login') : route('login'));
+
         // The tenant must be set before route model bindings resolve, so another
         // tenant's {location} or {business} is a 404 instead of an unscoped lookup.
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: SetTenant::class);

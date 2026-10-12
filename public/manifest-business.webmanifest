@@ -1,9 +1,9 @@
 {
-    "id": "/dashboard",
+    "id": "/business",
     "name": "punchcard Pro",
     "short_name": "punchcard Pro",
-    "start_url": "/dashboard",
-    "scope": "/",
+    "start_url": "/business",
+    "scope": "/business",
     "display": "standalone",
     "background_color": "#FBF6EE",
     "theme_color": "#3B2A20",

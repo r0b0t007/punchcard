@@ -24,8 +24,8 @@ describe('routeFor', () => {
             '/login',
             '/app',
             '/api/me/cards',
-            '/dashboard',
-            '/cards',
+            '/business',
+            '/business/cards',
             '/storage/logos/../private/key',
             '/build/assets/app.js',
         ]) {

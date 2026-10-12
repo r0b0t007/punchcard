@@ -5,6 +5,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
 use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
 Route::inertia('/', 'welcome')->name('home');
 
@@ -29,13 +31,15 @@ Route::middleware('guest')->group(function (): void {
     Route::post('business/register', [BusinessRegistrationController::class, 'store'])->middleware('throttle:business-signup')->name('business.register.store');
 });
 
-Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->group(function (): void {
+// punchcard Pro, the business app (CHW-151): every page under /business, its manifest's scope, so a tap (/t) or a
+// join link (/j) never opens in it.
+Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('business')->group(function (): void {
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
-    Route::get('dashboard', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
+    Route::get('/', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
     Route::middleware(RedirectToOnboarding::class)->group(function (): void {
-        Route::get('business/qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');
-        Route::post('business/qr-stand/printed', [QrStandController::class, 'printed'])->name('business.qr-stand.printed');
+        Route::get('qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');
+        Route::post('qr-stand/printed', [QrStandController::class, 'printed'])->name('business.qr-stand.printed');
         // The cards and the card builder's saves (CHW-32); {card} resolves in the tenant.
         Route::get('cards', [CardController::class, 'index'])->name('cards.index');
         Route::get('cards/create', [CardController::class, 'create'])->name('cards.create');
@@ -83,6 +87,18 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem');
     Route::delete('rewards/{reward}/redeem', [RewardController::class, 'close'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem.close');
 });
+
+// The business app's addresses before it moved under /business (CHW-151), for good: pages, and the saves of a page
+// loaded before the move, with their query string, method and form.
+Route::any('{path}', MovedToBusinessController::class)
+    ->where('path', 'dashboard|cards(?:/.*)?|onboarding(?:/.*)?')
+    ->name('business.moved');
+
+// punchcard Pro's sign-in, inside its scope: opening the app signed out never leaves it. The form posts to Fortify's
+// /login, without a page load.
+Route::get('business/login', [AuthenticatedSessionController::class, 'create'])
+    ->middleware(['guest', 'pwa:business'])
+    ->name('business.login');
 
 require __DIR__.'/onboarding.php';
 require __DIR__.'/settings.php';

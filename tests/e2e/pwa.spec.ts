@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { CDPSession, Page } from '@playwright/test';
 
 /**
  * The installable apps (CHW-35): on a phone, a café's join page and an
@@ -46,8 +46,22 @@ async function serviceWorkerScope(page: Page): Promise<string> {
     return scope;
 }
 
+const sessions = new WeakMap<Page, CDPSession>();
+
+/** The page's Chrome DevTools Protocol session, one per page. */
+async function cdp(page: Page): Promise<CDPSession> {
+    let session = sessions.get(page);
+
+    if (!session) {
+        session = await page.context().newCDPSession(page);
+        sessions.set(page, session);
+    }
+
+    return session;
+}
+
 async function installabilityErrors(page: Page): Promise<string[]> {
-    const session = await page.context().newCDPSession(page);
+    const session = await cdp(page);
     const { installabilityErrors } = await session.send(
         'Page.getInstallabilityErrors',
     );
@@ -77,7 +91,7 @@ test('a tap never waits for the service worker', async ({ page }) => {
 
     // Chrome tells which static route a navigation took (InstallEvent.addRoutes),
     // on the page it ends at: the tap's redirects follow on the same request.
-    const session = await page.context().newCDPSession(page);
+    const session = await cdp(page);
     await session.send('Network.enable');
     const routing: unknown[] = [];
     session.on('Network.responseReceived', ({ type, response }) => {
@@ -118,7 +132,7 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     const themeColor = page.locator('meta[name="theme-color"]');
 
     await signIn(page, 'owner@cafe.demo.test');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/business$/);
     await expect(manifest).toHaveAttribute(
         'href',
         '/manifest-business.webmanifest',
@@ -143,13 +157,21 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     await page.goForward();
     await expect(manifest).toHaveCount(0);
     await page.goBack();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/business$/);
     await expect(manifest).toHaveCount(1);
     await expect(themeColor).toHaveCount(1);
     expect(await registrations()).toBe(1);
 
     expect(new URL(await serviceWorkerScope(page)).pathname).toBe('/');
     expect(await installabilityErrors(page)).toEqual([]);
+
+    // punchcard Pro's scope as Chrome reads it (CHW-151): /business, so neither a tap (/t) nor a join link (/j) is
+    // in it (InstallableAppsTest checks those paths against the manifest).
+    const { manifest: parsed } = await (
+        await cdp(page)
+    ).send('Page.getAppManifest');
+    expect(parsed?.scope).toBeDefined();
+    expect(new URL(parsed?.scope ?? '', page.url()).pathname).toBe('/business');
 });
 
 test('the marketing site is no app and registers no service worker', async ({
