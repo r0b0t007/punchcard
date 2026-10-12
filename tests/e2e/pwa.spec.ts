@@ -75,19 +75,20 @@ test('a tap never waits for the service worker', async ({ page }) => {
     await page.goto('/j/cafe-hafa');
     await serviceWorkerScope(page);
 
-    // Chrome tells which static route a response took (InstallEvent.addRoutes).
+    // Chrome tells which static route a navigation took (InstallEvent.addRoutes),
+    // on the page it ends at: the tap's redirects follow on the same request.
     const session = await page.context().newCDPSession(page);
     await session.send('Network.enable');
-    const tap = new Promise<unknown>((resolve) => {
-        session.on('Network.responseReceived', ({ response }) => {
-            if (new URL(response.url).pathname === '/t') {
-                resolve(response.serviceWorkerRouterInfo);
-            }
-        });
+    const routing: unknown[] = [];
+    session.on('Network.responseReceived', ({ type, response }) => {
+        if (type === 'Document') {
+            routing.push(response.serviceWorkerRouterInfo ?? null);
+        }
     });
     await page.goto('/t?e=00&c=00');
 
-    expect(await tap).toMatchObject({ matchedSourceType: 'network' });
+    await expect.poll(() => routing.length).toBeGreaterThan(0);
+    expect(routing[0]).toMatchObject({ matchedSourceType: 'network' });
 });
 
 test("an owner's dashboard is the installable punchcard Pro app", async ({
@@ -124,6 +125,10 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     );
     await expect(themeColor).toHaveCount(1);
     await expect.poll(registrations).toBe(1);
+    // Installed (the app shell downloaded) before the visits, which it would slow on a one-process server.
+    await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+    });
 
     // Settings is no app's page: its tags go, and coming back registers nothing more.
     await page.getByRole('button', { name: 'Toggle sidebar' }).click();
