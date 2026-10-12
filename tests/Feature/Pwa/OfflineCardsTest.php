@@ -27,3 +27,14 @@ it('encrypts My cards in the browser\'s history', function (): void {
         ->assertJsonPath('component', 'app/cards')
         ->assertJsonPath('encryptHistory', true);
 });
+
+it('serves the offline page the same to everyone, nothing of the user in it', function (): void {
+    $customer = User::factory()->create(['name' => 'Salma Bennani', 'email' => 'salma@example.test']);
+
+    $this->actingAs($customer)->get(route('offline'))
+        ->assertOk()
+        ->assertSee('<div id="offline"></div>', escape: false)
+        ->assertSee('<link rel="manifest" href="/manifest-customer.webmanifest">', escape: false)
+        ->assertDontSee('Salma')
+        ->assertDontSee('salma@example.test');
+});

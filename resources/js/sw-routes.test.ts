@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { NETWORK_ROUTES, routeFor } from '@/sw-routes';
+import {
+    hasOfflineFallback,
+    NETWORK_ROUTES,
+    networkOrOffline,
+    routeFor,
+} from '@/sw-routes';
 
 const origin = 'https://punchcard.test';
 const route = (method: string, path: string, from = origin) =>
@@ -47,17 +52,92 @@ describe('routeFor', () => {
 });
 
 describe('NETWORK_ROUTES', () => {
-    it('sends every page load and every write past the service worker', () => {
-        const conditions = NETWORK_ROUTES.map((rule) => {
-            expect(rule.source).toBe('network');
+    it("sends every page load and every write past the service worker, but My cards'", () => {
+        const network = NETWORK_ROUTES.filter(
+            (rule) => rule.source === 'network',
+        ).map((rule) => rule.condition);
 
-            return rule.condition;
-        });
-
-        expect(conditions).toContainEqual({ requestMode: 'navigate' });
+        expect(network).toContainEqual({ requestMode: 'navigate' });
 
         for (const requestMethod of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-            expect(conditions).toContainEqual({ requestMethod });
+            expect(network).toContainEqual({ requestMethod });
         }
+    });
+
+    it("hands My cards' page loads to the service worker first, for their offline page", () => {
+        const firstNavigate = NETWORK_ROUTES.findIndex(
+            (rule) =>
+                rule.condition.requestMode === 'navigate' &&
+                rule.source === 'network',
+        );
+        const myCards = NETWORK_ROUTES.filter(
+            (rule) => rule.source === 'fetch-event',
+        );
+
+        expect(myCards.map((rule) => rule.condition)).toEqual([
+            { requestMode: 'navigate', urlPattern: '/app' },
+            { requestMode: 'navigate', urlPattern: '/app/*' },
+        ]);
+
+        // The rules apply in order: theirs before the one for every page.
+        for (const rule of myCards) {
+            expect(NETWORK_ROUTES.indexOf(rule)).toBeLessThan(firstNavigate);
+        }
+    });
+});
+
+describe('hasOfflineFallback', () => {
+    const fallback = (path: string, from = origin) =>
+        hasOfflineFallback(new URL(path, from), origin);
+
+    it('covers My cards and a card', () => {
+        expect(fallback('/app')).toBe(true);
+        expect(fallback('/app/cards/7')).toBe(true);
+    });
+
+    it('covers nothing else', () => {
+        for (const path of [
+            '/',
+            '/apple',
+            '/t?e=00',
+            '/rewards',
+            '/business',
+        ]) {
+            expect(fallback(path)).toBe(false);
+        }
+
+        expect(fallback('/app', 'https://cdn.example')).toBe(false);
+    });
+});
+
+describe('networkOrOffline', () => {
+    const offline = () => Promise.resolve(new Response('offline page'));
+
+    it('answers from the network when it can', async () => {
+        const answer = await networkOrOffline(
+            () => Promise.resolve(new Response('my cards')),
+            offline,
+        );
+
+        expect(await answer.text()).toBe('my cards');
+    });
+
+    it('answers the offline page when the network fails', async () => {
+        const answer = await networkOrOffline(
+            () => Promise.reject(new TypeError('Failed to fetch')),
+            offline,
+        );
+
+        expect(await answer.text()).toBe('offline page');
+    });
+
+    it('answers the offline page when the network keeps it waiting', async () => {
+        const answer = await networkOrOffline(
+            () => new Promise<Response>(() => undefined),
+            offline,
+            20,
+        );
+
+        expect(await answer.text()).toBe('offline page');
     });
 });

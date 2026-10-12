@@ -136,6 +136,47 @@ async function openCafeHafa(page: Page): Promise<void> {
     await expect(page).toHaveURL(/\/app\/cards\/\d+$/);
 }
 
+test.describe('offline', () => {
+    // The page the service worker serves when My cards can't load (CHW-35), opened here directly: what it shows
+    // comes from the phone, not the network. That the service worker falls back to it is sw-routes.test.ts's.
+    test('shows the cards kept on the phone, with when', async ({
+        page,
+    }, testInfo) => {
+        await page.goto('/app');
+        await expect
+            .poll(() => offlineSnapshot(page))
+            .toMatchObject({ cards: [{}, {}] });
+
+        await page.goto('/offline');
+
+        await expect(page.getByRole('status')).toContainText(
+            'Offline. Last updated',
+        );
+        await expect(
+            page.getByRole('button', { name: 'Try again' }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Hello Salma' }),
+        ).toBeVisible();
+        await expect(page.getByText('Café Hafa')).toBeVisible();
+        await expect(page.getByText('Atlas Coffee')).toBeVisible();
+        // Nothing to open: every page behind a link needs the network.
+        await expect(page.getByRole('link')).toHaveCount(0);
+        await expectNothingOffTheSides(page);
+        await attach(page, testInfo, 'my-cards-offline');
+
+        // Kept for someone other than the last signed-in customer: never shown.
+        await page.evaluate(() =>
+            localStorage.setItem('punchcard-offline-owner', '0'),
+        );
+        await page.reload();
+        await expect(
+            page.getByRole('heading', { level: 1, name: "You're offline" }),
+        ).toBeVisible();
+        await expect(page.getByText('Café Hafa')).toHaveCount(0);
+    });
+});
+
 test.describe('in English, light', () => {
     test.use({ locale: 'en-US', colorScheme: 'light' });
 

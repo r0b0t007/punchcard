@@ -231,6 +231,16 @@ test('the cards kept are dropped when the session ended elsewhere', async ({
         .not.toContain('punchcard-offline');
 });
 
+test('offline with no cards kept, My cards says so', async ({ page }) => {
+    // A phone that never kept any cards (or signed out): the offline page has nothing to show but a way back.
+    await page.goto('/offline');
+
+    await expect(
+        page.getByRole('heading', { level: 1, name: "You're offline" }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+});
+
 test('the marketing site is no app and registers no service worker', async ({
     page,
 }) => {

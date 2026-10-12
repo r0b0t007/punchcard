@@ -1,10 +1,19 @@
 /// <reference lib="webworker" />
 import { ExpirationPlugin } from 'workbox-expiration';
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import {
+    cleanupOutdatedCaches,
+    matchPrecache,
+    precacheAndRoute,
+} from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import type { Strategy } from 'workbox-strategies';
-import { NETWORK_ROUTES, routeFor } from './sw-routes';
+import {
+    hasOfflineFallback,
+    NETWORK_ROUTES,
+    networkOrOffline,
+    routeFor,
+} from './sw-routes';
 import type { StaticRoute, SwRoute } from './sw-routes';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -62,6 +71,19 @@ registerRoute(
             event,
             request,
         }),
+);
+
+// My cards' pages (CHW-35): from the network, else (offline, or no answer in 8 s) the offline page, which shows the
+// cards kept on the phone.
+registerRoute(
+    ({ request, url }) =>
+        request.mode === 'navigate' &&
+        hasOfflineFallback(url, self.location.origin),
+    ({ request }) =>
+        networkOrOffline(
+            () => fetch(request),
+            () => matchPrecache('/offline'),
+        ),
 );
 
 self.addEventListener('message', (event) => {

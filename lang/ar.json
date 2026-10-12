@@ -609,5 +609,8 @@
     "This café has closed: there are no offers to follow.": "أغلق هذا المقهى: لا توجد عروض للمتابعة.",
     "Verify your email address to follow offers.": "أكّد بريدك الإلكتروني لمتابعة العروض.",
     "A new version of punchcard is ready.": "نسخة جديدة من punchcard جاهزة.",
-    "Reload": "إعادة التحميل"
+    "Reload": "إعادة التحميل",
+    "Offline. Last updated :time.": "غير متصل. آخر تحديث :time.",
+    "You're offline": "أنت غير متصل",
+    "Your cards show here once you are back online.": "ستظهر بطاقاتك هنا عند عودتك إلى الاتصال."
 }

@@ -32,17 +32,63 @@ export function routeFor(method: string, url: URL, origin: string): SwRoute {
  * it applies without starting the service worker.
  */
 export type StaticRoute = {
-    condition: { requestMode?: RequestMode; requestMethod?: string };
-    source: 'network';
+    condition: {
+        requestMode?: RequestMode;
+        requestMethod?: string;
+        urlPattern?: string;
+    };
+    source: 'network' | 'fetch-event';
 };
+
+/**
+ * The pages of My cards (C5, C6), which the service worker answers with
+ * the cards kept on the phone when they can't load (CHW-35).
+ */
+export function hasOfflineFallback(url: URL, origin: string): boolean {
+    return url.origin === origin && /^\/app(\/|$)/.test(url.pathname);
+}
+
+/**
+ * A page of My cards from the network, else (offline, or no answer in
+ * `timeoutMs`) the offline page (CHW-35).
+ */
+export async function networkOrOffline(
+    fromNetwork: () => Promise<Response>,
+    offlinePage: () => Promise<Response | undefined>,
+    timeoutMs = 8000,
+): Promise<Response> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            fromNetwork(),
+            new Promise<never>((_, reject) => {
+                timer = setTimeout(
+                    () => reject(new Error('timeout')),
+                    timeoutMs,
+                );
+            }),
+        ]);
+    } catch {
+        return (await offlinePage()) ?? Response.error();
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 /**
  * What never waits for the service worker to start, in the browsers that
  * support static routing (Chromium): every page load, the tap endpoint `/t`
- * above all, and every write. The service worker would let them through
- * anyway (routeFor); this spares them its start-up.
+ * above all, but My cards' (which go to the service worker, for their
+ * offline fallback; the rules apply in order), and every write. The
+ * service worker would let them through anyway (routeFor); this spares
+ * them its start-up.
  */
 export const NETWORK_ROUTES: StaticRoute[] = [
+    ...['/app', '/app/*'].map((urlPattern): StaticRoute => ({
+        condition: { requestMode: 'navigate', urlPattern },
+        source: 'fetch-event',
+    })),
     { condition: { requestMode: 'navigate' }, source: 'network' },
     // Upper case, as requests carry them: the browser upper-cases a rule's
     // POST/PUT/DELETE but never its PATCH.

@@ -148,3 +148,53 @@ export async function keepOnlyCardsOf(userId: number | null): Promise<void> {
         await forgetOfflineCards();
     }
 }
+
+/** Whether the cards kept are the last signed-in customer's (a copy without its owner is never shown). */
+export function isOwnedBy(
+    snapshot: OfflineSnapshot,
+    owner: string | null,
+): boolean {
+    return owner !== null && owner === String(snapshot.userId);
+}
+
+/** When the cards were saved, in the customer's language (Latin digits, as everywhere in the app). */
+export function updatedAtLabel(
+    generatedAt: string,
+    locale: string,
+    timeZone?: string,
+): string {
+    return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+    }).format(new Date(generatedAt));
+}
+
+/**
+ * What the offline page shows (CHW-35): the cards kept on the phone, if
+ * they are the last signed-in customer's, with the words of their
+ * language (English without them).
+ */
+export async function readOfflineCards(): Promise<{
+    snapshot: OfflineSnapshot;
+    strings: Record<string, string>;
+} | null> {
+    const snapshot = await readSnapshot().catch(() => undefined);
+
+    if (!snapshot || !isOwnedBy(snapshot, owner())) {
+        return null;
+    }
+
+    const translations = await inStore<OfflineTranslations | undefined>(
+        'readonly',
+        (store) => store.get(TRANSLATIONS),
+    ).catch(() => undefined);
+
+    return {
+        snapshot,
+        strings:
+            translations?.locale === snapshot.locale
+                ? translations.strings
+                : {},
+    };
+}

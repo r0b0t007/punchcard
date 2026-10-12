@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { keptForSomeoneElse, snapshotOf } from '@/lib/offline-cards';
+import {
+    isOwnedBy,
+    keptForSomeoneElse,
+    snapshotOf,
+    updatedAtLabel,
+} from '@/lib/offline-cards';
 import type { MyCard } from '@/types/my-cards';
 
 const card: MyCard = {
@@ -51,5 +56,42 @@ describe('keptForSomeoneElse', () => {
     it('has nothing to drop when nothing is kept', () => {
         expect(keptForSomeoneElse(null, 42)).toBe(false);
         expect(keptForSomeoneElse(null, null)).toBe(false);
+    });
+});
+
+describe('isOwnedBy', () => {
+    const snapshot = snapshotOf(
+        {
+            userId: 42,
+            firstName: 'Salma',
+            rewardsReady: 0,
+            cards: [],
+            locale: 'en',
+            dir: 'ltr',
+        },
+        new Date('2026-10-11T11:00:00Z'),
+    );
+
+    it('shows the cards of the last signed-in customer', () => {
+        expect(isOwnedBy(snapshot, '42')).toBe(true);
+    });
+
+    it("never shows anyone else's, nor a copy whose owner is unknown", () => {
+        expect(isOwnedBy(snapshot, '7')).toBe(false);
+        expect(isOwnedBy(snapshot, null)).toBe(false);
+    });
+});
+
+describe('updatedAtLabel', () => {
+    it("says when, in the customer's language, with Latin digits", () => {
+        expect(updatedAtLabel('2026-10-11T11:00:00Z', 'en', 'UTC')).toContain(
+            '2026',
+        );
+        expect(updatedAtLabel('2026-10-11T11:00:00Z', 'ar', 'UTC')).toContain(
+            '2026',
+        );
+        expect(updatedAtLabel('2026-10-11T11:00:00Z', 'ar', 'UTC')).toMatch(
+            /11:00/,
+        );
     });
 });

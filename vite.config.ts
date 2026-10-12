@@ -5,9 +5,18 @@ import tailwindcss from '@tailwindcss/vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig, lazyPlugins } from 'vite-plus';
+
+/** The offline page's revision: its shell's assets, whose names carry their hash. */
+function offlineRevision(shell: Set<string>): string {
+    return createHash('sha256')
+        .update([...shell].sort().join(' '))
+        .digest('hex')
+        .slice(0, 16);
+}
 
 /**
  * The app shell the service worker precaches (pwa-conventions skill): the
@@ -31,7 +40,11 @@ function shellUrls(): Set<string> {
         (chunk.css ?? []).forEach((file) => urls.add(`/build/${file}`));
         (chunk.imports ?? []).forEach(visit);
     };
-    ['resources/js/app.tsx', 'resources/css/app.css'].forEach(visit);
+    [
+        'resources/js/app.tsx',
+        'resources/css/app.css',
+        'resources/js/offline.tsx',
+    ].forEach(visit);
 
     return urls;
 }
@@ -39,7 +52,12 @@ function shellUrls(): Set<string> {
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.tsx'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.tsx',
+                // The offline My cards page (CHW-35, resources/views/offline.blade.php).
+                'resources/js/offline.tsx',
+            ],
             refresh: true,
             // Both faces cover Latin and Arabic (fr/en/ar). Readex Pro for UI,
             // Baloo Bhaijaan 2 for card titles and reward moments.
@@ -91,9 +109,17 @@ export default defineConfig({
                         const shell = shellUrls();
 
                         return {
-                            manifest: entries.filter((entry) =>
-                                shell.has(entry.url),
-                            ),
+                            manifest: [
+                                ...entries.filter((entry) =>
+                                    shell.has(entry.url),
+                                ),
+                                // The offline page's shell (CHW-35): a new revision whenever its assets change.
+                                {
+                                    url: '/offline',
+                                    revision: offlineRevision(shell),
+                                    size: 0,
+                                },
+                            ],
                             warnings: [],
                         };
                     },
