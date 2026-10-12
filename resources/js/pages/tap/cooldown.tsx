@@ -4,7 +4,7 @@ import type { TapCard } from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { calendarDate } from '@/lib/local-moment';
-import { home } from '@/routes';
+import { cards } from '@/routes/app';
 
 /** When the next stamp is possible, in the location's time (DescribeTap). */
 type NextStamp = {
@@ -82,7 +82,7 @@ export default function TapCooldown({
             <TapScreen
                 actions={
                     <Button asChild size="lg">
-                        <Link href={home()}>{t('Done')}</Link>
+                        <Link href={cards()}>{t('See all my cards')}</Link>
                     </Button>
                 }
             >

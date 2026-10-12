@@ -1,10 +1,9 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import BrandMonogram from '@/components/loyalty-card/brand-monogram';
 import TapScreen from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { calendarDate } from '@/lib/local-moment';
-import { home } from '@/routes';
 import { redeem } from '@/routes/rewards';
 
 /** A reward still to redeem (ListCustomerRewards). */
@@ -27,13 +26,8 @@ export default function MyRewards({ rewards }: { rewards: SavedReward[] }) {
     return (
         <>
             <Head title={t('My rewards')} />
-            <TapScreen
-                actions={
-                    <Button asChild size="lg" variant="link">
-                        <Link href={home()}>{t('Done')}</Link>
-                    </Button>
-                }
-            >
+            {/* No Done: the customer tab bar (CHW-27) leads back to My cards. */}
+            <TapScreen className="min-h-0">
                 <div className="flex flex-col gap-1.5">
                     <h1 className="font-display text-4xl leading-tight font-bold">
                         {rewards.length > 0

@@ -73,7 +73,8 @@ return [
     |
     */
 
-    'home' => '/dashboard',
+    // StartController picks home: the dashboard, the admin panel or My cards (CHW-27).
+    'home' => '/start',
 
     /*
     |--------------------------------------------------------------------------

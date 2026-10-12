@@ -13,6 +13,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             nav: { cards: boolean };
+            /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */
+            customer: boolean;
             sidebarOpen: boolean;
             locale: string;
             dir: TextDirection;

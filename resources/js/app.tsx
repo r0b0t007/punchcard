@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
+import CustomerLayout from '@/layouts/customer-layout';
 import I18nLayout from '@/layouts/i18n-layout';
 import OnboardingLayout from '@/layouts/onboarding-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -14,12 +15,15 @@ void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     // I18nLayout comes first on every page: it provides translations and text
     // direction from the page props.
-    layout: (name) => {
+    layout: (name, page) => {
         switch (true) {
+            // The customer's home and rewards (CHW-27): full screen with the bottom tab bar.
+            case name.startsWith('app/') || name === 'rewards/index':
+                return [I18nLayout, CustomerLayout];
             case name === 'welcome' ||
                 name.startsWith('dev/') ||
                 name.startsWith('tap/') ||
-                // The customer's reward screens: full screen, like the tap screens (CHW-26).
+                // The redeem screen: full screen, like the tap screens (CHW-26).
                 name.startsWith('rewards/') ||
                 // The join page and the printable QR stand (CHW-31): full screen.
                 name.startsWith('join/') ||
@@ -30,8 +34,11 @@ void createInertiaApp({
             // The business onboarding wizard (CHW-31): full screen, its own steps.
             case name.startsWith('onboarding/'):
                 return [I18nLayout, OnboardingLayout];
+            // A customer's settings sit in their own layout, with the tab bar (CHW-27).
             case name.startsWith('settings/'):
-                return [I18nLayout, AppLayout, SettingsLayout];
+                return page.props.customer
+                    ? [I18nLayout, CustomerLayout, SettingsLayout]
+                    : [I18nLayout, AppLayout, SettingsLayout];
             default:
                 return [I18nLayout, AppLayout];
         }

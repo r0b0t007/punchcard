@@ -69,9 +69,9 @@ it('counts the stamper placed only once it has been tapped, not for a stamp by h
 it('shows no checklist to a customer or to staff', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Staff);
 
-    foreach ([User::factory()->create(), $staff] as $user) {
-        ($this->checklist)($user)->assertInertia(fn ($page) => $page->where('checklist', null));
-    }
+    ($this->checklist)($staff)->assertInertia(fn ($page) => $page->where('checklist', null));
+    // A customer never reaches the dashboard: their home is My cards (CHW-27).
+    $this->actingAs(User::factory()->create())->get(route('dashboard'))->assertRedirect(route('app.cards'));
 });
 
 it('reads only the owner\'s business: what happens at another never ticks it', function (): void {

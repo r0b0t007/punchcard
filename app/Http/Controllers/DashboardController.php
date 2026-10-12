@@ -6,9 +6,12 @@ namespace App\Http\Controllers;
 
 use App\Actions\Dashboard\DescribeDashboard;
 use App\Actions\Onboarding\DescribeChecklist;
+use App\Actions\Tenancy\HasMemberships;
 use App\Models\Business;
+use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -19,13 +22,20 @@ use Inertia\Response;
  * org admin working in it): the setup checklist (CHW-31,
  * DescribeChecklist) and the owner dashboard (CHW-33, DescribeDashboard),
  * for the business or one of its locations (?location=). Staff and
- * customers get neither. At the organization level HQ gets a note: the
- * network view is B18 (CHW-133).
+ * customers get neither: a customer goes to My cards (CHW-27). At the
+ * organization level HQ gets a note: the network view is B18 (CHW-133).
  */
 final class DashboardController extends Controller
 {
-    public function show(Request $request, TenantContext $context, DescribeChecklist $describeChecklist, DescribeDashboard $describeDashboard): Response
+    public function show(Request $request, TenantContext $context, DescribeChecklist $describeChecklist, DescribeDashboard $describeDashboard, HasMemberships $hasMemberships): Response|RedirectResponse
     {
+        $user = $request->user();
+
+        // A customer's home is My cards (CHW-27). With a tenant the user is a member: no need to ask.
+        if ($context->organizationId() === null && $user instanceof User && ! $hasMemberships->handle($user)) {
+            return to_route('app.cards');
+        }
+
         $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
 
         return Inertia::render('dashboard', [

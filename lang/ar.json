@@ -576,5 +576,22 @@
     "Visits per day": "الزيارات في اليوم",
     "Visits per day, last 30 days": "الزيارات في اليوم، آخر 30 يومًا",
     "Your regulars show here once customers visit.": "سيظهر عملاؤك الدائمون هنا بمجرد أن يزورك العملاء.",
-    ":change vs the 30 days before": ":change مقارنة بالأيام الثلاثين السابقة"
+    ":change vs the 30 days before": ":change مقارنة بالأيام الثلاثين السابقة",
+    ":count reward ready|:count rewards ready": "لا مكافآت جاهزة|مكافأة واحدة جاهزة|مكافأتان جاهزتان|:count مكافآت جاهزة|:count مكافأة جاهزة|:count مكافأة جاهزة",
+    "Add to Apple Wallet": "أضف إلى Apple Wallet",
+    "Add to Google Wallet": "أضف إلى Google Wallet",
+    "At a café that uses punchcard, hold your phone to the stamper at the counter: your first stamp starts your card.": "في مقهى يستعمل punchcard، قرّب هاتفك من جهاز الختم عند الصندوق: أول طابع يبدأ بطاقتك.",
+    "Hello": "مرحبًا",
+    "Hello :name": "مرحبًا :name",
+    "Last visit :count day ago|Last visit :count days ago": "آخر زيارة اليوم|آخر زيارة أمس|آخر زيارة قبل يومين|آخر زيارة قبل :count أيام|آخر زيارة قبل :count يومًا|آخر زيارة قبل :count يوم",
+    "Last visit today": "آخر زيارة اليوم",
+    "Main": "الرئيسية",
+    "My cards": "بطاقاتي",
+    "No cards yet": "لا بطاقات بعد",
+    "No visit yet": "لا زيارة بعد",
+    "Paused by the café": "أوقفها المقهى مؤقتًا",
+    "Rewards": "المكافآت",
+    "See all my cards": "عرض كل بطاقاتي",
+    "Wallet passes are coming soon.": "بطاقات Wallet قادمة قريبًا.",
+    "Your loyalty cards": "بطاقات الولاء الخاصة بك"
 }
