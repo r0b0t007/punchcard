@@ -34,15 +34,15 @@
         <link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-        {{-- The installable app this page belongs to (UsePwa, CHW-35): customer or business. --}}
-        @isset($pwa)
-            <link rel="manifest" href="/manifest-{{ $pwa }}.webmanifest">
-            <meta name="theme-color" content="#3B2A20">
-            <meta name="mobile-web-app-capable" content="yes">
-            <meta name="apple-mobile-web-app-capable" content="yes">
-            <meta name="apple-mobile-web-app-status-bar-style" content="default">
-            <meta name="apple-mobile-web-app-title" content="{{ $pwa === 'business' ? 'punchcard Pro' : 'punchcard' }}">
-        @endisset
+        {{-- The installable app this page belongs to (UsePwa, CHW-35); PwaHead keeps these in step on Inertia visits. --}}
+        @if ($pwa = $page['props']['pwa'] ?? null)
+            <link rel="manifest" href="/manifest-{{ $pwa['app'] }}.webmanifest" data-pwa>
+            <meta name="theme-color" content="#3B2A20" data-pwa>
+            <meta name="mobile-web-app-capable" content="yes" data-pwa>
+            <meta name="apple-mobile-web-app-capable" content="yes" data-pwa>
+            <meta name="apple-mobile-web-app-status-bar-style" content="default" data-pwa>
+            <meta name="apple-mobile-web-app-title" content="{{ $pwa['title'] }}" data-pwa>
+        @endif
 
         @fonts
 

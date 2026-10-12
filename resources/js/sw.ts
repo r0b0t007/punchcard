@@ -2,25 +2,41 @@
 import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
-import { routeFor } from './sw-routes';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { NETWORK_ROUTES, routeFor } from './sw-routes';
+import type { StaticRoute } from './sw-routes';
 
 declare const self: ServiceWorkerGlobalScope;
 
 /**
  * punchcard's service worker (CHW-35), for the customer app and the business
- * app alike: the built assets and fonts are precached, the customer's cards
- * are kept for offline use, logos and banners are refreshed in the
- * background, and nothing else is ever cached (routeFor). A new version
- * waits until the page asks it to take over (the update toast).
+ * app alike: the app shell is precached, fonts are kept once used, logos
+ * and banners are refreshed in the background, and nothing else is ever
+ * cached (routeFor). Page loads and writes skip it entirely where the
+ * browser can (NETWORK_ROUTES). A new version waits until the page asks it
+ * to take over (the update toast).
  */
+self.addEventListener('install', (event) => {
+    const install = event as ExtendableEvent & {
+        addRoutes?: (routes: StaticRoute[]) => Promise<void>;
+    };
+
+    if (install.addRoutes) {
+        install.waitUntil(install.addRoutes(NETWORK_ROUTES));
+    }
+});
+
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 registerRoute(
     ({ request, url }) =>
-        routeFor(request.method, url, self.location.origin) === 'my-cards',
-    new NetworkFirst({ cacheName: 'me-cards', networkTimeoutSeconds: 5 }),
+        routeFor(request.method, url, self.location.origin) === 'fonts',
+    new CacheFirst({
+        cacheName: 'fonts',
+        // Only a 200 is kept (Workbox's default).
+        plugins: [new ExpirationPlugin({ maxEntries: 30 })],
+    }),
 );
 
 registerRoute(

@@ -37,9 +37,8 @@ const test = base.extend<object, { customerSession: string }>({
             await page.locator('#email').fill('customer@demo.test');
             await page.locator('#password').fill('password');
             await page.locator('[data-test="login-button"]').click();
-            // A customer's home after signing in is My cards. php artisan serve answers one request
-            // at a time: a service worker installing in another worker (pwa.spec.ts) delays it.
-            await expect(page).toHaveURL(/\/app$/, { timeout: 20_000 });
+            // A customer's home after signing in is My cards.
+            await expect(page).toHaveURL(/\/app$/);
             await page.context().storageState({ path: file });
             await page.close();
 

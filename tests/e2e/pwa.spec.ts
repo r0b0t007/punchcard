@@ -71,16 +71,78 @@ test("a café's join page is the installable punchcard app", async ({
     expect(await installabilityErrors(page)).toEqual([]);
 });
 
+test('a tap never waits for the service worker', async ({ page }) => {
+    await page.goto('/j/cafe-hafa');
+    await serviceWorkerScope(page);
+
+    // Chrome tells which static route a response took (InstallEvent.addRoutes).
+    const session = await page.context().newCDPSession(page);
+    await session.send('Network.enable');
+    const tap = new Promise<unknown>((resolve) => {
+        session.on('Network.responseReceived', ({ response }) => {
+            if (new URL(response.url).pathname === '/t') {
+                resolve(response.serviceWorkerRouterInfo);
+            }
+        });
+    });
+    await page.goto('/t?e=00&c=00');
+
+    expect(await tap).toMatchObject({ matchedSourceType: 'network' });
+});
+
 test("an owner's dashboard is the installable punchcard Pro app", async ({
     page,
 }) => {
+    await page.addInitScript(() => {
+        const register = navigator.serviceWorker.register.bind(
+            navigator.serviceWorker,
+        );
+        Object.assign(window, { registrations: 0 });
+        navigator.serviceWorker.register = (...args) => {
+            Object.assign(window, {
+                registrations:
+                    (window as unknown as { registrations: number })
+                        .registrations + 1,
+            });
+
+            return register(...args);
+        };
+    });
+    const registrations = () =>
+        page.evaluate(
+            () =>
+                (window as unknown as { registrations: number }).registrations,
+        );
+    const manifest = page.locator('link[rel="manifest"]');
+    const themeColor = page.locator('meta[name="theme-color"]');
+
     await signIn(page, 'owner@cafe.demo.test');
     await expect(page).toHaveURL(/\/dashboard$/);
-
-    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+    await expect(manifest).toHaveAttribute(
         'href',
         '/manifest-business.webmanifest',
     );
+    await expect(themeColor).toHaveCount(1);
+    await expect.poll(registrations).toBe(1);
+
+    // Settings is no app's page: its tags go, and coming back registers nothing more.
+    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+    await page.getByRole('button', { name: /Yasmine Alaoui/ }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page).toHaveURL(/\/settings\//);
+    await expect(manifest).toHaveCount(0);
+    await expect(themeColor).toHaveCount(0);
+
+    await page.goBack();
+    await expect(manifest).toHaveCount(1);
+    await page.goForward();
+    await expect(manifest).toHaveCount(0);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(manifest).toHaveCount(1);
+    await expect(themeColor).toHaveCount(1);
+    expect(await registrations()).toBe(1);
+
     expect(new URL(await serviceWorkerScope(page)).pathname).toBe('/');
     expect(await installabilityErrors(page)).toEqual([]);
 });

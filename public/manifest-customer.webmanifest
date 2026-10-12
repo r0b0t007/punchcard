@@ -2,7 +2,6 @@
     "id": "/app",
     "name": "punchcard",
     "short_name": "punchcard",
-    "description": "Your loyalty cards, stamped with a tap of your phone.",
     "start_url": "/app",
     "scope": "/",
     "display": "standalone",

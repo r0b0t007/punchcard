@@ -1,7 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { DirectionProvider } from '@radix-ui/react-direction';
 import type { ReactNode } from 'react';
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PwaHead from '@/components/pwa-head';
 import ServiceWorker from '@/components/service-worker';
 import { createI18n, I18nContext } from '@/hooks/use-translation';
@@ -32,6 +32,16 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
         document.documentElement.dir = dir;
     }, [locale, dir]);
 
+    // The service worker registers on the first page of an app and stays
+    // registered: one registration per page load, whatever the visits after.
+    const [registersServiceWorker, setRegistersServiceWorker] = useState(
+        Boolean(pwa),
+    );
+
+    if (Boolean(pwa) && !registersServiceWorker) {
+        setRegistersServiceWorker(true);
+    }
+
     // A visit without its translations (e.g. a history entry whose once prop
     // is gone) renders the English keys; fetch the set once per locale.
     const refetched = useRef(new Set<string>());
@@ -46,9 +56,11 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
     return (
         <I18nContext value={i18n}>
             <DirectionProvider dir={dir}>{children}</DirectionProvider>
-            {/* Only a page of an installable app registers the service worker (CHW-35). */}
-            <PwaHead app={pwa ?? null} />
-            {pwa ? <ServiceWorker /> : null}
+            {/* The first page of an installable app registers the service worker (CHW-35). */}
+            <PwaHead pwa={pwa ?? null} />
+            {registersServiceWorker ? (
+                <ServiceWorker onAppPage={Boolean(pwa)} />
+            ) : null}
         </I18nContext>
     );
 }

@@ -78,17 +78,16 @@ export default defineConfig({
             manifest: false,
             injectManifest: {
                 globDirectory: 'public/build',
-                globPatterns: ['**/*.{js,css,woff2}'],
+                // The app shell only: page chunks load on visit, fonts are cached once used (sw.ts).
+                globPatterns: ['**/*.{js,css}'],
                 modifyURLPrefix: { '': '/build/' },
                 manifestTransforms: [
                     (entries) => {
                         const shell = shellUrls();
 
                         return {
-                            manifest: entries.filter(
-                                (entry) =>
-                                    shell.has(entry.url) ||
-                                    entry.url.endsWith('.woff2'),
+                            manifest: entries.filter((entry) =>
+                                shell.has(entry.url),
                             ),
                             warnings: [],
                         };

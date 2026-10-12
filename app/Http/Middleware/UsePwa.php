@@ -6,7 +6,6 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\View;
 use Inertia\Inertia;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,19 +16,25 @@ use Symfony\Component\HttpFoundation\Response;
  * (punchcard Pro: the dashboard, cards, onboarding). The page links that
  * app's manifest and registers the service worker; a page outside both
  * (the marketing site, sign-in, settings, admin) does neither.
+ *
+ * Shared as the Inertia prop `pwa`, which app.blade.php reads too.
  */
 final class UsePwa
 {
-    public const array APPS = ['customer', 'business'];
+    /**
+     * Each app's home-screen title, as its manifest's short_name.
+     *
+     * @var array<string, string>
+     */
+    public const array APPS = ['customer' => 'punchcard', 'business' => 'punchcard Pro'];
 
     public function handle(Request $request, Closure $next, string $app): Response
     {
-        if (! in_array($app, self::APPS, true)) {
+        if (! array_key_exists($app, self::APPS)) {
             throw new InvalidArgumentException("Unknown app [{$app}].");
         }
 
-        View::share('pwa', $app);
-        Inertia::share('pwa', $app);
+        Inertia::share('pwa', ['app' => $app, 'title' => self::APPS[$app]]);
 
         return $next($request);
     }
