@@ -56,7 +56,7 @@ describe('NETWORK_ROUTES', () => {
 
         expect(conditions).toContainEqual({ requestMode: 'navigate' });
 
-        for (const requestMethod of ['post', 'put', 'patch', 'delete']) {
+        for (const requestMethod of ['POST', 'PUT', 'PATCH', 'DELETE']) {
             expect(conditions).toContainEqual({ requestMethod });
         }
     });

@@ -3,8 +3,9 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import type { Strategy } from 'workbox-strategies';
 import { NETWORK_ROUTES, routeFor } from './sw-routes';
-import type { StaticRoute } from './sw-routes';
+import type { StaticRoute, SwRoute } from './sw-routes';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -22,27 +23,23 @@ self.addEventListener('install', (event) => {
     };
 
     if (install.addRoutes) {
-        install.waitUntil(install.addRoutes(NETWORK_ROUTES));
+        // A shortcut only: a browser that refuses a rule still installs the worker.
+        install.waitUntil(
+            install.addRoutes(NETWORK_ROUTES).catch(() => undefined),
+        );
     }
 });
 
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-registerRoute(
-    ({ request, url }) =>
-        routeFor(request.method, url, self.location.origin) === 'fonts',
-    new CacheFirst({
+// Only a 200 is ever kept (Workbox's default).
+const strategies: Record<NonNullable<SwRoute>, Strategy> = {
+    fonts: new CacheFirst({
         cacheName: 'fonts',
-        // Only a 200 is kept (Workbox's default).
         plugins: [new ExpirationPlugin({ maxEntries: 30 })],
     }),
-);
-
-registerRoute(
-    ({ request, url }) =>
-        routeFor(request.method, url, self.location.origin) === 'images',
-    new StaleWhileRevalidate({
+    images: new StaleWhileRevalidate({
         cacheName: 'images',
         plugins: [
             new ExpirationPlugin({
@@ -51,6 +48,20 @@ registerRoute(
             }),
         ],
     }),
+};
+
+// routeFor once per request: Workbox hands the match to the handler as params.
+registerRoute(
+    ({ request, url }) => {
+        const route = routeFor(request.method, url, self.location.origin);
+
+        return route ? { route } : false;
+    },
+    ({ event, request, params }) =>
+        strategies[(params as { route: NonNullable<SwRoute> }).route].handle({
+            event,
+            request,
+        }),
 );
 
 self.addEventListener('message', (event) => {

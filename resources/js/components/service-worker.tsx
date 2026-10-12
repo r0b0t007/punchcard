@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from '@/hooks/use-translation';
+import { createUpdateFlow } from '@/lib/update-flow';
 
 const TOAST_ID = 'service-worker-update';
 
@@ -10,14 +11,29 @@ const TOAST_ID = 'service-worker-update';
  * never competes with a tap or join page for the network. Mounted once, on
  * the first page of an app (a manifest is linked), and kept mounted: when a
  * new version is waiting, a toast on an app's pages offers to reload, and
- * only then does it take over, never mid-action.
+ * only the tab whose Reload was tapped reloads (createUpdateFlow).
  */
 export default function ServiceWorker({ onAppPage }: { onAppPage: boolean }) {
     const { t } = useTranslation();
+    const activate = useRef<() => void>(() => undefined);
+    const [flow] = useState(() =>
+        createUpdateFlow(
+            () => window.location.reload(),
+            () => activate.current(),
+        ),
+    );
     const {
         needRefresh: [needRefresh],
         updateServiceWorker,
-    } = useRegisterSW({ immediate: false });
+    } = useRegisterSW({
+        immediate: false,
+        // In place of vite-plugin-pwa's reload of every tab the new version takes over.
+        onNeedReload: () => flow.newVersionControls(),
+    });
+
+    useEffect(() => {
+        activate.current = () => void updateServiceWorker(true);
+    }, [updateServiceWorker]);
 
     useEffect(() => {
         if (!needRefresh || !onAppPage) {
@@ -31,10 +47,10 @@ export default function ServiceWorker({ onAppPage }: { onAppPage: boolean }) {
             duration: Infinity,
             action: {
                 label: t('Reload'),
-                onClick: () => void updateServiceWorker(true),
+                onClick: () => flow.requestReload(),
             },
         });
-    }, [needRefresh, onAppPage, t, updateServiceWorker]);
+    }, [flow, needRefresh, onAppPage, t]);
 
     return null;
 }

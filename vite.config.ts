@@ -11,13 +11,14 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
 
 /**
  * The app shell the service worker precaches (pwa-conventions skill): the
- * app entry and the chunks it imports statically, the stylesheet and the
- * fonts. Each page's own chunk loads when the page does, as before.
+ * app entry, the chunks it imports statically and their stylesheets. Each
+ * page's own chunk loads when the page does, as before; fonts are cached
+ * the first time a page uses one (sw.ts).
  */
 function shellUrls(): Set<string> {
     const manifest = JSON.parse(
         readFileSync('public/build/manifest.json', 'utf8'),
-    ) as Record<string, { file: string; imports?: string[] }>;
+    ) as Record<string, { file: string; imports?: string[]; css?: string[] }>;
     const urls = new Set<string>();
     const visit = (key: string) => {
         const chunk = manifest[key];
@@ -27,6 +28,7 @@ function shellUrls(): Set<string> {
         }
 
         urls.add(`/build/${chunk.file}`);
+        (chunk.css ?? []).forEach((file) => urls.add(`/build/${file}`));
         (chunk.imports ?? []).forEach(visit);
     };
     ['resources/js/app.tsx', 'resources/css/app.css'].forEach(visit);
@@ -81,6 +83,9 @@ export default defineConfig({
                 // The app shell only: page chunks load on visit, fonts are cached once used (sw.ts).
                 globPatterns: ['**/*.{js,css}'],
                 modifyURLPrefix: { '': '/build/' },
+                // Their names carry a hash: precache them as the page loaded them, from the HTTP
+                // cache, not again under a revision (the plugin's default expects assets/, not /build/assets/).
+                dontCacheBustURLsMatching: /^\/build\/assets\//,
                 manifestTransforms: [
                     (entries) => {
                         const shell = shellUrls();

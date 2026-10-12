@@ -30,7 +30,7 @@ it('links the customer app on a customer\'s pages', function (): void {
     $this->actingAs(User::factory()->create())->get(route('app.cards'))
         ->assertSee('<link rel="manifest" href="/manifest-customer.webmanifest" data-pwa>', escape: false)
         ->assertSee('<meta name="apple-mobile-web-app-title" content="punchcard" data-pwa>', escape: false)
-        ->assertInertia(fn ($page) => $page->where('pwa', ['app' => 'customer', 'title' => 'punchcard']));
+        ->assertInertia(fn ($page) => $page->where('pwa', UsePwa::describe('customer')));
 });
 
 it('links the business app on a business\'s pages', function (): void {
@@ -39,7 +39,7 @@ it('links the business app on a business\'s pages', function (): void {
     $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])->get(route('dashboard'))
         ->assertSee('<link rel="manifest" href="/manifest-business.webmanifest" data-pwa>', escape: false)
         ->assertSee('<meta name="apple-mobile-web-app-title" content="punchcard Pro" data-pwa>', escape: false)
-        ->assertInertia(fn ($page) => $page->where('pwa', ['app' => 'business', 'title' => 'punchcard Pro']));
+        ->assertInertia(fn ($page) => $page->where('pwa', UsePwa::describe('business')));
 });
 
 it('links no app on the marketing site or the sign-in page', function (string $path): void {
@@ -61,6 +61,7 @@ it('describes both apps in valid manifests whose icons exist', function (string 
 
     expect($manifest)->toHaveKeys(['id', 'name', 'short_name', 'start_url', 'scope', 'display', 'theme_color', 'background_color', 'icons'])
         ->and($manifest['short_name'])->toBe(UsePwa::APPS[$app])
+        ->and($manifest['theme_color'])->toBe(UsePwa::THEME_COLOR)
         ->and($manifest['start_url'])->toBe($startUrl)
         ->and($manifest['scope'])->toBe('/')
         ->and(array_column($manifest['icons'], 'sizes'))->toContain('192x192', '512x512')

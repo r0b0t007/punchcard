@@ -17,7 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  * app's manifest and registers the service worker; a page outside both
  * (the marketing site, sign-in, settings, admin) does neither.
  *
- * Shared as the Inertia prop `pwa`, which app.blade.php reads too.
+ * Shared as the Inertia prop `pwa`, with the <head> tags of the app:
+ * app.blade.php writes them on a full load, PwaHead on every visit.
  */
 final class UsePwa
 {
@@ -28,14 +29,37 @@ final class UsePwa
      */
     public const array APPS = ['customer' => 'punchcard', 'business' => 'punchcard Pro'];
 
+    /** The browser chrome's colour, as both manifests' theme_color (espresso). */
+    public const string THEME_COLOR = '#3B2A20';
+
     public function handle(Request $request, Closure $next, string $app): Response
     {
         if (! array_key_exists($app, self::APPS)) {
             throw new InvalidArgumentException("Unknown app [{$app}].");
         }
 
-        Inertia::share('pwa', ['app' => $app, 'title' => self::APPS[$app]]);
+        Inertia::share('pwa', self::describe($app));
 
         return $next($request);
+    }
+
+    /**
+     * The app and its <head> tags: the manifest link and the metas, by name.
+     *
+     * @return array{app: string, manifest: string, meta: array<string, string>}
+     */
+    public static function describe(string $app): array
+    {
+        return [
+            'app' => $app,
+            'manifest' => "/manifest-{$app}.webmanifest",
+            'meta' => [
+                'theme-color' => self::THEME_COLOR,
+                'mobile-web-app-capable' => 'yes',
+                'apple-mobile-web-app-capable' => 'yes',
+                'apple-mobile-web-app-status-bar-style' => 'default',
+                'apple-mobile-web-app-title' => self::APPS[$app],
+            ],
+        ];
     }
 }

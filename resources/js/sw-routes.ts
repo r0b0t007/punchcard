@@ -44,7 +44,9 @@ export type StaticRoute = {
  */
 export const NETWORK_ROUTES: StaticRoute[] = [
     { condition: { requestMode: 'navigate' }, source: 'network' },
-    ...['post', 'put', 'patch', 'delete'].map((requestMethod): StaticRoute => ({
+    // Upper case, as requests carry them: the browser upper-cases a rule's
+    // POST/PUT/DELETE but never its PATCH.
+    ...['POST', 'PUT', 'PATCH', 'DELETE'].map((requestMethod): StaticRoute => ({
         condition: { requestMethod },
         source: 'network',
     })),
