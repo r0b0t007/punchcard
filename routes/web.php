@@ -100,9 +100,5 @@ Route::get('business/login', [AuthenticatedSessionController::class, 'create'])
     ->middleware(['guest', 'pwa:business'])
     ->name('business.login');
 
-// My cards' data as JSON (CHW-35), which the service worker keeps for offline use: a guest gets a 401, never a
-// sign-in page a cache could keep (bootstrap/app.php renders api/* as JSON). Never cached by a browser or a proxy.
-Route::middleware(['auth', NeverCache::class])->get('api/me/cards', [MyCardsController::class, 'snapshot'])->name('api.me.cards');
-
 require __DIR__.'/onboarding.php';
 require __DIR__.'/settings.php';

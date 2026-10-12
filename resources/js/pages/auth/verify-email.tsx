@@ -1,5 +1,5 @@
 // Components
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -33,7 +33,10 @@ export default function VerifyEmail({ status }: { status?: string }) {
 
                         <TextLink
                             href={logout()}
-                            onClick={() => void forgetOfflineCards()}
+                            onClick={() => {
+                                router.clearHistory();
+                                void forgetOfflineCards();
+                            }}
                             className="mx-auto block text-sm"
                         >
                             {t('Log out')}

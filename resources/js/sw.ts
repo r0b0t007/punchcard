@@ -2,13 +2,9 @@
 import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import {
-    CacheFirst,
-    NetworkFirst,
-    StaleWhileRevalidate,
-} from 'workbox-strategies';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import type { Strategy } from 'workbox-strategies';
-import { CARDS_CACHE, NETWORK_ROUTES, routeFor } from './sw-routes';
+import { NETWORK_ROUTES, routeFor } from './sw-routes';
 import type { StaticRoute, SwRoute } from './sw-routes';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -39,11 +35,6 @@ cleanupOutdatedCaches();
 
 // Only a 200 is ever kept (Workbox's default).
 const strategies: Record<NonNullable<SwRoute>, Strategy> = {
-    // The customer's cards for offline use, dropped on sign-out (CARDS_CACHE).
-    'my-cards': new NetworkFirst({
-        cacheName: CARDS_CACHE,
-        networkTimeoutSeconds: 5,
-    }),
     fonts: new CacheFirst({
         cacheName: 'fonts',
         plugins: [new ExpirationPlugin({ maxEntries: 30 })],

@@ -63,6 +63,23 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | History Encryption
+    |--------------------------------------------------------------------------
+    |
+    | Every page's props are encrypted in the browser's history (CHW-35): once
+    | a sign-out clears the key, Back asks the server again instead of
+    | showing, and saving for offline use, the previous customer's cards.
+    |
+    */
+
+    'history' => [
+
+        'encrypt' => true,
+
+    ],
+
     'testing' => [
 
         'ensure_pages_exist' => true,

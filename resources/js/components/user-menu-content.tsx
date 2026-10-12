@@ -24,7 +24,8 @@ export function UserMenuContent({ user }: Props) {
     const handleLogout = () => {
         cleanup();
         router.flushAll();
-        // The server's Clear-Site-Data does the same, where the browser honours it (CHW-35).
+        // Nothing of this customer's stays on the phone, not even in Back's history (CHW-35).
+        router.clearHistory();
         void forgetOfflineCards();
     };
 

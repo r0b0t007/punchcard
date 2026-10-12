@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { snapshotOf } from '@/lib/offline-cards';
+import { keptForSomeoneElse, snapshotOf } from '@/lib/offline-cards';
 import type { MyCard } from '@/types/my-cards';
 
 const card: MyCard = {
@@ -13,17 +13,16 @@ const card: MyCard = {
 };
 
 describe('snapshotOf', () => {
-    it('keeps whose cards, when, and the words to show them in', () => {
+    it('keeps whose cards, when, and in which language', () => {
         expect(
             snapshotOf(
                 {
+                    userId: 42,
                     firstName: 'Salma',
                     rewardsReady: 1,
                     cards: [card],
-                    userId: 42,
                     locale: 'ar',
                     dir: 'rtl',
-                    translations: { 'My cards': 'بطاقاتي' },
                 },
                 new Date('2026-10-11T11:00:00Z'),
             ),
@@ -35,7 +34,22 @@ describe('snapshotOf', () => {
             generatedAt: '2026-10-11T11:00:00.000Z',
             locale: 'ar',
             dir: 'rtl',
-            translations: { 'My cards': 'بطاقاتي' },
         });
+    });
+});
+
+describe('keptForSomeoneElse', () => {
+    it('keeps the cards of whoever is signed in', () => {
+        expect(keptForSomeoneElse('42', 42)).toBe(false);
+    });
+
+    it('drops them for anyone else, or a guest', () => {
+        expect(keptForSomeoneElse('42', 7)).toBe(true);
+        expect(keptForSomeoneElse('42', null)).toBe(true);
+    });
+
+    it('has nothing to drop when nothing is kept', () => {
+        expect(keptForSomeoneElse(null, 42)).toBe(false);
+        expect(keptForSomeoneElse(null, null)).toBe(false);
     });
 });

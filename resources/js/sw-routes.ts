@@ -2,8 +2,6 @@
  * What the service worker does with a request (CHW-35, pwa-conventions
  * skill). Kept apart from sw.ts so it can be unit-tested.
  *
- * - The customer's cards (`/api/me/cards`): network first, the last copy
- *   when offline (C5). Dropped on sign-out (Clear-Site-Data).
  * - Fonts: cache first, the first time a page uses one (their names are
  *   hashed, and a page only loads the subsets it shows).
  * - Logos and banners: stale while revalidate.
@@ -11,18 +9,11 @@
  *   sign-in and every other page, every POST/PUT/PATCH/DELETE and all
  *   business data. The app shell comes from the precache.
  */
-export type SwRoute = 'my-cards' | 'fonts' | 'images' | null;
-
-/** The cache the customer's cards are kept in, dropped on sign-out (offline-cards.ts). */
-export const CARDS_CACHE = 'me-cards';
+export type SwRoute = 'fonts' | 'images' | null;
 
 export function routeFor(method: string, url: URL, origin: string): SwRoute {
     if (method !== 'GET' || url.origin !== origin) {
         return null;
-    }
-
-    if (url.pathname === '/api/me/cards') {
-        return 'my-cards';
     }
 
     if (/^\/build\/assets\/[^/]+\.woff2$/.test(url.pathname)) {

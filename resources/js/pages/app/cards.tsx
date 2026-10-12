@@ -4,7 +4,11 @@ import { useEffect } from 'react';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/use-translation';
-import { saveSnapshot, snapshotOf } from '@/lib/offline-cards';
+import {
+    saveSnapshot,
+    saveTranslations,
+    snapshotOf,
+} from '@/lib/offline-cards';
 import { show } from '@/routes/app/cards';
 import { index as rewards } from '@/routes/rewards';
 import type { MyCard } from '@/types/my-cards';
@@ -24,37 +28,35 @@ export default function MyCards({
     cards: MyCard[];
 }) {
     const { t } = useTranslation();
-    const { auth, locale, dir, translations } = usePage().props;
+    const { props, version } = usePage();
+    const { auth, locale, dir, translations } = props;
 
-    // Kept on the phone for when it is offline (CHW-35), in the customer's language.
+    // Kept on the phone for when it is offline (CHW-35), with the words of the customer's language.
     useEffect(() => {
-        if (!translations) {
-            return;
-        }
-
         saveSnapshot(
             snapshotOf(
                 {
+                    userId: auth.user.id,
                     firstName,
                     rewardsReady,
                     cards,
-                    userId: auth.user.id,
                     locale,
                     dir,
-                    translations,
                 },
                 new Date(),
             ),
         ).catch(() => undefined);
-    }, [
-        auth.user.id,
-        cards,
-        dir,
-        firstName,
-        locale,
-        rewardsReady,
-        translations,
-    ]);
+    }, [auth.user.id, cards, dir, firstName, locale, rewardsReady]);
+
+    useEffect(() => {
+        if (translations) {
+            saveTranslations({
+                locale,
+                version: version ?? '',
+                strings: translations,
+            }).catch(() => undefined);
+        }
+    }, [locale, translations, version]);
 
     return (
         <>
