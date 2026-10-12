@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Actions\Tenancy\HasMemberships;
 use App\Models\LoyaltyCard;
+use App\Models\User;
 use App\Support\Locales;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -47,6 +49,9 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             // What the sidebar offers in the tenant being worked in: the cards page to whoever runs the program or the business (CHW-32).
+            // A customer's settings pages use the customer layout and its tab bar (CHW-27); read there only.
+            'customer' => fn (): bool => $request->is('settings/*') && $request->user() instanceof User
+                && ! app(HasMemberships::class)->handle($request->user()),
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
             ],

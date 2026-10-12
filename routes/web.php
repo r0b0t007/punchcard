@@ -8,6 +8,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
+use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
@@ -71,7 +72,9 @@ Route::middleware(NeverCache::class)->group(function (): void {
 // screen polls while the tap lands in the same session (an Android PWA shares the browser's
 // cookies): block() queues them like the /t requests, so a poll never writes back a stale session.
 Route::middleware(['auth', NeverCache::class])->group(function (): void {
-    // The customer's home, My cards (CHW-27): where customers land after signing in.
+    // Home after signing in (CHW-27): the dashboard, the admin panel or My cards.
+    Route::get('start', StartController::class)->name('start');
+    // My cards (CHW-27): the customer's home, and the cards of anyone who collects stamps.
     Route::get('app', [MyCardsController::class, 'index'])->name('app.cards');
     Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
     Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:reward-screen')->block(10, 10)->name('rewards.redeem.show');

@@ -1,7 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ChevronRight, Gift, SmartphoneNfc } from 'lucide-react';
-import LoyaltyCard from '@/components/loyalty-card';
-import type { StampStyle } from '@/components/loyalty-card';
+import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/use-translation';
@@ -84,23 +83,9 @@ export default function MyCards({
                     <ul className="flex flex-col gap-6">
                         {cards.map((myCard) => (
                             <li key={myCard.id} className="flex flex-col gap-2">
-                                <LoyaltyCard
-                                    businessName={myCard.card.businessName}
-                                    cardName={myCard.card.cardName}
+                                <TapLoyaltyCard
+                                    card={myCard.card}
                                     logoUrl={myCard.logoUrl}
-                                    stampsRequired={myCard.card.stampsRequired}
-                                    stampsCollected={
-                                        myCard.card.stampsCollected
-                                    }
-                                    stampStyle={
-                                        (myCard.card.stampStyle ??
-                                            'dot') as StampStyle
-                                    }
-                                    brandColor={myCard.card.brandColor}
-                                    brandForeground={
-                                        myCard.card.brandForeground
-                                    }
-                                    rewardText={myCard.card.rewardText}
                                 />
                                 <div className="flex flex-wrap items-center gap-2 px-1 text-sm text-muted-foreground">
                                     <span>

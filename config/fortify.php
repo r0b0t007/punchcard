@@ -73,8 +73,8 @@ return [
     |
     */
 
-    // Customers land on My cards; /app sends whoever runs or works in a business to the dashboard (CHW-27).
-    'home' => '/app',
+    // StartController picks home: the dashboard, the admin panel or My cards (CHW-27).
+    'home' => '/start',
 
     /*
     |--------------------------------------------------------------------------

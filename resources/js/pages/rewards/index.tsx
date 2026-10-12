@@ -27,7 +27,7 @@ export default function MyRewards({ rewards }: { rewards: SavedReward[] }) {
         <>
             <Head title={t('My rewards')} />
             {/* No Done: the customer tab bar (CHW-27) leads back to My cards. */}
-            <TapScreen>
+            <TapScreen className="min-h-0">
                 <div className="flex flex-col gap-1.5">
                     <h1 className="font-display text-4xl leading-tight font-bold">
                         {rewards.length > 0

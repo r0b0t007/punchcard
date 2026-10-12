@@ -9,14 +9,19 @@ import { index as rewards } from '@/routes/rewards';
 
 /** The customer's tabs (C5's bottom navigation); Discover comes with discovery (CHW-54). */
 const TABS = [
-    { label: 'Cards', href: cards(), icon: WalletCards },
-    { label: 'Rewards', href: rewards(), icon: Gift },
-    { label: 'Profile', href: profile(), icon: UserRound },
+    { label: 'Cards', href: cards(), section: '/app', icon: WalletCards },
+    { label: 'Rewards', href: rewards(), section: '/rewards', icon: Gift },
+    {
+        label: 'Profile',
+        href: profile(),
+        section: '/settings',
+        icon: UserRound,
+    },
 ] as const;
 
 /**
  * The customer's screens (CHW-27): full screen, with a tab bar pinned to the
- * bottom, above the phone's home indicator.
+ * bottom.
  */
 export default function CustomerLayout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
@@ -28,11 +33,13 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
             {children}
             <nav
                 aria-label={t('Main')}
-                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background pb-safe"
+                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background"
             >
                 <ul className="mx-auto grid max-w-md grid-cols-3">
                     {TABS.map((tab) => {
-                        const current = path === tab.href.url;
+                        const current =
+                            path === tab.section ||
+                            path.startsWith(`${tab.section}/`);
 
                         return (
                             <li key={tab.label}>

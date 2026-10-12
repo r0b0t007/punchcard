@@ -25,7 +25,8 @@ final class CustomerCard
      */
     public static function of(Business $business, LoyaltyCard $card, ?Location $location = null, int $stamps = 0): array
     {
-        return self::shape($business->name, $location?->name, $card, $business->organization->brand_color, $stamps);
+        // The organization is read only for a card without its own colour.
+        return self::shape($business->name, $location?->name, $card, $card->brandColor() ?? $business->organization->brand_color, $stamps);
     }
 
     /**
@@ -36,13 +37,13 @@ final class CustomerCard
      */
     public static function ofProgram(Organization $organization, LoyaltyCard $card, int $stamps = 0): array
     {
-        return self::shape($organization->name, null, $card, $organization->brand_color, $stamps);
+        return self::shape($organization->name, null, $card, $card->brandColor() ?? $organization->brand_color, $stamps);
     }
 
     /**
      * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
      */
-    private static function shape(string $name, ?string $locationName, LoyaltyCard $card, ?string $organizationColor, int $stamps): array
+    private static function shape(string $name, ?string $locationName, LoyaltyCard $card, ?string $brandColor, int $stamps): array
     {
         return [
             'businessName' => $name,
@@ -51,7 +52,7 @@ final class CustomerCard
             'stampsRequired' => $card->stamps_required,
             'stampsCollected' => max(0, min($stamps, $card->stamps_required)),
             'rewardText' => $card->reward_text,
-            'brandColor' => $card->brandColor() ?? $organizationColor,
+            'brandColor' => $brandColor,
             'brandForeground' => $card->brandForeground(),
             'stampStyle' => $card->stamp_style,
         ];

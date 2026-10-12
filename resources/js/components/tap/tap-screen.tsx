@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import LoyaltyCard from '@/components/loyalty-card';
 import type { LoyaltyCardProps, StampStyle } from '@/components/loyalty-card';
 import BrandMonogram from '@/components/loyalty-card/brand-monogram';
+import { cn } from '@/lib/utils';
 
 /** The café's card as a tap result shows it (DescribeTap). */
 export type TapCard = {
@@ -26,12 +27,20 @@ export type TapCard = {
 export default function TapScreen({
     children,
     actions,
+    className,
 }: {
     children: ReactNode;
     actions?: ReactNode;
+    /** E.g. min-h-0 inside the customer layout, which already fills the screen (CHW-27). */
+    className?: string;
 }) {
     return (
-        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background text-foreground">
+        <main
+            className={cn(
+                'mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background text-foreground',
+                className,
+            )}
+        >
             <div className="flex flex-col gap-7 px-6 pt-8">{children}</div>
             {actions ? (
                 <div className="mt-auto flex flex-col gap-3 px-6 pt-8 pb-8">
@@ -72,7 +81,7 @@ export function TapLoyaltyCard({
     ...states
 }: { card: TapCard } & Pick<
     LoyaltyCardProps,
-    'progressLabel' | 'ghostNext' | 'landingFrom'
+    'logoUrl' | 'progressLabel' | 'ghostNext' | 'landingFrom'
 >) {
     return (
         <LoyaltyCard

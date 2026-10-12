@@ -34,6 +34,6 @@ class RegistrationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('app.cards', absolute: false));
+        $response->assertRedirect(route('start', absolute: false));
     }
 }

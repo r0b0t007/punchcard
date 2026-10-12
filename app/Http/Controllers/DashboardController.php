@@ -31,8 +31,8 @@ final class DashboardController extends Controller
     {
         $user = $request->user();
 
-        // A customer's home is My cards (CHW-27).
-        if ($user instanceof User && ! $hasMemberships->handle($user)) {
+        // A customer's home is My cards (CHW-27). With a tenant the user is a member: no need to ask.
+        if ($context->organizationId() === null && $user instanceof User && ! $hasMemberships->handle($user)) {
             return to_route('app.cards');
         }
 

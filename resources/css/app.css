@@ -114,11 +114,6 @@
  * inline: utilities read var(--card-brand) on the element itself, so LoyaltyCard can
  * override these per card. A plain @theme entry would resolve once on :root.
  */
-/* Room for the phone's home indicator under a bar pinned to the bottom (the customer tab bar). */
-@utility pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-}
-
 /* Animates size only (sidebar collapse), so theme changes don't fade. */
 @utility transition-size {
     transition-property: width, height;

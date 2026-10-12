@@ -39,9 +39,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias(['tenant' => SetTenant::class, 'onboarding' => ResolveOnboardingBusiness::class]);
 
-        // A signed-in user on a guest page (login, register) goes home: My cards, which sends whoever runs or
-        // works in a business on to the dashboard (CHW-27).
-        $middleware->redirectUsersTo('/app');
+        // A signed-in user on a guest page (login, register) goes home, as after signing in (StartController, CHW-27).
+        $middleware->redirectUsersTo('/start');
 
         // The tenant must be set before route model bindings resolve, so another
         // tenant's {location} or {business} is a 404 instead of an unscoped lookup.

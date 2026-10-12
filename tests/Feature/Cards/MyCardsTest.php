@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\BusinessRole;
+use App\Enums\PlatformRole;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\CardEnrollment;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
 
 /*
@@ -135,8 +137,12 @@ it('sends guests to sign in', function (): void {
     $this->get(route('app.cards'))->assertRedirect(route('login'));
 });
 
-it('sends whoever runs or works in a business to their dashboard', function (User $user): void {
-    $this->actingAs($user)->get(route('app.cards'))->assertRedirect(route('dashboard'));
+it('sends whoever runs or works in a business home to their dashboard, and still shows them their own cards', function (User $user): void {
+    $this->actingAs($user)->get(route('start'))->assertRedirect(route('dashboard'));
+
+    $this->tenants->enroll($user, $this->tenants->cardB);
+    $this->actingAs($user)->get(route('app.cards'))->assertOk()
+        ->assertInertia(fn ($page) => $page->has('cards', 1));
 })->with([
     'an owner' => fn () => $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner),
     'staff' => fn () => $this->tenants->member(User::factory()->create(), $this->tenants->a1),
@@ -145,7 +151,36 @@ it('sends whoever runs or works in a business to their dashboard', function (Use
 
 it('lands a customer on their cards after signing in, and sends one who opens the dashboard there', function (): void {
     $this->post(route('login.store'), ['email' => $this->customer->email, 'password' => 'password'])
-        ->assertRedirect('/app');
+        ->assertRedirect(route('start', absolute: false));
 
+    $this->actingAs($this->customer)->get(route('start'))->assertRedirect(route('app.cards'));
+    $this->actingAs($this->customer)->get(route('start', ['verified' => 1]))->assertRedirect(route('app.cards', ['verified' => 1]));
     $this->actingAs($this->customer)->get(route('dashboard'))->assertRedirect(route('app.cards'));
+});
+
+it('treats a business that was given up as no business: its owner goes to their cards', function (): void {
+    // A cancelled setup keeps its rows, archived (CancelSetup); ResolveTenant gives no tenant there.
+    $owner = $this->tenants->admin($this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner), $this->tenants->orgB);
+    $this->context->bypass(function (): void {
+        $this->tenants->b1->forceFill(['archived_at' => now()])->save();
+        $this->tenants->orgB->forceFill(['archived_at' => now()])->save();
+    });
+
+    $this->actingAs($owner)->get(route('start'))->assertRedirect(route('app.cards'));
+    $this->actingAs($owner)->get(route('dashboard'))->assertRedirect(route('app.cards'));
+});
+
+it('sends the platform admin home to the admin panel', function (): void {
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
+
+    $this->actingAs($admin)->get(route('start'))->assertRedirect(url('/admin'));
+});
+
+it('gives a customer\'s settings the customer layout, never a business user\'s', function (): void {
+    $owner = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
+
+    $this->actingAs($this->customer)->get(route('profile.edit'))->assertInertia(fn ($page) => $page->where('customer', true));
+    $this->actingAs($owner)->get(route('profile.edit'))->assertInertia(fn ($page) => $page->where('customer', false));
+    $this->actingAs($this->customer)->get(route('app.cards'))->assertInertia(fn ($page) => $page->where('customer', false));
 });

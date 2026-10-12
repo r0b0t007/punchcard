@@ -197,7 +197,8 @@ describe('cancelling setup', function (): void {
 
         expect(($this->fresh)($this->business)->archived_at)->not->toBeNull()
             ->and(app(MustHandOverBusiness::class)->handle($this->owner))->toBeFalse();
-        $this->get(route('dashboard'))->assertOk();
+        // With no business left they are a customer: the dashboard sends them to My cards (CHW-27).
+        $this->get(route('dashboard'))->assertRedirect(route('app.cards'));
     });
 
     it('never closes a business that is set up', function (): void {
