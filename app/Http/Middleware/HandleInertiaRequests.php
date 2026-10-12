@@ -52,6 +52,8 @@ class HandleInertiaRequests extends Middleware
             // A customer's settings pages use the customer layout and its tab bar (CHW-27); read there only.
             'customer' => fn (): bool => $request->is('settings/*') && $request->user() instanceof User
                 && ! app(HasMemberships::class)->handle($request->user()),
+            // The installable app the page belongs to, if any (UsePwa, CHW-35).
+            'pwa' => null,
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
             ],

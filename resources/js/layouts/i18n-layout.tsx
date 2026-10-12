@@ -1,7 +1,9 @@
 import { router, usePage } from '@inertiajs/react';
 import { DirectionProvider } from '@radix-ui/react-direction';
 import type { ReactNode } from 'react';
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import PwaHead from '@/components/pwa-head';
+import ServiceWorker from '@/components/service-worker';
 import { createI18n, I18nContext } from '@/hooks/use-translation';
 
 /**
@@ -9,13 +11,14 @@ import { createI18n, I18nContext } from '@/hooks/use-translation';
  * locale and translations from the page props *during render*, so a page
  * never shows the previous language after a switch or a login, and provides
  * them to useTranslation(). Also keeps <html lang dir> in sync and feeds
- * Radix's DirectionProvider, which does not read <html dir>.
+ * Radix's DirectionProvider, which does not read <html dir>, and registers
+ * the service worker on the pages of an installable app (CHW-35).
  *
  * Outside it (component tests, previews) useTranslation() falls back to the
  * English keys.
  */
 export default function I18nLayout({ children }: { children: ReactNode }) {
-    const { locale, dir, translations } = usePage().props;
+    const { locale, dir, translations, pwa } = usePage().props;
 
     // Stable while the locale is unchanged (the client reuses the cached once
     // prop), so t() keeps its identity across visits.
@@ -28,6 +31,16 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
         document.documentElement.lang = locale;
         document.documentElement.dir = dir;
     }, [locale, dir]);
+
+    // The service worker registers on the first page of an app and stays
+    // registered: one registration per page load, whatever the visits after.
+    const [registersServiceWorker, setRegistersServiceWorker] = useState(
+        Boolean(pwa),
+    );
+
+    if (Boolean(pwa) && !registersServiceWorker) {
+        setRegistersServiceWorker(true);
+    }
 
     // A visit without its translations (e.g. a history entry whose once prop
     // is gone) renders the English keys; fetch the set once per locale.
@@ -43,6 +56,11 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
     return (
         <I18nContext value={i18n}>
             <DirectionProvider dir={dir}>{children}</DirectionProvider>
+            {/* The first page of an installable app registers the service worker (CHW-35). */}
+            <PwaHead pwa={pwa ?? null} />
+            {registersServiceWorker ? (
+                <ServiceWorker onAppPage={Boolean(pwa)} />
+            ) : null}
         </I18nContext>
     );
 }

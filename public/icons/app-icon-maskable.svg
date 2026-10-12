@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <!-- The maskable variant (CHW-35): full bleed, the stamp inside the central safe zone (radius 40 % of the icon). -->
+    <rect width="512" height="512" fill="#3B2A20"/>
+    <circle cx="256" cy="256" r="126" fill="#F2A541"/>
+    <circle cx="256" cy="256" r="126" fill="none" stroke="#FBF6EE" stroke-opacity="0.25" stroke-width="8"/>
+    <path d="M194 261 L237 304 L323 212" fill="none" stroke="#3B2A20" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

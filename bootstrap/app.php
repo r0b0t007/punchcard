@@ -9,6 +9,7 @@ use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SetTenant;
+use App\Http\Middleware\UsePwa;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -37,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // A changed password (or a deleted, anonymised account) signs out every other device.
         $middleware->authenticateSessions();
 
-        $middleware->alias(['tenant' => SetTenant::class, 'onboarding' => ResolveOnboardingBusiness::class]);
+        $middleware->alias(['tenant' => SetTenant::class, 'onboarding' => ResolveOnboardingBusiness::class, 'pwa' => UsePwa::class]);
 
         // A signed-in user on a guest page (login, register) goes home, as after signing in (StartController, CHW-27).
         $middleware->redirectUsersTo('/start');

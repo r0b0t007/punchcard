@@ -30,9 +30,17 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+        {{-- The installable app this page belongs to (UsePwa, CHW-35); PwaHead keeps these in step on Inertia visits. --}}
+        @if ($pwa = $page['props']['pwa'] ?? null)
+            <link rel="manifest" href="{{ $pwa['manifest'] }}" data-pwa>
+            @foreach ($pwa['meta'] as $name => $content)
+                <meta name="{{ $name }}" content="{{ $content }}" data-pwa>
+            @endforeach
+        @endif
 
         @fonts
 

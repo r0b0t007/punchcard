@@ -27,7 +27,12 @@ export default defineConfig({
     webServer: process.env.E2E_BASE_URL
         ? undefined
         : {
-              command: 'php artisan serve --host=127.0.0.1 --port=8000',
+              // Four PHP workers: the specs run in parallel, and one PHP server process would
+              // queue every request (pages, assets, a service worker's precache) behind the others.
+              // --no-reload is what lets serve start them; PHP ignores the workers on Windows.
+              command:
+                  'php artisan serve --host=127.0.0.1 --port=8000 --no-reload',
+              env: { PHP_CLI_SERVER_WORKERS: '4' },
               url: baseURL,
               reuseExistingServer: !process.env.CI,
               timeout: 120_000,

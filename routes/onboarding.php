@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // The onboarding wizard (CHW-31): on the user's own business being set up (the `onboarding`
 // middleware), never one named in the URL.
-Route::middleware(['auth', 'verified', 'onboarding'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
+Route::middleware(['auth', 'verified', 'onboarding', 'pwa:business'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
     Route::get('/', [OnboardingController::class, 'resume'])->name('show');
     Route::get('{step}', [OnboardingController::class, 'show'])
         ->whereIn('step', array_map(fn (OnboardingStep $step): string => $step->value, OnboardingStep::cases()))

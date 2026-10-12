@@ -7,14 +7,14 @@ description: PWA rules for punchcard's customer and business surfaces (manifests
 
 ## Surfaces
 
-| Surface        | Path                                             | Manifest                                                                     | Notes                                                                |
-| -------------- | ------------------------------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Marketing site | `/`, `/pricing`, `/faq`, `/legal/*`              | none                                                                         | SSR-friendly, no service worker control needed                       |
-| Customer PWA   | `/app/*` + tap `/t`                              | `manifest-customer.webmanifest`, `start_url: /app`, `scope: /`               | Tap URLs must be in scope so Android opens them in the installed app |
-| Business PWA   | `/business/*`, staff counter `/business/counter` | `manifest-business.webmanifest`, `start_url: /business`, `scope: /business/` | Separate name/icon ("punchcard Pro")                                 |
-| Admin          | `/admin` (Filament)                              | none                                                                         | Desktop only                                                         |
+| Surface        | Path                                                   | Manifest                                                                     | Notes                                                                                                             |
+| -------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Marketing site | `/`, `/pricing`, `/faq`, `/legal/*`                    | none                                                                         | SSR-friendly, no service worker control needed                                                                    |
+| Customer PWA   | `/app/*` + tap `/t`                                    | `manifest-customer.webmanifest`, `start_url: /app`, `scope: /`               | Tap URLs must be in scope so Android opens them in the installed app                                              |
+| Business PWA   | `/dashboard`, `/cards`, `/business/*`, `/onboarding/*` | `manifest-business.webmanifest`, `start_url: /dashboard`, `scope: /` for now | Separate name ("punchcard Pro"). Narrowing its scope to `/business/` needs the routes moved there first (CHW-151) |
+| Admin          | `/admin` (Filament)                                    | none                                                                         | Desktop only                                                                                                      |
 
-Serve the right `<link rel="manifest">` per Inertia layout. Icons: 192, 512, maskable 512, Apple touch icon 180.
+The `pwa:customer` / `pwa:business` route middleware (`UsePwa`) picks the manifest: app.blade.php writes it on a full load and `PwaHead` keeps it in step on Inertia visits. Icons: 192, 512, maskable 512, Apple touch icon 180.
 
 ## iOS facts to design around
 
@@ -26,11 +26,13 @@ Serve the right `<link rel="manifest">` per Inertia layout. Icons: 192, 512, mas
 ## Service worker
 
 - Tooling: `vite-plugin-pwa` (Workbox, `injectManifest` strategy). Confirm compatibility with the project's Vite/vite-plus version before adding it; pin the version.
-- Precache the app shell and fonts only. Runtime caching:
-    - `GET /api/me/cards`: network-first, fall back to cache (offline card view).
+- Precache the app shell only (the app entry and its static imports). Register after the page has loaded (`immediate: false`), never while a tap or join page loads. Runtime caching (`resources/js/sw-routes.ts`):
+    - `GET /api/me/cards`: network-first, fall back to cache (offline card view). Cleared on sign-out (`Clear-Site-Data`), as it holds one customer's cards.
+    - Fonts: cache-first once a page used them (only the subsets it shows).
     - Images/logos: stale-while-revalidate, capped entries.
     - **Never cache** `/t`, auth routes, any POST/PATCH/DELETE, `/business/*` data.
 - Store the last-known cards in IndexedDB for the offline C5 screen; show "offline, last updated <time>".
+- Page loads and writes skip the worker's start-up where the browser can (static routing, `NETWORK_ROUTES`): the tap must stay fast.
 - Version the SW; on update show a "New version, reload" toast rather than reloading mid-action.
 
 ## Push

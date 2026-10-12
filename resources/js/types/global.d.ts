@@ -1,5 +1,6 @@
 import type { Auth } from '@/types/auth';
 import type { LocaleOption, TextDirection } from '@/types/i18n';
+import type { Pwa } from '@/types/pwa';
 
 declare module 'react' {
     interface InputHTMLAttributes<T> {
@@ -13,6 +14,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             nav: { cards: boolean };
+            /** The installable app the page belongs to (UsePwa, CHW-35). */
+            pwa: Pwa;
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */
             customer: boolean;
             sidebarOpen: boolean;

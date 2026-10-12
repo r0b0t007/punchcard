@@ -5,7 +5,36 @@ import tailwindcss from '@tailwindcss/vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
+import { readFileSync } from 'node:fs';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig, lazyPlugins } from 'vite-plus';
+
+/**
+ * The app shell the service worker precaches (pwa-conventions skill): the
+ * app entry, the chunks it imports statically and their stylesheets. Each
+ * page's own chunk loads when the page does, as before; fonts are cached
+ * the first time a page uses one (sw.ts).
+ */
+function shellUrls(): Set<string> {
+    const manifest = JSON.parse(
+        readFileSync('public/build/manifest.json', 'utf8'),
+    ) as Record<string, { file: string; imports?: string[]; css?: string[] }>;
+    const urls = new Set<string>();
+    const visit = (key: string) => {
+        const chunk = manifest[key];
+
+        if (!chunk || urls.has(`/build/${chunk.file}`)) {
+            return;
+        }
+
+        urls.add(`/build/${chunk.file}`);
+        (chunk.css ?? []).forEach((file) => urls.add(`/build/${file}`));
+        (chunk.imports ?? []).forEach(visit);
+    };
+    ['resources/js/app.tsx', 'resources/css/app.css'].forEach(visit);
+
+    return urls;
+}
 
 export default defineConfig({
     plugins: lazyPlugins(() => [
@@ -35,6 +64,41 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+        }),
+        // The service worker (CHW-35, pwa-conventions skill): written at the site root so its
+        // scope is the whole site, while the assets it precaches stay in /build.
+        VitePWA({
+            strategies: 'injectManifest',
+            srcDir: 'resources/js',
+            filename: 'sw.ts',
+            outDir: 'public',
+            // Registered at /sw.js with the whole site as its scope, not under Vite's /build/ base.
+            base: '/',
+            scope: '/',
+            registerType: 'prompt',
+            injectRegister: false,
+            manifest: false,
+            injectManifest: {
+                globDirectory: 'public/build',
+                // The app shell only: page chunks load on visit, fonts are cached once used (sw.ts).
+                globPatterns: ['**/*.{js,css}'],
+                modifyURLPrefix: { '': '/build/' },
+                // Their names carry a hash: precache them as the page loaded them, from the HTTP
+                // cache, not again under a revision (the plugin's default expects assets/, not /build/assets/).
+                dontCacheBustURLsMatching: /^\/build\/assets\//,
+                manifestTransforms: [
+                    (entries) => {
+                        const shell = shellUrls();
+
+                        return {
+                            manifest: entries.filter((entry) =>
+                                shell.has(entry.url),
+                            ),
+                            warnings: [],
+                        };
+                    },
+                ],
+            },
         }),
     ]),
     server: {
