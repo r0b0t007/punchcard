@@ -40,7 +40,10 @@ final class MyCardsController extends Controller
 
     public function show(MyCardRequest $request, DescribeMyCard $describeMyCard): Response
     {
-        return Inertia::render('app/card', $describeMyCard->handle($request->enrollment(), CarbonImmutable::now()));
+        $user = $request->user();
+        assert($user instanceof User);
+
+        return Inertia::render('app/card', $describeMyCard->handle($request->enrollment(), $user, CarbonImmutable::now()));
     }
 
     public function follow(FollowRequest $request, SetFollow $setFollow): RedirectResponse

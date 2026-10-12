@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ChevronLeft,
     Clock,
@@ -12,6 +12,7 @@ import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { Badge } from '@/components/ui/badge';
+import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { cards } from '@/routes/app';
 import { follow } from '@/routes/app/cards';
 import { index as rewards } from '@/routes/rewards';
+import { notice as verifyEmail } from '@/routes/verification';
 
 type Props = {
     /** The enrollment. */
@@ -54,6 +56,8 @@ type Props = {
     following: boolean;
     /** False once the café has closed: no new follow. */
     canFollow: boolean;
+    /** Consent needs a verified email. */
+    mustVerify: boolean;
 };
 
 /**
@@ -76,8 +80,11 @@ export default function MyCard({
     venues,
     following,
     canFollow,
+    mustVerify,
 }: Props) {
     const { t, locale } = useTranslation();
+    // SetFollow says why it refused (a closed café, an email to verify).
+    const { errors } = usePage().props;
     const hasInfo =
         Boolean(info.hours) || Boolean(info.phone) || info.links.length > 0;
 
@@ -218,6 +225,8 @@ export default function MyCard({
                         <Checkbox
                             id="follow"
                             checked={following}
+                            // Turning it off always works; turning it on needs a verified email.
+                            disabled={mustVerify && !following}
                             onCheckedChange={(checked) =>
                                 router.patch(
                                     follow.url(id),
@@ -236,6 +245,17 @@ export default function MyCard({
                                     { business: card.businessName },
                                 )}
                             </p>
+                            {mustVerify && !following ? (
+                                <Link
+                                    href={verifyEmail()}
+                                    className="text-sm font-medium underline underline-offset-4"
+                                >
+                                    {t(
+                                        'Verify your email address to follow offers.',
+                                    )}
+                                </Link>
+                            ) : null}
+                            <InputError message={errors.follow} />
                         </div>
                     </section>
                 ) : null}

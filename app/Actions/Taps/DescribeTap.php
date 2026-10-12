@@ -109,9 +109,18 @@ final readonly class DescribeTap
         });
     }
 
-    /** The customer's copy of the tap's card, for "See this card" (CHW-27, C6). */
+    /**
+     * The customer's copy of the tap's card, for "See this card" (CHW-27,
+     * C6): the one its stamp went on, else the customer's copy of its card.
+     */
     private function enrollmentOf(Tap $tap): ?int
     {
+        if ($tap->stamp_event_id !== null) {
+            $id = StampEvent::query()->whereKey($tap->stamp_event_id)->value('enrollment_id');
+
+            return $id === null ? null : (int) $id;
+        }
+
         if ($tap->card_id === null || $tap->user_id === null) {
             return null;
         }

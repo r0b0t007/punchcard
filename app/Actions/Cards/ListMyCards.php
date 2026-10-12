@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Cards;
 
-use App\Enums\CardMode;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\CardEnrollment;
@@ -87,7 +86,7 @@ final readonly class ListMyCards
 
                 $list[] = [
                     'id' => $enrollment->id,
-                    'card' => CustomerCard::ofProgram($organization, $card, $card->mode === CardMode::Progressive ? $enrollment->lifetime_stamps : $enrollment->current_stamps),
+                    'card' => CustomerCard::ofProgram($organization, $card, CustomerCard::stampsOf($card, $enrollment)),
                     'logoUrl' => $organization->logoUrl(),
                     'rewardsReady' => (int) $ready->get($enrollment->id, 0),
                     'lastVisitDaysAgo' => $lastVisit === null ? null : (int) round(abs($lastVisit->created_at->toImmutable()->setTimezone($timezone)->startOfDay()

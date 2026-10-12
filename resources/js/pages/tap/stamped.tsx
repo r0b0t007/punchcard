@@ -84,7 +84,15 @@ export default function TapStamped({
                                     </Link>
                                 </Button>
                             ) : null}
-                            <Button asChild size="lg" variant="outline">
+                            <Button
+                                asChild
+                                size="lg"
+                                variant={
+                                    enrollmentId !== null
+                                        ? 'outline'
+                                        : 'default'
+                                }
+                            >
                                 <Link href={cards()}>
                                     {t('See all my cards')}
                                 </Link>

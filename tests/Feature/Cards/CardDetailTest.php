@@ -193,7 +193,7 @@ it('offers no follow for a café that has closed, and refuses one cleanly', func
 });
 
 it('keeps one follow when it is turned on twice at once', function (): void {
-    // The other request's row is already there: the insert finds it instead of failing.
+    // The other request's row is already there: it is turned on, never doubled.
     $this->context->bypass(fn () => Follow::query()->create(['user_id' => $this->customer->id, 'organization_id' => $this->tenants->orgA->id, 'notify' => true]));
 
     app(SetFollow::class)->handle($this->enrollment, true);
@@ -207,4 +207,31 @@ it('never gives a deleted account a follow back', function (): void {
     app(SetFollow::class)->handle($this->enrollment, true);
 
     expect($this->context->bypass(fn (): int => Follow::query()->count()))->toBe(0);
+});
+
+it('asks for a verified email before taking consent to offers', function (): void {
+    $this->customer->forceFill(['email_verified_at' => null])->save();
+
+    ($this->show)()->assertInertia(fn ($page) => $page->where('mustVerify', true)->where('canFollow', true));
+    ($this->follow)(true)->assertSessionHasErrors('follow');
+    expect($this->context->bypass(fn (): int => Follow::query()->count()))->toBe(0);
+});
+
+it('lets an unverified customer turn following off', function (): void {
+    ($this->follow)(true);
+    $this->customer->forceFill(['email_verified_at' => null])->save();
+
+    ($this->follow)(false)->assertSessionHasNoErrors();
+    expect($this->context->bypass(fn () => Follow::query()->sole()))->notify->toBeFalse();
+});
+
+it('shows a card whose stored tiers are malformed, without its tiers', function (): void {
+    $this->context->bypass(fn () => $this->tenants->cardB->forceFill([
+        'mode' => 'progressive', 'tiers' => [['stamps' => 5, 'reward' => 'Tea'], ['stamps' => 10, 'reward' => 'Cake']], 'stamps_required' => 10,
+    ])->save());
+    // Written around the guards, as an old row could be.
+    DB::table('loyalty_cards')->where('id', $this->tenants->cardB->id)->update(['tiers' => json_encode([['stamps' => 'x']])]);
+
+    ($this->show)($this->tenants->enroll($this->customer, $this->tenants->cardB))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('tiers', null));
 });

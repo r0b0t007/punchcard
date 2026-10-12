@@ -19,11 +19,14 @@ use Illuminate\Validation\ValidationException;
  * consent's last change stays dated. In bypass(): only the customer sets
  * their own follow (Follow), on a card they hold (MyCardRequest).
  *
- * - A closed program (archived organization) takes no new follow: the
- *   form says so. Turning one off always works.
- * - Two requests turning it on at once keep one row (createOrFirst).
- * - The user is locked first, so an account being deleted (DeleteAccount,
- *   which locks it too) never gets a follow back.
+ * - Consent needs a verified email: whoever gives it owns the inbox the
+ *   offers go to. Turning it off never does.
+ * - A closed program (archived organization) takes no new follow. Archiving
+ *   writes the organization's row: read locked, the check and the follow
+ *   never interleave with it.
+ * - The user is locked first: one customer's requests run one at a time,
+ *   and an account being deleted (DeleteAccount locks it too) never gets
+ *   a follow back.
  */
 final readonly class SetFollow
 {
@@ -46,15 +49,17 @@ final readonly class SetFollow
                 return;
             }
 
-            if (Organization::query()->whereKey($enrollment->organization_id)->whereNotNull('archived_at')->exists()) {
+            if (! $user->hasVerifiedEmail()) {
+                throw ValidationException::withMessages(['follow' => __('Verify your email address to follow offers.')]);
+            }
+
+            $organization = Organization::query()->whereKey($enrollment->organization_id)->lockForUpdate()->first(['id', 'archived_at']);
+
+            if (! $organization instanceof Organization || $organization->archived_at !== null) {
                 throw ValidationException::withMessages(['follow' => __('This café has closed: there are no offers to follow.')]);
             }
 
-            $existing = Follow::query()->createOrFirst($keys, ['notify' => true]);
-
-            if (! $existing->wasRecentlyCreated && ! $existing->notify) {
-                $existing->forceFill(['notify' => true])->save();
-            }
+            Follow::query()->updateOrCreate($keys, ['notify' => true]);
         }));
     }
 }
