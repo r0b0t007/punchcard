@@ -83,8 +83,10 @@ jobs:
       - name: Run Playwright
         run: npx playwright test
 
+      # Every run, not only a failed one: the report holds the phone screenshots the specs attach
+      # (customer-cards.spec.ts), and mobile-safari runs only here.
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ !cancelled() }}
         with:
           name: playwright-report
           path: playwright-report/
