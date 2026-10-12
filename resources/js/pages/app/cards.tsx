@@ -1,22 +1,13 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { ChevronRight, Gift, SmartphoneNfc } from 'lucide-react';
+import { useEffect } from 'react';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
-import type { TapCard } from '@/components/tap/tap-screen';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/use-translation';
+import { saveSnapshot, snapshotOf } from '@/lib/offline-cards';
 import { show } from '@/routes/app/cards';
 import { index as rewards } from '@/routes/rewards';
-
-type MyCard = {
-    /** The enrollment. */
-    id: number;
-    card: TapCard;
-    logoUrl: string | null;
-    rewardsReady: number;
-    /** Local days since the last stamp in person; null before any. */
-    lastVisitDaysAgo: number | null;
-    paused: boolean;
-};
+import type { MyCard } from '@/types/my-cards';
 
 /**
  * C5 My cards (CHW-27): the customer's home. A banner for the rewards ready,
@@ -33,6 +24,37 @@ export default function MyCards({
     cards: MyCard[];
 }) {
     const { t } = useTranslation();
+    const { auth, locale, dir, translations } = usePage().props;
+
+    // Kept on the phone for when it is offline (CHW-35), in the customer's language.
+    useEffect(() => {
+        if (!translations) {
+            return;
+        }
+
+        saveSnapshot(
+            snapshotOf(
+                {
+                    firstName,
+                    rewardsReady,
+                    cards,
+                    userId: auth.user.id,
+                    locale,
+                    dir,
+                    translations,
+                },
+                new Date(),
+            ),
+        ).catch(() => undefined);
+    }, [
+        auth.user.id,
+        cards,
+        dir,
+        firstName,
+        locale,
+        rewardsReady,
+        translations,
+    ]);
 
     return (
         <>

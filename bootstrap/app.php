@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\ClearSiteDataOnSignOut;
 use App\Http\Middleware\GiveSessionTapToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            ClearSiteDataOnSignOut::class,
         ]);
 
         // A changed password (or a deleted, anonymised account) signs out every other device.

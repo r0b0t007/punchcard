@@ -3,6 +3,7 @@ import { Form, Head } from '@inertiajs/react';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { forgetOfflineCards } from '@/lib/offline-cards';
 import { logout } from '@/routes';
 import { useTranslation } from '@/hooks/use-translation';
 import { send } from '@/routes/verification';
@@ -32,6 +33,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
 
                         <TextLink
                             href={logout()}
+                            onClick={() => void forgetOfflineCards()}
                             className="mx-auto block text-sm"
                         >
                             {t('Log out')}

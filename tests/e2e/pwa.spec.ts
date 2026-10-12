@@ -60,6 +60,12 @@ async function cdp(page: Page): Promise<CDPSession> {
     return session;
 }
 
+function offlineDatabases(page: Page): Promise<string[]> {
+    return page.evaluate(async () =>
+        (await indexedDB.databases()).map((database) => database.name ?? ''),
+    );
+}
+
 async function installabilityErrors(page: Page): Promise<string[]> {
     const session = await cdp(page);
     const { installabilityErrors } = await session.send(
@@ -172,6 +178,38 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     ).send('Page.getAppManifest');
     expect(parsed?.scope).toBeDefined();
     expect(new URL(parsed?.scope ?? '', page.url()).pathname).toBe('/business');
+});
+
+test('a sign-out leaves no cards on the phone', async ({ page }) => {
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/app');
+    await serviceWorkerScope(page);
+    // The service worker's copy of the cards (network first), written once the answer is back.
+    await page.evaluate(() =>
+        fetch('/api/me/cards', { headers: { Accept: 'application/json' } }),
+    );
+    await expect
+        .poll(() =>
+            page.evaluate(
+                async () =>
+                    (await (await caches.open('me-cards')).keys()).length,
+            ),
+        )
+        .toBe(1);
+    await expect
+        .poll(() => offlineDatabases(page))
+        .toContain('punchcard-offline');
+
+    await page.goto('/business');
+    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+    await page.getByRole('button', { name: /Yasmine Alaoui/ }).click();
+    await page.getByRole('menuitem', { name: 'Log out' }).click();
+    await page.waitForURL((url) => url.pathname === '/');
+
+    await expect
+        .poll(() => offlineDatabases(page))
+        .not.toContain('punchcard-offline');
+    expect(await page.evaluate(() => caches.has('me-cards'))).toBe(false);
 });
 
 test('the marketing site is no app and registers no service worker', async ({

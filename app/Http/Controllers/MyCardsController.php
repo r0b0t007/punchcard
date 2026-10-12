@@ -11,6 +11,7 @@ use App\Http\Requests\FollowRequest;
 use App\Http\Requests\MyCardRequest;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,8 @@ use Inertia\Response;
  *   Customers land here after signing in (StartController).
  * - GET /app/cards/{enrollment}: one card in full (C6, DescribeMyCard).
  * - PATCH /app/cards/{enrollment}/follow: "Follow for offers" (SetFollow).
+ * - GET /api/me/cards: My cards as JSON, for offline use (CHW-35): whose
+ *   cards and when, so a copy kept on the phone says both.
  *
  * {enrollment} is one of the customer's own cards (MyCardRequest): anyone
  * else's is a 404.
@@ -36,6 +39,19 @@ final class MyCardsController extends Controller
         assert($user instanceof User);
 
         return Inertia::render('app/cards', $listMyCards->handle($user, CarbonImmutable::now()));
+    }
+
+    public function snapshot(Request $request, ListMyCards $listMyCards): JsonResponse
+    {
+        $user = $request->user();
+        assert($user instanceof User);
+        $now = CarbonImmutable::now();
+
+        return response()->json([
+            ...$listMyCards->handle($user, $now),
+            'userId' => $user->id,
+            'generatedAt' => $now->toIso8601String(),
+        ]);
     }
 
     public function show(MyCardRequest $request, DescribeMyCard $describeMyCard): Response

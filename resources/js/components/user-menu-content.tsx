@@ -8,6 +8,7 @@ import {
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { useTranslation } from '@/hooks/use-translation';
+import { forgetOfflineCards } from '@/lib/offline-cards';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';
@@ -23,6 +24,8 @@ export function UserMenuContent({ user }: Props) {
     const handleLogout = () => {
         cleanup();
         router.flushAll();
+        // The server's Clear-Site-Data does the same, where the browser honours it (CHW-35).
+        void forgetOfflineCards();
     };
 
     return (

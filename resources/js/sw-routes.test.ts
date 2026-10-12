@@ -6,6 +6,10 @@ const route = (method: string, path: string, from = origin) =>
     routeFor(method, new URL(path, from), origin);
 
 describe('routeFor', () => {
+    it("keeps the customer's cards for offline use", () => {
+        expect(route('GET', '/api/me/cards')).toBe('my-cards');
+    });
+
     it('keeps a font once a page used it', () => {
         expect(
             route('GET', '/build/assets/instrument-sans-latin-400.woff2'),
@@ -23,7 +27,7 @@ describe('routeFor', () => {
             '/t/result',
             '/login',
             '/app',
-            '/api/me/cards',
+            '/api/me/cards/1',
             '/business',
             '/business/cards',
             '/storage/logos/../private/key',
@@ -36,6 +40,7 @@ describe('routeFor', () => {
     it('never touches a write, even to a cached address', () => {
         for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
             expect(route(method, '/storage/logos/1/a.png')).toBeNull();
+            expect(route(method, '/api/me/cards')).toBeNull();
         }
     });
 
