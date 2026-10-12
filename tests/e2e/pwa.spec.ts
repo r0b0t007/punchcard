@@ -118,7 +118,7 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     const themeColor = page.locator('meta[name="theme-color"]');
 
     await signIn(page, 'owner@cafe.demo.test');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/business$/);
     await expect(manifest).toHaveAttribute(
         'href',
         '/manifest-business.webmanifest',
@@ -143,13 +143,27 @@ test("an owner's dashboard is the installable punchcard Pro app", async ({
     await page.goForward();
     await expect(manifest).toHaveCount(0);
     await page.goBack();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/business$/);
     await expect(manifest).toHaveCount(1);
     await expect(themeColor).toHaveCount(1);
     expect(await registrations()).toBe(1);
 
     expect(new URL(await serviceWorkerScope(page)).pathname).toBe('/');
     expect(await installabilityErrors(page)).toEqual([]);
+
+    // punchcard Pro's scope as Chrome reads it (CHW-151): its own pages, never a tap or a join link.
+    const session = await page.context().newCDPSession(page);
+    const { manifest: parsed } = await session.send('Page.getAppManifest');
+    const scope = new URL(parsed?.scope ?? '').pathname;
+    expect(scope).toBe('/business');
+
+    for (const path of ['/business', '/business/cards']) {
+        expect(path.startsWith(scope)).toBe(true);
+    }
+
+    for (const path of ['/t?e=00&c=00', '/j/cafe-hafa', '/app', '/rewards']) {
+        expect(path.startsWith(scope)).toBe(false);
+    }
 });
 
 test('the marketing site is no app and registers no service worker', async ({

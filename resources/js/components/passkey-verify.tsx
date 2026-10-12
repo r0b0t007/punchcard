@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
+import { start } from '@/routes';
 
 type Props = {
     routes?: {
@@ -33,7 +34,8 @@ export default function PasskeyVerify({
             },
         }),
         onSuccess: (response) => {
-            router.visit(response.redirect ?? '/dashboard');
+            // Home: the dashboard, the admin panel or My cards (StartController).
+            router.visit(response.redirect ?? start());
         },
     });
 
