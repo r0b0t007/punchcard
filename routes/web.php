@@ -76,6 +76,8 @@ Route::middleware(['auth', NeverCache::class])->group(function (): void {
     Route::get('start', StartController::class)->name('start');
     // My cards (CHW-27): the customer's home, and the cards of anyone who collects stamps.
     Route::get('app', [MyCardsController::class, 'index'])->name('app.cards');
+    Route::get('app/cards/{enrollment}', [MyCardsController::class, 'show'])->whereNumber('enrollment')->name('app.cards.show');
+    Route::patch('app/cards/{enrollment}/follow', [MyCardsController::class, 'follow'])->whereNumber('enrollment')->name('app.cards.follow');
     Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
     Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:reward-screen')->block(10, 10)->name('rewards.redeem.show');
     Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem');

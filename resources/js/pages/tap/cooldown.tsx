@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { calendarDate } from '@/lib/local-moment';
 import { cards } from '@/routes/app';
+import { show } from '@/routes/app/cards';
 
 /** When the next stamp is possible, in the location's time (DescribeTap). */
 type NextStamp = {
@@ -21,10 +22,13 @@ export default function TapCooldown({
     card,
     nextStamp,
     stampedMinutesAgo,
+    enrollmentId,
 }: {
     card: TapCard | null;
     nextStamp: NextStamp | null;
     stampedMinutesAgo: number | null;
+    /** The customer's copy of the card, for "See this card" (C6). */
+    enrollmentId: number | null;
 }) {
     const { t, locale } = useTranslation();
     const collected = card?.stampsCollected ?? 0;
@@ -81,9 +85,24 @@ export default function TapCooldown({
             <Head title={t('Already stamped')} />
             <TapScreen
                 actions={
-                    <Button asChild size="lg">
-                        <Link href={cards()}>{t('See all my cards')}</Link>
-                    </Button>
+                    <>
+                        {enrollmentId !== null ? (
+                            <Button asChild size="lg">
+                                <Link href={show(enrollmentId)}>
+                                    {t('See this card')}
+                                </Link>
+                            </Button>
+                        ) : null}
+                        <Button
+                            asChild
+                            size="lg"
+                            variant={
+                                enrollmentId !== null ? 'outline' : 'default'
+                            }
+                        >
+                            <Link href={cards()}>{t('See all my cards')}</Link>
+                        </Button>
+                    </>
                 }
             >
                 {card ? <TapLoyaltyCard card={card} /> : null}

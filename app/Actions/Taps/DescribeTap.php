@@ -80,6 +80,7 @@ final readonly class DescribeTap
                     'given' => $tap->qty,
                     'rewards' => $rewards,
                     'stampedAt' => $tap->created_at === null ? null : LocalMoment::of($tap->created_at, $timezone),
+                    'enrollmentId' => $this->enrollmentOf($tap),
                 ]];
             }
 
@@ -100,11 +101,24 @@ final readonly class DescribeTap
                     'card' => $this->card($tap, $card, $location, $tap->card_stamps),
                     'nextStamp' => $this->nextStamp($tap, $timezone),
                     'stampedMinutesAgo' => $this->stampedMinutesAgo($tap, $card),
+                    'enrollmentId' => $this->enrollmentOf($tap),
                 ]];
             }
 
             return ['component' => 'tap/refused', 'props' => ['reason' => $this->reason($tap)]];
         });
+    }
+
+    /** The customer's copy of the tap's card, for "See this card" (CHW-27, C6). */
+    private function enrollmentOf(Tap $tap): ?int
+    {
+        if ($tap->card_id === null || $tap->user_id === null) {
+            return null;
+        }
+
+        $id = CardEnrollment::query()->where('card_id', $tap->card_id)->where('user_id', $tap->user_id)->value('id');
+
+        return $id === null ? null : (int) $id;
     }
 
     /**
