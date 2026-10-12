@@ -5,7 +5,34 @@ import tailwindcss from '@tailwindcss/vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
+import { readFileSync } from 'node:fs';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig, lazyPlugins } from 'vite-plus';
+
+/**
+ * The app shell the service worker precaches (pwa-conventions skill): the
+ * app entry and the chunks it imports statically, the stylesheet and the
+ * fonts. Each page's own chunk loads when the page does, as before.
+ */
+function shellUrls(): Set<string> {
+    const manifest = JSON.parse(
+        readFileSync('public/build/manifest.json', 'utf8'),
+    ) as Record<string, { file: string; imports?: string[] }>;
+    const urls = new Set<string>();
+    const visit = (key: string) => {
+        const chunk = manifest[key];
+
+        if (!chunk || urls.has(`/build/${chunk.file}`)) {
+            return;
+        }
+
+        urls.add(`/build/${chunk.file}`);
+        (chunk.imports ?? []).forEach(visit);
+    };
+    ['resources/js/app.tsx', 'resources/css/app.css'].forEach(visit);
+
+    return urls;
+}
 
 export default defineConfig({
     plugins: lazyPlugins(() => [
@@ -35,6 +62,39 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+        }),
+        // The service worker (CHW-35, pwa-conventions skill): written at the site root so its
+        // scope is the whole site, while the assets it precaches stay in /build.
+        VitePWA({
+            strategies: 'injectManifest',
+            srcDir: 'resources/js',
+            filename: 'sw.ts',
+            outDir: 'public',
+            // Registered at /sw.js with the whole site as its scope, not under Vite's /build/ base.
+            base: '/',
+            scope: '/',
+            registerType: 'prompt',
+            injectRegister: false,
+            manifest: false,
+            injectManifest: {
+                globDirectory: 'public/build',
+                globPatterns: ['**/*.{js,css,woff2}'],
+                modifyURLPrefix: { '': '/build/' },
+                manifestTransforms: [
+                    (entries) => {
+                        const shell = shellUrls();
+
+                        return {
+                            manifest: entries.filter(
+                                (entry) =>
+                                    shell.has(entry.url) ||
+                                    entry.url.endsWith('.woff2'),
+                            ),
+                            warnings: [],
+                        };
+                    },
+                ],
+            },
         }),
     ]),
     server: {

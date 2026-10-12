@@ -53,3 +53,7 @@ yarn-error.log
 /blob-report
 /playwright/.cache
 .vitest/
+
+# The service worker vite-plugin-pwa builds at the site root (CHW-35).
+/public/sw.js
+/public/sw.mjs

@@ -29,7 +29,7 @@ Route::middleware('guest')->group(function (): void {
     Route::post('business/register', [BusinessRegistrationController::class, 'store'])->middleware('throttle:business-signup')->name('business.register.store');
 });
 
-Route::middleware(['auth', 'verified', 'tenant'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->group(function (): void {
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
     Route::get('dashboard', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
@@ -48,7 +48,7 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function (): void {
 });
 
 // The join page (CHW-31): the QR stand's link, public; adding the card takes a signed-in customer. Never cached.
-Route::middleware(NeverCache::class)->group(function (): void {
+Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void {
     Route::get('j/{slug}', [JoinController::class, 'show'])->middleware('throttle:join-page')->name('join.show');
     Route::middleware(['guest', 'throttle:join-page'])->group(function (): void {
         Route::get('j/{slug}/register', [JoinController::class, 'register'])->name('join.register');
@@ -58,7 +58,7 @@ Route::middleware(NeverCache::class)->group(function (): void {
 });
 
 // The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.
-Route::middleware(NeverCache::class)->group(function (): void {
+Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void {
     // block(): one tap request at a time per session, so two quick taps can't race on the session's
     // pending taps (TapSession) or on which result it shows.
     Route::get('t', [TapController::class, 'receive'])->middleware('throttle:tap')->block(10, 10)->name('taps.receive');
@@ -71,7 +71,7 @@ Route::middleware(NeverCache::class)->group(function (): void {
 // their rewards and is asked to verify before redeeming (OpenRedeemWindow). Never cached. The redeem
 // screen polls while the tap lands in the same session (an Android PWA shares the browser's
 // cookies): block() queues them like the /t requests, so a poll never writes back a stale session.
-Route::middleware(['auth', NeverCache::class])->group(function (): void {
+Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (): void {
     // Home after signing in (CHW-27): the dashboard, the admin panel or My cards.
     Route::get('start', StartController::class)->name('start');
     // My cards (CHW-27): the customer's home, and the cards of anyone who collects stamps.

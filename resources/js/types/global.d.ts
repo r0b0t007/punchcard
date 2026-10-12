@@ -13,6 +13,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             nav: { cards: boolean };
+            /** The installable app the page belongs to (UsePwa, CHW-35). */
+            pwa: 'customer' | 'business' | null;
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */
             customer: boolean;
             sidebarOpen: boolean;

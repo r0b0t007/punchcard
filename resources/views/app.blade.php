@@ -30,9 +30,19 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+        {{-- The installable app this page belongs to (UsePwa, CHW-35): customer or business. --}}
+        @isset($pwa)
+            <link rel="manifest" href="/manifest-{{ $pwa }}.webmanifest">
+            <meta name="theme-color" content="#3B2A20">
+            <meta name="mobile-web-app-capable" content="yes">
+            <meta name="apple-mobile-web-app-capable" content="yes">
+            <meta name="apple-mobile-web-app-status-bar-style" content="default">
+            <meta name="apple-mobile-web-app-title" content="{{ $pwa === 'business' ? 'punchcard Pro' : 'punchcard' }}">
+        @endisset
 
         @fonts
 

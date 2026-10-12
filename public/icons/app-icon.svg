@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <!-- punchcard's provisional app icon (CHW-35): a saffron stamp with a check on espresso, from the design tokens. -->
+    <rect width="512" height="512" rx="112" fill="#3B2A20"/>
+    <circle cx="256" cy="256" r="158" fill="#F2A541"/>
+    <circle cx="256" cy="256" r="158" fill="none" stroke="#FBF6EE" stroke-opacity="0.25" stroke-width="10"/>
+    <path d="M178 262 L232 316 L340 200" fill="none" stroke="#3B2A20" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
