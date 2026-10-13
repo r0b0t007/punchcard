@@ -22,6 +22,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
@@ -34,6 +35,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -194,6 +196,17 @@ class AppServiceProvider extends ServiceProvider
         // Business sign-up (CHW-31): each one creates an organization, so a few an hour per client
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
+
+        // Email sign-in links (CHW-23): a few per address typed, so nobody floods an inbox, and a cap per client
+        // address. Over either, the form says to wait (never which addresses have an account).
+        RateLimiter::for('login-link', function (Request $request): array {
+            $wait = fn (): RedirectResponse => back()->withErrors(['email' => __('Too many sign-in links asked for. Try again in a few minutes.')])->onlyInput('email');
+
+            return [
+                Limit::perMinutes(15, 3)->by('login-link:email:'.sha1(is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : ''))->response($wait),
+                Limit::perHour(10)->by('login-link:address:'.ClientAddress::rateLimitKey($request->ip()))->response($wait),
+            ];
+        });
 
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
         // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a

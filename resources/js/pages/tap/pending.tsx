@@ -6,9 +6,10 @@ import TapScreen, {
 import type { TapCard } from '@/components/tap/tap-screen';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { login, register } from '@/routes';
+import { login } from '@/routes';
+import { create as emailLink } from '@/routes/login-link';
 
-/** C1: a signed-out first tap, its stamp waiting for sign-in (CHW-25). */
+/** C1: a signed-out first tap, its stamp waiting for sign-in (CHW-25), by an email link (CHW-23) or a password. */
 export default function TapPending({ card }: { card: TapCard | null }) {
     const { t } = useTranslation();
 
@@ -19,7 +20,7 @@ export default function TapPending({ card }: { card: TapCard | null }) {
                 actions={
                     <>
                         <Button asChild size="lg">
-                            <Link href={register()}>
+                            <Link href={emailLink()}>
                                 {t('Continue with email')}
                             </Link>
                         </Button>

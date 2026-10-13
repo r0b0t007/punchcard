@@ -30,12 +30,14 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $email
  * @property string|null $locale
  * @property Carbon|null $email_verified_at
- * @property string $password
+ * @property string|null $password null for a customer signed up by email link (CHW-23)
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
  * @property Carbon|null $anonymised_at
+ * @property Carbon|null $adult_confirmed_at when they said they are 16 or older (CHW-23)
+ * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: never asked for (CHW-23)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -74,7 +76,19 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'anonymised_at' => 'datetime',
+            'adult_confirmed_at' => 'datetime',
+            'marketing_opt_in_at' => 'datetime',
         ];
+    }
+
+    /**
+     * An account without a password (signed up by email link, CHW-23) has
+     * none to match: never a null hash, which the remember cookie and
+     * AuthenticateSession would otherwise hash.
+     */
+    public function getAuthPassword(): string
+    {
+        return $this->password ?? '';
     }
 
     /** The account was deleted but its stamp history kept (DeleteAccount): no person behind it any more. */
