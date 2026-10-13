@@ -43,5 +43,5 @@ The `pwa:customer` / `pwa:business` route middleware (`UsePwa`) picks the manife
 
 ## Checks
 
-- Lighthouse PWA installability + accessibility in CI for C2, C5, B3.
+- Lighthouse on C2, C5 and B3, signed in (`tests/lighthouse`, `npm run lighthouse`, the `lighthouse` workflow on frontend PRs): each installable by Chrome's own check (`Page.getInstallabilityErrors`; Lighthouse 12 dropped its PWA audits) and accessibility at least 90. Performance is reported, not enforced (`php artisan serve`). A new key screen gets a run there too.
 - Playwright `mobile-safari` and `mobile-chrome` projects for every customer screen.

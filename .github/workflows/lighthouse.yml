@@ -1,0 +1,101 @@
+name: lighthouse
+
+# Lighthouse on C2 (stamp screen), C5 (My cards) and B3 (owner's dashboard), signed in, as a phone
+# sees them (tests/lighthouse, CHW-35): each installable, and accessibility at least 90. Performance
+# is in the reports, not enforced. On pull requests that touch the frontend.
+on:
+  pull_request:
+    paths:
+      - 'resources/**'
+      - 'lang/**'
+      - 'public/**'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'app/Http/Middleware/UsePwa.php'
+      - 'tests/lighthouse/**'
+      - 'tests/e2e/helpers.ts'
+      - 'playwright.config.ts'
+      - 'playwright.lighthouse.config.ts'
+      - '.github/workflows/lighthouse.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The stamp screen comes from a tap written by punchcard:fake-tap, which runs in local only (the
+    # demo seeder too).
+    env:
+      APP_ENV: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: intl, bcmath, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      # A throwaway SUN master key for this run only: the fake tap is built and verified with it.
+      - name: Generate a test SUN key
+        run: echo "NFC_SUN_MASTER_KEY=$(openssl rand -hex 16 | tr a-f A-F)" >> "$GITHUB_ENV"
+
+      - name: Install and build
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=pgsql/DB_CONNECTION=sqlite/' .env
+          sed -i 's/^MAIL_MAILER=smtp/MAIL_MAILER=log/' .env
+          touch database/database.sqlite
+          php artisan key:generate
+          php artisan migrate --force
+          php artisan db:seed --no-interaction
+          npm run build
+
+      # Chromium from the cache main warms for e2e.yml (its browsers job, same key); the install
+      # skips what was restored.
+      - name: Browser cache key
+        id: browsers-key
+        run: |
+          set -o pipefail
+          version=$(npx playwright --version | awk '{print $2}')
+          test -n "$version" && test -n "$ImageOS"
+          echo "key=playwright-$ImageOS-$version-chromium-webkit" >> "$GITHUB_OUTPUT"
+
+      - name: Restore browsers
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers-key.outputs.key }}
+
+      - name: Install Chromium
+        timeout-minutes: 15
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse
+        run: npm run lighthouse
+
+      # Every run: the HTML report holds each screen's Lighthouse report.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-report
+          path: lighthouse-report/
+          retention-days: 7

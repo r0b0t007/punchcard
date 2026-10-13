@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { CDPSession, Page } from '@playwright/test';
-import { freshTap, signUp } from './helpers';
+import { freshTap, signIn, signUp } from './helpers';
 
 /**
  * The installable apps (CHW-35): on a phone, a café's join page and an
@@ -20,14 +20,6 @@ test.skip(
 
 // Installing the worker downloads the app shell first: slow on a single-threaded dev server.
 test.describe.configure({ timeout: 60_000 });
-
-async function signIn(page: Page, email: string): Promise<void> {
-    await page.goto('/login');
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill('password');
-    await page.locator('[data-test="login-button"]').click();
-    await page.waitForURL((url) => !url.pathname.startsWith('/login'));
-}
 
 /**
  * Waits for the service worker the page registered, then for it to control
