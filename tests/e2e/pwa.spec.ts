@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import type { CDPSession, Page } from '@playwright/test';
-import { freshTap, signIn, signUp } from './helpers';
+import type { Page } from '@playwright/test';
+import { cdp, freshTap, installabilityErrors, signIn, signUp } from './helpers';
 
 /**
  * The installable apps (CHW-35): on a phone, a café's join page and an
@@ -40,33 +40,10 @@ async function serviceWorkerScope(page: Page): Promise<string> {
     return scope;
 }
 
-const sessions = new WeakMap<Page, CDPSession>();
-
-/** The page's Chrome DevTools Protocol session, one per page. */
-async function cdp(page: Page): Promise<CDPSession> {
-    let session = sessions.get(page);
-
-    if (!session) {
-        session = await page.context().newCDPSession(page);
-        sessions.set(page, session);
-    }
-
-    return session;
-}
-
 function offlineDatabases(page: Page): Promise<string[]> {
     return page.evaluate(async () =>
         (await indexedDB.databases()).map((database) => database.name ?? ''),
     );
-}
-
-async function installabilityErrors(page: Page): Promise<string[]> {
-    const session = await cdp(page);
-    const { installabilityErrors } = await session.send(
-        'Page.getInstallabilityErrors',
-    );
-
-    return installabilityErrors.map((error) => error.errorId);
 }
 
 // The join page, public: the demo customer is left to the other specs, as
