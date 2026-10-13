@@ -27,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // The offline page stays up, so a new service worker (which precaches it) installs during maintenance too.
+        $middleware->preventRequestsDuringMaintenance(except: ['offline']);
+
         $middleware->web(append: [
             HandleAppearance::class,
             GiveSessionTapToken::class,

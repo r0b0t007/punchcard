@@ -115,12 +115,6 @@ export async function saveTranslations(
     );
 }
 
-export function readSnapshot(): Promise<OfflineSnapshot | undefined> {
-    return inStore<OfflineSnapshot | undefined>('readonly', (store) =>
-        store.get(CARDS),
-    );
-}
-
 /** Drops the cards kept on the phone, and whose they were. Never fails a sign-out. */
 export async function forgetOfflineCards(): Promise<void> {
     try {
@@ -147,4 +141,112 @@ export async function keepOnlyCardsOf(userId: number | null): Promise<void> {
     if (keptForSomeoneElse(owner(), userId)) {
         await forgetOfflineCards();
     }
+}
+
+/** Whether the cards kept are the last signed-in customer's (a copy without its owner is never shown). */
+export function isOwnedBy(
+    snapshot: OfflineSnapshot,
+    owner: string | null,
+): boolean {
+    return owner !== null && !keptForSomeoneElse(owner, snapshot.userId);
+}
+
+/** When the cards were saved, in the customer's language (Latin digits, as everywhere in the app). */
+export function updatedAtLabel(
+    generatedAt: string,
+    locale: string,
+    timeZone?: string,
+): string {
+    return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone,
+    }).format(new Date(generatedAt));
+}
+
+/**
+ * The cards as of `now`: a last visit saved as "today" is "3 days ago"
+ * three days later, counted on the phone's calendar.
+ */
+export function cardsAsOf(
+    cards: MyCard[],
+    generatedAt: string,
+    now: Date,
+): MyCard[] {
+    const day = (date: Date) =>
+        new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    // Rounded: a day of a clock change is 23 or 25 hours long.
+    const days = Math.round(
+        (day(now).getTime() - day(new Date(generatedAt)).getTime()) /
+            86_400_000,
+    );
+
+    return cards.map((card) => ({
+        ...card,
+        lastVisitDaysAgo:
+            card.lastVisitDaysAgo === null
+                ? null
+                : card.lastVisitDaysAgo + Math.max(days, 0),
+    }));
+}
+
+/** The first of the phone's languages the app speaks, else the app's default. */
+export function phoneLocale(
+    languages: readonly string[],
+    supported: string[],
+    fallback: string,
+): string {
+    return (
+        languages
+            .map((language) => language.split('-')[0].toLowerCase())
+            .find((language) => supported.includes(language)) ?? fallback
+    );
+}
+
+/**
+ * What the offline page shows (CHW-35): the cards kept on the phone, if
+ * they are the last signed-in customer's, with the words of their
+ * language (English without them).
+ */
+export async function readOfflineCards(): Promise<{
+    snapshot: OfflineSnapshot;
+    strings: Record<string, string>;
+} | null> {
+    const keptFor = owner();
+
+    // Nobody's cards kept (signed out): never opened, so the database a sign-out deleted stays deleted.
+    if (keptFor === null) {
+        return null;
+    }
+
+    // The cards and their words in one read.
+    const [snapshot, translations] = await open()
+        .then((database) =>
+            new Promise<
+                [OfflineSnapshot | undefined, OfflineTranslations | undefined]
+            >((resolve, reject) => {
+                const store = database
+                    .transaction(STORE, 'readonly')
+                    .objectStore(STORE);
+                const cards = store.get(CARDS);
+                const words = store.get(TRANSLATIONS);
+                store.transaction.oncomplete = () =>
+                    resolve([cards.result, words.result]);
+                store.transaction.onerror = () =>
+                    reject(store.transaction.error);
+            }).finally(() => database.close()),
+        )
+        .catch(() => [undefined, undefined] as const);
+
+    if (!snapshot || !isOwnedBy(snapshot, keptFor)) {
+        return null;
+    }
+
+    return {
+        snapshot,
+        strings:
+            translations?.locale === snapshot.locale
+                ? translations.strings
+                : {},
+    };
 }

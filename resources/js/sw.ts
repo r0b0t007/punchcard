@@ -1,10 +1,22 @@
 /// <reference lib="webworker" />
 import { ExpirationPlugin } from 'workbox-expiration';
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import {
+    cleanupOutdatedCaches,
+    matchPrecache,
+    precacheAndRoute,
+} from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import type { Strategy } from 'workbox-strategies';
-import { NETWORK_ROUTES, routeFor } from './sw-routes';
+import {
+    hasOfflineFallback,
+    isMyCardsVisit,
+    loadInFull,
+    NETWORK_ROUTES,
+    networkOrOffline,
+    preloadedOrFetched,
+    routeFor,
+} from './sw-routes';
 import type { StaticRoute, SwRoute } from './sw-routes';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -14,8 +26,9 @@ declare const self: ServiceWorkerGlobalScope;
  * app alike: the app shell is precached, fonts are kept once used, logos
  * and banners are refreshed in the background, and nothing else is ever
  * cached (routeFor). Page loads and writes skip it entirely where the
- * browser can (NETWORK_ROUTES). A new version waits until the page asks it
- * to take over (the update toast).
+ * browser can (NETWORK_ROUTES); the page loads that reach it start while
+ * it boots (navigation preload). A new version waits until the page asks
+ * it to take over (the update toast).
  */
 self.addEventListener('install', (event) => {
     const install = event as ExtendableEvent & {
@@ -27,6 +40,15 @@ self.addEventListener('install', (event) => {
         install.waitUntil(
             install.addRoutes(NETWORK_ROUTES).catch(() => undefined),
         );
+    }
+});
+
+// Where the browser has it (Safari 15.4+, Chromium): a page load doesn't wait for the worker to boot.
+const preloads = 'navigationPreload' in self.registration;
+
+self.addEventListener('activate', (event) => {
+    if (preloads) {
+        event.waitUntil(self.registration.navigationPreload.enable());
     }
 });
 
@@ -62,6 +84,44 @@ registerRoute(
             event,
             request,
         }),
+);
+
+// GET page loads, from their preload (once started, it must be the answer: anything else would load the page twice);
+// a form posted as a page load is left to the browser. My cards' pages (CHW-35) fall back to the offline page, which
+// shows the cards kept on the phone; without preload, other pages are left to the browser too.
+registerRoute(
+    ({ request, url }) => {
+        if (request.method !== 'GET' || request.mode !== 'navigate') {
+            return false;
+        }
+
+        const myCards = hasOfflineFallback(url, self.location.origin);
+
+        return myCards || preloads ? { myCards } : false;
+    },
+    ({ event, request, params }) => {
+        const fromNetwork = () =>
+            preloadedOrFetched((event as FetchEvent).preloadResponse, () =>
+                fetch(request),
+            );
+
+        return (params as { myCards: boolean }).myCards
+            ? networkOrOffline(fromNetwork, () => matchPrecache('/offline'))
+            : fromNetwork();
+    },
+);
+
+// A tap on My cards in the app (an Inertia visit) that can't reach the network: loaded in full instead, as a page
+// load the route above answers with the offline page. A worker without that page never asks for it.
+registerRoute(
+    ({ request, url }) =>
+        isMyCardsVisit(
+            request.method,
+            url,
+            request.headers,
+            self.location.origin,
+        ),
+    ({ request, url }) => fetch(request).catch(() => loadInFull(url)),
 );
 
 self.addEventListener('message', (event) => {

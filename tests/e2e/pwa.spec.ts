@@ -231,6 +231,65 @@ test('the cards kept are dropped when the session ended elsewhere', async ({
         .not.toContain('punchcard-offline');
 });
 
+test('offline with no cards kept, My cards says so', async ({ page }) => {
+    // A phone that never kept any cards (or signed out): the offline page has nothing to show but a way back.
+    await page.goto('/offline');
+
+    await expect(
+        page.getByRole('heading', { level: 1, name: "You're offline" }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+});
+
+test.describe('on a phone in Arabic', () => {
+    test.use({ locale: 'ar-MA' });
+
+    test('offline with no cards kept, My cards says so in its language', async ({
+        page,
+    }) => {
+        await page.goto('/offline');
+
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'أنت غير متصل' }),
+        ).toBeVisible();
+        await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+        await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+    });
+});
+
+test('offline, a tap on My cards in the app shows the cards kept on the phone', async ({
+    page,
+}) => {
+    const tab = (name: string) =>
+        page
+            .getByRole('navigation', { name: 'Main' })
+            .getByRole('link', { name });
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/app');
+    await serviceWorkerScope(page);
+    await tab('Rewards').click();
+    await page.waitForURL(/\/rewards$/);
+
+    // Offline (the service worker too), the Inertia visit becomes a page load, which the worker answers with the
+    // offline page.
+    await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+    await page.context().setOffline(true);
+    await tab('Cards').click();
+    await page.waitForURL(/\/app$/);
+    await expect(page.getByRole('status')).toContainText(
+        'Offline. Last updated',
+    );
+    await expect(
+        page.getByRole('heading', { level: 1, name: /^Hello/ }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false);
+
+    // Back online, the page itself.
+    await page.context().setOffline(false);
+    await page.reload();
+    await expect(page.getByRole('status')).toHaveCount(0);
+});
+
 test('the marketing site is no app and registers no service worker', async ({
     page,
 }) => {

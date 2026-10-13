@@ -49,6 +49,30 @@ final class Locales
     }
 
     /**
+     * A few strings in every locale, with its direction: for a page that
+     * picks its language on the device (the offline page, CHW-35).
+     *
+     * @param  list<string>  $keys
+     * @return array<string, array{dir: 'ltr'|'rtl', strings: array<string, string>}>
+     */
+    public static function phrasebook(array $keys): array
+    {
+        $phrasebook = [];
+
+        foreach (self::codes() as $locale) {
+            $strings = [];
+
+            foreach ($keys as $key) {
+                $strings[$key] = __($key, locale: $locale);
+            }
+
+            $phrasebook[$locale] = ['dir' => self::direction($locale), 'strings' => $strings];
+        }
+
+        return $phrasebook;
+    }
+
+    /**
      * The JSON translations for one locale (English source string => translation).
      *
      * @return array<string, string>

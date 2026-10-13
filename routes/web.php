@@ -7,6 +7,7 @@ use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
+use App\Http\Controllers\OfflinePageController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\StartController;
@@ -99,6 +100,12 @@ Route::any('{path}', MovedToBusinessController::class)
 Route::get('business/login', [AuthenticatedSessionController::class, 'create'])
     ->middleware(['guest', 'pwa:business'])
     ->name('business.login');
+
+// The offline My cards page (CHW-35): the shell the service worker precaches and serves when a page of My cards
+// can't load. The same for everyone: the cards come from the phone, so no session (nor its cookie) in the copy kept.
+Route::get('offline', OfflinePageController::class)
+    ->withoutMiddleware('web')
+    ->name('offline');
 
 require __DIR__.'/onboarding.php';
 require __DIR__.'/settings.php';
