@@ -22,6 +22,7 @@ The `pwa:customer` / `pwa:business` route middleware (`UsePwa`) picks the manife
 - Safari and the home-screen PWA do **not** share cookies or storage. The tap always lands in Safari, so keep a long-lived Safari session (remember-me, passkeys, magic link). Never require the installed PWA for stamping.
 - Web push on iOS works only for home-screen-installed PWAs, after a user gesture. Wallet pass updates are the reliable iOS notification channel.
 - No `beforeinstallprompt` on iOS: show the C13 instruction sheet (Share → Add to Home Screen) after the second stamp, never on first visit.
+- The C13 sheet (`components/tap/install-sheet.tsx`, rules in `lib/install-prompt.ts`) opens on the stamp screen's first look, never over a reward, when `DescribeTap` says `offerInstall` (the customer's second presence stamp or later, on any card, up to the one shown). iPhone/iPad Safari gets the steps; Chromium the Install button once it fired `beforeinstallprompt` (held from page load on the customer app's pages only, so Chrome's own banner never shows there; punchcard Pro keeps it); never in the installed app. Put away or installed, it stays away a month on that browser (localStorage `punchcard-install-sheet`); an installed app gets no prompt from Chrome anyway. Worked out in an effect: nothing reads `window` while a page renders on the server.
 
 ## Service worker
 

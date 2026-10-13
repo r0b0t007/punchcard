@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { freshTap, signUp } from './helpers';
 
 /**
  * The customer tap flow (CHW-25) on an iPhone: C1 signed out, sign up, C2,
- * a second tap inside the cooldown, then Arabic right to left and dark mode;
- * and redeeming a reward (CHW-26): Redeem, then a tap on the stamper.
+ * a second tap inside the cooldown, a second visit elsewhere with the
+ * install sheet (CHW-35, C13), then Arabic right to left and dark mode; and
+ * redeeming a reward (CHW-26): Redeem, then a tap on the stamper.
  *
  * Needs the demo data (php artisan db:seed) and a SUN master key
  * (NFC_SUN_MASTER_KEY): punchcard:fake-tap writes a valid tap URL for the
@@ -18,25 +20,6 @@ test.skip(
     ({ browserName }) => browserName !== 'webkit',
     'Runs on mobile-safari only.',
 );
-
-/** A fresh tap URL (path and query) from the demo's first stamper. */
-function freshTap(): string {
-    const output = execFileSync('php', ['artisan', 'punchcard:fake-tap', '1'], {
-        encoding: 'utf8',
-    });
-    const url = new URL(output.trim().split(/\s+/).pop() ?? '');
-
-    return `${url.pathname}${url.search}`;
-}
-
-async function signUp(page: Page): Promise<void> {
-    await page.getByRole('link', { name: 'Continue with email' }).click();
-    await page.locator('#name').fill('Salma Tapper');
-    await page.locator('#email').fill(`tap-${Date.now()}@example.com`);
-    await page.locator('#password').fill('a-long-test-password-1');
-    await page.locator('#password_confirmation').fill('a-long-test-password-1');
-    await page.locator('[data-test="register-user-button"]').click();
-}
 
 /** Gives the demo customer a Free mint tea at Café Hafa, stamper 1's café: each run redeems one. */
 function giveDemoReward(): void {
@@ -227,6 +210,10 @@ test.describe('in English, light', () => {
             page.getByRole('heading', { name: '1 of 10' }),
         ).toBeVisible();
 
+        // The first visit: no install sheet (it would open 1.5 s in).
+        await page.waitForTimeout(2_000);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+
         await page.reload();
         await expect(
             page.getByRole('heading', { name: '1 of 10' }),
@@ -240,6 +227,41 @@ test.describe('in English, light', () => {
         await expect(
             page.getByText(/^Next stamp available (tomorrow )?at$/),
         ).toBeVisible();
+    });
+
+    test('from the second visit on, the stamp screen shows how to install the app', async ({
+        page,
+    }, testInfo) => {
+        await page.goto(freshTap());
+        await signUp(page);
+        await expect(
+            page.getByRole('heading', { name: '1 of 10' }),
+        ).toBeVisible();
+
+        // A second visit, at a café of another program (its own card, so no cooldown).
+        await page.goto(freshTap(4));
+        const sheet = page.getByRole('dialog', {
+            name: 'Keep punchcard on your home screen',
+        });
+        await expect(sheet).toBeVisible();
+        // Each step after its number.
+        await expect(sheet.getByRole('listitem')).toHaveText([
+            /^1\s*Tap Share in the toolbar$/,
+            /^2\s*Choose Add to Home Screen$/,
+            /^3\s*Tap Add$/,
+        ]);
+        await testInfo.attach('install-sheet-iphone', {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+        });
+
+        await sheet.getByRole('button', { name: 'Got it' }).click();
+        await expect(sheet).toBeHidden();
+
+        // Put away, and never again on a reload of the result.
+        await page.reload();
+        await page.waitForTimeout(2_000);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
     });
 });
 

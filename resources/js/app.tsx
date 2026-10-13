@@ -1,3 +1,5 @@
+// First: the browser's install prompt can come before anything else is ready (CHW-35, C13).
+import '@/lib/install-prompt';
 import { createInertiaApp } from '@inertiajs/react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
