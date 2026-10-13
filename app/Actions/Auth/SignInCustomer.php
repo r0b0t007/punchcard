@@ -23,6 +23,9 @@ use Illuminate\Support\Str;
  * someone else, with their password: the link proves the address is this
  * person's, so whatever that someone set up goes (password, remember
  * token, sessions, passkeys) before the account is confirmed and theirs.
+ * Their sessions end because sessions are rows of the database driver
+ * (config/session.php): with another driver, end them there too, as
+ * AuthenticateSession checks no password hash for an account without one.
  */
 final readonly class SignInCustomer
 {

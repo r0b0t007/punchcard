@@ -108,7 +108,8 @@ it('never mails a link to an account it would let skip a second factor', functio
     ($this->requestLink)($user->email)->assertRedirect()->assertSessionHas('status', 'login-link-sent');
 
     Notification::assertNotSentTo($user, LoginLinkMail::class);
-    Notification::assertSentTo($user, SignInWithPasswordMail::class);
+    // An account that never chose a password (signed up by link, then two-factor on) is told how to choose one.
+    Notification::assertSentTo($user, SignInWithPasswordMail::class, fn (SignInWithPasswordMail $mail): bool => str_contains(implode(' ', $mail->toMail($user)->outroLines), route('password.request')));
     expect(LoginLink::query()->count())->toBe(0);
 })->with(['two-factor on', 'a business owner', 'staff', 'an org admin', 'the platform admin']);
 
@@ -426,4 +427,15 @@ it('says on the link\'s page which account it signs in to, half hidden', functio
 
     $this->get(($this->linkFor)('salma@example.test'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('email', 's***@example.test'));
+});
+
+it('forgets the links a day after they were sent (the address is personal data)', function (): void {
+    $old = LoginLink::for('salma@example.test');
+    $this->travel(25)->hours();
+    $recent = LoginLink::for('nadia@example.test');
+
+    Artisan::call('model:prune', ['--model' => [LoginLink::class]]);
+
+    expect(LoginLink::query()->pluck('id')->all())->toBe([$recent->id])
+        ->and(LoginLink::query()->find($old->id))->toBeNull();
 });

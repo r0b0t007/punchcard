@@ -645,5 +645,6 @@
     "Send me news and offers from punchcard by email": "Recevoir par e-mail les nouveautés et offres de punchcard",
     "Create my account": "Créer mon compte",
     "Tell us your name to finish signing up.": "Indiquez votre nom pour terminer l’inscription.",
-    "Signs you in as :email": "Vous connecte en tant que :email"
+    "Signs you in as :email": "Vous connecte en tant que :email",
+    "Never chose a password? Choose one at :url": "Jamais choisi de mot de passe ? Choisissez-en un ici : :url"
 }

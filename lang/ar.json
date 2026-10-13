@@ -645,5 +645,6 @@
     "Send me news and offers from punchcard by email": "أرسل لي أخبار وعروض punchcard عبر البريد الإلكتروني",
     "Create my account": "إنشاء حسابي",
     "Tell us your name to finish signing up.": "أخبرنا باسمك لإكمال التسجيل.",
-    "Signs you in as :email": "يسجّل دخولك باسم :email"
+    "Signs you in as :email": "يسجّل دخولك باسم :email",
+    "Never chose a password? Choose one at :url": "لم تختر كلمة مرور قط؟ اخترها هنا: :url"
 }
