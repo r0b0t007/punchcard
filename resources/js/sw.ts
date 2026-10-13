@@ -10,6 +10,8 @@ import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import type { Strategy } from 'workbox-strategies';
 import {
     hasOfflineFallback,
+    isMyCardsVisit,
+    loadInFull,
     NETWORK_ROUTES,
     networkOrOffline,
     preloadedOrFetched,
@@ -101,6 +103,19 @@ registerRoute(
             ? networkOrOffline(fromNetwork, () => matchPrecache('/offline'))
             : fromNetwork();
     },
+);
+
+// A tap on My cards in the app (an Inertia visit) that can't reach the network: loaded in full instead, as a page
+// load the route above answers with the offline page. A worker without that page never asks for it.
+registerRoute(
+    ({ request, url }) =>
+        isMyCardsVisit(
+            request.method,
+            url,
+            request.headers,
+            self.location.origin,
+        ),
+    ({ request, url }) => fetch(request).catch(() => loadInFull(url)),
 );
 
 self.addEventListener('message', (event) => {

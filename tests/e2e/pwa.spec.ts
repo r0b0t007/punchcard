@@ -257,7 +257,7 @@ test.describe('on a phone in Arabic', () => {
     });
 });
 
-test('offline, a tap on My cards in the app loads it in full, for the service worker to answer', async ({
+test('offline, a tap on My cards in the app shows the cards kept on the phone', async ({
     page,
 }) => {
     const tab = (name: string) =>
@@ -270,16 +270,24 @@ test('offline, a tap on My cards in the app loads it in full, for the service wo
     await tab('Rewards').click();
     await page.waitForURL(/\/rewards$/);
 
-    // An Inertia visit fails offline; the page load that replaces it goes to the service worker.
+    // Offline (the service worker too), the Inertia visit becomes a page load, which the worker answers with the
+    // offline page.
     await page.evaluate(() => Object.assign(window, { sameDocument: true }));
     await page.context().setOffline(true);
     await tab('Cards').click();
     await page.waitForURL(/\/app$/);
+    await expect(page.getByRole('status')).toContainText(
+        'Offline. Last updated',
+    );
     await expect(
         page.getByRole('heading', { level: 1, name: /^Hello/ }),
     ).toBeVisible();
     expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false);
+
+    // Back online, the page itself.
     await page.context().setOffline(false);
+    await page.reload();
+    await expect(page.getByRole('status')).toHaveCount(0);
 });
 
 test('the marketing site is no app and registers no service worker', async ({

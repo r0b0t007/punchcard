@@ -66,13 +66,45 @@ export async function networkOrOffline(
 
 /**
  * A page load from the request the browser started while the service
- * worker booted (navigation preload), else fetched now: never both.
+ * worker booted (navigation preload), else fetched now. A preload that
+ * failed is tried once more, as the browser alone would have loaded it.
  */
 export async function preloadedOrFetched(
     preloadResponse: Promise<Response | undefined> | undefined,
     fetchAgain: () => Promise<Response>,
 ): Promise<Response> {
-    return (await preloadResponse) ?? fetchAgain();
+    return (
+        (await Promise.resolve(preloadResponse).catch(() => undefined)) ??
+        fetchAgain()
+    );
+}
+
+/**
+ * Whether a request is an Inertia visit to a page of My cards (a tap in
+ * the app), which offline loads in full for the offline page (CHW-35).
+ * Never a prefetch nor a partial reload: those fail as they are.
+ */
+export function isMyCardsVisit(
+    method: string,
+    url: URL,
+    headers: Headers,
+    origin: string,
+): boolean {
+    return (
+        method === 'GET' &&
+        headers.has('X-Inertia') &&
+        !headers.has('X-Inertia-Partial-Component') &&
+        headers.get('Purpose') !== 'prefetch' &&
+        hasOfflineFallback(url, origin)
+    );
+}
+
+/** Inertia's answer for "load this address in full", which then comes to the worker as a page load. */
+export function loadInFull(url: URL): Response {
+    return new Response(null, {
+        status: 409,
+        headers: { 'X-Inertia-Location': url.href },
+    });
 }
 
 /**

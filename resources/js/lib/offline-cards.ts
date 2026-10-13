@@ -115,12 +115,6 @@ export async function saveTranslations(
     );
 }
 
-export function readSnapshot(): Promise<OfflineSnapshot | undefined> {
-    return inStore<OfflineSnapshot | undefined>('readonly', (store) =>
-        store.get(CARDS),
-    );
-}
-
 /** Drops the cards kept on the phone, and whose they were. Never fails a sign-out. */
 export async function forgetOfflineCards(): Promise<void> {
     try {
@@ -154,7 +148,7 @@ export function isOwnedBy(
     snapshot: OfflineSnapshot,
     owner: string | null,
 ): boolean {
-    return owner !== null && owner === String(snapshot.userId);
+    return owner !== null && !keptForSomeoneElse(owner, snapshot.userId);
 }
 
 /** When the cards were saved, in the customer's language (Latin digits, as everywhere in the app). */
@@ -224,16 +218,28 @@ export async function readOfflineCards(): Promise<{
         return null;
     }
 
-    const snapshot = await readSnapshot().catch(() => undefined);
+    // The cards and their words in one read.
+    const [snapshot, translations] = await open()
+        .then((database) =>
+            new Promise<
+                [OfflineSnapshot | undefined, OfflineTranslations | undefined]
+            >((resolve, reject) => {
+                const store = database
+                    .transaction(STORE, 'readonly')
+                    .objectStore(STORE);
+                const cards = store.get(CARDS);
+                const words = store.get(TRANSLATIONS);
+                store.transaction.oncomplete = () =>
+                    resolve([cards.result, words.result]);
+                store.transaction.onerror = () =>
+                    reject(store.transaction.error);
+            }).finally(() => database.close()),
+        )
+        .catch(() => [undefined, undefined] as const);
 
     if (!snapshot || !isOwnedBy(snapshot, keptFor)) {
         return null;
     }
-
-    const translations = await inStore<OfflineTranslations | undefined>(
-        'readonly',
-        (store) => store.get(TRANSLATIONS),
-    ).catch(() => undefined);
 
     return {
         snapshot,

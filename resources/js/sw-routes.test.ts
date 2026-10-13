@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
     hasOfflineFallback,
+    isMyCardsVisit,
+    loadInFull,
     NETWORK_ROUTES,
     networkOrOffline,
     preloadedOrFetched,
@@ -168,12 +170,74 @@ describe('preloadedOrFetched', () => {
         ).toBe('fetched again');
     });
 
-    it('fails as the preload failed, for the offline page to answer', async () => {
+    it('tries once more when the preload failed', async () => {
+        const answer = await preloadedOrFetched(
+            Promise.reject(new TypeError('Failed to fetch')),
+            fetchAgain,
+        );
+
+        expect(await answer.text()).toBe('fetched again');
+    });
+
+    it('fails when that fails too, for the offline page to answer', async () => {
         await expect(
             preloadedOrFetched(
                 Promise.reject(new TypeError('Failed to fetch')),
-                fetchAgain,
+                () => Promise.reject(new TypeError('Failed to fetch')),
             ),
         ).rejects.toThrow('Failed to fetch');
+    });
+});
+
+describe('isMyCardsVisit', () => {
+    const visit = (
+        path: string,
+        headers: Record<string, string> = {},
+        method = 'GET',
+    ) =>
+        isMyCardsVisit(
+            method,
+            new URL(path, origin),
+            new Headers({ 'X-Inertia': 'true', ...headers }),
+            origin,
+        );
+
+    it('covers a tap on My cards or a card in the app', () => {
+        expect(visit('/app')).toBe(true);
+        expect(visit('/app/cards/7')).toBe(true);
+    });
+
+    it('leaves prefetches, partial reloads and writes alone', () => {
+        expect(visit('/app', { Purpose: 'prefetch' })).toBe(false);
+        expect(
+            visit('/app/cards/7', {
+                'X-Inertia-Partial-Component': 'app/card',
+                'X-Inertia-Partial-Data': 'translations',
+            }),
+        ).toBe(false);
+        expect(visit('/app', {}, 'POST')).toBe(false);
+    });
+
+    it('covers no other page, nor a request that is no Inertia visit', () => {
+        expect(visit('/rewards')).toBe(false);
+        expect(
+            isMyCardsVisit(
+                'GET',
+                new URL('/app', origin),
+                new Headers(),
+                origin,
+            ),
+        ).toBe(false);
+    });
+});
+
+describe('loadInFull', () => {
+    it("is Inertia's answer for a page load of the same address", () => {
+        const answer = loadInFull(new URL('/app/cards/7', origin));
+
+        expect(answer.status).toBe(409);
+        expect(answer.headers.get('X-Inertia-Location')).toBe(
+            `${origin}/app/cards/7`,
+        );
     });
 });
