@@ -19,6 +19,7 @@ import {
     snoozedUntil,
     useInstallPrompt,
 } from '@/lib/install-prompt';
+import type { InstallOffer } from '@/lib/install-prompt';
 
 /** Long enough for the stamp to land first (TapLoyaltyCard). */
 const OPENS_AFTER_MS = 1500;
@@ -27,7 +28,8 @@ const OPENS_AFTER_MS = 1500;
  * C13 (CHW-35): keep punchcard on the home screen. On an iPhone, the three
  * Add to Home Screen steps; where the browser can install it, its own
  * prompt. Offered when `offerInstall` (install-prompt.ts says on which
- * phones), it opens once the stamp has landed; put away, it stays away for
+ * phones, worked out on the phone only, never while a page renders on the
+ * server), it opens once the stamp has landed; put away, it stays away for
  * a month on this browser.
  */
 export default function InstallSheet({
@@ -36,29 +38,33 @@ export default function InstallSheet({
     offerInstall: boolean;
 }) {
     const { t } = useTranslation();
-    const prompt = useInstallPrompt();
-    const [askedLately] = useState(snoozedUntil);
-    const [standalone] = useState(isStandalone);
-    const [shownAt] = useState(() => Date.now());
+    const hasPrompt = useInstallPrompt() !== null;
+    const [offer, setOffer] = useState<InstallOffer>(null);
     const [open, setOpen] = useState(false);
-    const offer = installOffer({
-        offerInstall,
-        standalone,
-        userAgent: navigator.userAgent,
-        hasPrompt: prompt !== null,
-        snoozedUntil: askedLately,
-        now: shownAt,
-    });
 
+    // Again when the browser's prompt comes or goes; once put away (snoozed), never.
     useEffect(() => {
-        if (offer === null) {
+        const next = installOffer({
+            offerInstall,
+            standalone: isStandalone(),
+            userAgent: navigator.userAgent,
+            touchPoints: navigator.maxTouchPoints,
+            hasPrompt,
+            snoozedUntil: snoozedUntil(),
+            now: Date.now(),
+        });
+
+        if (next === null) {
             return;
         }
 
-        const timer = window.setTimeout(() => setOpen(true), OPENS_AFTER_MS);
+        const timer = window.setTimeout(() => {
+            setOffer(next);
+            setOpen(true);
+        }, OPENS_AFTER_MS);
 
         return () => window.clearTimeout(timer);
-    }, [offer]);
+    }, [offerInstall, hasPrompt]);
 
     const putAway = () => {
         snooze(Date.now());
@@ -67,7 +73,7 @@ export default function InstallSheet({
 
     return (
         <Sheet
-            open={open && offer !== null}
+            open={open}
             onOpenChange={(isOpen) => (isOpen ? setOpen(true) : putAway())}
         >
             <SheetContent side="bottom" className="mx-auto max-w-md">

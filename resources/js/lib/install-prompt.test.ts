@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { installOffer, snoozeUntil } from '@/lib/install-prompt';
+import {
+    holdsBackPrompt,
+    installOffer,
+    snoozeUntil,
+} from '@/lib/install-prompt';
 
 const IPHONE_SAFARI =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
@@ -7,6 +11,9 @@ const IPHONE_CHROME =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1';
 const IPHONE_INSTAGRAM =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0.0';
+// iPadOS Safari asks for desktop sites: a Mac's user agent, on a touch screen.
+const IPAD_SAFARI =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
 const ANDROID_CHROME =
     'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
 
@@ -16,6 +23,7 @@ const offer = (overrides: Partial<Parameters<typeof installOffer>[0]> = {}) =>
         offerInstall: true,
         standalone: false,
         userAgent: IPHONE_SAFARI,
+        touchPoints: 5,
         hasPrompt: false,
         snoozedUntil: null,
         now,
@@ -25,6 +33,11 @@ const offer = (overrides: Partial<Parameters<typeof installOffer>[0]> = {}) =>
 describe('installOffer', () => {
     it('shows the steps in Safari on an iPhone, where the browser has no prompt', () => {
         expect(offer()).toBe('ios');
+    });
+
+    it('shows them on an iPad too, which says it is a Mac, but not on a Mac', () => {
+        expect(offer({ userAgent: IPAD_SAFARI })).toBe('ios');
+        expect(offer({ userAgent: IPAD_SAFARI, touchPoints: 0 })).toBeNull();
     });
 
     it('never in another browser on an iPhone, whose steps differ', () => {
@@ -61,6 +74,13 @@ describe('installOffer', () => {
         expect(
             offer({ snoozedUntil: snoozed, now: now + 30 * 86_400_000 }),
         ).toBe('ios');
-        expect(offer({ snoozedUntil: Infinity })).toBeNull();
+    });
+});
+
+describe('holdsBackPrompt', () => {
+    it("holds back the browser's prompt for the sheet on the customer app's pages only", () => {
+        expect(holdsBackPrompt('/manifest-customer.webmanifest')).toBe(true);
+        expect(holdsBackPrompt('/manifest-business.webmanifest')).toBe(false);
+        expect(holdsBackPrompt(null)).toBe(false);
     });
 });

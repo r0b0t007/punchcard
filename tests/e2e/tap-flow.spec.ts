@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { freshTap, signUp } from './helpers';
 
 /**
  * The customer tap flow (CHW-25) on an iPhone: C1 signed out, sign up, C2,
@@ -19,27 +20,6 @@ test.skip(
     ({ browserName }) => browserName !== 'webkit',
     'Runs on mobile-safari only.',
 );
-
-/** A fresh tap URL (path and query) from a demo stamper: the first (Café Hafa), or 4 (Atlas Coffee Tangier). */
-function freshTap(stamper = 1): string {
-    const output = execFileSync(
-        'php',
-        ['artisan', 'punchcard:fake-tap', String(stamper)],
-        { encoding: 'utf8' },
-    );
-    const url = new URL(output.trim().split(/\s+/).pop() ?? '');
-
-    return `${url.pathname}${url.search}`;
-}
-
-async function signUp(page: Page): Promise<void> {
-    await page.getByRole('link', { name: 'Continue with email' }).click();
-    await page.locator('#name').fill('Salma Tapper');
-    await page.locator('#email').fill(`tap-${Date.now()}@example.com`);
-    await page.locator('#password').fill('a-long-test-password-1');
-    await page.locator('#password_confirmation').fill('a-long-test-password-1');
-    await page.locator('[data-test="register-user-button"]').click();
-}
 
 /** Gives the demo customer a Free mint tea at Café Hafa, stamper 1's café: each run redeems one. */
 function giveDemoReward(): void {

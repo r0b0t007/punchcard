@@ -149,7 +149,10 @@ final readonly class DescribeTap
             ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $tap->user_id))
             ->whereIn('source', StampSource::presenceValues())
             ->where('id', '<=', $tap->stamp_event_id)
-            ->count() >= 2;
+            // Whether there is a second: never counts all of a loyal customer's stamps.
+            ->skip(1)
+            ->take(1)
+            ->exists();
     }
 
     /**

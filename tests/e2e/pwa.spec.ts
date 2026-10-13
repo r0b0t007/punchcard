@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import type { CDPSession, Page } from '@playwright/test';
+import { freshTap, signUp } from './helpers';
 
 /**
  * The installable apps (CHW-35): on a phone, a café's join page and an
@@ -46,18 +46,6 @@ async function serviceWorkerScope(page: Page): Promise<string> {
         .toBe(true);
 
     return scope;
-}
-
-/** A fresh tap URL (path and query) from a demo stamper, as the stamper would write it. */
-function freshTap(stamper: number): string {
-    const output = execFileSync(
-        'php',
-        ['artisan', 'punchcard:fake-tap', String(stamper)],
-        { encoding: 'utf8' },
-    );
-    const url = new URL(output.trim().split(/\s+/).pop() ?? '');
-
-    return `${url.pathname}${url.search}`;
 }
 
 const sessions = new WeakMap<Page, CDPSession>();
@@ -347,14 +335,7 @@ test.describe('in dark mode', () => {
 
         // A new customer's first visit (Café Hafa): no sheet.
         await page.goto(freshTap(3));
-        await page.getByRole('link', { name: 'Continue with email' }).click();
-        await page.locator('#name').fill('Nadia Installer');
-        await page.locator('#email').fill(`install-${Date.now()}@example.com`);
-        await page.locator('#password').fill('a-long-test-password-1');
-        await page
-            .locator('#password_confirmation')
-            .fill('a-long-test-password-1');
-        await page.locator('[data-test="register-user-button"]').click();
+        await signUp(page);
         // Signing up, then claiming the tap: slow on a single-process dev server.
         await expect(
             page.getByRole('heading', { name: '1 of 10' }),
