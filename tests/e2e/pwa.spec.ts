@@ -241,6 +241,47 @@ test('offline with no cards kept, My cards says so', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
 });
 
+test.describe('on a phone in Arabic', () => {
+    test.use({ locale: 'ar-MA' });
+
+    test('offline with no cards kept, My cards says so in its language', async ({
+        page,
+    }) => {
+        await page.goto('/offline');
+
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'أنت غير متصل' }),
+        ).toBeVisible();
+        await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+        await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+    });
+});
+
+test('offline, a tap on My cards in the app loads it in full, for the service worker to answer', async ({
+    page,
+}) => {
+    const tab = (name: string) =>
+        page
+            .getByRole('navigation', { name: 'Main' })
+            .getByRole('link', { name });
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/app');
+    await serviceWorkerScope(page);
+    await tab('Rewards').click();
+    await page.waitForURL(/\/rewards$/);
+
+    // An Inertia visit fails offline; the page load that replaces it goes to the service worker.
+    await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+    await page.context().setOffline(true);
+    await tab('Cards').click();
+    await page.waitForURL(/\/app$/);
+    await expect(
+        page.getByRole('heading', { level: 1, name: /^Hello/ }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => 'sameDocument' in window)).toBe(false);
+    await page.context().setOffline(false);
+});
+
 test('the marketing site is no app and registers no service worker', async ({
     page,
 }) => {

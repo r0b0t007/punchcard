@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from '@/hooks/use-translation';
+import { loadInFullWhenOffline } from '@/lib/offline-visits';
 import { createUpdateFlow } from '@/lib/update-flow';
 
 const TOAST_ID = 'service-worker-update';
@@ -12,6 +13,8 @@ const TOAST_ID = 'service-worker-update';
  * the first page of an app (a manifest is linked), and kept mounted: when a
  * new version is waiting, a toast on an app's pages offers to reload, and
  * only the tab whose Reload was tapped reloads (createUpdateFlow).
+ * Offline, a visit to My cards loads in full, for the worker to show the
+ * cards kept on the phone (loadInFullWhenOffline).
  */
 export default function ServiceWorker({ onAppPage }: { onAppPage: boolean }) {
     const { t } = useTranslation();
@@ -34,6 +37,8 @@ export default function ServiceWorker({ onAppPage }: { onAppPage: boolean }) {
     useEffect(() => {
         activate.current = () => void updateServiceWorker(true);
     }, [updateServiceWorker]);
+
+    useEffect(() => loadInFullWhenOffline(), []);
 
     useEffect(() => {
         if (!needRefresh || !onAppPage) {

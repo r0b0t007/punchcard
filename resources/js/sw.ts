@@ -12,6 +12,7 @@ import {
     hasOfflineFallback,
     NETWORK_ROUTES,
     networkOrOffline,
+    preloadedOrFetched,
     routeFor,
 } from './sw-routes';
 import type { StaticRoute, SwRoute } from './sw-routes';
@@ -23,8 +24,9 @@ declare const self: ServiceWorkerGlobalScope;
  * app alike: the app shell is precached, fonts are kept once used, logos
  * and banners are refreshed in the background, and nothing else is ever
  * cached (routeFor). Page loads and writes skip it entirely where the
- * browser can (NETWORK_ROUTES). A new version waits until the page asks it
- * to take over (the update toast).
+ * browser can (NETWORK_ROUTES); the page loads that reach it start while
+ * it boots (navigation preload). A new version waits until the page asks
+ * it to take over (the update toast).
  */
 self.addEventListener('install', (event) => {
     const install = event as ExtendableEvent & {
@@ -36,6 +38,15 @@ self.addEventListener('install', (event) => {
         install.waitUntil(
             install.addRoutes(NETWORK_ROUTES).catch(() => undefined),
         );
+    }
+});
+
+// Where the browser has it (Safari 15.4+, Chromium): a page load doesn't wait for the worker to boot.
+const preloads = 'navigationPreload' in self.registration;
+
+self.addEventListener('activate', (event) => {
+    if (preloads) {
+        event.waitUntil(self.registration.navigationPreload.enable());
     }
 });
 
@@ -73,17 +84,23 @@ registerRoute(
         }),
 );
 
-// My cards' pages (CHW-35): from the network, else (offline, or no answer in 8 s) the offline page, which shows the
-// cards kept on the phone.
+// Page loads, from their preload (once started, it must be the answer: anything else would load the page twice).
+// My cards' pages (CHW-35) fall back to the offline page, which shows the cards kept on the phone; without preload,
+// other pages are left to the browser.
 registerRoute(
     ({ request, url }) =>
         request.mode === 'navigate' &&
-        hasOfflineFallback(url, self.location.origin),
-    ({ request }) =>
-        networkOrOffline(
-            () => fetch(request),
-            () => matchPrecache('/offline'),
-        ),
+        (preloads || hasOfflineFallback(url, self.location.origin)),
+    ({ event, request, url }) => {
+        const fromNetwork = () =>
+            preloadedOrFetched((event as FetchEvent).preloadResponse, () =>
+                fetch(request),
+            );
+
+        return hasOfflineFallback(url, self.location.origin)
+            ? networkOrOffline(fromNetwork, () => matchPrecache('/offline'))
+            : fromNetwork();
+    },
 );
 
 self.addEventListener('message', (event) => {

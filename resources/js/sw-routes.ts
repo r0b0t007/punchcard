@@ -49,31 +49,30 @@ export function hasOfflineFallback(url: URL, origin: string): boolean {
 }
 
 /**
- * A page of My cards from the network, else (offline, or no answer in
- * `timeoutMs`) the offline page (CHW-35).
+ * A page of My cards from the network, else (offline) the offline page
+ * (CHW-35). Only a failure falls back: a slow answer is still the page,
+ * however long the browser waits for it.
  */
 export async function networkOrOffline(
     fromNetwork: () => Promise<Response>,
     offlinePage: () => Promise<Response | undefined>,
-    timeoutMs = 8000,
 ): Promise<Response> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
     try {
-        return await Promise.race([
-            fromNetwork(),
-            new Promise<never>((_, reject) => {
-                timer = setTimeout(
-                    () => reject(new Error('timeout')),
-                    timeoutMs,
-                );
-            }),
-        ]);
+        return await fromNetwork();
     } catch {
         return (await offlinePage()) ?? Response.error();
-    } finally {
-        clearTimeout(timer);
     }
+}
+
+/**
+ * A page load from the request the browser started while the service
+ * worker booted (navigation preload), else fetched now: never both.
+ */
+export async function preloadedOrFetched(
+    preloadResponse: Promise<Response | undefined> | undefined,
+    fetchAgain: () => Promise<Response>,
+): Promise<Response> {
+    return (await preloadResponse) ?? fetchAgain();
 }
 
 /**

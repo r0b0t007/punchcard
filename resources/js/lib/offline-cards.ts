@@ -171,6 +171,44 @@ export function updatedAtLabel(
 }
 
 /**
+ * The cards as of `now`: a last visit saved as "today" is "3 days ago"
+ * three days later, counted on the phone's calendar.
+ */
+export function cardsAsOf(
+    cards: MyCard[],
+    generatedAt: string,
+    now: Date,
+): MyCard[] {
+    const day = (date: Date) =>
+        new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    // Rounded: a day of a clock change is 23 or 25 hours long.
+    const days = Math.round(
+        (day(now).getTime() - day(new Date(generatedAt)).getTime()) /
+            86_400_000,
+    );
+
+    return cards.map((card) => ({
+        ...card,
+        lastVisitDaysAgo:
+            card.lastVisitDaysAgo === null
+                ? null
+                : card.lastVisitDaysAgo + Math.max(days, 0),
+    }));
+}
+
+/** The first of the phone's languages the app speaks, else English. */
+export function phoneLocale(
+    languages: readonly string[],
+    supported: string[],
+): string {
+    return (
+        languages
+            .map((language) => language.split('-')[0].toLowerCase())
+            .find((language) => supported.includes(language)) ?? 'en'
+    );
+}
+
+/**
  * What the offline page shows (CHW-35): the cards kept on the phone, if
  * they are the last signed-in customer's, with the words of their
  * language (English without them).
@@ -179,9 +217,16 @@ export async function readOfflineCards(): Promise<{
     snapshot: OfflineSnapshot;
     strings: Record<string, string>;
 } | null> {
+    const keptFor = owner();
+
+    // Nobody's cards kept (signed out): never opened, so the database a sign-out deleted stays deleted.
+    if (keptFor === null) {
+        return null;
+    }
+
     const snapshot = await readSnapshot().catch(() => undefined);
 
-    if (!snapshot || !isOwnedBy(snapshot, owner())) {
+    if (!snapshot || !isOwnedBy(snapshot, keptFor)) {
         return null;
     }
 

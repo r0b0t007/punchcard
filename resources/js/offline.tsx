@@ -9,18 +9,43 @@ import {
     I18nContext,
     useTranslation,
 } from '@/hooks/use-translation';
-import { readOfflineCards, updatedAtLabel } from '@/lib/offline-cards';
+import {
+    cardsAsOf,
+    phoneLocale,
+    readOfflineCards,
+    updatedAtLabel,
+} from '@/lib/offline-cards';
+import type { TextDirection } from '@/types/i18n';
 
 type Kept = Awaited<ReturnType<typeof readOfflineCards>>;
+
+/** The words for a phone with no cards kept, in every language (OfflinePageController). */
+type NothingKeptWords = Record<
+    string,
+    { dir: TextDirection; strings: Record<string, string> }
+>;
+
+function nothingKeptWords(): NothingKeptWords {
+    try {
+        return JSON.parse(
+            document.getElementById('nothing-kept')?.textContent ?? '{}',
+        ) as NothingKeptWords;
+    } catch {
+        return {};
+    }
+}
 
 /**
  * The page the service worker serves when a page of My cards can't load
  * (CHW-35, C5 offline): the cards kept on the phone, in the customer's
  * language, with when they were saved. Nothing in it needs the network;
- * "Try again" reloads the page asked for.
+ * "Try again" reloads the page asked for. With none kept, it says so in
+ * the phone's language.
  */
 function OfflinePage() {
     const [kept, setKept] = useState<Kept | undefined>(undefined);
+    const [words] = useState(nothingKeptWords);
+    const phone = phoneLocale(navigator.languages, Object.keys(words));
 
     useEffect(() => {
         void readOfflineCards()
@@ -28,8 +53,9 @@ function OfflinePage() {
             .then(setKept);
     }, []);
 
-    const locale = kept?.snapshot.locale ?? 'en';
-    const dir = kept?.snapshot.dir ?? 'ltr';
+    const locale = kept ? kept.snapshot.locale : phone;
+    const dir = kept ? kept.snapshot.dir : (words[phone]?.dir ?? 'ltr');
+    const strings = kept ? kept.strings : (words[phone]?.strings ?? {});
 
     useEffect(() => {
         document.documentElement.lang = locale;
@@ -43,13 +69,17 @@ function OfflinePage() {
     const retry = () => window.location.reload();
 
     return (
-        <I18nContext value={createI18n(locale, dir, kept?.strings ?? {})}>
+        <I18nContext value={createI18n(locale, dir, strings)}>
             <DirectionProvider dir={dir}>
                 {kept ? (
                     <MyCardsView
                         firstName={kept.snapshot.firstName}
                         rewardsReady={kept.snapshot.rewardsReady}
-                        cards={kept.snapshot.cards}
+                        cards={cardsAsOf(
+                            kept.snapshot.cards,
+                            kept.snapshot.generatedAt,
+                            new Date(),
+                        )}
                         offline={{
                             updatedAt: updatedAtLabel(
                                 kept.snapshot.generatedAt,

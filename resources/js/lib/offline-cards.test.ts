@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+    cardsAsOf,
     isOwnedBy,
     keptForSomeoneElse,
+    phoneLocale,
     snapshotOf,
     updatedAtLabel,
 } from '@/lib/offline-cards';
@@ -93,5 +95,44 @@ describe('updatedAtLabel', () => {
         expect(updatedAtLabel('2026-10-11T11:00:00Z', 'ar', 'UTC')).toMatch(
             /11:00/,
         );
+    });
+});
+
+describe('cardsAsOf', () => {
+    const never: MyCard = { ...card, id: 8, lastVisitDaysAgo: null };
+
+    it('counts the days since the cards were saved, on the phone’s calendar', () => {
+        // Saved late on the 11th, shown early on the 14th: three days on.
+        const shown = cardsAsOf(
+            [card, never],
+            new Date(2026, 9, 11, 23, 30).toISOString(),
+            new Date(2026, 9, 14, 0, 30),
+        );
+
+        expect(shown.map((kept) => kept.lastVisitDaysAgo)).toEqual([5, null]);
+    });
+
+    it('changes nothing on the day they were saved', () => {
+        expect(
+            cardsAsOf(
+                [card],
+                new Date(2026, 9, 11, 8, 0).toISOString(),
+                new Date(2026, 9, 11, 22, 0),
+            )[0].lastVisitDaysAgo,
+        ).toBe(2);
+    });
+});
+
+describe('phoneLocale', () => {
+    const supported = ['fr', 'en', 'ar'];
+
+    it('picks the first of the phone’s languages the app speaks', () => {
+        expect(phoneLocale(['ar-MA', 'fr-FR'], supported)).toBe('ar');
+        expect(phoneLocale(['de-DE', 'fr-CA', 'en'], supported)).toBe('fr');
+    });
+
+    it('falls back to English', () => {
+        expect(phoneLocale(['de-DE'], supported)).toBe('en');
+        expect(phoneLocale([], supported)).toBe('en');
     });
 });

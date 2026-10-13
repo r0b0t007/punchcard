@@ -3,6 +3,7 @@ import {
     hasOfflineFallback,
     NETWORK_ROUTES,
     networkOrOffline,
+    preloadedOrFetched,
     routeFor,
 } from '@/sw-routes';
 
@@ -131,13 +132,48 @@ describe('networkOrOffline', () => {
         expect(await answer.text()).toBe('offline page');
     });
 
-    it('answers the offline page when the network keeps it waiting', async () => {
+    it('waits for a slow answer rather than calling it offline', async () => {
         const answer = await networkOrOffline(
-            () => new Promise<Response>(() => undefined),
+            () =>
+                new Promise<Response>((resolve) =>
+                    setTimeout(() => resolve(new Response('my cards')), 30),
+                ),
             offline,
-            20,
         );
 
-        expect(await answer.text()).toBe('offline page');
+        expect(await answer.text()).toBe('my cards');
+    });
+});
+
+describe('preloadedOrFetched', () => {
+    const fetchAgain = () => Promise.resolve(new Response('fetched again'));
+
+    it('answers with the request the browser started while the worker booted', async () => {
+        const answer = await preloadedOrFetched(
+            Promise.resolve(new Response('preloaded')),
+            fetchAgain,
+        );
+
+        expect(await answer.text()).toBe('preloaded');
+    });
+
+    it('fetches the page itself when nothing was preloaded', async () => {
+        expect(
+            await (
+                await preloadedOrFetched(Promise.resolve(undefined), fetchAgain)
+            ).text(),
+        ).toBe('fetched again');
+        expect(
+            await (await preloadedOrFetched(undefined, fetchAgain)).text(),
+        ).toBe('fetched again');
+    });
+
+    it('fails as the preload failed, for the offline page to answer', async () => {
+        await expect(
+            preloadedOrFetched(
+                Promise.reject(new TypeError('Failed to fetch')),
+                fetchAgain,
+            ),
+        ).rejects.toThrow('Failed to fetch');
     });
 });

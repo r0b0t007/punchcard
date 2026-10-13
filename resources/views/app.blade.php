@@ -19,20 +19,7 @@
             })();
         </script>
 
-        {{-- Inline style to set the HTML background color based on our theme in app.css --}}
-        <style>
-            html {
-                background-color: #fbf6ee;
-            }
-
-            html.dark {
-                background-color: #17120e;
-            }
-        </style>
-
-        <link rel="icon" href="/favicon.ico" sizes="32x32">
-        <link rel="icon" href="/icons/app-icon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @include('partials.head')
 
         {{-- The installable app this page belongs to (UsePwa, CHW-35); PwaHead keeps these in step on Inertia visits. --}}
         @if ($pwa = $page['props']['pwa'] ?? null)

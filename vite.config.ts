@@ -6,16 +6,36 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 
-/** The offline page's revision: its shell's assets, whose names carry their hash. */
-function offlineRevision(shell: Set<string>): string {
-    return createHash('sha256')
-        .update([...shell].sort().join(' '))
-        .digest('hex')
-        .slice(0, 16);
+/**
+ * The offline page's revision: everything it is made of, so phones fetch
+ * it again whenever any of it changes. The build (its assets, whose names
+ * carry their hash, and the fonts), its views and controller, its head
+ * tags (UsePwa) and its words.
+ */
+function offlineRevision(): string {
+    const hash = createHash('sha256');
+
+    [
+        'public/build/manifest.json',
+        'public/build/fonts-manifest.json',
+        'resources/views/offline.blade.php',
+        'resources/views/partials/head.blade.php',
+        'app/Http/Controllers/OfflinePageController.php',
+        'app/Http/Middleware/UsePwa.php',
+        'config/punchcard.php',
+        ...readdirSync('lang')
+            .filter((file) => file.endsWith('.json'))
+            .sort()
+            .map((file) => `lang/${file}`),
+    ].forEach((file) => {
+        hash.update(file).update(existsSync(file) ? readFileSync(file) : '');
+    });
+
+    return hash.digest('hex').slice(0, 16);
 }
 
 /**
@@ -113,10 +133,10 @@ export default defineConfig({
                                 ...entries.filter((entry) =>
                                     shell.has(entry.url),
                                 ),
-                                // The offline page's shell (CHW-35): a new revision whenever its assets change.
+                                // The offline page (CHW-35): a new revision whenever anything it is made of changes.
                                 {
                                     url: '/offline',
-                                    revision: offlineRevision(shell),
+                                    revision: offlineRevision(),
                                     size: 0,
                                 },
                             ],
