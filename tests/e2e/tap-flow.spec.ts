@@ -264,10 +264,11 @@ test.describe('in English, light', () => {
             name: 'Keep punchcard on your home screen',
         });
         await expect(sheet).toBeVisible();
+        // Each step after its number.
         await expect(sheet.getByRole('listitem')).toHaveText([
-            'Tap Share in the toolbar',
-            'Choose Add to Home Screen',
-            'Tap Add',
+            /^1\s*Tap Share in the toolbar$/,
+            /^2\s*Choose Add to Home Screen$/,
+            /^3\s*Tap Add$/,
         ]);
         await testInfo.attach('install-sheet-iphone', {
             body: await page.screenshot(),
