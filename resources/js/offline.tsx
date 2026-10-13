@@ -19,19 +19,22 @@ import type { TextDirection } from '@/types/i18n';
 
 type Kept = Awaited<ReturnType<typeof readOfflineCards>>;
 
-/** The words for a phone with no cards kept, in every language (OfflinePageController). */
-type NothingKeptWords = Record<
-    string,
-    { dir: TextDirection; strings: Record<string, string> }
->;
+/** The words for a phone with no cards kept, in every language, and the app's default (OfflinePageController). */
+type NothingKeptWords = {
+    defaultLocale: string;
+    locales: Record<
+        string,
+        { dir: TextDirection; strings: Record<string, string> }
+    >;
+};
 
 function nothingKeptWords(): NothingKeptWords {
     try {
         return JSON.parse(
-            document.getElementById('nothing-kept')?.textContent ?? '{}',
+            document.getElementById('nothing-kept')?.textContent ?? '',
         ) as NothingKeptWords;
     } catch {
-        return {};
+        return { defaultLocale: 'en', locales: {} };
     }
 }
 
@@ -45,7 +48,11 @@ function nothingKeptWords(): NothingKeptWords {
 function OfflinePage() {
     const [kept, setKept] = useState<Kept | undefined>(undefined);
     const [words] = useState(nothingKeptWords);
-    const phone = phoneLocale(navigator.languages, Object.keys(words));
+    const phone = phoneLocale(
+        navigator.languages,
+        Object.keys(words.locales),
+        words.defaultLocale,
+    );
 
     useEffect(() => {
         void readOfflineCards()
@@ -54,8 +61,8 @@ function OfflinePage() {
     }, []);
 
     const locale = kept ? kept.snapshot.locale : phone;
-    const dir = kept ? kept.snapshot.dir : (words[phone]?.dir ?? 'ltr');
-    const strings = kept ? kept.strings : (words[phone]?.strings ?? {});
+    const dir = kept ? kept.snapshot.dir : (words.locales[phone]?.dir ?? 'ltr');
+    const strings = kept ? kept.strings : (words.locales[phone]?.strings ?? {});
 
     useEffect(() => {
         document.documentElement.lang = locale;

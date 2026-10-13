@@ -56,7 +56,10 @@ it('serves the offline page during maintenance, so a new service worker still in
 });
 
 it('gives the offline page its words in every language, for a phone with no cards kept', function (): void {
-    $nothingKept = $this->get(route('offline'))->assertOk()->viewData('nothingKept');
+    $response = $this->get(route('offline'))->assertOk();
+    $nothingKept = $response->viewData('nothingKept');
+
+    expect($response->viewData('defaultLocale'))->toBe(Locales::default());
 
     expect(array_keys($nothingKept))->toBe(Locales::codes())
         ->and($nothingKept['ar']['dir'])->toBe('rtl')

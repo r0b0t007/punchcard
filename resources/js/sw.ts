@@ -86,20 +86,26 @@ registerRoute(
         }),
 );
 
-// Page loads, from their preload (once started, it must be the answer: anything else would load the page twice).
-// My cards' pages (CHW-35) fall back to the offline page, which shows the cards kept on the phone; without preload,
-// other pages are left to the browser.
+// GET page loads, from their preload (once started, it must be the answer: anything else would load the page twice);
+// a form posted as a page load is left to the browser. My cards' pages (CHW-35) fall back to the offline page, which
+// shows the cards kept on the phone; without preload, other pages are left to the browser too.
 registerRoute(
-    ({ request, url }) =>
-        request.mode === 'navigate' &&
-        (preloads || hasOfflineFallback(url, self.location.origin)),
-    ({ event, request, url }) => {
+    ({ request, url }) => {
+        if (request.method !== 'GET' || request.mode !== 'navigate') {
+            return false;
+        }
+
+        const myCards = hasOfflineFallback(url, self.location.origin);
+
+        return myCards || preloads ? { myCards } : false;
+    },
+    ({ event, request, params }) => {
         const fromNetwork = () =>
             preloadedOrFetched((event as FetchEvent).preloadResponse, () =>
                 fetch(request),
             );
 
-        return hasOfflineFallback(url, self.location.origin)
+        return (params as { myCards: boolean }).myCards
             ? networkOrOffline(fromNetwork, () => matchPrecache('/offline'))
             : fromNetwork();
     },

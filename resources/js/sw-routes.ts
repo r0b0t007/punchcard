@@ -67,16 +67,14 @@ export async function networkOrOffline(
 /**
  * A page load from the request the browser started while the service
  * worker booted (navigation preload), else fetched now. A preload that
- * failed is tried once more, as the browser alone would have loaded it.
+ * failed is never sent again, as the browser alone wouldn't: it may have
+ * reached the server, and a tap (`/t`) only counts once.
  */
 export async function preloadedOrFetched(
     preloadResponse: Promise<Response | undefined> | undefined,
     fetchAgain: () => Promise<Response>,
 ): Promise<Response> {
-    return (
-        (await Promise.resolve(preloadResponse).catch(() => undefined)) ??
-        fetchAgain()
-    );
+    return (await preloadResponse) ?? fetchAgain();
 }
 
 /**

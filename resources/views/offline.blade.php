@@ -42,7 +42,7 @@
         @vite(['resources/css/app.css', 'resources/js/offline.tsx'])
     </head>
     <body class="font-sans antialiased">
-        <script type="application/json" id="nothing-kept">@json($nothingKept)</script>
+        <script type="application/json" id="nothing-kept">@json(['defaultLocale' => $defaultLocale, 'locales' => $nothingKept])</script>
         <div id="offline"></div>
     </body>
 </html>

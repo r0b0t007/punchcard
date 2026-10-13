@@ -190,15 +190,16 @@ export function cardsAsOf(
     }));
 }
 
-/** The first of the phone's languages the app speaks, else English. */
+/** The first of the phone's languages the app speaks, else the app's default. */
 export function phoneLocale(
     languages: readonly string[],
     supported: string[],
+    fallback: string,
 ): string {
     return (
         languages
             .map((language) => language.split('-')[0].toLowerCase())
-            .find((language) => supported.includes(language)) ?? 'en'
+            .find((language) => supported.includes(language)) ?? fallback
     );
 }
 

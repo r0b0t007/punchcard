@@ -127,12 +127,14 @@ describe('phoneLocale', () => {
     const supported = ['fr', 'en', 'ar'];
 
     it('picks the first of the phone’s languages the app speaks', () => {
-        expect(phoneLocale(['ar-MA', 'fr-FR'], supported)).toBe('ar');
-        expect(phoneLocale(['de-DE', 'fr-CA', 'en'], supported)).toBe('fr');
+        expect(phoneLocale(['ar-MA', 'fr-FR'], supported, 'fr')).toBe('ar');
+        expect(phoneLocale(['de-DE', 'en-GB', 'fr'], supported, 'fr')).toBe(
+            'en',
+        );
     });
 
-    it('falls back to English', () => {
-        expect(phoneLocale(['de-DE'], supported)).toBe('en');
-        expect(phoneLocale([], supported)).toBe('en');
+    it("falls back to the app's default language", () => {
+        expect(phoneLocale(['de-DE'], supported, 'fr')).toBe('fr');
+        expect(phoneLocale([], supported, 'fr')).toBe('fr');
     });
 });

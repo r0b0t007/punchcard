@@ -12,7 +12,7 @@ use Illuminate\Contracts\View\View;
  * precaches and serves when a page of My cards can't load. The same for
  * everyone, so it carries no session: the cards come from the phone. For
  * a phone with none kept, it brings its few words in every language, and
- * the page picks the phone's.
+ * the page picks the phone's (else the app's default).
  */
 final class OfflinePageController extends Controller
 {
@@ -25,18 +25,9 @@ final class OfflinePageController extends Controller
 
     public function __invoke(): View
     {
-        $nothingKept = [];
-
-        foreach (Locales::codes() as $locale) {
-            $nothingKept[$locale] = [
-                'dir' => Locales::direction($locale),
-                'strings' => array_combine(
-                    self::NOTHING_KEPT,
-                    array_map(fn (string $key): string => __($key, locale: $locale), self::NOTHING_KEPT),
-                ),
-            ];
-        }
-
-        return view('offline', ['nothingKept' => $nothingKept]);
+        return view('offline', [
+            'nothingKept' => Locales::phrasebook(self::NOTHING_KEPT),
+            'defaultLocale' => Locales::default(),
+        ]);
     }
 }

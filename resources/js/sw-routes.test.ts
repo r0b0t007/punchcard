@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import {
     hasOfflineFallback,
     isMyCardsVisit,
@@ -170,22 +170,16 @@ describe('preloadedOrFetched', () => {
         ).toBe('fetched again');
     });
 
-    it('tries once more when the preload failed', async () => {
-        const answer = await preloadedOrFetched(
-            Promise.reject(new TypeError('Failed to fetch')),
-            fetchAgain,
-        );
+    it('never sends the request again when the preload failed (a tap may have stamped already)', async () => {
+        const again = vi.fn(fetchAgain);
 
-        expect(await answer.text()).toBe('fetched again');
-    });
-
-    it('fails when that fails too, for the offline page to answer', async () => {
         await expect(
             preloadedOrFetched(
                 Promise.reject(new TypeError('Failed to fetch')),
-                () => Promise.reject(new TypeError('Failed to fetch')),
+                again,
             ),
         ).rejects.toThrow('Failed to fetch');
+        expect(again).not.toHaveBeenCalled();
     });
 });
 
