@@ -30,7 +30,8 @@ use Illuminate\Support\Carbon;
  *   before (the stamps that landed animate), the stamps given, any reward
  *   unlocked (C3: still to redeem, redeemed or expired) and when the stamp
  *   was given, in
- *   the location's time;
+ *   the location's time, and whether to offer the app's install sheet (C13:
+ *   from the customer's second visit on);
  * - tap/redeemed: the reward the tap redeemed instead of stamping (CHW-26),
  *   where and when, in the location's time, and how long it still shows
  *   live, for staff to glance at;
@@ -81,6 +82,7 @@ final readonly class DescribeTap
                     'rewards' => $rewards,
                     'stampedAt' => $tap->created_at === null ? null : LocalMoment::of($tap->created_at, $timezone),
                     'enrollmentId' => $this->enrollmentOf($tap),
+                    'offerInstall' => $this->isSecondVisitOrLater($tap),
                 ]];
             }
 
@@ -128,6 +130,26 @@ final readonly class DescribeTap
         $id = CardEnrollment::query()->where('card_id', $tap->card_id)->where('user_id', $tap->user_id)->value('id');
 
         return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * Whether the tap's stamp is the customer's second visit or later
+     * (CHW-35, C13): their second stamp proving presence, on any card,
+     * counted up to this one (stamps since don't make an old screen offer
+     * it). Counted in stamp events: one tap or scan giving several stamps is
+     * one, but a tap and a staff stamp on the same visit are two.
+     */
+    private function isSecondVisitOrLater(Tap $tap): bool
+    {
+        if ($tap->user_id === null || $tap->stamp_event_id === null) {
+            return false;
+        }
+
+        return StampEvent::query()
+            ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $tap->user_id))
+            ->whereIn('source', StampSource::presenceValues())
+            ->where('id', '<=', $tap->stamp_event_id)
+            ->count() >= 2;
     }
 
     /**

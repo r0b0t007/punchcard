@@ -612,5 +612,13 @@
     "Reload": "Recharger",
     "Offline. Last updated :time.": "Hors ligne. Mis à jour le :time.",
     "You're offline": "Vous êtes hors ligne",
-    "Your cards show here once you are back online.": "Vos cartes s’afficheront ici dès que vous serez de nouveau en ligne."
+    "Your cards show here once you are back online.": "Vos cartes s’afficheront ici dès que vous serez de nouveau en ligne.",
+    "Keep punchcard on your home screen": "Gardez punchcard sur votre écran d’accueil",
+    "Your cards in one tap, even offline.": "Vos cartes en un geste, même hors ligne.",
+    "Tap Share in the toolbar": "Touchez Partager dans la barre d’outils",
+    "Choose Add to Home Screen": "Choisissez « Sur l’écran d’accueil »",
+    "Tap Add": "Touchez Ajouter",
+    "Install": "Installer",
+    "Not now": "Plus tard",
+    "Got it": "Compris"
 }

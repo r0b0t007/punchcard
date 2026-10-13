@@ -612,5 +612,13 @@
     "Reload": "إعادة التحميل",
     "Offline. Last updated :time.": "غير متصل. آخر تحديث :time.",
     "You're offline": "أنت غير متصل",
-    "Your cards show here once you are back online.": "ستظهر بطاقاتك هنا عند عودتك إلى الاتصال."
+    "Your cards show here once you are back online.": "ستظهر بطاقاتك هنا عند عودتك إلى الاتصال.",
+    "Keep punchcard on your home screen": "احتفظ بـ punchcard على شاشتك الرئيسية",
+    "Your cards in one tap, even offline.": "بطاقاتك بلمسة واحدة، حتى دون اتصال.",
+    "Tap Share in the toolbar": "اضغط على «مشاركة» في شريط الأدوات",
+    "Choose Add to Home Screen": "اختر «إضافة إلى الشاشة الرئيسية»",
+    "Tap Add": "اضغط على «إضافة»",
+    "Install": "تثبيت",
+    "Not now": "ليس الآن",
+    "Got it": "فهمت"
 }

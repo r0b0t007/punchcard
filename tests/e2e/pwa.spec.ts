@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import type { CDPSession, Page } from '@playwright/test';
 
@@ -9,7 +10,8 @@ import type { CDPSession, Page } from '@playwright/test';
  * its PWA audits, so this asks Chrome itself (CDP), on mobile-chrome only.
  *
  * Needs the demo data (php artisan db:seed) and a production build: the
- * service worker is built with the assets (public/sw.js).
+ * service worker is built with the assets (public/sw.js). The install sheet
+ * also needs a SUN master key (NFC_SUN_MASTER_KEY), for punchcard:fake-tap.
  */
 test.skip(
     ({ browserName, isMobile }) => browserName !== 'chromium' || !isMobile,
@@ -44,6 +46,18 @@ async function serviceWorkerScope(page: Page): Promise<string> {
         .toBe(true);
 
     return scope;
+}
+
+/** A fresh tap URL (path and query) from a demo stamper, as the stamper would write it. */
+function freshTap(stamper: number): string {
+    const output = execFileSync(
+        'php',
+        ['artisan', 'punchcard:fake-tap', String(stamper)],
+        { encoding: 'utf8' },
+    );
+    const url = new URL(output.trim().split(/\s+/).pop() ?? '');
+
+    return `${url.pathname}${url.search}`;
 }
 
 const sessions = new WeakMap<Page, CDPSession>();
@@ -288,6 +302,85 @@ test('offline, a tap on My cards in the app shows the cards kept on the phone', 
     await page.context().setOffline(false);
     await page.reload();
     await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test.describe('in dark mode', () => {
+    test.use({ colorScheme: 'dark' });
+
+    test('from the second visit on, the stamp screen offers to install the app', async ({
+        page,
+    }, testInfo) => {
+        // Chrome offers its prompt once it judges the app installable; stood in for here, the same on every run.
+        await page.addInitScript(() => {
+            const prompted = { count: 0 };
+            Object.assign(window, { prompted });
+            window.addEventListener(
+                'beforeinstallprompt',
+                (event) => {
+                    if (event.isTrusted) {
+                        event.stopImmediatePropagation();
+                    }
+                },
+                true,
+            );
+            window.addEventListener('load', () =>
+                window.dispatchEvent(
+                    Object.assign(
+                        new Event('beforeinstallprompt', { cancelable: true }),
+                        {
+                            prompt: () => {
+                                prompted.count += 1;
+
+                                return Promise.resolve();
+                            },
+                            userChoice: Promise.resolve({
+                                outcome: 'accepted',
+                            }),
+                        },
+                    ),
+                ),
+            );
+        });
+        const sheet = page.getByRole('dialog', {
+            name: 'Keep punchcard on your home screen',
+        });
+
+        // A new customer's first visit (Café Hafa): no sheet.
+        await page.goto(freshTap(3));
+        await page.getByRole('link', { name: 'Continue with email' }).click();
+        await page.locator('#name').fill('Nadia Installer');
+        await page.locator('#email').fill(`install-${Date.now()}@example.com`);
+        await page.locator('#password').fill('a-long-test-password-1');
+        await page
+            .locator('#password_confirmation')
+            .fill('a-long-test-password-1');
+        await page.locator('[data-test="register-user-button"]').click();
+        // Signing up, then claiming the tap: slow on a single-process dev server.
+        await expect(
+            page.getByRole('heading', { name: '1 of 10' }),
+        ).toBeVisible({ timeout: 20_000 });
+        await page.waitForTimeout(2_000);
+        await expect(sheet).toHaveCount(0);
+
+        // The second, at a café of another program (its own card, so no cooldown).
+        await page.goto(freshTap(5));
+        await expect(sheet).toBeVisible();
+        await expect(sheet.getByRole('listitem')).toHaveCount(0);
+        await testInfo.attach('install-sheet-android-dark', {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+        });
+
+        await sheet.getByRole('button', { name: 'Install' }).click();
+        await expect(sheet).toBeHidden();
+        expect(
+            await page.evaluate(
+                () =>
+                    (window as unknown as { prompted: { count: number } })
+                        .prompted.count,
+            ),
+        ).toBe(1);
+    });
 });
 
 test('the marketing site is no app and registers no service worker', async ({

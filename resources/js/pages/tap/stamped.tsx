@@ -1,4 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import InstallSheet from '@/components/tap/install-sheet';
 import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
@@ -20,7 +21,8 @@ type UnlockedReward = {
 /**
  * C2: the stamp landed (CHW-25). C3 when it unlocked a reward (CHW-26): the
  * card glows complete, the reward is announced, and it can be redeemed now
- * or kept for later.
+ * or kept for later. From the customer's second visit on, the install sheet
+ * (C13, CHW-35), but never over a reward.
  */
 export default function TapStamped({
     card,
@@ -30,6 +32,7 @@ export default function TapStamped({
     stampsBefore,
     fresh,
     enrollmentId,
+    offerInstall,
 }: {
     card: TapCard | null;
     given: number;
@@ -39,6 +42,8 @@ export default function TapStamped({
     fresh: boolean;
     /** The customer's copy of the card, for "See this card" (C6). */
     enrollmentId: number | null;
+    /** The customer's second visit or later (DescribeTap). */
+    offerInstall: boolean;
 }) {
     const { t, locale } = useTranslation();
     const added = t(':count stamp added|:count stamps added', {
@@ -183,6 +188,10 @@ export default function TapStamped({
                     </h1>
                 )}
             </TapScreen>
+            {/* On the first look only: never again on a reload or a later visit. */}
+            <InstallSheet
+                offerInstall={offerInstall && fresh && rewards.length === 0}
+            />
         </>
     );
 }

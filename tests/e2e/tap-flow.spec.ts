@@ -4,8 +4,9 @@ import type { Page } from '@playwright/test';
 
 /**
  * The customer tap flow (CHW-25) on an iPhone: C1 signed out, sign up, C2,
- * a second tap inside the cooldown, then Arabic right to left and dark mode;
- * and redeeming a reward (CHW-26): Redeem, then a tap on the stamper.
+ * a second tap inside the cooldown, a second visit elsewhere with the
+ * install sheet (CHW-35, C13), then Arabic right to left and dark mode; and
+ * redeeming a reward (CHW-26): Redeem, then a tap on the stamper.
  *
  * Needs the demo data (php artisan db:seed) and a SUN master key
  * (NFC_SUN_MASTER_KEY): punchcard:fake-tap writes a valid tap URL for the
@@ -19,11 +20,13 @@ test.skip(
     'Runs on mobile-safari only.',
 );
 
-/** A fresh tap URL (path and query) from the demo's first stamper. */
-function freshTap(): string {
-    const output = execFileSync('php', ['artisan', 'punchcard:fake-tap', '1'], {
-        encoding: 'utf8',
-    });
+/** A fresh tap URL (path and query) from a demo stamper: the first (Café Hafa), or 4 (Atlas Coffee Tangier). */
+function freshTap(stamper = 1): string {
+    const output = execFileSync(
+        'php',
+        ['artisan', 'punchcard:fake-tap', String(stamper)],
+        { encoding: 'utf8' },
+    );
     const url = new URL(output.trim().split(/\s+/).pop() ?? '');
 
     return `${url.pathname}${url.search}`;
@@ -227,6 +230,10 @@ test.describe('in English, light', () => {
             page.getByRole('heading', { name: '1 of 10' }),
         ).toBeVisible();
 
+        // The first visit: no install sheet (it would open 1.5 s in).
+        await page.waitForTimeout(2_000);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+
         await page.reload();
         await expect(
             page.getByRole('heading', { name: '1 of 10' }),
@@ -240,6 +247,40 @@ test.describe('in English, light', () => {
         await expect(
             page.getByText(/^Next stamp available (tomorrow )?at$/),
         ).toBeVisible();
+    });
+
+    test('from the second visit on, the stamp screen shows how to install the app', async ({
+        page,
+    }, testInfo) => {
+        await page.goto(freshTap());
+        await signUp(page);
+        await expect(
+            page.getByRole('heading', { name: '1 of 10' }),
+        ).toBeVisible();
+
+        // A second visit, at a café of another program (its own card, so no cooldown).
+        await page.goto(freshTap(4));
+        const sheet = page.getByRole('dialog', {
+            name: 'Keep punchcard on your home screen',
+        });
+        await expect(sheet).toBeVisible();
+        await expect(sheet.getByRole('listitem')).toHaveText([
+            'Tap Share in the toolbar',
+            'Choose Add to Home Screen',
+            'Tap Add',
+        ]);
+        await testInfo.attach('install-sheet-iphone', {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+        });
+
+        await sheet.getByRole('button', { name: 'Got it' }).click();
+        await expect(sheet).toBeHidden();
+
+        // Put away, and never again on a reload of the result.
+        await page.reload();
+        await page.waitForTimeout(2_000);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
     });
 });
 
