@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import type { CDPSession, Page } from '@playwright/test';
-import { freshTap, signUp } from './helpers';
+import type { Page } from '@playwright/test';
+import { cdp, freshTap, installabilityErrors, signIn, signUp } from './helpers';
 
 /**
  * The installable apps (CHW-35): on a phone, a café's join page and an
@@ -21,14 +21,6 @@ test.skip(
 // Installing the worker downloads the app shell first: slow on a single-threaded dev server.
 test.describe.configure({ timeout: 60_000 });
 
-async function signIn(page: Page, email: string): Promise<void> {
-    await page.goto('/login');
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill('password');
-    await page.locator('[data-test="login-button"]').click();
-    await page.waitForURL((url) => !url.pathname.startsWith('/login'));
-}
-
 /**
  * Waits for the service worker the page registered, then for it to control
  * the page: a worker installed on this visit controls the next load.
@@ -48,33 +40,10 @@ async function serviceWorkerScope(page: Page): Promise<string> {
     return scope;
 }
 
-const sessions = new WeakMap<Page, CDPSession>();
-
-/** The page's Chrome DevTools Protocol session, one per page. */
-async function cdp(page: Page): Promise<CDPSession> {
-    let session = sessions.get(page);
-
-    if (!session) {
-        session = await page.context().newCDPSession(page);
-        sessions.set(page, session);
-    }
-
-    return session;
-}
-
 function offlineDatabases(page: Page): Promise<string[]> {
     return page.evaluate(async () =>
         (await indexedDB.databases()).map((database) => database.name ?? ''),
     );
-}
-
-async function installabilityErrors(page: Page): Promise<string[]> {
-    const session = await cdp(page);
-    const { installabilityErrors } = await session.send(
-        'Page.getInstallabilityErrors',
-    );
-
-    return installabilityErrors.map((error) => error.errorId);
 }
 
 // The join page, public: the demo customer is left to the other specs, as
