@@ -14,7 +14,8 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
  * The offline page's revision: everything it is made of, so phones fetch
  * it again whenever any of it changes. The build (its assets, whose names
  * carry their hash, and the fonts), its views and controller, its head
- * tags (UsePwa), its words, and the PHP packages that print its tags
+ * tags (UsePwa), its words and how they are set out by language (Locales),
+ * and the PHP packages that print its tags
  * (composer.lock). The server's ASSET_URL is outside the build: rebuild
  * after changing it.
  */
@@ -27,6 +28,7 @@ function offlineRevision(): string {
         'resources/views/offline.blade.php',
         'resources/views/partials/head.blade.php',
         'app/Http/Controllers/OfflinePageController.php',
+        'app/Support/Locales.php',
         'app/Http/Middleware/UsePwa.php',
         'config/punchcard.php',
         'composer.lock',
