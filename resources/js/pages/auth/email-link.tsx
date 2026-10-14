@@ -43,6 +43,12 @@ export default function EmailLink({
                             { minutes },
                         )}
                     </p>
+                    {/* A stamp waiting for sign-in stays with this browser (CHW-142): not with the mail app's own. */}
+                    <p className="text-sm text-muted-foreground">
+                        {t(
+                            'Open the link in this browser to keep a stamp waiting here.',
+                        )}
+                    </p>
                     <TextLink href={create()} className="text-sm">
                         {t('Use another email')}
                     </TextLink>

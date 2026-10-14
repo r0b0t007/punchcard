@@ -16,10 +16,10 @@ use App\Support\Tenancy\TenantContext;
  * (two-factor on), a role in a business or organization, or the platform
  * admin signs in with its password or passkey, never a link that would
  * skip it. Any membership counts, even of a business not operating yet.
- * Nor an account with a password whose address was never confirmed: it may
- * have been registered by someone else, or its owner may have mistyped a new
- * address, so a link to that address must not confirm it; its owner signs in
- * with the password (or chooses one again by email).
+ * Nor an account whose address isn't confirmed: someone may have registered
+ * it, or put it on their account in settings, so a link from the address's
+ * owner must never sign them in to that account. Its owner signs in with
+ * the password, or chooses one by email (SignInWithPasswordMail).
  */
 final readonly class MaySignInByLink
 {
@@ -28,7 +28,7 @@ final readonly class MaySignInByLink
     public function handle(User $user): bool
     {
         return ! $user->isAnonymised()
-            && ($user->hasVerifiedEmail() || $user->password === null)
+            && $user->hasVerifiedEmail()
             && ! $user->hasEnabledTwoFactorAuthentication()
             && ! $user->hasRole(PlatformRole::Admin->value)
             && ! $this->context->bypass(fn (): bool => BusinessMember::query()->where('user_id', $user->id)->exists()

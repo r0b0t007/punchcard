@@ -9,6 +9,7 @@ use App\Actions\Auth\UseLoginLink;
 use App\Http\Requests\LoginLinkRequest;
 use App\Jobs\MailLoginLink;
 use App\Models\LoginLink;
+use App\Support\Auth\ProvenEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -31,9 +32,6 @@ use Inertia\Response;
  */
 final class LoginLinkController extends Controller
 {
-    /** The address the last link proved, until when, for FinishSignUpController. */
-    public const string PROVEN_EMAIL = 'sign-up.proven-email';
-
     public function create(Request $request): Response
     {
         return Inertia::render('auth/email-link', ['status' => $request->session()->get('status'), 'minutes' => LoginLink::MINUTES]);
@@ -63,9 +61,7 @@ final class LoginLinkController extends Controller
         }
 
         if ($used['user'] === null) {
-            // A new session id with the proven address: one planted beforehand never carries it.
-            $request->session()->regenerate();
-            $request->session()->put(self::PROVEN_EMAIL, ['email' => $used['email'], 'until' => now()->addMinutes(LoginLink::MINUTES)->getTimestamp()]);
+            ProvenEmail::remember($request->session(), $used['email']);
 
             return to_route('sign-up.finish');
         }

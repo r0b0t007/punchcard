@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\LoginLink;
+use App\Models\User;
 use App\Support\Nfc\FakeTap;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -28,7 +29,7 @@ class LoginLinkCommand extends Command
             return self::FAILURE;
         }
 
-        $this->line(LoginLink::for(strtolower(trim((string) $this->argument('email'))))->signedUrl());
+        $this->line(LoginLink::for(User::normalizeEmail((string) $this->argument('email')))->signedUrl());
 
         return self::SUCCESS;
     }

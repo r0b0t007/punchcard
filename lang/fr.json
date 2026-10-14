@@ -647,5 +647,6 @@
     "Tell us your name to finish signing up.": "Indiquez votre nom pour terminer l’inscription.",
     "Signs you in as :email": "Vous connecte en tant que :email",
     "Never chose a password? Choose one at :url": "Jamais choisi de mot de passe ? Choisissez-en un ici : :url",
-    "This address signs in with its password or a passkey.": "Cette adresse se connecte avec son mot de passe ou une clé d’accès."
+    "This address signs in with its password or a passkey.": "Cette adresse se connecte avec son mot de passe ou une clé d’accès.",
+    "Open the link in this browser to keep a stamp waiting here.": "Ouvrez le lien dans ce navigateur pour garder un tampon en attente ici."
 }

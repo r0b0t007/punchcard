@@ -8,6 +8,7 @@ use App\Actions\Auth\CreateCustomer;
 use App\Actions\Auth\SignInCustomer;
 use App\Http\Requests\FinishSignUpRequest;
 use App\Models\User;
+use App\Support\Auth\ProvenEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,7 +25,7 @@ final class FinishSignUpController extends Controller
 {
     public function create(Request $request): Response|RedirectResponse
     {
-        $email = $this->provenEmail($request);
+        $email = ProvenEmail::of($request->session());
 
         return $email === null
             ? to_route('login-link.create')
@@ -33,14 +34,14 @@ final class FinishSignUpController extends Controller
 
     public function store(FinishSignUpRequest $request, CreateCustomer $createCustomer, SignInCustomer $signInCustomer): RedirectResponse
     {
-        $email = $this->provenEmail($request);
-        $customer = $email === null ? null : $createCustomer->handle($email, (string) $request->validated('name'), $request->wantsNews());
+        $email = ProvenEmail::of($request->session());
 
         if ($email === null) {
             return to_route('login-link.create');
         }
 
-        $request->session()->forget(LoginLinkController::PROVEN_EMAIL);
+        $customer = $createCustomer->handle($email, (string) $request->validated('name'), $request->wantsNews());
+        ProvenEmail::forget($request->session());
 
         // The address now belongs to an account that signs in otherwise (MaySignInByLink): say so.
         if (! $customer instanceof User) {
@@ -49,14 +50,5 @@ final class FinishSignUpController extends Controller
         $signInCustomer->handle($request, $customer);
 
         return redirect()->intended(route('start'));
-    }
-
-    private function provenEmail(Request $request): ?string
-    {
-        $proven = $request->session()->get(LoginLinkController::PROVEN_EMAIL);
-
-        return is_array($proven) && is_string($proven['email'] ?? null) && (int) ($proven['until'] ?? 0) > now()->getTimestamp()
-            ? $proven['email']
-            : null;
     }
 }

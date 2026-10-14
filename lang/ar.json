@@ -647,5 +647,6 @@
     "Tell us your name to finish signing up.": "أخبرنا باسمك لإكمال التسجيل.",
     "Signs you in as :email": "يسجّل دخولك باسم :email",
     "Never chose a password? Choose one at :url": "لم تختر كلمة مرور قط؟ اخترها هنا: :url",
-    "This address signs in with its password or a passkey.": "يسجّل هذا العنوان الدخول بكلمة المرور أو بمفتاح مرور."
+    "This address signs in with its password or a passkey.": "يسجّل هذا العنوان الدخول بكلمة المرور أو بمفتاح مرور.",
+    "Open the link in this browser to keep a stamp waiting here.": "افتح الرابط في هذا المتصفح للاحتفاظ بطابع ينتظرك هنا."
 }

@@ -84,15 +84,26 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     }
 
     /**
-     * Addresses are stored in lower case, however they are typed (sign-up,
-     * settings, admin), as sign-in and email links look them up (CHW-23),
-     * when Fortify lowercases usernames (fortify.lowercase_usernames).
+     * An address as accounts store it and every lookup uses (sign-in, email
+     * links, their limits, CHW-23): trimmed, and in lower case when Fortify
+     * lowercases usernames (fortify.lowercase_usernames).
+     */
+    public static function normalizeEmail(string $email): string
+    {
+        $email = trim($email);
+
+        return config('fortify.lowercase_usernames') ? Str::lower($email) : $email;
+    }
+
+    /**
+     * Addresses are stored normalised, however they are typed (sign-up,
+     * settings, admin).
      *
      * @return Attribute<string, string>
      */
     protected function email(): Attribute
     {
-        return Attribute::make(set: fn (string $value): string => config('fortify.lowercase_usernames') ? Str::lower($value) : $value);
+        return Attribute::make(set: fn (string $value): string => self::normalizeEmail($value));
     }
 
     /**
