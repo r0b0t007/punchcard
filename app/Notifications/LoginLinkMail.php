@@ -6,7 +6,6 @@ namespace App\Notifications;
 
 use App\Models\LoginLink;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -14,7 +13,7 @@ use Illuminate\Notifications\Notification;
  * The email sign-in link (CHW-23, SendLoginLink): signed, good once, for
  * LoginLink::MINUTES. To a customer's account, or to a new address.
  */
-final class LoginLinkMail extends Notification implements ShouldQueue
+final class LoginLinkMail extends Notification
 {
     use Queueable;
 

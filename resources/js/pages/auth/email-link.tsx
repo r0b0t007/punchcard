@@ -15,7 +15,14 @@ import { create, store } from '@/routes/login-link';
  * the address, then "check your inbox", whatever the address (the page
  * never says who has an account).
  */
-export default function EmailLink({ status }: { status?: string }) {
+export default function EmailLink({
+    status,
+    minutes,
+}: {
+    status?: string;
+    /** How long a link signs in (LoginLink::MINUTES). */
+    minutes: number;
+}) {
     const { t } = useTranslation();
 
     if (status === 'login-link-sent') {
@@ -33,7 +40,7 @@ export default function EmailLink({ status }: { status?: string }) {
                     <p className="text-sm text-muted-foreground">
                         {t(
                             'We emailed you a sign-in link. It works once, for :minutes minutes.',
-                            { minutes: 15 },
+                            { minutes },
                         )}
                     </p>
                     <TextLink href={create()} className="text-sm">

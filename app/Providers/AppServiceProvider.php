@@ -197,14 +197,19 @@ class AppServiceProvider extends ServiceProvider
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
 
-        // Email sign-in links (CHW-23): a few per address typed, so nobody floods an inbox, and a cap per client
-        // address. Over either, the form says to wait (never which addresses have an account).
+        // Email sign-in links (CHW-23): a few per address typed from one client address (from elsewhere, the
+        // customer still gets theirs: nobody can use up another's), some per browser, and a generous cap per client
+        // address, which customers on a carrier's address share (CGNAT). Over any, the form says to wait (never
+        // which addresses have an account).
         RateLimiter::for('login-link', function (Request $request): array {
             $wait = fn (): RedirectResponse => back()->withErrors(['email' => __('Too many sign-in links asked for. Try again in a few minutes.')])->onlyInput('email');
+            $address = ClientAddress::rateLimitKey($request->ip());
+            $email = is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : '';
 
             return [
-                Limit::perMinutes(15, 3)->by('login-link:email:'.sha1(is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : ''))->response($wait),
-                Limit::perHour(10)->by('login-link:address:'.ClientAddress::rateLimitKey($request->ip()))->response($wait),
+                Limit::perMinutes(15, 3)->by('login-link:email:'.sha1($email).':'.$address)->response($wait),
+                Limit::perHour(10)->by('login-link:session:'.($request->hasSession() ? $request->session()->getId() : $address))->response($wait),
+                Limit::perHour(100)->by('login-link:address:'.$address)->response($wait),
             ];
         });
 

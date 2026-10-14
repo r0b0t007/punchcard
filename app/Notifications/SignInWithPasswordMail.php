@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -16,7 +15,7 @@ use Illuminate\Notifications\Notification;
  * account signed up by link that turned on two-factor never chose a
  * password: the mail says where to choose one (only its owner reads it).
  */
-final class SignInWithPasswordMail extends Notification implements ShouldQueue
+final class SignInWithPasswordMail extends Notification
 {
     use Queueable;
 

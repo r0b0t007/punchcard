@@ -36,11 +36,16 @@ final class FinishSignUpController extends Controller
         $email = $this->provenEmail($request);
         $customer = $email === null ? null : $createCustomer->handle($email, (string) $request->validated('name'), $request->wantsNews());
 
-        if (! $customer instanceof User) {
+        if ($email === null) {
             return to_route('login-link.create');
         }
 
         $request->session()->forget(LoginLinkController::PROVEN_EMAIL);
+
+        // The address now belongs to an account that signs in otherwise (MaySignInByLink): say so.
+        if (! $customer instanceof User) {
+            return to_route('login-link.create')->withErrors(['email' => __('This address signs in with its password or a passkey.')]);
+        }
         $signInCustomer->handle($request, $customer);
 
         return redirect()->intended(route('start'));

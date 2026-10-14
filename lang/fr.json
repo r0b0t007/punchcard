@@ -646,5 +646,6 @@
     "Create my account": "Créer mon compte",
     "Tell us your name to finish signing up.": "Indiquez votre nom pour terminer l’inscription.",
     "Signs you in as :email": "Vous connecte en tant que :email",
-    "Never chose a password? Choose one at :url": "Jamais choisi de mot de passe ? Choisissez-en un ici : :url"
+    "Never chose a password? Choose one at :url": "Jamais choisi de mot de passe ? Choisissez-en un ici : :url",
+    "This address signs in with its password or a passkey.": "Cette adresse se connecte avec son mot de passe ou une clé d’accès."
 }

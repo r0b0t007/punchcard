@@ -15,16 +15,17 @@ use Illuminate\Support\Facades\Notification;
  * a LoginLink row, and its URL signed until it expires. An account that may
  * not use links (MaySignInByLink) is told to use its password instead; an
  * anonymised one gets nothing. The caller answers the same in every case.
- * In the account's language, else the page's.
+ * In the account's language, else the page's. Run on the queue
+ * (MailLoginLink), so the page answers in the same time for any address.
  */
 final readonly class SendLoginLink
 {
     public function __construct(private MaySignInByLink $maySignInByLink) {}
 
-    public function handle(string $email): void
+    public function handle(string $email, string $pageLocale): void
     {
         $user = User::query()->where('email', $email)->first();
-        $locale = $user?->preferredLocale() ?? app()->getLocale();
+        $locale = $user?->preferredLocale() ?? $pageLocale;
 
         if ($user instanceof User && ! $this->maySignInByLink->handle($user)) {
             if (! $user->isAnonymised()) {

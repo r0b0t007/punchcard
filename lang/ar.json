@@ -646,5 +646,6 @@
     "Create my account": "إنشاء حسابي",
     "Tell us your name to finish signing up.": "أخبرنا باسمك لإكمال التسجيل.",
     "Signs you in as :email": "يسجّل دخولك باسم :email",
-    "Never chose a password? Choose one at :url": "لم تختر كلمة مرور قط؟ اخترها هنا: :url"
+    "Never chose a password? Choose one at :url": "لم تختر كلمة مرور قط؟ اخترها هنا: :url",
+    "This address signs in with its password or a passkey.": "يسجّل هذا العنوان الدخول بكلمة المرور أو بمفتاح مرور."
 }

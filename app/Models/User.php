@@ -15,10 +15,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -79,6 +81,18 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'adult_confirmed_at' => 'datetime',
             'marketing_opt_in_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Addresses are stored in lower case, however they are typed (sign-up,
+     * settings, admin), as sign-in and email links look them up (CHW-23),
+     * when Fortify lowercases usernames (fortify.lowercase_usernames).
+     *
+     * @return Attribute<string, string>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => config('fortify.lowercase_usernames') ? Str::lower($value) : $value);
     }
 
     /**

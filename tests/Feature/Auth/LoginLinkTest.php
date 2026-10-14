@@ -6,6 +6,7 @@ use App\Enums\BusinessRole;
 use App\Enums\PlatformRole;
 use App\Enums\TapStatus;
 use App\Http\Controllers\LoginLinkController;
+use App\Jobs\MailLoginLink;
 use App\Models\LoginLink;
 use App\Models\NfcTag;
 use App\Models\StampEvent;
@@ -13,15 +14,19 @@ use App\Models\Tap;
 use App\Models\User;
 use App\Notifications\LoginLinkMail;
 use App\Notifications\SignInWithPasswordMail;
+use App\Support\Http\ClientAddress;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -75,7 +80,7 @@ afterEach(function (): void {
 
 it('asks guests for their email', function (): void {
     $this->get(route('login-link.create'))->assertOk()
-        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-link'));
+        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-link')->where('minutes', LoginLink::MINUTES));
 
     $this->actingAs(User::factory()->create())->get(route('login-link.create'))->assertRedirect();
 });
@@ -103,6 +108,8 @@ it('never mails a link to an account it would let skip a second factor', functio
         'staff' => $tenants->member($user, $tenants->b1),
         'an org admin' => $tenants->admin($user, $tenants->orgA),
         'the platform admin' => $user->assignRole(Role::findOrCreate(PlatformRole::Admin->value)),
+        // Registered with a password, never confirmed: perhaps by someone else, perhaps a changed address.
+        'unconfirmed, with a password' => $user->forceFill(['email_verified_at' => null])->save(),
     };
 
     ($this->requestLink)($user->email)->assertRedirect()->assertSessionHas('status', 'login-link-sent');
@@ -111,30 +118,42 @@ it('never mails a link to an account it would let skip a second factor', functio
     // An account that never chose a password (signed up by link, then two-factor on) is told how to choose one.
     Notification::assertSentTo($user, SignInWithPasswordMail::class, fn (SignInWithPasswordMail $mail): bool => str_contains(implode(' ', $mail->toMail($user)->outroLines), route('password.request')));
     expect(LoginLink::query()->count())->toBe(0);
-})->with(['two-factor on', 'a business owner', 'staff', 'an org admin', 'the platform admin']);
+})->with(['two-factor on', 'a business owner', 'staff', 'an org admin', 'the platform admin', 'unconfirmed, with a password']);
 
-it('limits the links per address typed and per client address', function (): void {
+it('limits the links per address typed from one client address, so nobody else can use up a customer\'s', function (): void {
     Notification::fake();
+    $request = fn (string $from) => $this->withServerVariables(['REMOTE_ADDR' => $from])->post(route('login-link.store'), ['email' => 'salma@example.test']);
 
     foreach (range(1, 3) as $attempt) {
-        ($this->requestLink)('salma@example.test')->assertSessionHas('status', 'login-link-sent');
+        $request('203.0.113.7')->assertSessionHas('status', 'login-link-sent');
     }
 
-    ($this->requestLink)('salma@example.test')->assertSessionHasErrors('email');
-    expect(LoginLink::query()->count())->toBe(3);
+    $request('203.0.113.7')->assertSessionHasErrors('email');
+    // The customer, from their own phone, still gets theirs.
+    $request('198.51.100.9')->assertSessionHas('status', 'login-link-sent');
+    expect(LoginLink::query()->count())->toBe(4);
+});
 
-    RateLimiter::clear('login-link:email:'.sha1('salma@example.test'));
-    foreach (range(1, 7) as $attempt) {
-        ($this->requestLink)("customer{$attempt}@example.test")->assertSessionHas('status', 'login-link-sent');
-    }
+it('limits links per browser, and far more loosely per client address (customers share a carrier\'s)', function (): void {
+    $request = Request::create(route('login-link.store'), 'POST', ['email' => ' Salma@Example.test '], server: ['REMOTE_ADDR' => '203.0.113.7']);
+    $request->setLaravelSession($session = app('session')->driver());
+    $session->start();
+    $address = ClientAddress::rateLimitKey('203.0.113.7');
 
-    ($this->requestLink)('one-more@example.test')->assertSessionHasErrors('email');
-    expect(LoginLink::query()->count())->toBe(10);
+    $limits = RateLimiter::limiter('login-link')($request);
+
+    expect(array_map(fn (Limit $limit): array => [$limit->maxAttempts, $limit->decaySeconds, $limit->key], $limits))->toBe([
+        [3, 900, 'login-link:email:'.sha1('salma@example.test').':'.$address],
+        [10, 3600, 'login-link:session:'.$session->getId()],
+        [100, 3600, 'login-link:address:'.$address],
+    ]);
 });
 
 it('signs a customer in for a year from the link, once they confirm (a mail scanner opening it spends nothing)', function (): void {
     Notification::fake();
-    $customer = User::factory()->unverified()->create(['email' => 'salma@example.test']);
+    // A customer without a password, whose new address isn't confirmed yet (changed in settings): their passkey stays.
+    $customer = User::factory()->unverified()->create(['email' => 'salma@example.test', 'password' => null]);
+    DB::table('passkeys')->insert(['user_id' => $customer->id, 'name' => 'Their phone', 'credential_id' => 'theirs', 'credential' => '{}', 'created_at' => now(), 'updated_at' => now()]);
     ($this->requestLink)('salma@example.test');
     $link = ($this->linkFor)('salma@example.test');
 
@@ -147,6 +166,7 @@ it('signs a customer in for a year from the link, once they confirm (a mail scan
 
     $this->assertAuthenticatedAs($customer);
     expect($customer->fresh()->hasVerifiedEmail())->toBeTrue()
+        ->and(DB::table('passkeys')->where('user_id', $customer->id)->exists())->toBeTrue()
         ->and(session('auth.password_confirmed_at'))->toBe(now()->unix());
 
     $remember = collect($response->headers->getCookies())->first(fn ($cookie): bool => $cookie->getName() === Auth::guard()->getRecallerName());
@@ -334,27 +354,19 @@ it('refuses a link past its time, whatever its signature says', function (): voi
     $this->assertGuest();
 });
 
-it('takes an unconfirmed account back from whoever registered the address first', function (): void {
+it('never confirms an account with a password through a link (it may be someone else\'s, or a mistyped new address)', function (): void {
     Notification::fake();
-    // Someone registered the address with their password, and never confirmed it: it wasn't theirs.
-    $account = User::factory()->unverified()->create(['email' => 'salma@example.test', 'remember_token' => 'theirs']);
-    DB::table('sessions')->insert(['id' => 'their-session', 'user_id' => $account->id, 'payload' => '', 'last_activity' => now()->getTimestamp()]);
-    DB::table('passkeys')->insert(['user_id' => $account->id, 'name' => 'Theirs', 'credential_id' => 'theirs', 'credential' => '{}', 'created_at' => now(), 'updated_at' => now()]);
-
     ($this->requestLink)('salma@example.test');
-    $this->post(($this->linkFor)('salma@example.test'))->assertRedirect(route('start'));
+    $link = ($this->linkFor)('salma@example.test');
+    // Registered with a password before the link was used, never confirmed.
+    $account = User::factory()->unverified()->create(['email' => 'salma@example.test']);
+    $password = $account->password;
 
-    $account->refresh();
-    $this->assertAuthenticatedAs($account);
-    expect($account->password)->toBeNull()
-        ->and($account->remember_token)->not->toBe('theirs')
-        ->and(DB::table('sessions')->where('user_id', $account->id)->where('id', 'their-session')->exists())->toBeFalse()
-        ->and(DB::table('passkeys')->where('user_id', $account->id)->exists())->toBeFalse();
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
 
-    // Their password signs in no more.
-    Auth::logout();
-    $this->post(route('login.store'), ['email' => 'salma@example.test', 'password' => 'password'])->assertSessionHasErrors();
     $this->assertGuest();
+    expect($account->fresh()->hasVerifiedEmail())->toBeFalse()
+        ->and($account->fresh()->password)->toBe($password);
 });
 
 it('keeps the password of a confirmed account that signs in by link', function (): void {
@@ -391,30 +403,64 @@ it('gives the browser a new session once a link proved a new address', function 
         ->and(session(LoginLinkController::PROVEN_EMAIL.'.email'))->toBe('nadia@example.test');
 });
 
-it('handles an account that appeared between the link and the finish screen', function (string $account): void {
+it('says so when the address can no longer sign up by link, before the finish screen is sent', function (string $account): void {
     Notification::fake();
     ($this->requestLink)('nadia@example.test');
     $this->post(($this->linkFor)('nadia@example.test'));
     $appeared = User::factory()->unverified()->create(['email' => 'nadia@example.test']);
 
     if ($account === 'with two-factor') {
-        $appeared->forceFill(['two_factor_secret' => encrypt('secret'), 'two_factor_confirmed_at' => now()])->save();
+        $appeared->forceFill(['email_verified_at' => now(), 'two_factor_secret' => encrypt('secret'), 'two_factor_confirmed_at' => now()])->save();
     }
 
-    $response = $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi', 'adult' => '1']);
+    $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi', 'adult' => '1'])
+        ->assertRedirect(route('login-link.create'))
+        ->assertSessionHasErrors(['email' => __('This address signs in with its password or a passkey.')]);
 
-    if ($account === 'with two-factor') {
-        $response->assertRedirect(route('login-link.create'));
-        $this->assertGuest();
-    } else {
-        // Registered meanwhile, never confirmed: the address is the link's, so the account is too.
-        $response->assertRedirect(route('start'));
-        $this->assertAuthenticatedAs($appeared);
-        expect($appeared->fresh()->password)->toBeNull();
-    }
+    $this->assertGuest();
+    expect(session()->has(LoginLinkController::PROVEN_EMAIL))->toBeFalse()
+        ->and(User::query()->where('email', 'nadia@example.test')->count())->toBe(1);
+})->with(['unconfirmed, with a password', 'with two-factor']);
 
-    expect(User::query()->where('email', 'nadia@example.test')->count())->toBe(1);
-})->with(['unconfirmed', 'with two-factor']);
+it('records the consent given on the finish screen, also on an account confirmed meanwhile', function (): void {
+    Notification::fake();
+    ($this->requestLink)('nadia@example.test');
+    $this->post(($this->linkFor)('nadia@example.test'));
+    $customer = User::factory()->create(['email' => 'nadia@example.test', 'name' => 'Nadia T.']);
+
+    $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi', 'adult' => '1', 'marketing' => '1'])->assertRedirect(route('start'));
+
+    $customer->refresh();
+    $this->assertAuthenticatedAs($customer);
+    expect($customer->adult_confirmed_at?->equalTo(now()))->toBeTrue()
+        ->and($customer->marketing_opt_in_at?->equalTo(now()))->toBeTrue()
+        // Their name is theirs already.
+        ->and($customer->name)->toBe('Nadia T.');
+});
+
+it('stores an address in lower case, however it is typed, so a link finds its account', function (): void {
+    Notification::fake();
+    // Without a password: changing the address unconfirms it, which a link then confirms.
+    $customer = User::factory()->create(['email' => 'salma@example.test', 'password' => null]);
+
+    $this->actingAs($customer)->patch(route('profile.update'), ['name' => $customer->name, 'email' => 'Salma.New@Example.TEST']);
+    Auth::logout();
+    ($this->requestLink)('salma.new@example.test');
+
+    expect($customer->fresh()->email)->toBe('salma.new@example.test');
+    Notification::assertSentTo($customer, LoginLinkMail::class);
+    expect(User::query()->count())->toBe(1);
+});
+
+it('does the work of a link in a queued job, so the answer takes as long for any address', function (): void {
+    Queue::fake();
+    User::factory()->create(['email' => 'salma@example.test']);
+
+    ($this->requestLink)('salma@example.test')->assertSessionHas('status', 'login-link-sent');
+
+    Queue::assertPushed(MailLoginLink::class, fn (MailLoginLink $job): bool => $job->email === 'salma@example.test' && $job->locale === 'en');
+    expect(LoginLink::query()->count())->toBe(0);
+});
 
 it('answers a malformed address like any wrong one', function (): void {
     $this->post(route('login-link.store'), ['email' => ['salma@example.test']])->assertSessionHasErrors('email');
@@ -425,8 +471,12 @@ it('says on the link\'s page which account it signs in to, half hidden', functio
     User::factory()->create(['email' => 'salma@example.test']);
     ($this->requestLink)('salma@example.test');
 
-    $this->get(($this->linkFor)('salma@example.test'))
-        ->assertInertia(fn (Assert $page): Assert => $page->where('email', 's***@example.test'));
+    $link = ($this->linkFor)('salma@example.test');
+
+    $this->get($link)
+        ->assertInertia(fn (Assert $page): Assert => $page->where('email', 's***@example.test')
+            // Its own path: never the host or scheme a proxy may have changed.
+            ->where('action', parse_url($link, PHP_URL_PATH).'?'.parse_url($link, PHP_URL_QUERY)));
 });
 
 it('forgets the links a day after they were sent (the address is personal data)', function (): void {

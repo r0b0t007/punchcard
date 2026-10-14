@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\Auth\SendLoginLink;
 use App\Actions\Auth\SignInCustomer;
 use App\Actions\Auth\UseLoginLink;
 use App\Http\Requests\LoginLinkRequest;
+use App\Jobs\MailLoginLink;
 use App\Models\LoginLink;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,12 +36,13 @@ final class LoginLinkController extends Controller
 
     public function create(Request $request): Response
     {
-        return Inertia::render('auth/email-link', ['status' => $request->session()->get('status')]);
+        return Inertia::render('auth/email-link', ['status' => $request->session()->get('status'), 'minutes' => LoginLink::MINUTES]);
     }
 
-    public function store(LoginLinkRequest $request, SendLoginLink $sendLoginLink): RedirectResponse
+    /** The work on the queue (MailLoginLink): the answer takes as long for any address. */
+    public function store(LoginLinkRequest $request): RedirectResponse
     {
-        $sendLoginLink->handle($request->email());
+        MailLoginLink::dispatch($request->email(), app()->getLocale());
 
         return back()->with('status', 'login-link-sent');
     }
@@ -64,7 +65,7 @@ final class LoginLinkController extends Controller
         if ($used['user'] === null) {
             // A new session id with the proven address: one planted beforehand never carries it.
             $request->session()->regenerate();
-            $request->session()->put(self::PROVEN_EMAIL, ['email' => $used['email'], 'until' => now()->addMinutes(15)->getTimestamp()]);
+            $request->session()->put(self::PROVEN_EMAIL, ['email' => $used['email'], 'until' => now()->addMinutes(LoginLink::MINUTES)->getTimestamp()]);
 
             return to_route('sign-up.finish');
         }
@@ -79,7 +80,8 @@ final class LoginLinkController extends Controller
     {
         return Inertia::render('auth/email-link-open', [
             'expired' => ! $link instanceof LoginLink,
-            'action' => $link instanceof LoginLink ? $request->fullUrl() : null,
+            // Its own path and query: never a host or scheme a proxy may have changed.
+            'action' => $link instanceof LoginLink ? $request->getRequestUri() : null,
             'email' => $link?->maskedEmail(),
         ]);
     }

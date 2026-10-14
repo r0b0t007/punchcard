@@ -13,7 +13,8 @@ use Illuminate\Database\UniqueConstraintViolationException;
  * address is verified (the link proved it), there is no password, and they
  * said they are 16 or older, and whether they want news by email, each
  * dated (CNDP). Signed up meanwhile by another route: that account, if it
- * may sign in by link (MaySignInByLink), else null.
+ * may sign in by link (MaySignInByLink), with the consent just given where
+ * it has none (its name stays its own); else null.
  */
 final readonly class CreateCustomer
 {
@@ -24,7 +25,7 @@ final readonly class CreateCustomer
         $existing = User::query()->where('email', $email)->first();
 
         if ($existing instanceof User) {
-            return $this->maySignInByLink->handle($existing) ? $existing : null;
+            return $this->maySignInByLink->handle($existing) ? $this->consented($existing, $wantsNews) : null;
         }
 
         try {
@@ -35,6 +36,16 @@ final readonly class CreateCustomer
         }
 
         event(new Registered($user));
+
+        return $user;
+    }
+
+    private function consented(User $user, bool $wantsNews): User
+    {
+        $user->forceFill([
+            'adult_confirmed_at' => $user->adult_confirmed_at ?? now(),
+            'marketing_opt_in_at' => $user->marketing_opt_in_at ?? ($wantsNews ? now() : null),
+        ])->save();
 
         return $user;
     }
