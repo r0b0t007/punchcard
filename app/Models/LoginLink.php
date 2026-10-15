@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Auth\MailedLink;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\URL;
 
 /**
  * An email sign-in link (CHW-23): its URL is signed and good until
@@ -63,26 +63,18 @@ class LoginLink extends Model
         $query->where('purpose', $purpose)->whereNull('used_at')->where('expires_at', '>', now());
     }
 
-    /**
-     * Its URL, signed until it expires: what the mail links to. Always on
-     * the app's own address (app.url), never the request's host, which a
-     * client can name: a link mailed to someone else's host would hand them
-     * its signature. The signature leaves the host out (LoginLinkController
-     * checks it the same way), so it also works behind a proxy.
-     */
+    /** Its URL, signed until it expires: what the mail links to (MailedLink::signed). */
     public function signedUrl(): string
     {
         $route = $this->purpose === self::CONFIRM ? 'password.confirm-by-email.show' : 'login-link.show';
 
-        return rtrim((string) config('app.url'), '/').URL::temporarySignedRoute($route, $this->expires_at, ['link' => $this->id], absolute: false);
+        return MailedLink::signed($route, $this->expires_at, ['link' => $this->id]);
     }
 
     /** Its address, half hidden, for the link's page: s***@example.com. */
     public function maskedEmail(): string
     {
-        [$name, $domain] = array_pad(explode('@', $this->email, 2), 2, '');
-
-        return mb_substr($name, 0, 1).'***@'.$domain;
+        return MailedLink::maskedEmail($this->email);
     }
 
     protected function casts(): array

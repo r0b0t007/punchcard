@@ -196,6 +196,9 @@ class AppServiceProvider extends ServiceProvider
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
 
+        // Staff invitations (CHW-146): each mails an address, so a few an hour per owner.
+        RateLimiter::for('staff-invite', fn (Request $request): Limit => Limit::perHour(20)->by('staff-invite:'.$request->user()?->getAuthIdentifier()));
+
         // Email sign-in links (CHW-23): a few per address typed from one client address (from elsewhere, the
         // customer still gets theirs), so many per address typed from anywhere (no inbox is flooded; whoever uses
         // it up delays a customer's link by an hour at most, who stays signed in for a year anyway), some per

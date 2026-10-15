@@ -7,6 +7,7 @@ return [
     'confirmed' => 'La confirmation du champ :attribute ne correspond pas.',
     'current_password' => 'Le mot de passe est incorrect.',
     'email' => 'Le champ :attribute doit être une adresse e-mail valide.',
+    'exists' => 'La valeur choisie pour le champ :attribute n’est pas valide.',
     'in' => 'La valeur choisie pour le champ :attribute n’est pas valide.',
     'lowercase' => 'Le champ :attribute doit être en minuscules.',
     'max' => [
@@ -34,6 +35,7 @@ return [
         'password_confirmation' => 'confirmation du mot de passe',
         'locale' => 'langue',
         'business_name' => 'nom du commerce',
+        'location_id' => 'établissement',
         'code' => 'code',
         'recovery_code' => 'code de récupération',
     ],
