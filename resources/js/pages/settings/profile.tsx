@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
-import { edit } from '@/routes/profile';
+import { confirm as confirmItsYou, edit } from '@/routes/profile';
 import type { Auth } from '@/types';
 import { send } from '@/routes/verification';
 
@@ -19,9 +19,15 @@ type PageProps = {
 export default function Profile({
     mustVerifyEmail,
     status,
+    hasPassword,
+    recentlyConfirmed,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    /** Without one (signed up by email link, CHW-23), deleting the account asks to confirm it's them. */
+    hasPassword: boolean;
+    /** A new address asks to confirm it's them first, unless they did lately (CHW-23). */
+    recentlyConfirmed: boolean;
 }) {
     const { auth } = usePage<PageProps>().props;
     const { t } = useTranslation();
@@ -87,6 +93,19 @@ export default function Profile({
                                     className="mt-2"
                                     message={errors.email}
                                 />
+                                {recentlyConfirmed ? null : (
+                                    <p className="text-sm text-muted-foreground">
+                                        {t(
+                                            "Changing it asks you to confirm it's you first.",
+                                        )}{' '}
+                                        <Link
+                                            href={confirmItsYou()}
+                                            className="font-medium text-foreground underline underline-offset-4"
+                                        >
+                                            {t("Confirm it's you")}
+                                        </Link>
+                                    </p>
+                                )}
                             </div>
 
                             {mustVerifyEmail &&
@@ -131,7 +150,7 @@ export default function Profile({
                 </Form>
             </div>
 
-            <DeleteUser />
+            <DeleteUser hasPassword={hasPassword} />
         </>
     );
 }

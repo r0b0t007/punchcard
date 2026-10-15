@@ -73,7 +73,11 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));
 
-        Fortify::confirmPasswordView(fn () => Inertia::render('auth/confirm-password'));
+        // An account without a password (signed up by email link, CHW-23) confirms with a passkey or a link by email.
+        Fortify::confirmPasswordView(fn (Request $request) => Inertia::render('auth/confirm-password', [
+            'hasPassword' => $request->user()?->password !== null,
+            'status' => $request->session()->get('status'),
+        ]));
     }
 
     /**

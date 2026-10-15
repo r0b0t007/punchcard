@@ -6,10 +6,13 @@ use App\Actions\Account\DeleteAccount;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Notifications\EmailChangedMail;
+use App\Support\Auth\RecentConfirmation;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,6 +25,10 @@ class ProfileController extends Controller
     {
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            // Without one (signed up by email link, CHW-23), deleting the account asks to confirm it's them instead.
+            'hasPassword' => $request->user()->password !== null,
+            // A new address asks to confirm it's them first, unless they did lately (ProfileUpdateRequest).
+            'recentlyConfirmed' => RecentConfirmation::holds($request->session()),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -31,6 +38,7 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        $oldEmail = $request->user()->email;
         $request->user()->fill($request->validated());
 
         if ($request->user()->isDirty('email')) {
@@ -38,6 +46,13 @@ class ProfileController extends Controller
         }
 
         $request->user()->save();
+
+        // The new address is confirmed from its inbox at once (until then it signs in by no link), and the old one
+        // hears of the change (CHW-23).
+        if ($request->user()->wasChanged('email')) {
+            $request->user()->sendEmailVerificationNotification();
+            Notification::route('mail', $oldEmail)->notify((new EmailChangedMail($request->user()->email))->locale($request->user()->preferredLocale() ?? app()->getLocale()));
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 

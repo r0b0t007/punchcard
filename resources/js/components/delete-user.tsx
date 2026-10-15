@@ -1,4 +1,4 @@
-import { Form, router } from '@inertiajs/react';
+import { Form, Link, router } from '@inertiajs/react';
 import { useRef } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/heading';
@@ -17,8 +17,14 @@ import {
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
 import { forgetOfflineCards } from '@/lib/offline-cards';
+import { confirm as confirmItsYou } from '@/routes/profile';
 
-export default function DeleteUser() {
+/**
+ * Deleting the account: with its password, or, for an account without one
+ * (signed up by email link, CHW-23), once it confirmed it's them (a passkey
+ * or a link by email, then back here).
+ */
+export default function DeleteUser({ hasPassword }: { hasPassword: boolean }) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const { t } = useTranslation();
 
@@ -53,9 +59,13 @@ export default function DeleteUser() {
                             {t('Are you sure you want to delete your account?')}
                         </DialogTitle>
                         <DialogDescription>
-                            {t(
-                                "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Please enter your password to confirm.",
-                            )}
+                            {hasPassword
+                                ? t(
+                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Please enter your password to confirm.",
+                                  )
+                                : t(
+                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct.",
+                                  )}
                         </DialogDescription>
 
                         <Form
@@ -75,22 +85,34 @@ export default function DeleteUser() {
                             {({ resetAndClearErrors, processing, errors }) => (
                                 <>
                                     <div className="grid gap-2">
-                                        <Label
-                                            htmlFor="password"
-                                            className="sr-only"
-                                        >
-                                            {t('Password')}
-                                        </Label>
+                                        {hasPassword ? (
+                                            <>
+                                                <Label
+                                                    htmlFor="password"
+                                                    className="sr-only"
+                                                >
+                                                    {t('Password')}
+                                                </Label>
 
-                                        <PasswordInput
-                                            id="password"
-                                            name="password"
-                                            ref={passwordInput}
-                                            placeholder={t('Password')}
-                                            autoComplete="current-password"
-                                        />
+                                                <PasswordInput
+                                                    id="password"
+                                                    name="password"
+                                                    ref={passwordInput}
+                                                    placeholder={t('Password')}
+                                                    autoComplete="current-password"
+                                                />
+                                            </>
+                                        ) : null}
 
                                         <InputError message={errors.password} />
+                                        {!hasPassword && errors.password ? (
+                                            <Link
+                                                href={confirmItsYou()}
+                                                className="text-sm font-medium underline underline-offset-4"
+                                            >
+                                                {t("Confirm it's you")}
+                                            </Link>
+                                        ) : null}
                                         <InputError message={errors.account} />
                                     </div>
 

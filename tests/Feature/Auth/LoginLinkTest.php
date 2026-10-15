@@ -446,7 +446,7 @@ it('stores an address in lower case, however it is typed, so a link finds its ac
     Notification::fake();
     $customer = User::factory()->create(['email' => 'salma@example.test', 'password' => null]);
 
-    $this->actingAs($customer)->patch(route('profile.update'), ['name' => $customer->name, 'email' => 'Salma.New@Example.TEST']);
+    $this->actingAs($customer)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $customer->name, 'email' => 'Salma.New@Example.TEST']);
     Auth::logout();
     // Confirmed from the mail settings sent, as a changed address must be before a link signs in to it.
     $customer->fresh()->markEmailAsVerified();
@@ -461,7 +461,7 @@ it('never lets an address someone put on their account sign its owner in to that
     Notification::fake();
     // Someone signed up by link, then put another person's address on their account (unconfirmed).
     $theirs = User::factory()->create(['email' => 'someone@example.test', 'password' => null]);
-    $this->actingAs($theirs)->patch(route('profile.update'), ['name' => $theirs->name, 'email' => 'salma@example.test']);
+    $this->actingAs($theirs)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $theirs->name, 'email' => 'salma@example.test']);
     Auth::logout();
 
     // The address's owner asks for a link: none, so nobody signs in to that account by it.
@@ -477,7 +477,7 @@ it('refuses a case variant of a taken address in settings, without an error page
     User::factory()->create(['email' => 'salma@example.test']);
     $other = User::factory()->create();
 
-    $this->actingAs($other)->patch(route('profile.update'), ['name' => $other->name, 'email' => 'Salma@Example.test'])
+    $this->actingAs($other)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $other->name, 'email' => 'Salma@Example.test'])
         ->assertSessionHasErrors('email');
 });
 

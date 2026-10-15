@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\ConfirmByEmailController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Middleware\NeverCache;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +14,15 @@ Route::middleware(['auth'])->group(function (): void {
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
     // Deleting an account must not depend on having verified its email (CHW-139).
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).
+    Route::get('settings/profile/confirm', fn () => to_route('profile.edit'))->middleware(RequirePassword::class)->name('profile.confirm');
+
+    // "Confirm it's you" by email, for an account without a password (CHW-23): never cached, the link is in the URL.
+    Route::middleware(NeverCache::class)->group(function (): void {
+        Route::post('user/confirm-by-email', [ConfirmByEmailController::class, 'store'])->middleware('throttle:confirm-link')->name('password.confirm-by-email');
+        Route::get('user/confirm-by-email/{link}', [ConfirmByEmailController::class, 'show'])->whereNumber('link')->name('password.confirm-by-email.show');
+        Route::post('user/confirm-by-email/{link}', [ConfirmByEmailController::class, 'confirm'])->whereNumber('link')->name('password.confirm-by-email.confirm');
+    });
 });
 
 Route::middleware(['auth', 'verified'])->group(function (): void {

@@ -222,7 +222,7 @@ it('reserves the anonymised email domain, so nobody can take an address before t
 
     $response = match ($how) {
         'signup' => $this->post(route('register.store'), ['name' => 'X', 'email' => $reserved, 'password' => 'password', 'password_confirmation' => 'password']),
-        'profile' => $this->actingAs($squatter)->patch(route('profile.update'), ['name' => 'X', 'email' => strtoupper($reserved)]),
+        'profile' => $this->actingAs($squatter)->withSession(['auth.password_confirmed_at' => time()])->patch(route('profile.update'), ['name' => 'X', 'email' => strtoupper($reserved)]),
     };
 
     $response->assertSessionHasErrors('email');
