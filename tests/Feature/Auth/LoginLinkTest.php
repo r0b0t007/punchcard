@@ -225,7 +225,7 @@ it('asks a new address who they are, then makes an account without a password', 
         ->assertInertia(fn (Assert $page): Assert => $page->component('auth/finish-sign-up')->where('email', 'nadia@example.test'));
 
     // 16 or older, or no account.
-    $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi'])->assertSessionHasErrors('adult');
+    $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi'])->assertSessionHasErrors(['adult' => "Confirm you're 16 or older to create an account."]);
     $this->assertGuest();
 
     $this->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi', 'adult' => '1'])->assertRedirect(route('start'));

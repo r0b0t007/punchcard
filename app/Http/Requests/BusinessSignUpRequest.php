@@ -34,6 +34,14 @@ class BusinessSignUpRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->consentMessages();
+    }
+
+    /**
      * The validated account fields, for CreateNewUser (which checks them again,
      * as for any registration): the confirmation is the password it matched,
      * and the consent given (CHW-23).
@@ -42,15 +50,15 @@ class BusinessSignUpRequest extends FormRequest
      */
     public function account(): array
     {
-        $account = $this->safe()->only(['name', 'email', 'password']);
+        $account = $this->safe()->only(['name', 'email', 'password', 'adult', 'marketing']);
 
         return [
             'name' => (string) $account['name'],
             'email' => (string) $account['email'],
             'password' => (string) $account['password'],
             'password_confirmation' => (string) $account['password'],
-            'adult' => $this->boolean('adult') ? '1' : '0',
-            'marketing' => $this->boolean('marketing') ? '1' : '0',
+            'adult' => (string) $account['adult'],
+            'marketing' => (string) ($account['marketing'] ?? ''),
         ];
     }
 

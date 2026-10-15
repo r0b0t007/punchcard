@@ -30,8 +30,8 @@ afterEach(function (): void {
     Carbon::setTestNow();
 });
 
-it('creates no account without "16 or older"', function (string $form): void {
-    ($this->signUp)($form, [])->assertSessionHasErrors('adult');
+it('creates no account without "16 or older", and says what is missing', function (string $form): void {
+    ($this->signUp)($form, [])->assertSessionHasErrors(['adult' => "Confirm you're 16 or older to create an account."]);
 
     $this->assertGuest();
     expect(User::query()->count())->toBe(0);

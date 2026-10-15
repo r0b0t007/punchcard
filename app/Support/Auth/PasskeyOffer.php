@@ -12,6 +12,8 @@ use Illuminate\Contracts\Session\Session;
  * ID or a fingerprint. Started by SignInCustomer, shown while the account
  * has none and the session counts as confirmed (adding one needs it,
  * RecentConfirmation), until "not now". Never after a password sign-in.
+ * Once a passkey exists or the confirmation lapses, the offer ends for the
+ * session: no lookup on every page after that.
  */
 final class PasskeyOffer
 {
@@ -24,9 +26,17 @@ final class PasskeyOffer
 
     public static function holds(Session $session, User $user): bool
     {
-        return $session->get(self::KEY) === true
-            && RecentConfirmation::holds($session)
-            && ! $user->passkeys()->exists();
+        if ($session->get(self::KEY) !== true) {
+            return false;
+        }
+
+        if (! RecentConfirmation::holds($session) || $user->passkeys()->exists()) {
+            self::dismiss($session);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function dismiss(Session $session): void

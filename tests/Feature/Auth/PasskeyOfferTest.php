@@ -42,10 +42,14 @@ it('offers a passkey after an email-link sign-in, until "not now"', function ():
     ($this->offered)(false);
 });
 
-it('stops offering once the account has a passkey', function (): void {
+it('stops offering once the account has a passkey, for the rest of the session', function (): void {
     ($this->signInByLink)();
-    $this->customer->passkeys()->create(['name' => 'iPhone', 'credential_id' => 'cred-1', 'credential' => []]);
+    $passkey = $this->customer->passkeys()->create(['name' => 'iPhone', 'credential_id' => 'cred-1', 'credential' => []]);
 
+    ($this->offered)(false);
+
+    // The offer ended there: no passkey lookup on every page from then on.
+    $passkey->delete();
     ($this->offered)(false);
 });
 
@@ -53,6 +57,10 @@ it('stops offering once adding one would ask to confirm it\'s them again', funct
     ($this->signInByLink)();
     $this->travel(config('auth.password_timeout') + 1)->seconds();
 
+    ($this->offered)(false);
+
+    // Ended for the session, even once confirmed again.
+    $this->withSession(['auth.password_confirmed_at' => now()->unix()]);
     ($this->offered)(false);
 });
 

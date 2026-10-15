@@ -1,28 +1,39 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { Fingerprint } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
 import PasskeyRegistration from '@/components/passkey-register';
 import { buttonVariants } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { dismiss } from '@/routes/passkey-offer';
 
+const subscribeToNothing = () => () => {};
+
 /**
  * After an email-link sign-in (CHW-23): next time, Face ID or a fingerprint
  * instead of waiting for a link. Shown while the server offers it
- * (offerPasskey: no passkey yet, session confirmed), in a browser that can
- * make one, until they add one or say "not now".
+ * (offerPasskey: no passkey yet, session confirmed), until they add one or
+ * say "not now". In the server's HTML too, so the page never shifts when
+ * it loads; only a browser that can't make passkeys hides it afterwards.
+ * A landmark with a plain title, so the page's own heading comes first.
  */
 export default function PasskeyOffer() {
     const { t } = useTranslation();
     const { offerPasskey } = usePage<{ offerPasskey: boolean }>().props;
     const { isSupported } = usePasskeyRegister();
+    // False on the server and while hydrating, when isSupported is false too.
+    const hydrated = useSyncExternalStore(
+        subscribeToNothing,
+        () => true,
+        () => false,
+    );
 
-    if (!offerPasskey || !isSupported) {
+    if (!offerPasskey || (hydrated && !isSupported)) {
         return null;
     }
 
     return (
-        <section
+        <aside
             aria-labelledby="passkey-offer-title"
             className="mx-auto max-w-md px-4 pt-4"
             data-test="passkey-offer"
@@ -34,11 +45,11 @@ export default function PasskeyOffer() {
                         className="mt-0.5 size-5 shrink-0 text-muted-foreground"
                     />
                     <div className="space-y-1">
-                        <h2 id="passkey-offer-title" className="font-medium">
+                        <p id="passkey-offer-title" className="font-medium">
                             {t(
                                 'Next time, sign in with Face ID or your fingerprint',
                             )}
-                        </h2>
+                        </p>
                         <p className="text-sm text-muted-foreground">
                             {t(
                                 'Add a passkey on this phone: no link to wait for.',
@@ -47,11 +58,8 @@ export default function PasskeyOffer() {
                     </div>
                 </div>
                 <div className="flex flex-wrap items-start gap-2">
-                    <PasskeyRegistration
-                        onSuccess={() =>
-                            router.reload({ only: ['offerPasskey'] })
-                        }
-                    />
+                    {/* The whole page again: a passkey list below (security settings) shows the new one too. */}
+                    <PasskeyRegistration onSuccess={() => router.reload()} />
                     <Link
                         href={dismiss()}
                         as="button"
@@ -63,6 +71,6 @@ export default function PasskeyOffer() {
                     </Link>
                 </div>
             </div>
-        </section>
+        </aside>
     );
 }

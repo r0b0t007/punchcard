@@ -29,7 +29,7 @@ class CreateNewUser implements CreatesNewUsers
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             ...$this->consentRules(),
-        ])->validate();
+        ], $this->consentMessages())->validate();
 
         $user = new User([
             'name' => $input['name'],

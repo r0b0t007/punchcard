@@ -28,6 +28,14 @@ class FinishSignUpRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->consentMessages();
+    }
+
     public function wantsNews(): bool
     {
         return $this->boolean('marketing');
