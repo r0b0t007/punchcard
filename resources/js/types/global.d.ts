@@ -13,7 +13,8 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
-            nav: { cards: boolean };
+            /** The sidebar's pages the user may open: cards (CHW-32), staff (CHW-146). */
+            nav: { cards: boolean; staff: boolean };
             /** The installable app the page belongs to (UsePwa, CHW-35). */
             pwa: Pwa;
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */

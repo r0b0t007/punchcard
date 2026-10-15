@@ -1,5 +1,11 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, CreditCard, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    CreditCard,
+    FolderGit2,
+    LayoutGrid,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -15,6 +21,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as cards } from '@/routes/cards';
+import { index as staff } from '@/routes/staff';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -29,6 +36,12 @@ const cardsNavItem: NavItem = {
     title: 'Cards',
     href: cards(),
     icon: CreditCard,
+};
+
+const staffNavItem: NavItem = {
+    title: 'Staff',
+    href: staff(),
+    icon: Users,
 };
 
 const footerNavItems: NavItem[] = [
@@ -46,7 +59,11 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { nav } = usePage().props;
-    const items = nav.cards ? [...mainNavItems, cardsNavItem] : mainNavItems;
+    const items = [
+        ...mainNavItems,
+        ...(nav.cards ? [cardsNavItem] : []),
+        ...(nav.staff ? [staffNavItem] : []),
+    ];
 
     return (
         <Sidebar collapsible="icon" variant="inset">

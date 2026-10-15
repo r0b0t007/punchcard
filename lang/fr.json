@@ -465,7 +465,6 @@
     "Place your stamper": "Installez votre borne",
     "Put it by the till. It is ticked with its first tap.": "Posez-la près de la caisse. Cette étape est cochée à son premier passage.",
     "Invite your staff": "Invitez votre équipe",
-    "Staff invitations are coming soon.": "Les invitations d’équipe arrivent bientôt.",
     "To do": "À faire",
     "Cyclic": "Cyclique",
     "Progressive": "Progressive",
@@ -707,5 +706,11 @@
     "This invitation can't be used any more: ask for a new one.": "Cette invitation n’est plus utilisable : demandez-en une nouvelle.",
     "This invitation is for :email: sign out, then open it again.": "Cette invitation est pour :email : déconnectez-vous, puis rouvrez-la.",
     "Waiting to join": "En attente",
-    "You're on the staff of :business.": "Vous faites partie de l’équipe de :business."
+    "You're on the staff of :business.": "Vous faites partie de l’équipe de :business.",
+    "Your staff": "Votre équipe",
+    "Remove :name from your staff?": "Retirer :name de votre équipe ?",
+    "They can no longer stamp or redeem here. Their account and the stamps they gave stay.": "Cette personne ne pourra plus tamponner ni valider de récompenses ici. Son compte et les tampons donnés restent.",
+    "Removed from your staff.": "Retiré de votre équipe.",
+    "Invitation cancelled.": "Invitation annulée.",
+    "They stamp cards and redeem rewards at the counter.": "Elle tamponne les cartes et valide les récompenses au comptoir."
 }

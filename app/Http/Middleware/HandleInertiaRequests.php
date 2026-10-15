@@ -3,10 +3,13 @@
 namespace App\Http\Middleware;
 
 use App\Actions\Tenancy\HasMemberships;
+use App\Models\Business;
+use App\Models\BusinessMember;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -60,6 +63,8 @@ class HandleInertiaRequests extends Middleware
             'pwa' => null,
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
+                // The staff page (CHW-146): whoever runs the business worked in.
+                'staff' => $this->managesStaff($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
@@ -72,5 +77,14 @@ class HandleInertiaRequests extends Middleware
             'translations' => Inertia::once(fn (): array => Locales::translations($locale))
                 ->as('translations-'.$locale),
         ];
+    }
+
+    /** Whether the user runs the business worked in, so manages its staff; no business, no staff page. */
+    private function managesStaff(Request $request): bool
+    {
+        $businessId = app(TenantContext::class)->businessId();
+        $business = $businessId === null ? null : Business::query()->find($businessId);
+
+        return $business instanceof Business && ($request->user()?->can('viewAny', [BusinessMember::class, $business]) ?? false);
     }
 }
