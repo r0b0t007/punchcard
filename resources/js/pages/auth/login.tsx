@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { register } from '@/routes';
+import { create as emailLink } from '@/routes/login-link';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import PasskeyVerify from '@/components/passkey-verify';
@@ -99,6 +100,12 @@ export default function Login({ status, canResetPassword }: Props) {
                                 {processing && <Spinner />}
                                 {t('Log in')}
                             </Button>
+                        </div>
+
+                        <div className="text-center text-sm">
+                            <TextLink href={emailLink()} tabIndex={5}>
+                                {t('Email me a sign-in link')}
+                            </TextLink>
                         </div>
 
                         <div className="text-center text-sm text-muted-foreground">

@@ -52,7 +52,7 @@ it('brings a visitor back here after they register or sign in from it', function
 
     expect(session('url.intended'))->toBe(route('join.show', $this->business->slug));
 })->with([
-    'register' => ['join.register', 'register'],
+    'register' => ['join.register', 'login-link.create'],
     'sign in' => ['join.login', 'login'],
 ]);
 
@@ -115,7 +115,7 @@ it('leaves a tap waiting to be claimed its sign-in redirect, whatever host it wa
     $claim = 'https://stamp.example'.parse_url(route('taps.claim'), PHP_URL_PATH);
     $this->withSession(['url.intended' => $claim]);
 
-    $this->get(route('join.register', $this->business->slug))->assertRedirect(route('register'));
+    $this->get(route('join.register', $this->business->slug))->assertRedirect(route('login-link.create'));
 
     expect(session('url.intended'))->toBe($claim);
 });

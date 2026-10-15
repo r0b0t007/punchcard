@@ -3,8 +3,10 @@
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinishSignUpController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\LoginLinkController;
 use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\OfflinePageController;
@@ -30,6 +32,17 @@ if (app()->environment('local')) {
 Route::middleware('guest')->group(function (): void {
     Route::get('business/register', [BusinessRegistrationController::class, 'create'])->name('business.register');
     Route::post('business/register', [BusinessRegistrationController::class, 'store'])->middleware('throttle:business-signup')->name('business.register.store');
+});
+
+// Signing in with an email link, customers only (CHW-23): the address, the link's page (one button: opening it spends
+// nothing), then a new customer's first details. Never cached: the link is in the URL.
+Route::middleware(['guest', NeverCache::class])->group(function (): void {
+    Route::get('login/email', [LoginLinkController::class, 'create'])->name('login-link.create');
+    Route::post('login/email', [LoginLinkController::class, 'store'])->middleware('throttle:login-link')->name('login-link.store');
+    Route::get('login/link/{link}', [LoginLinkController::class, 'show'])->whereNumber('link')->name('login-link.show');
+    Route::post('login/link/{link}', [LoginLinkController::class, 'signIn'])->whereNumber('link')->name('login-link.sign-in');
+    Route::get('sign-up/finish', [FinishSignUpController::class, 'create'])->name('sign-up.finish');
+    Route::post('sign-up/finish', [FinishSignUpController::class, 'store'])->name('sign-up.finish.store');
 });
 
 // punchcard Pro, the business app (CHW-151): every page under /business, its manifest's scope, so a tap (/t) or a

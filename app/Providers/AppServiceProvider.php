@@ -22,6 +22,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
@@ -194,6 +195,24 @@ class AppServiceProvider extends ServiceProvider
         // Business sign-up (CHW-31): each one creates an organization, so a few an hour per client
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
+
+        // Email sign-in links (CHW-23): a few per address typed from one client address (from elsewhere, the
+        // customer still gets theirs), so many per address typed from anywhere (no inbox is flooded; whoever uses
+        // it up delays a customer's link by an hour at most, who stays signed in for a year anyway), some per
+        // browser, and a generous cap per client address, which customers on a carrier's address share (CGNAT).
+        // Over any, the form says to wait (never which addresses have an account).
+        RateLimiter::for('login-link', function (Request $request): array {
+            $wait = fn (): RedirectResponse => back()->withErrors(['email' => __('Too many sign-in links asked for. Try again in a few minutes.')])->onlyInput('email');
+            $address = ClientAddress::rateLimitKey($request->ip());
+            $email = is_string($request->input('email')) ? User::normalizeEmail($request->input('email')) : '';
+
+            return [
+                Limit::perMinutes(15, 3)->by('login-link:email:'.sha1($email).':'.$address)->response($wait),
+                Limit::perHour(10)->by('login-link:email:'.sha1($email))->response($wait),
+                Limit::perHour(10)->by('login-link:session:'.($request->hasSession() ? $request->session()->getId() : $address))->response($wait),
+                Limit::perHour(100)->by('login-link:address:'.$address)->response($wait),
+            ];
+        });
 
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
         // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a

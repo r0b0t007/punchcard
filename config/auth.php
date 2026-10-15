@@ -43,6 +43,8 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+            // A year, in minutes: taps land in Safari, so a customer stays signed in there (CHW-23).
+            'remember' => 525600,
         ],
     ],
 

@@ -45,7 +45,8 @@ final class JoinController extends Controller
     {
         $this->comeBack($request, $this->business($find, $slug));
 
-        return to_route('register');
+        // Signing up is an email link away (CHW-23), as from a first tap (C1).
+        return to_route('login-link.create');
     }
 
     public function login(Request $request, string $slug, FindJoinableBusiness $find): RedirectResponse

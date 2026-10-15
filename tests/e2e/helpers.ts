@@ -18,13 +18,42 @@ export function freshTap(stamper = 1): string {
     return `${url.pathname}${url.search}`;
 }
 
-/** Signs up a new customer from a first tap's page (C1), in English. */
-export async function signUp(page: Page): Promise<void> {
-    await page.getByRole('link', { name: 'Continue with email' }).click();
-    await fillSignUp(page);
+/**
+ * A working email sign-in link (path and query) for an address, as the mail
+ * carries it (CHW-23): punchcard:login-link, since a test can't read mail.
+ */
+export function loginLink(email: string): string {
+    const output = execFileSync(
+        'php',
+        ['artisan', 'punchcard:login-link', email],
+        { encoding: 'utf8' },
+    );
+    const url = new URL(output.trim().split(/\s+/).pop() ?? '');
+
+    return `${url.pathname}${url.search}`;
 }
 
-/** Fills and sends the sign-up form the page shows, as a new customer. */
+/**
+ * Signs up a new customer from a first tap's page (C1), in English, as a
+ * customer would (CHW-23): Continue with email, the link in their inbox,
+ * then their name and that they are 16 or older.
+ */
+export async function signUp(page: Page): Promise<void> {
+    const email = `tap-${Date.now()}@example.com`;
+
+    await page.getByRole('link', { name: 'Continue with email' }).click();
+    await page.locator('#email').fill(email);
+    await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
+    await page.getByRole('heading', { name: 'Check your inbox' }).waitFor();
+
+    await page.goto(loginLink(email));
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.locator('#name').fill('Salma Tapper');
+    await page.getByRole('checkbox', { name: "I'm 16 or older" }).check();
+    await page.locator('[data-test="finish-sign-up-button"]').click();
+}
+
+/** Fills and sends the password sign-up form (/register), as a new customer. */
 export async function fillSignUp(page: Page): Promise<void> {
     await page.locator('#name').fill('Salma Tapper');
     await page.locator('#email').fill(`tap-${Date.now()}@example.com`);
