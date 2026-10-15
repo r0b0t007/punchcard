@@ -7,6 +7,7 @@ namespace App\Http\Requests\Settings;
 use App\Actions\Account\MustHandOverBusiness;
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
+use App\Support\Auth\RecentConfirmation;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,7 +24,8 @@ class ProfileDeleteRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        // An account without a password (signed up by email link, CHW-23) confirms it's them instead (after()).
+        return $this->user()?->hasPassword() !== true ? [] : [
             'password' => $this->currentPasswordRules(),
         ];
     }
@@ -36,6 +38,8 @@ class ProfileDeleteRequest extends FormRequest
     public function after(MustHandOverBusiness $mustHandOverBusiness): array
     {
         return [
+            // Without a password, having confirmed it's them lately stands in for the current one (CHW-23).
+            RecentConfirmation::rule($this->session(), 'password', $this->user()?->hasPassword() === false),
             function (Validator $validator) use ($mustHandOverBusiness): void {
                 $user = $this->user();
 

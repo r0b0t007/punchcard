@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Actions\Auth\MayConfirmByEmail;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -73,7 +75,12 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));
 
-        Fortify::confirmPasswordView(fn () => Inertia::render('auth/confirm-password'));
+        // An account without a password (signed up by email link, CHW-23) confirms with a passkey or a link by email.
+        Fortify::confirmPasswordView(fn (Request $request) => Inertia::render('auth/confirm-password', [
+            'hasPassword' => $request->user()?->hasPassword() === true,
+            'mayConfirmByEmail' => $request->user() instanceof User && app(MayConfirmByEmail::class)->handle($request->user()),
+            'status' => $request->session()->get('status'),
+        ]));
     }
 
     /**

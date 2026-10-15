@@ -47,9 +47,7 @@ final class LoginLinkController extends Controller
 
     public function show(Request $request, int $link): Response
     {
-        $loginLink = $request->hasValidSignature(absolute: false) ? LoginLink::query()->find($link) : null;
-
-        return $this->linkPage($request, $loginLink?->isUsable() === true ? $loginLink : null);
+        return $this->linkPage($request, $request->hasValidSignature(absolute: false) ? LoginLink::query()->whereKey($link)->usable(LoginLink::SIGN_IN)->first() : null);
     }
 
     public function signIn(Request $request, int $link, UseLoginLink $useLoginLink, SignInCustomer $signInCustomer): Response|RedirectResponse

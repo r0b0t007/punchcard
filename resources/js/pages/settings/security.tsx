@@ -15,6 +15,8 @@ import ManageTwoFactor from '@/components/manage-two-factor';
 
 type Props = {
     passwordRules: string;
+    /** Without one (signed up by email link, CHW-23): choose one, no current password. */
+    hasPassword: boolean;
 } & ManagePasskeysProps &
     ManageTwoFactorProps;
 
@@ -32,10 +34,20 @@ export default function Security(props: Props) {
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title={t('Update password')}
-                    description={t(
-                        'Ensure your account is using a long, random password to stay secure',
-                    )}
+                    title={
+                        props.hasPassword
+                            ? t('Update password')
+                            : t('Choose a password')
+                    }
+                    description={
+                        props.hasPassword
+                            ? t(
+                                  'Ensure your account is using a long, random password to stay secure',
+                              )
+                            : t(
+                                  'You sign in with an email link. A password lets you sign in without one too.',
+                              )
+                    }
                 />
 
                 <Form
@@ -62,22 +74,26 @@ export default function Security(props: Props) {
                 >
                     {({ errors, processing }) => (
                         <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="current_password">
-                                    {t('Current password')}
-                                </Label>
+                            {props.hasPassword ? (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="current_password">
+                                        {t('Current password')}
+                                    </Label>
 
-                                <PasswordInput
-                                    id="current_password"
-                                    ref={currentPasswordInput}
-                                    name="current_password"
-                                    className="mt-1 block w-full"
-                                    autoComplete="current-password"
-                                    placeholder={t('Current password')}
-                                />
+                                    <PasswordInput
+                                        id="current_password"
+                                        ref={currentPasswordInput}
+                                        name="current_password"
+                                        className="mt-1 block w-full"
+                                        autoComplete="current-password"
+                                        placeholder={t('Current password')}
+                                    />
 
-                                <InputError message={errors.current_password} />
-                            </div>
+                                    <InputError
+                                        message={errors.current_password}
+                                    />
+                                </div>
+                            ) : null}
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password">

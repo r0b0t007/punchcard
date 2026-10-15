@@ -214,6 +214,11 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // "Confirm it's you" links (CHW-23): a few per account, mailed to its own address.
+        RateLimiter::for('confirm-link', fn (Request $request): Limit => Limit::perMinutes(15, 3)
+            ->by('confirm-link:'.$request->user()?->getAuthIdentifier())
+            ->response(fn (): RedirectResponse => back()->withErrors(['email' => __('Too many links asked for. Try again in a few minutes.')])));
+
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
         // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
         // generous cap per client address all the same.

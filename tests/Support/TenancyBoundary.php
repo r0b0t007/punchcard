@@ -27,6 +27,7 @@ final class TenancyBoundary
         'app/Support/Tenancy/PlatformBuilder.php' => 'guards forceDelete() and truncate() on platform data (NFC tags, the tap log), which need bypass()',
         'app/Models/Concerns/IsPlatformData.php' => 'registers the platform scope: platform data reads as empty outside bypass()',
         'app/Support/Tenancy/ArchivedSites.php' => 'reads the archive flags of a location, its business and organization in one joined query, read-only and in bypass(), so the tap path pays one round trip',
+        'app/Actions/Auth/SetPassword.php' => 'ends an account\'s other sessions in the session store\'s own connection (config/session.php): sessions are not tenant data',
         'app/Support/Auth/ActiveUserProvider.php' => 'overrides the auth provider\'s user query (users are not tenant data) to narrow it, never to escape a scope',
         'app/Models/Business.php' => 'registers its own tenant scope',
         'app/Models/Organization.php' => 'registers its own tenant scope',

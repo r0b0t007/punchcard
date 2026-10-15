@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Actions\Auth\SetPassword;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
@@ -38,6 +39,8 @@ class SecurityController extends Controller
                     ->all()
                 : [],
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            // Without one (signed up by email link, CHW-23), the form chooses one, with no current password.
+            'hasPassword' => $request->user()->hasPassword(),
         ];
 
         if (Features::canManageTwoFactorAuthentication()) {
@@ -53,11 +56,9 @@ class SecurityController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(PasswordUpdateRequest $request): RedirectResponse
+    public function update(PasswordUpdateRequest $request, SetPassword $setPassword): RedirectResponse
     {
-        $request->user()->update([
-            'password' => $request->password,
-        ]);
+        $setPassword->handle($request->user(), (string) $request->validated('password'), $request->session()->getId());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

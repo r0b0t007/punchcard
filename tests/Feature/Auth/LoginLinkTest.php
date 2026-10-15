@@ -11,6 +11,7 @@ use App\Models\NfcTag;
 use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
+use App\Notifications\ConfirmNewEmailMail;
 use App\Notifications\LoginLinkMail;
 use App\Notifications\SignInWithPasswordMail;
 use App\Support\Auth\ProvenEmail;
@@ -446,10 +447,16 @@ it('stores an address in lower case, however it is typed, so a link finds its ac
     Notification::fake();
     $customer = User::factory()->create(['email' => 'salma@example.test', 'password' => null]);
 
-    $this->actingAs($customer)->patch(route('profile.update'), ['name' => $customer->name, 'email' => 'Salma.New@Example.TEST']);
+    $this->actingAs($customer)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $customer->name, 'email' => 'Salma.New@Example.TEST']);
     Auth::logout();
-    // Confirmed from the mail settings sent, as a changed address must be before a link signs in to it.
-    $customer->fresh()->markEmailAsVerified();
+    // Switched from the new inbox, as a new address must be before it is the account's.
+    $switch = null;
+    Notification::assertSentOnDemand(ConfirmNewEmailMail::class, function (ConfirmNewEmailMail $mail) use (&$switch): bool {
+        $switch = $mail->url;
+
+        return true;
+    });
+    $this->post((string) $switch);
     ($this->requestLink)('salma.new@example.test');
 
     expect($customer->fresh()->email)->toBe('salma.new@example.test');
@@ -457,27 +464,26 @@ it('stores an address in lower case, however it is typed, so a link finds its ac
     expect(User::query()->count())->toBe(1);
 });
 
-it('never lets an address someone put on their account sign its owner in to that account', function (): void {
+it('never lets an address someone asked for on their account sign its owner in to that account', function (): void {
     Notification::fake();
-    // Someone signed up by link, then put another person's address on their account (unconfirmed).
+    // Someone signed up by link, then asked for another person's address on their account (never confirmed).
     $theirs = User::factory()->create(['email' => 'someone@example.test', 'password' => null]);
-    $this->actingAs($theirs)->patch(route('profile.update'), ['name' => $theirs->name, 'email' => 'salma@example.test']);
+    $this->actingAs($theirs)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $theirs->name, 'email' => 'salma@example.test']);
     Auth::logout();
 
-    // The address's owner asks for a link: none, so nobody signs in to that account by it.
+    // The address's owner asks for a link: theirs alone, for an account of their own.
     ($this->requestLink)('salma@example.test')->assertSessionHas('status', 'login-link-sent');
 
     Notification::assertNotSentTo($theirs->fresh(), LoginLinkMail::class);
-    expect(LoginLink::query()->count())->toBe(0)
-        ->and($theirs->fresh()->hasVerifiedEmail())->toBeFalse();
-    $this->assertGuest();
+    Notification::assertSentOnDemand(LoginLinkMail::class, fn (LoginLinkMail $mail, array $channels, AnonymousNotifiable $to): bool => $to->routes['mail'] === 'salma@example.test');
+    expect($theirs->fresh()->email)->toBe('someone@example.test');
 });
 
 it('refuses a case variant of a taken address in settings, without an error page', function (): void {
     User::factory()->create(['email' => 'salma@example.test']);
     $other = User::factory()->create();
 
-    $this->actingAs($other)->patch(route('profile.update'), ['name' => $other->name, 'email' => 'Salma@Example.test'])
+    $this->actingAs($other)->withSession(['auth.password_confirmed_at' => now()->unix()])->patch(route('profile.update'), ['name' => $other->name, 'email' => 'Salma@Example.test'])
         ->assertSessionHasErrors('email');
 });
 
