@@ -6,15 +6,16 @@ namespace App\Notifications;
 
 use App\Models\LoginLink;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
  * "Confirm it's you" for a signed-in account without a password (CHW-23,
  * ConfirmByEmailController): a link that confirms, good once, for
- * LoginLink::MINUTES. To the account's own address only.
+ * LoginLink::MINUTES. To the account's own address only. On the queue.
  */
-final class ConfirmLinkMail extends Notification
+final class ConfirmLinkMail extends Notification implements ShouldQueue
 {
     use Queueable;
 

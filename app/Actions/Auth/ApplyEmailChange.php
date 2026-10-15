@@ -32,16 +32,19 @@ final readonly class ApplyEmailChange
             $outcome = DB::transaction(function () use ($userId, $hash): array {
                 $user = User::query()->lockForUpdate()->find($userId);
 
-                if (! $user instanceof User || $user->pending_email === null || ! hash_equals(sha1($user->pending_email), $hash)) {
+                // Out of date, replaced or cancelled, or the account deleted since: no address goes on it.
+                $pending = $user instanceof User && ! $user->isAnonymised() ? $user->pendingEmail() : null;
+
+                if ($pending === null || ! hash_equals(sha1($pending), $hash)) {
                     return [self::EXPIRED, null];
                 }
 
-                if (User::query()->where('email', $user->pending_email)->exists()) {
+                if (User::query()->where('email', $pending)->exists()) {
                     return [self::TAKEN, null];
                 }
 
                 $old = $user->email;
-                $user->forceFill(['email' => $user->pending_email, 'email_verified_at' => now(), 'pending_email' => null])->save();
+                $user->forceFill(['email' => $pending, 'email_verified_at' => now(), 'pending_email' => null, 'pending_email_expires_at' => null])->save();
 
                 return [self::CHANGED, [$user, $old]];
             });

@@ -60,7 +60,11 @@ final class ConfirmByEmailController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        if (! $request->hasValidSignature(absolute: false) || ! $confirmByLink->handle($user, $link)) {
+        if (! $request->hasValidSignature(absolute: false)) {
+            return $this->linkPage($request, 'expired');
+        }
+
+        if (! $confirmByLink->handle($user, $link)) {
             $mailedTo = LoginLink::query()->whereKey($link)->value('email');
 
             return $this->linkPage($request, is_string($mailedTo) && $mailedTo !== $user->email ? 'other-account' : 'expired');

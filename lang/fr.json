@@ -679,5 +679,6 @@
     "This link has expired, was used already or was replaced by a later one.": "Ce lien a expiré, a déjà été utilisé ou a été remplacé par un plus récent.",
     "Your new address": "Votre nouvelle adresse",
     "Go to punchcard": "Aller sur punchcard",
-    "One tap and your account uses it.": "Un geste et votre compte l’utilise."
+    "One tap and your account uses it.": "Un geste et votre compte l’utilise.",
+    "Too many address changes. Try again later.": "Trop de changements d’adresse. Réessayez plus tard."
 }

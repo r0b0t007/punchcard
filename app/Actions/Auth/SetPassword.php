@@ -29,7 +29,7 @@ final readonly class SetPassword
         $this->guard->logoutOtherDevices($password);
 
         if ($first && config('session.driver') === 'database') {
-            DB::table((string) config('session.table', 'sessions'))->where('user_id', $user->id)->where('id', '!=', $sessionId)->delete();
+            DB::connection(config('session.connection'))->table((string) config('session.table', 'sessions'))->where('user_id', $user->id)->where('id', '!=', $sessionId)->delete();
         }
     }
 }

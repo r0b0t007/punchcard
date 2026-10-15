@@ -15,13 +15,14 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table): void {
             $table->string('pending_email')->nullable();
+            $table->timestamp('pending_email_expires_at')->nullable();
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
-            $table->dropColumn('pending_email');
+            $table->dropColumn(['pending_email', 'pending_email_expires_at']);
         });
     }
 };

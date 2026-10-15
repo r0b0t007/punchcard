@@ -679,5 +679,6 @@
     "This link has expired, was used already or was replaced by a later one.": "انتهت صلاحية هذا الرابط أو سبق استخدامه أو حلّ محله رابط أحدث.",
     "Your new address": "عنوانك الجديد",
     "Go to punchcard": "الذهاب إلى punchcard",
-    "One tap and your account uses it.": "لمسة واحدة ويستخدمه حسابك."
+    "One tap and your account uses it.": "لمسة واحدة ويستخدمه حسابك.",
+    "Too many address changes. Try again later.": "تغييرات كثيرة في العنوان. حاول مرة أخرى لاحقًا."
 }

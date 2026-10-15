@@ -257,19 +257,73 @@ it('switches only to the address last asked for', function (): void {
     expect($this->customer->fresh()->email)->toBe('salma@example.test');
 });
 
-it('limits profile updates, which mail new addresses', function (): void {
+it('limits the new addresses mailed, never the name', function (): void {
     Notification::fake();
     $session = ['auth.password_confirmed_at' => now()->unix()];
+    $save = fn (array $profile) => $this->actingAs($this->customer)->withSession($session)->patch(route('profile.update'), $profile);
 
     foreach (range(1, 5) as $attempt) {
-        $this->actingAs($this->customer)->withSession($session)
-            ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => "new{$attempt}@example.test"])
-            ->assertSessionHasNoErrors();
+        $save(['name' => $this->customer->name, 'email' => "new{$attempt}@example.test"])->assertSessionHasNoErrors();
     }
 
-    $this->actingAs($this->customer)->withSession($session)
-        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'new6@example.test'])
-        ->assertTooManyRequests();
+    // A sixth new address: a form error, not an error page.
+    $save(['name' => $this->customer->name, 'email' => 'new6@example.test'])->assertSessionHasErrors('email');
+    expect($this->customer->fresh()->pending_email)->toBe('new5@example.test');
+
+    // The name, as often as they like.
+    foreach (range(1, 6) as $attempt) {
+        $save(['name' => "Salma {$attempt}", 'email' => 'salma@example.test'])->assertSessionHasNoErrors();
+    }
+});
+
+it('cancels a new address when the current one is saved again', function (): void {
+    Notification::fake();
+    $session = ['auth.password_confirmed_at' => now()->unix()];
+    $this->actingAs($this->customer)->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@gmial.test']);
+    $link = ($this->newAddressLink)('salma@gmial.test');
+
+    $this->actingAs($this->customer->fresh())->withSession($session)
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@example.test'])
+        ->assertSessionHasNoErrors();
+
+    expect($this->customer->fresh()->pending_email)->toBeNull();
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    expect($this->customer->fresh()->email)->toBe('salma@example.test');
+});
+
+it('stops showing a new address once its link is out of date', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test']);
+    $this->travel(61)->minutes();
+
+    $this->actingAs($this->customer->fresh())->get(route('profile.edit'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('pendingEmail', null));
+});
+
+it('never puts an address back on a deleted account', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test']);
+    $link = ($this->newAddressLink)('salma.new@example.test');
+    // Anonymised (deleted with history kept) after asking for it, as DeleteAccount does, but for the pending address.
+    $this->customer->fresh()->forceFill(['email' => 'deleted-x@deleted.invalid', 'anonymised_at' => now()])->save();
+    auth()->logout();
+
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+
+    expect($this->customer->fresh()->email)->toBe('deleted-x@deleted.invalid');
+});
+
+it('says whose a confirm link is only once its signature holds', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->post(route('password.confirm-by-email'));
+    $theirs = LoginLink::query()->sole();
+
+    // Unsigned, from another account: nothing about whose it is.
+    $this->actingAs(User::factory()->create(['password' => null]))
+        ->post(route('password.confirm-by-email.confirm', $theirs->id))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('reason', 'expired'));
 });
 
 it('changes no address without a recent confirmation (a stale session can\'t move the account)', function (): void {

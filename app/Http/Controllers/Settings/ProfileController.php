@@ -27,7 +27,7 @@ class ProfileController extends Controller
             // Without one (signed up by email link, CHW-23), deleting the account asks to confirm it's them instead.
             'hasPassword' => $request->user()->hasPassword(),
             // A new address waiting to be confirmed from its inbox (RequestEmailChange).
-            'pendingEmail' => $request->user()->pending_email,
+            'pendingEmail' => $request->user()->pendingEmail(),
             // A new address asks to confirm it's them first, unless they did lately (ProfileUpdateRequest).
             'recentlyConfirmed' => RecentConfirmation::holds($request->session()),
             'status' => $request->session()->get('status'),
@@ -35,11 +35,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information.
-     */
-    /**
      * The name at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
-     * then the account keeps its address, so a mistyped one costs nothing.
+     * then the account keeps its address, so a mistyped one costs nothing. The current address again cancels it.
      */
     public function update(ProfileUpdateRequest $request, RequestEmailChange $requestEmailChange): RedirectResponse
     {
@@ -47,8 +44,11 @@ class ProfileController extends Controller
         $email = (string) $request->validated('email');
         $user->fill(['name' => $request->validated('name')])->save();
 
-        if ($email !== $user->email) {
-            $requestEmailChange->handle($user, $email);
+        if (! $requestEmailChange->handle($user, $email)) {
+            return back()->withErrors(['email' => __('Too many address changes. Try again later.')]);
+        }
+
+        if ($user->pending_email !== null) {
             Inertia::flash('toast', ['type' => 'success', 'message' => __('Check :email to confirm your new address.', ['email' => $email])]);
 
             return to_route('profile.edit');

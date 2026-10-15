@@ -85,11 +85,6 @@ class LoginLink extends Model
         return mb_substr($name, 0, 1).'***@'.$domain;
     }
 
-    public function isUsable(): bool
-    {
-        return $this->used_at === null && $this->expires_at->isFuture();
-    }
-
     protected function casts(): array
     {
         return [

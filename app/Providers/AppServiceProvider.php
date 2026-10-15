@@ -214,9 +214,6 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
-        // Profile updates (CHW-23): a new address is mailed a link, so a few an hour per account.
-        RateLimiter::for('profile-update', fn (Request $request): Limit => Limit::perHour(5)->by('profile-update:'.$request->user()?->getAuthIdentifier()));
-
         // "Confirm it's you" links (CHW-23): a few per account, mailed to its own address.
         RateLimiter::for('confirm-link', fn (Request $request): Limit => Limit::perMinutes(15, 3)
             ->by('confirm-link:'.$request->user()?->getAuthIdentifier())

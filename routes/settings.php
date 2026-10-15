@@ -12,8 +12,7 @@ Route::middleware(['auth'])->group(function (): void {
     Route::redirect('settings', '/settings/profile');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    // Throttled: a new address is mailed a link (RequestEmailChange, CHW-23).
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->middleware('throttle:profile-update')->name('profile.update');
+    Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
     // Deleting an account must not depend on having verified its email (CHW-139).
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).

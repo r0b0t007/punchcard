@@ -33,15 +33,9 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function after(): array
     {
-        return [
-            function (Validator $validator): void {
-                $email = $this->input('email');
+        $email = $this->input('email');
 
-                if (is_string($email) && $email !== $this->user()?->email && ! RecentConfirmation::holds($this->session())) {
-                    $validator->errors()->add('email', __('Confirm it\'s you first.'));
-                }
-            },
-        ];
+        return [RecentConfirmation::rule($this->session(), 'email', is_string($email) && $email !== $this->user()?->email)];
     }
 
     /** The address as accounts store it (User::normalizeEmail), so a case variant of a taken one is refused here. */

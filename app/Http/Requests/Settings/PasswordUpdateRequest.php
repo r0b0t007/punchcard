@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Settings;
 
 use App\Concerns\PasswordValidationRules;
+use App\Support\Auth\RecentConfirmation;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -33,6 +34,7 @@ class PasswordUpdateRequest extends FormRequest
      */
     public function after(): array
     {
-        return [$this->confirmedInsteadOfPassword($this->user(), $this->session())];
+        // Without a password, having confirmed it's them lately stands in for the current one (CHW-23).
+        return [RecentConfirmation::rule($this->session(), 'password', $this->user()?->hasPassword() === false)];
     }
 }

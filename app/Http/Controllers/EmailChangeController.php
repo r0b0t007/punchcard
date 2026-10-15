@@ -24,9 +24,8 @@ final class EmailChangeController extends Controller
 {
     public function show(Request $request, int $user): Response
     {
-        $pending = $request->hasValidSignature(absolute: false)
-            ? User::query()->whereKey($user)->value('pending_email')
-            : null;
+        $account = $request->hasValidSignature(absolute: false) ? User::query()->find($user) : null;
+        $pending = $account instanceof User && ! $account->isAnonymised() ? $account->pendingEmail() : null;
         $waiting = is_string($pending) && hash_equals(sha1($pending), (string) $request->query('hash'));
 
         return $this->page($request, expired: ! $waiting);
