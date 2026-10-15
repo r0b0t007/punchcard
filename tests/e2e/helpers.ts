@@ -53,12 +53,13 @@ export async function signUp(page: Page): Promise<void> {
     await page.locator('[data-test="finish-sign-up-button"]').click();
 }
 
-/** Fills and sends the password sign-up form (/register), as a new customer. */
+/** Fills and sends the password sign-up form (/register), as a new customer: 16 or older (CHW-23). */
 export async function fillSignUp(page: Page): Promise<void> {
     await page.locator('#name').fill('Salma Tapper');
     await page.locator('#email').fill(`tap-${Date.now()}@example.com`);
     await page.locator('#password').fill('a-long-test-password-1');
     await page.locator('#password_confirmation').fill('a-long-test-password-1');
+    await page.getByRole('checkbox', { name: "I'm 16 or older" }).check();
     await page.locator('[data-test="register-user-button"]').click();
 }
 

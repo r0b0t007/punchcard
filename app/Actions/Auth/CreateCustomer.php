@@ -18,14 +18,17 @@ use Illuminate\Database\UniqueConstraintViolationException;
  */
 final readonly class CreateCustomer
 {
-    public function __construct(private MaySignInByLink $maySignInByLink) {}
+    public function __construct(
+        private MaySignInByLink $maySignInByLink,
+        private RecordConsent $recordConsent,
+    ) {}
 
     public function handle(string $email, string $name, bool $wantsNews): ?User
     {
         $existing = User::query()->where('email', $email)->first();
 
         if ($existing instanceof User) {
-            return $this->maySignInByLink->handle($existing) ? $this->consented($existing, $wantsNews) : null;
+            return $this->maySignInByLink->handle($existing) ? $this->recordConsent->handle($existing, $wantsNews) : null;
         }
 
         try {
@@ -40,16 +43,6 @@ final readonly class CreateCustomer
         return $user;
     }
 
-    private function consented(User $user, bool $wantsNews): User
-    {
-        $user->forceFill([
-            'adult_confirmed_at' => $user->adult_confirmed_at ?? now(),
-            'marketing_opt_in_at' => $user->marketing_opt_in_at ?? ($wantsNews ? now() : null),
-        ])->save();
-
-        return $user;
-    }
-
     private function create(string $email, string $name, bool $wantsNews): User
     {
         $user = (new User)->forceFill([
@@ -57,11 +50,8 @@ final readonly class CreateCustomer
             'email' => $email,
             'password' => null,
             'email_verified_at' => now(),
-            'adult_confirmed_at' => now(),
-            'marketing_opt_in_at' => $wantsNews ? now() : null,
         ]);
-        $user->save();
 
-        return $user;
+        return $this->recordConsent->handle($user, $wantsNews);
     }
 }

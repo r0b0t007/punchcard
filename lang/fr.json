@@ -681,5 +681,8 @@
     "Go to punchcard": "Aller sur punchcard",
     "One tap and your account uses it.": "Un geste et votre compte l’utilise.",
     "Too many address changes. Try again later.": "Trop de changements d’adresse. Réessayez plus tard.",
-    "New address cancelled.": "Nouvelle adresse annulée."
+    "New address cancelled.": "Nouvelle adresse annulée.",
+    "Next time, sign in with Face ID or your fingerprint": "La prochaine fois, connectez-vous avec Face ID ou votre empreinte",
+    "Add a passkey on this phone: no link to wait for.": "Ajoutez une clé d’accès sur ce téléphone : plus de lien à attendre.",
+    "Confirm you're 16 or older to create an account.": "Confirmez que vous avez 16 ans ou plus pour créer un compte."
 }

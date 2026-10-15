@@ -108,7 +108,7 @@ it('keeps a signed-out tap pending, then stamps it once after signing in or up',
 
     $signIn = $how === 'sign in'
         ? $this->post(route('login.store'), ['email' => $this->customer->email, 'password' => 'password'])
-        : $this->post(route('register.store'), ['name' => 'Salma', 'email' => 'salma@example.com', 'password' => 'password', 'password_confirmation' => 'password']);
+        : $this->post(route('register.store'), ['name' => 'Salma', 'email' => 'salma@example.com', 'password' => 'password', 'password_confirmation' => 'password', 'adult' => '1']);
     $signIn->assertRedirect(route('taps.claim'));
 
     $this->get(route('taps.claim'))->assertRedirect(route('taps.result'))->assertHeader('Cache-Control', 'no-store, private');

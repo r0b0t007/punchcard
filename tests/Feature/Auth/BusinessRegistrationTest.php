@@ -35,6 +35,7 @@ beforeEach(function (): void {
         'email' => 'nour@cafe-nour.test',
         'password' => 'password',
         'password_confirmation' => 'password',
+        'adult' => '1',
     ];
     $this->signUp = fn (array $overrides = []) => $this->post(route('business.register.store'), [...$this->account, 'business_name' => 'Café Nour', ...$overrides]);
     $this->businesses = fn (): int => $this->context->bypass(fn (): int => Business::query()->count());

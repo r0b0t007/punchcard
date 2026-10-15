@@ -115,7 +115,7 @@ it('lets nobody sign in to an anonymised account, and frees its email', function
     $this->assertGuest();
 
     $this->post(route('register.store'), [
-        'name' => 'Salma', 'email' => 'salma@example.com', 'password' => 'password', 'password_confirmation' => 'password',
+        'name' => 'Salma', 'email' => 'salma@example.com', 'password' => 'password', 'password_confirmation' => 'password', 'adult' => '1',
     ]);
 
     $this->assertAuthenticated();

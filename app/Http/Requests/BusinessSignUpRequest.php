@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Concerns\ConsentRules;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
  */
 class BusinessSignUpRequest extends FormRequest
 {
-    use PasswordValidationRules, ProfileValidationRules;
+    use ConsentRules, PasswordValidationRules, ProfileValidationRules;
 
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -28,24 +29,36 @@ class BusinessSignUpRequest extends FormRequest
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             'business_name' => ['required', 'string', 'max:120'],
+            ...$this->consentRules(),
         ];
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->consentMessages();
+    }
+
+    /**
      * The validated account fields, for CreateNewUser (which checks them again,
-     * as for any registration): the confirmation is the password it matched.
+     * as for any registration): the confirmation is the password it matched,
+     * and the consent given (CHW-23).
      *
      * @return array<string, string>
      */
     public function account(): array
     {
-        $account = $this->safe()->only(['name', 'email', 'password']);
+        $account = $this->safe()->only(['name', 'email', 'password', 'adult', 'marketing']);
 
         return [
             'name' => (string) $account['name'],
             'email' => (string) $account['email'],
             'password' => (string) $account['password'],
             'password_confirmation' => (string) $account['password'],
+            'adult' => (string) $account['adult'],
+            'marketing' => (string) ($account['marketing'] ?? ''),
         ];
     }
 

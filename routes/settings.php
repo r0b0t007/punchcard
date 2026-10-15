@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ConfirmByEmailController;
 use App\Http\Controllers\EmailChangeController;
+use App\Http\Controllers\PasskeyOfferController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Middleware\NeverCache;
@@ -17,6 +18,8 @@ Route::middleware(['auth'])->group(function (): void {
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).
     Route::get('settings/profile/confirm', fn () => to_route('profile.edit'))->middleware(RequirePassword::class)->name('profile.confirm');
+    // "Not now" on the passkey offered after an email-link sign-in (CHW-23).
+    Route::post('passkey-offer/dismiss', [PasskeyOfferController::class, 'dismiss'])->name('passkey-offer.dismiss');
     // A new address dropped before its link is opened (CHW-23).
     Route::delete('settings/email-change', [EmailChangeController::class, 'destroy'])->name('email-change.cancel');
 
