@@ -12,6 +12,8 @@ use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\OfflinePageController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
@@ -62,6 +64,9 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
         Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');
         Route::post('cards/{card}/banner', [CardController::class, 'banner'])->whereNumber('card')->name('cards.banner');
+        // The staff and their invitations (CHW-146), the owner's.
+        Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
+        Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');
     });
 });
 
@@ -73,6 +78,12 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
         Route::get('j/{slug}/login', [JoinController::class, 'login'])->name('join.login');
     });
     Route::post('j/{slug}', [JoinController::class, 'store'])->middleware(['auth', 'throttle:join'])->name('join.store');
+});
+
+// An invitation to a business's staff (CHW-146), opened from the invited inbox, signed in or not. Never cached.
+Route::middleware(NeverCache::class)->group(function (): void {
+    Route::get('staff-invitations/{invitation}', [StaffInvitationController::class, 'show'])->whereNumber('invitation')->name('staff-invitations.show');
+    Route::post('staff-invitations/{invitation}', [StaffInvitationController::class, 'accept'])->whereNumber('invitation')->name('staff-invitations.accept');
 });
 
 // The NFC tap endpoint (CHW-25): the URL every stamper writes, and its result pages. Never cached.

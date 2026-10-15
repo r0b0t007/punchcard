@@ -7,6 +7,7 @@ return [
     'confirmed' => 'تأكيد حقل :attribute غير مطابق.',
     'current_password' => 'كلمة المرور غير صحيحة.',
     'email' => 'يجب أن يكون حقل :attribute عنوان بريد إلكتروني صالحًا.',
+    'exists' => 'القيمة المختارة في حقل :attribute غير صالحة.',
     'in' => 'القيمة المختارة في حقل :attribute غير صالحة.',
     'lowercase' => 'يجب أن يكون حقل :attribute بأحرف صغيرة.',
     'max' => [
@@ -34,6 +35,7 @@ return [
         'password_confirmation' => 'تأكيد كلمة المرور',
         'locale' => 'اللغة',
         'business_name' => 'اسم المحل',
+        'location_id' => 'الفرع',
         'code' => 'الرمز',
         'recovery_code' => 'رمز الاسترداد',
     ],
