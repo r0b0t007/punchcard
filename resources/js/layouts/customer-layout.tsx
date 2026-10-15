@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Gift, UserRound, WalletCards } from 'lucide-react';
 import type { ReactNode } from 'react';
+import PasskeyOffer from '@/components/passkey-offer';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { cards } from '@/routes/app';
@@ -21,7 +22,7 @@ const TABS = [
 
 /**
  * The customer's screens (CHW-27): full screen, with a tab bar pinned to the
- * bottom.
+ * bottom, and the passkey offered after an email-link sign-in (CHW-23).
  */
 export default function CustomerLayout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
@@ -30,6 +31,7 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
 
     return (
         <div className="min-h-dvh bg-background pb-20">
+            <PasskeyOffer />
             {children}
             <nav
                 aria-label={t('Main')}

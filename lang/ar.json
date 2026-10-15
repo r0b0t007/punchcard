@@ -681,5 +681,7 @@
     "Go to punchcard": "الذهاب إلى punchcard",
     "One tap and your account uses it.": "لمسة واحدة ويستخدمه حسابك.",
     "Too many address changes. Try again later.": "تغييرات كثيرة في العنوان. حاول مرة أخرى لاحقًا.",
-    "New address cancelled.": "تم إلغاء العنوان الجديد."
+    "New address cancelled.": "تم إلغاء العنوان الجديد.",
+    "Next time, sign in with Face ID or your fingerprint": "في المرة القادمة، سجّل الدخول ببصمة الوجه أو بصمة إصبعك",
+    "Add a passkey on this phone: no link to wait for.": "أضف مفتاح مرور على هذا الهاتف: لا حاجة لانتظار رابط."
 }

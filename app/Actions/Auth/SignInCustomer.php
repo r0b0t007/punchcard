@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Auth;
 
 use App\Models\User;
+use App\Support\Auth\PasskeyOffer;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ use Illuminate\Http\Request;
  * remember cookie, config/auth.php): taps land in Safari, which must stay
  * signed in. Their address is confirmed (MaySignInByLink), and the link
  * proved the inbox, so the password counts as just confirmed (adding a
- * passkey needs no password).
+ * passkey needs no password), and a passkey is offered (PasskeyOffer).
  * Through the guard, so Login fires and a waiting tap follows the new
  * session (RekeyTapClaimToken).
  */
@@ -23,9 +24,9 @@ final readonly class SignInCustomer
 
     public function handle(Request $request, User $user): void
     {
-
         $this->guard->login($user, remember: true);
         $request->session()->regenerate();
         $request->session()->passwordConfirmed();
+        PasskeyOffer::start($request->session());
     }
 }

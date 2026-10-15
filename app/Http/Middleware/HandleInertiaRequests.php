@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Actions\Tenancy\HasMemberships;
 use App\Models\LoyaltyCard;
 use App\Models\User;
+use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -52,6 +53,9 @@ class HandleInertiaRequests extends Middleware
             // A customer's settings pages use the customer layout and its tab bar (CHW-27); read there only.
             'customer' => fn (): bool => $request->is('settings/*') && $request->user() instanceof User
                 && ! app(HasMemberships::class)->handle($request->user()),
+            // Face ID or a fingerprint next time, offered after an email-link sign-in (CHW-23).
+            'offerPasskey' => fn (): bool => $request->user() instanceof User && $request->hasSession()
+                && PasskeyOffer::holds($request->session(), $request->user()),
             // The installable app the page belongs to, if any (UsePwa, CHW-35).
             'pwa' => null,
             'nav' => fn (): array => [

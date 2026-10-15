@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import ConsentFields from '@/components/consent-fields';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -113,10 +114,12 @@ export default function RegisterBusiness({ passwordRules }: Props) {
                                 />
                             </div>
 
+                            <ConsentFields error={errors.adult} tabIndex={6} />
+
                             <Button
                                 type="submit"
                                 className="mt-2 w-full"
-                                tabIndex={6}
+                                tabIndex={8}
                                 data-test="register-business-button"
                             >
                                 {processing && <Spinner />}
@@ -127,13 +130,13 @@ export default function RegisterBusiness({ passwordRules }: Props) {
                         <div className="grid gap-1 text-center text-sm text-muted-foreground">
                             <p>
                                 {t('Already have an account?')}{' '}
-                                <TextLink href={login()} tabIndex={7}>
+                                <TextLink href={login()} tabIndex={9}>
                                     {t('Log in')}
                                 </TextLink>
                             </p>
                             <p>
                                 {t('Collecting stamps?')}{' '}
-                                <TextLink href={register()} tabIndex={8}>
+                                <TextLink href={register()} tabIndex={10}>
                                     {t('Create a customer account')}
                                 </TextLink>
                             </p>

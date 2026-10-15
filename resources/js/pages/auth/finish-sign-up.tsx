@@ -1,7 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
+import ConsentFields from '@/components/consent-fields';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -46,33 +46,7 @@ export default function FinishSignUp({ email }: { email: string }) {
                             <InputError message={errors.name} />
                         </div>
 
-                        <div className="grid gap-2">
-                            <div className="flex items-center gap-3">
-                                <Checkbox
-                                    id="adult"
-                                    name="adult"
-                                    value="1"
-                                    required
-                                />
-                                <Label htmlFor="adult">
-                                    {t("I'm 16 or older")}
-                                </Label>
-                            </div>
-                            <InputError message={errors.adult} />
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <Checkbox
-                                id="marketing"
-                                name="marketing"
-                                value="1"
-                            />
-                            <Label htmlFor="marketing">
-                                {t(
-                                    'Send me news and offers from punchcard by email',
-                                )}
-                            </Label>
-                        </div>
+                        <ConsentFields error={errors.adult} />
 
                         <Button
                             type="submit"
