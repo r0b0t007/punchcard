@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
-import { home, login, logout } from '@/routes';
+import { home, logout } from '@/routes';
 
 type State =
     | 'join'
@@ -100,9 +100,20 @@ export default function StaffInvitation({
                                 { email: address },
                             )}
                         </p>
-                        <Button asChild className="w-full">
-                            <Link href={login()}>{t('Sign in')}</Link>
-                        </Button>
+                        {/* Posted, so only choosing to sign in brings them back here; opening the page never does. */}
+                        <Form action={action} method="post">
+                            {({ processing }) => (
+                                <Button
+                                    type="submit"
+                                    className="w-full"
+                                    disabled={processing}
+                                    data-test="staff-invitation-sign-in-button"
+                                >
+                                    {processing && <Spinner />}
+                                    {t('Sign in')}
+                                </Button>
+                            )}
+                        </Form>
                     </div>
                 ) : (
                     <Form
@@ -122,6 +133,8 @@ export default function StaffInvitation({
                                               email: address,
                                           })}
                                 </p>
+
+                                <InputError message={errors.email} />
 
                                 {state === 'sign-up' ? (
                                     <div className="grid gap-2">

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Staff\DescribeStaffPage;
 use App\Actions\Staff\InviteStaff;
 use App\Http\Requests\Staff\InviteStaffRequest;
 use App\Models\Business;
 use App\Models\BusinessMember;
-use App\Models\Location;
-use App\Models\StaffInvitation;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -20,13 +19,14 @@ use Inertia\Response;
 /**
  * A business's staff (CHW-146, B13 for the pilot), its owner's:
  *
- * - GET /business/staff: the invite form and the invitations still pending.
+ * - GET /business/staff: the invite form and the invitations still pending
+ *   (DescribeStaffPage).
  * - POST /business/staff/invitations (throttled, staff-invite): an
  *   invitation mailed (InviteStaff).
  */
 final class StaffController extends Controller
 {
-    public function index(TenantContext $context): Response
+    public function index(TenantContext $context, DescribeStaffPage $describeStaffPage): Response
     {
         $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
 
@@ -35,26 +35,8 @@ final class StaffController extends Controller
         }
 
         Gate::authorize('viewAny', [BusinessMember::class, $business]);
-        $locations = Location::query()->where('business_id', $business->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name', 'timezone']);
-        // An invitation to the whole business reads in its first location's time (times show in the location's timezone).
-        $businessTimezone = $locations->sortBy('id')->first()->timezone ?? config('app.timezone');
 
-        return Inertia::render('business/staff', [
-            'locations' => $locations->map(fn (Location $location): array => ['id' => $location->id, 'name' => $location->name])->values(),
-            'invitations' => StaffInvitation::query()
-                ->where('business_id', $business->id)
-                ->pending()
-                ->with('location:id,name,timezone')
-                ->latest('id')
-                ->get()
-                ->map(fn (StaffInvitation $invitation): array => [
-                    'id' => $invitation->id,
-                    'email' => $invitation->email,
-                    'location' => $invitation->location?->name,
-                    'expiresAt' => $invitation->expires_at->toIso8601String(),
-                    'timezone' => $invitation->location->timezone ?? $businessTimezone,
-                ]),
-        ]);
+        return Inertia::render('business/staff', $describeStaffPage->handle($business));
     }
 
     public function invite(InviteStaffRequest $request, InviteStaff $inviteStaff): RedirectResponse

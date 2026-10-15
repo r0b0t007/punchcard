@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Staff;
+
+use App\Models\Business;
+use App\Models\Location;
+use App\Models\StaffInvitation;
+use Illuminate\Database\Eloquent\Builder;
+
+/**
+ * The staff page of a business (CHW-146, B13 for the pilot), as its owner
+ * sees it: the open locations to invite to, and the invitations still
+ * waiting, each with its date in its location's timezone (the business's
+ * first location's for the whole business). An invitation to a location
+ * archived since is left out: its link no longer works (FindStaffInvitation).
+ */
+final readonly class DescribeStaffPage
+{
+    /**
+     * @return array{
+     *     locations: array<int, array{id: int, name: string}>,
+     *     invitations: array<int, array{id: int, email: string, location: string|null, expiresAt: string, timezone: string}>,
+     * }
+     */
+    public function handle(Business $business): array
+    {
+        $locations = Location::query()->where('business_id', $business->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name', 'timezone']);
+        $businessTimezone = $locations->sortBy('id')->first()->timezone ?? (string) config('app.timezone');
+
+        $invitations = StaffInvitation::query()
+            ->where('business_id', $business->id)
+            ->pending()
+            ->where(fn (Builder $query) => $query->whereNull('location_id')->orWhereIn('location_id', $locations->pluck('id')))
+            ->with('location:id,name,timezone')
+            ->latest('id')
+            ->get();
+
+        return [
+            'locations' => $locations->map(fn (Location $location): array => ['id' => $location->id, 'name' => $location->name])->values()->all(),
+            'invitations' => $invitations->map(fn (StaffInvitation $invitation): array => [
+                'id' => $invitation->id,
+                'email' => $invitation->email,
+                'location' => $invitation->location?->name,
+                'expiresAt' => $invitation->expires_at->toIso8601String(),
+                'timezone' => $invitation->location->timezone ?? $businessTimezone,
+            ])->values()->all(),
+        ];
+    }
+}

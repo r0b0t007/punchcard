@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Auth\MailedLink;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -20,7 +21,6 @@ use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\URL;
 use LogicException;
 
 /**
@@ -107,21 +107,16 @@ class StaffInvitation extends Model implements TenantModel
         $query->whereNull('accepted_at')->where('expires_at', '>', now());
     }
 
-    /**
-     * Its link, signed until it expires: what the mail carries. On the app's
-     * own address (app.url), never the request's host, as LoginLink::signedUrl.
-     */
+    /** Its link, signed until it expires: what the mail carries (MailedLink::signed). */
     public function signedUrl(): string
     {
-        return rtrim((string) config('app.url'), '/').URL::temporarySignedRoute('staff-invitations.show', $this->expires_at, ['invitation' => $this->id], absolute: false);
+        return MailedLink::signed('staff-invitations.show', $this->expires_at, ['invitation' => $this->id]);
     }
 
     /** Its address, half hidden: k***@example.com. */
     public function maskedEmail(): string
     {
-        [$name, $domain] = array_pad(explode('@', $this->email, 2), 2, '');
-
-        return mb_substr($name, 0, 1).'***@'.$domain;
+        return MailedLink::maskedEmail($this->email);
     }
 
     /**

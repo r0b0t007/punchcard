@@ -10,6 +10,7 @@ use App\Http\Middleware\SetTenant;
 use App\Http\Requests\Staff\AcceptStaffInvitationRequest;
 use App\Models\StaffInvitation;
 use App\Models\User;
+use App\Support\Auth\MailedLink;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -20,24 +21,20 @@ use Inertia\Response;
  * The link of an invitation to a business's staff (CHW-146), opened from
  * the invited inbox, signed in or not:
  *
- * - GET /staff-invitations/{invitation}: its page (opening it spends
- *   nothing): join, choose a password then join, sign in first (and come
- *   back here), sign up, another account's, or expired.
- * - POST /staff-invitations/{invitation}: the button: a new account first
- *   (verified: the link proved the inbox), or a first password, then onto
- *   the staff, all or nothing (JoinStaff), and into that business.
+ * - GET /staff-invitations/{invitation}: its page: join, choose a password
+ *   then join, sign in first, sign up, another account's, or expired.
+ *   Opening it changes nothing: it spends nothing, and never decides where
+ *   a later sign-in lands.
+ * - POST /staff-invitations/{invitation}: the button: signing in first (and
+ *   coming back here, unless a tap waits to be claimed), or a new account,
+ *   or a first password, then onto the staff, all or nothing (JoinStaff),
+ *   and into that business.
  */
 final class StaffInvitationController extends Controller
 {
     public function show(AcceptStaffInvitationRequest $request): Response
     {
-        $state = $request->state();
-
-        if ($state === DescribeStaffInvitation::SIGN_IN) {
-            $this->comeBackHere($request);
-        }
-
-        return $this->page($request, $request->invitation(), $state);
+        return $this->page($request, $request->invitation(), $request->state());
     }
 
     public function accept(AcceptStaffInvitationRequest $request, JoinStaff $joinStaff): Response|RedirectResponse
@@ -82,11 +79,16 @@ final class StaffInvitationController extends Controller
 
     /**
      * Signing in (password, passkey or email link) comes back to this link: on the app's own address (app.url),
-     * never a host or scheme a proxy may have changed.
+     * never a host or scheme a proxy may have changed. A tap waiting to be claimed comes first (as on the join
+     * page): its stamp is never lost to an invitation.
      */
     private function comeBackHere(AcceptStaffInvitationRequest $request): void
     {
-        redirect()->setIntendedUrl(rtrim((string) config('app.url'), '/').$request->getRequestUri());
+        $intended = $request->session()->get('url.intended');
+
+        if (! is_string($intended) || parse_url($intended, PHP_URL_PATH) !== parse_url(route('taps.claim'), PHP_URL_PATH)) {
+            redirect()->setIntendedUrl(MailedLink::onTheApp($request->getRequestUri()));
+        }
     }
 
     private function page(AcceptStaffInvitationRequest $request, ?StaffInvitation $invitation, ?string $state): Response

@@ -10,6 +10,7 @@ use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
 use App\Models\BusinessMember;
+use App\Models\Location;
 use App\Models\StaffInvitation;
 use App\Models\User;
 use App\Notifications\StaffInvitationMail;
@@ -193,14 +194,25 @@ it('asks a guest whose address has an account to sign in first, then brings them
     $link = ($this->linkFor)('karim@example.test');
     auth()->logout();
 
+    // Opening it decides nothing about where a later sign-in lands.
     $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'sign-in'));
-    expect(session('url.intended'))->toBe($link);
+    expect(session('url.intended'))->toBeNull();
 
-    // Nothing joins without signing in, and signing in still comes back here, on the app's own address.
-    session()->forget('url.intended');
+    // Its "Sign in" button: nothing joins yet, and signing in comes back here, on the app's own address.
     $this->post($link)->assertRedirect(route('login'));
     $this->assertGuest();
     expect(session('url.intended'))->toBe($link);
+});
+
+it('never takes the place of a tap waiting to be claimed after signing in', function (): void {
+    User::factory()->create(['email' => 'karim@example.test']);
+    ($this->invite)(['email' => 'karim@example.test']);
+    $link = ($this->linkFor)('karim@example.test');
+    auth()->logout();
+
+    $this->withSession(['url.intended' => route('taps.claim')])->post($link)->assertRedirect(route('login'));
+
+    expect(session('url.intended'))->toBe(route('taps.claim'));
 });
 
 it('never lets another account use the invitation', function (): void {
@@ -388,4 +400,27 @@ it('brings a guest back on the app\'s own address after signing in, whatever hos
     $this->post('http://internal.example'.$path)->assertRedirect(route('login'));
 
     expect(session('url.intended'))->toBe($link);
+});
+
+it('leaves out of the waiting list an invitation to a location archived since', function (): void {
+    $location = $this->tenants->locationOf($this->tenants->a1);
+    ($this->invite)(['email' => 'karim@example.test', 'location_id' => $location->id]);
+    $this->context->bypass(fn () => Location::query()->whereKey($location->id)->update(['archived_at' => now()]));
+
+    ($this->as)($this->owner, $this->tenants->a1)->get(route('staff.index'))
+        ->assertInertia(fn (Assert $page): Assert => $page->has('invitations', 0));
+});
+
+it('sets no password when the invitation stops working as the account joins', function (): void {
+    $salma = User::factory()->create(['email' => 'salma@example.test', 'password' => null]);
+    ($this->invite)(['email' => 'salma@example.test']);
+    $invitation = app(FindStaffInvitation::class)->handle(($this->invitations)()->sole()->id);
+    $this->context->bypass(fn () => Business::query()->whereKey($this->tenants->a1->id)->update(['archived_at' => now()]));
+
+    $joined = app(JoinStaff::class)->handle($invitation, DescribeStaffInvitation::CHOOSE_PASSWORD, $salma, [
+        'password' => 'a-long-test-password-1', 'password_confirmation' => 'a-long-test-password-1',
+    ], 'session-id');
+
+    expect($joined)->toBeNull()
+        ->and($salma->fresh()->hasPassword())->toBeFalse();
 });

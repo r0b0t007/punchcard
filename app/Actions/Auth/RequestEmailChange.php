@@ -6,9 +6,9 @@ namespace App\Actions\Auth;
 
 use App\Models\User;
 use App\Notifications\ConfirmNewEmailMail;
+use App\Support\Auth\MailedLink;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL;
 
 /**
  * A new address asked for in settings (CHW-23): kept aside (pending_email)
@@ -47,12 +47,7 @@ final readonly class RequestEmailChange
         RateLimiter::hit('email-change:'.$user->id, 3600);
         $user->forceFill(['pending_email' => $newEmail, 'pending_email_expires_at' => now()->addMinutes(self::MINUTES)])->save();
 
-        $url = rtrim((string) config('app.url'), '/').URL::temporarySignedRoute(
-            'email-change.show',
-            now()->addMinutes(self::MINUTES),
-            ['user' => $user->id, 'hash' => sha1($newEmail)],
-            absolute: false,
-        );
+        $url = MailedLink::signed('email-change.show', now()->addMinutes(self::MINUTES), ['user' => $user->id, 'hash' => sha1($newEmail)]);
 
         Notification::route('mail', $newEmail)->notify((new ConfirmNewEmailMail($url))->locale($user->preferredLocale() ?? app()->getLocale()));
 

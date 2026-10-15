@@ -9,16 +9,17 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Models\StaffInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 /**
  * Joins a business's staff from an invitation's link (CHW-146), all or
- * nothing: someone new gets their account first (the invited address), an
- * account without a password
- * chooses one (staff never sign in by email link), then the account joins
- * (AcceptStaffInvitation). Should the invitation stop working meanwhile
- * (used in another tab, replaced, the site closed), none of it stays. The
- * account that joined, or null. The caller signs a new account in.
+ * nothing: someone new gets their account first (the invited address), then
+ * the account joins (AcceptStaffInvitation, which confirms the address), and
+ * only then does an account without a password choose one (staff never sign
+ * in by email link): the password's own effects (signing other devices out,
+ * a new remember cookie) only follow a join that happened. Should the
+ * invitation stop working meanwhile (used in another tab, replaced, the site
+ * closed), none of it stays. The account that joined, or null. The caller
+ * signs a new account in.
  */
 final readonly class JoinStaff
 {
@@ -34,37 +35,24 @@ final readonly class JoinStaff
      */
     public function handle(StaffInvitation $invitation, string $state, ?User $user, array $input, string $sessionId): ?User
     {
-        DB::beginTransaction();
-
         try {
-            if ($state === DescribeStaffInvitation::SIGN_UP) {
-                // Confirmed as it joins (AcceptStaffInvitation): the link came to its inbox.
-                $user = $this->createNewUser->create([...$input, 'email' => $invitation->email]);
-            }
+            return DB::transaction(function () use ($invitation, $state, $user, $input, $sessionId): User {
+                if ($state === DescribeStaffInvitation::SIGN_UP) {
+                    $user = $this->createNewUser->create([...$input, 'email' => $invitation->email]);
+                }
 
-            if (! $user instanceof User) {
-                DB::rollBack();
+                if (! $user instanceof User || ! $this->acceptStaffInvitation->handle($invitation->id, $user)) {
+                    throw new InvitationGone;
+                }
 
-                return null;
-            }
+                if ($state === DescribeStaffInvitation::CHOOSE_PASSWORD) {
+                    $this->setPassword->handle($user, $input['password'] ?? '', $sessionId);
+                }
 
-            if ($state === DescribeStaffInvitation::CHOOSE_PASSWORD) {
-                $this->setPassword->handle($user, $input['password'] ?? '', $sessionId);
-            }
-
-            if (! $this->acceptStaffInvitation->handle($invitation->id, $user)) {
-                DB::rollBack();
-
-                return null;
-            }
-
-            DB::commit();
-
-            return $user;
-        } catch (Throwable $exception) {
-            DB::rollBack();
-
-            throw $exception;
+                return $user;
+            });
+        } catch (InvitationGone) {
+            return null;
         }
     }
 }
