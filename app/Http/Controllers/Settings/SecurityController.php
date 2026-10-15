@@ -40,7 +40,7 @@ class SecurityController extends Controller
                 : [],
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
             // Without one (signed up by email link, CHW-23), the form chooses one, with no current password.
-            'hasPassword' => $request->user()->password !== null,
+            'hasPassword' => $request->user()->hasPassword(),
         ];
 
         if (Features::canManageTwoFactorAuthentication()) {

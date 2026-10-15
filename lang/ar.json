@@ -665,5 +665,19 @@
     "Your punchcard address changed": "تغيّر عنوان حسابك في punchcard",
     "The address of your punchcard account was changed to :email.": "أصبح عنوان حسابك في punchcard هو :email.",
     "If it wasn't you, reply to this email at once.": "إذا لم يكن هذا أنت، فرُدّ على هذه الرسالة فورًا.",
-    "Changing it asks you to confirm it's you first.": "لتغييره، أكّد أولاً أنه أنت."
+    "Changing it asks you to confirm it's you first.": "لتغييره، أكّد أولاً أنه أنت.",
+    "Confirm your new punchcard address": "أكّد عنوانك الجديد في punchcard",
+    "Tap the button to make this the address of your punchcard account. The link works once, for :minutes minutes.": "اضغط على الزر لجعل هذا العنوان عنوان حسابك في punchcard. يعمل الرابط مرة واحدة، لمدة :minutes دقيقة.",
+    "Use this address": "استخدم هذا العنوان",
+    "If you didn't ask for it, ignore this email: the account keeps its address.": "إذا لم تطلبه، فتجاهل هذه الرسالة: يحتفظ الحساب بعنوانه.",
+    "Check :email to confirm your new address.": "تحقق من :email لتأكيد عنوانك الجديد.",
+    "No passkey here? Sign out, then choose a password with “Forgot your password?” on the sign-in page.": "لا يوجد مفتاح مرور هنا؟ سجّل الخروج، ثم اختر كلمة مرور عبر «نسيت كلمة المرور؟» في صفحة تسجيل الدخول.",
+    "This link is for another account: sign in to that one to use it.": "هذا الرابط لحساب آخر: سجّل الدخول إليه لاستخدامه.",
+    "We sent a link to :email. Your address changes once you open it.": "أرسلنا رابطًا إلى :email. يتغيّر عنوانك عند فتحه.",
+    "Done: this is now the address of your punchcard account.": "تم: هذا هو الآن عنوان حسابك في punchcard.",
+    "Another account uses this address now, so yours keeps its own.": "يستخدم حساب آخر هذا العنوان الآن، لذا يحتفظ حسابك بعنوانه.",
+    "This link has expired, was used already or was replaced by a later one.": "انتهت صلاحية هذا الرابط أو سبق استخدامه أو حلّ محله رابط أحدث.",
+    "Your new address": "عنوانك الجديد",
+    "Go to punchcard": "الذهاب إلى punchcard",
+    "One tap and your account uses it.": "لمسة واحدة ويستخدمه حسابك."
 }

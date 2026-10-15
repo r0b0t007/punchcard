@@ -21,6 +21,7 @@ export default function Profile({
     status,
     hasPassword,
     recentlyConfirmed,
+    pendingEmail,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
@@ -28,9 +29,11 @@ export default function Profile({
     hasPassword: boolean;
     /** A new address asks to confirm it's them first, unless they did lately (CHW-23). */
     recentlyConfirmed: boolean;
+    /** A new address waiting to be confirmed from its own inbox. */
+    pendingEmail: string | null;
 }) {
     const { auth } = usePage<PageProps>().props;
-    const { t } = useTranslation();
+    const { t, tn } = useTranslation();
 
     return (
         <>
@@ -93,6 +96,20 @@ export default function Profile({
                                     className="mt-2"
                                     message={errors.email}
                                 />
+                                {pendingEmail ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        {tn(
+                                            'We sent a link to :email. Your address changes once you open it.',
+                                            {
+                                                email: (
+                                                    <bdi dir="ltr">
+                                                        {pendingEmail}
+                                                    </bdi>
+                                                ),
+                                            },
+                                        )}
+                                    </p>
+                                ) : null}
                                 {recentlyConfirmed ? null : (
                                     <p className="text-sm text-muted-foreground">
                                         {t(

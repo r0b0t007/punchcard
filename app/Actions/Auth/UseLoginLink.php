@@ -8,7 +8,7 @@ use App\Models\LoginLink;
 use App\Models\User;
 
 /**
- * Spends an email sign-in link (CHW-23), once (LoginLink::spend: never a
+ * Spends an email sign-in link (CHW-23), once (SpendLoginLink: never a
  * confirm link). Null when it was used or is out of date, or when its account may no longer use links (turned on
  * two-factor since, MaySignInByLink). Else its address, and the account
  * there if there is one (none: a new customer, who finishes signing up).
@@ -16,12 +16,15 @@ use App\Models\User;
  */
 final readonly class UseLoginLink
 {
-    public function __construct(private MaySignInByLink $maySignInByLink) {}
+    public function __construct(
+        private MaySignInByLink $maySignInByLink,
+        private SpendLoginLink $spendLoginLink,
+    ) {}
 
     /** @return array{email: string, user: User|null}|null */
     public function handle(int $linkId): ?array
     {
-        $email = LoginLink::spend($linkId, LoginLink::SIGN_IN);
+        $email = $this->spendLoginLink->handle($linkId, LoginLink::SIGN_IN);
 
         if (! is_string($email)) {
             return null;

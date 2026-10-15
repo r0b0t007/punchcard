@@ -39,9 +39,11 @@ class ProfileUpdateTest extends TestCase
 
         $user->refresh();
 
+        // The new address waits until confirmed from its own inbox (CHW-23); the account keeps the old one.
         $this->assertSame('Test User', $user->name);
-        $this->assertSame('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
+        $this->assertSame('test@example.com', $user->pending_email);
+        $this->assertNotSame('test@example.com', $user->email);
+        $this->assertNotNull($user->email_verified_at);
     }
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void

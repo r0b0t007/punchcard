@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Requests\Settings;
 
 use App\Concerns\PasswordValidationRules;
-use App\Support\Auth\RecentConfirmation;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,7 +23,7 @@ class PasswordUpdateRequest extends FormRequest
     {
         // An account without a password (signed up by email link, CHW-23) chooses one, having confirmed it's them (after()).
         return [
-            ...$this->user()?->password === null ? [] : ['current_password' => $this->currentPasswordRules()],
+            ...$this->user()?->hasPassword() !== true ? [] : ['current_password' => $this->currentPasswordRules()],
             'password' => $this->passwordRules(),
         ];
     }
@@ -34,12 +33,6 @@ class PasswordUpdateRequest extends FormRequest
      */
     public function after(): array
     {
-        return [
-            function (Validator $validator): void {
-                if ($this->user()?->password === null && ! RecentConfirmation::holds($this->session())) {
-                    $validator->errors()->add('password', __('Confirm it\'s you first.'));
-                }
-            },
-        ];
+        return [$this->confirmedInsteadOfPassword($this->user(), $this->session())];
     }
 }

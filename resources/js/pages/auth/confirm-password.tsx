@@ -16,13 +16,16 @@ import { useTranslation } from '@/hooks/use-translation';
 /**
  * Confirming it's you, where settings ask (RequirePassword): a passkey, then
  * the password; or, for an account without one (signed up by email link,
- * CHW-23), a link mailed to its address.
+ * CHW-23), a link mailed to its address, where it may (MayConfirmByEmail).
+ * With neither, the page says how to get a password.
  */
 export default function ConfirmPassword({
     hasPassword,
+    mayConfirmByEmail,
     status,
 }: {
     hasPassword: boolean;
+    mayConfirmByEmail: boolean;
     status?: string;
 }) {
     const { t } = useTranslation();
@@ -41,11 +44,21 @@ export default function ConfirmPassword({
                 separator={
                     hasPassword
                         ? t('Or confirm with password')
-                        : t('Or confirm by email')
+                        : mayConfirmByEmail
+                          ? t('Or confirm by email')
+                          : undefined
                 }
             />
 
-            {hasPassword ? null : (
+            {hasPassword || mayConfirmByEmail ? null : (
+                <p className="text-center text-sm text-muted-foreground">
+                    {t(
+                        'No passkey here? Sign out, then choose a password with “Forgot your password?” on the sign-in page.',
+                    )}
+                </p>
+            )}
+
+            {!mayConfirmByEmail ? null : (
                 <Form {...confirmByEmail.form()} className="space-y-4">
                     {({ processing, errors }) =>
                         status === 'confirm-link-sent' ? (

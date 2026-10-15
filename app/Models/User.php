@@ -39,6 +39,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $remember_token
  * @property Carbon|null $anonymised_at
  * @property Carbon|null $adult_confirmed_at when they said they are 16 or older (CHW-23)
+ * @property string|null $pending_email a new address asked for in settings, until confirmed from its inbox (CHW-23)
  * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: never asked for (CHW-23)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -104,6 +105,12 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     protected function email(): Attribute
     {
         return Attribute::make(set: fn (string $value): string => self::normalizeEmail($value));
+    }
+
+    /** Signed up by email link, an account has none until it chooses one (CHW-23). */
+    public function hasPassword(): bool
+    {
+        return $this->password !== null;
     }
 
     /**

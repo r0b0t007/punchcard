@@ -665,5 +665,19 @@
     "Your punchcard address changed": "L’adresse de votre compte punchcard a changé",
     "The address of your punchcard account was changed to :email.": "L’adresse de votre compte punchcard est désormais :email.",
     "If it wasn't you, reply to this email at once.": "Si ce n’était pas vous, répondez tout de suite à cet e-mail.",
-    "Changing it asks you to confirm it's you first.": "Pour la changer, confirmez d’abord que c’est vous."
+    "Changing it asks you to confirm it's you first.": "Pour la changer, confirmez d’abord que c’est vous.",
+    "Confirm your new punchcard address": "Confirmez votre nouvelle adresse punchcard",
+    "Tap the button to make this the address of your punchcard account. The link works once, for :minutes minutes.": "Touchez le bouton pour faire de cette adresse celle de votre compte punchcard. Le lien fonctionne une seule fois, pendant :minutes minutes.",
+    "Use this address": "Utiliser cette adresse",
+    "If you didn't ask for it, ignore this email: the account keeps its address.": "Si vous ne l’avez pas demandé, ignorez cet e-mail : le compte garde son adresse.",
+    "Check :email to confirm your new address.": "Consultez :email pour confirmer votre nouvelle adresse.",
+    "No passkey here? Sign out, then choose a password with “Forgot your password?” on the sign-in page.": "Pas de clé d’accès ici ? Déconnectez-vous, puis choisissez un mot de passe avec « Mot de passe oublié ? » sur la page de connexion.",
+    "This link is for another account: sign in to that one to use it.": "Ce lien est pour un autre compte : connectez-vous à celui-ci pour l’utiliser.",
+    "We sent a link to :email. Your address changes once you open it.": "Nous avons envoyé un lien à :email. Votre adresse change dès que vous l’ouvrez.",
+    "Done: this is now the address of your punchcard account.": "C’est fait : c’est désormais l’adresse de votre compte punchcard.",
+    "Another account uses this address now, so yours keeps its own.": "Un autre compte utilise maintenant cette adresse : le vôtre garde la sienne.",
+    "This link has expired, was used already or was replaced by a later one.": "Ce lien a expiré, a déjà été utilisé ou a été remplacé par un plus récent.",
+    "Your new address": "Votre nouvelle adresse",
+    "Go to punchcard": "Aller sur punchcard",
+    "One tap and your account uses it.": "Un geste et votre compte l’utilise."
 }

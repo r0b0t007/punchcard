@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * To an account's old address, once it was changed in settings (CHW-23): if
- * it wasn't them, they hear of it there.
+ * To an account's old address, once it was changed (CHW-23, ApplyEmailChange):
+ * if it wasn't them, they hear of it there. On the queue.
  */
-final class EmailChangedMail extends Notification
+final class EmailChangedMail extends Notification implements ShouldQueue
 {
     use Queueable;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
@@ -52,33 +53,14 @@ class LoginLink extends Model
     }
 
     /**
-     * Spends a link, once and only for its purpose: one UPDATE marks it used
-     * only if it is unused, in date and for that purpose, so of two taps on
-     * it only one counts, on any database, with no lock held. Given an
-     * address, only a link mailed to it is spent (anyone else leaves it to
-     * its owner). Its address, or null when it can't be spent.
+     * Links that can still be spent for a purpose: unused and in date.
+     *
+     * @param  Builder<self>  $query
      */
-    public static function spend(int $id, string $purpose, ?string $email = null): ?string
+    #[Scope]
+    protected function usable(Builder $query, string $purpose): void
     {
-        $spent = static::query()
-            ->whereKey($id)
-            ->where('purpose', $purpose)
-            ->when($email !== null, fn (Builder $query): Builder => $query->where('email', $email))
-            ->whereNull('used_at')
-            ->where('expires_at', '>', now())
-            ->update(['used_at' => now()]);
-
-        $email = $spent === 1 ? static::query()->whereKey($id)->value('email') : null;
-
-        return is_string($email) ? $email : null;
-    }
-
-    /** The link, if it can still be spent for that purpose: for its page, which spends nothing. */
-    public static function usable(int $id, string $purpose): ?self
-    {
-        $link = static::query()->whereKey($id)->where('purpose', $purpose)->first();
-
-        return $link?->isUsable() === true ? $link : null;
+        $query->where('purpose', $purpose)->whereNull('used_at')->where('expires_at', '>', now());
     }
 
     /**

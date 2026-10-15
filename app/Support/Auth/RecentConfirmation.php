@@ -16,6 +16,7 @@ final class RecentConfirmation
 {
     public static function holds(Session $session): bool
     {
-        return (int) $session->get('auth.password_confirmed_at', 0) + (int) config('auth.password_timeout') > now()->getTimestamp();
+        // As RequirePassword counts it: confirmed while no longer ago than the timeout.
+        return now()->getTimestamp() - (int) $session->get('auth.password_confirmed_at', 0) <= (int) config('auth.password_timeout');
     }
 }

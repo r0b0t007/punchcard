@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ConfirmByEmailController;
+use App\Http\Controllers\EmailChangeController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Middleware\NeverCache;
@@ -11,7 +12,8 @@ Route::middleware(['auth'])->group(function (): void {
     Route::redirect('settings', '/settings/profile');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    // Throttled: a new address is mailed a link (RequestEmailChange, CHW-23).
+    Route::patch('settings/profile', [ProfileController::class, 'update'])->middleware('throttle:profile-update')->name('profile.update');
     // Deleting an account must not depend on having verified its email (CHW-139).
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).
@@ -35,6 +37,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+});
+
+// The link mailed to a new address asked for in settings (CHW-23), opened from that inbox, signed in or not.
+Route::middleware(NeverCache::class)->group(function (): void {
+    Route::get('email/confirm/{user}', [EmailChangeController::class, 'show'])->whereNumber('user')->name('email-change.show');
+    Route::post('email/confirm/{user}', [EmailChangeController::class, 'confirm'])->whereNumber('user')->name('email-change.confirm');
 });
 
 Route::get('.well-known/passkey-endpoints', fn () => response()->json([

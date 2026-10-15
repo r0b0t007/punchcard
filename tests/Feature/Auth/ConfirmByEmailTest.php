@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\LoginLink;
 use App\Models\User;
 use App\Notifications\ConfirmLinkMail;
+use App\Notifications\ConfirmNewEmailMail;
 use App\Notifications\EmailChangedMail;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\AnonymousNotifiable;
@@ -44,6 +45,20 @@ beforeEach(function (): void {
         return (string) $urls[count($urls) - 1];
     };
     $this->confirmed = fn (): bool => session('auth.password_confirmed_at') === now()->unix();
+
+    // The last link mailed to a new address, to switch to it.
+    $this->newAddressLink = function (string $address): string {
+        $urls = new ArrayObject;
+        Notification::assertSentOnDemand(ConfirmNewEmailMail::class, function (ConfirmNewEmailMail $mail, array $channels, AnonymousNotifiable $to) use ($address, $urls): bool {
+            if ($to->routes['mail'] === $address) {
+                $urls[] = $mail->url;
+            }
+
+            return $to->routes['mail'] === $address;
+        });
+
+        return (string) $urls[count($urls) - 1];
+    };
 });
 
 afterEach(function (): void {
@@ -52,10 +67,14 @@ afterEach(function (): void {
 
 it('offers an account without a password to confirm by email, and one with a password its password', function (): void {
     $this->actingAs($this->customer)->get(route('password.confirm'))
-        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-password')->where('hasPassword', false));
+        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-password')->where('hasPassword', false)->where('mayConfirmByEmail', true));
 
     $this->actingAs(User::factory()->create())->get(route('password.confirm'))
-        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-password')->where('hasPassword', true));
+        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-password')->where('hasPassword', true)->where('mayConfirmByEmail', false));
+
+    // Without a password, nor a link to confirm by (two-factor on): the page says what to do instead.
+    $this->actingAs(User::factory()->withTwoFactor()->create(['password' => null]))->get(route('password.confirm'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('hasPassword', false)->where('mayConfirmByEmail', false));
 });
 
 it('mails a link to the account\'s own address, whose button confirms it\'s them and goes back where they were', function (): void {
@@ -80,8 +99,11 @@ it('refuses a confirm link opened by another account, or used twice', function (
     $this->actingAs($this->customer)->post(route('password.confirm-by-email'));
     $link = ($this->confirmLinkFor)($this->customer);
 
-    $this->actingAs(User::factory()->create(['password' => null]))->post($link)
-        ->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $someoneElse = User::factory()->create(['password' => null]);
+    $this->actingAs($someoneElse)->get($link)
+        ->assertInertia(fn (Assert $page): Assert => $page->where('expired', true)->where('reason', 'other-account'));
+    $this->actingAs($someoneElse)->post($link)
+        ->assertInertia(fn (Assert $page): Assert => $page->where('expired', true)->where('reason', 'other-account'));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 
     $this->actingAs($this->customer)->post($link)->assertRedirect();
@@ -166,15 +188,88 @@ it('says on the profile and security pages whether the account has a password', 
         ->assertInertia(fn (Assert $page): Assert => $page->where('hasPassword', false));
 });
 
-it('mails the confirmation to the new address and a notice to the old one, once confirmed it\'s them', function (): void {
+it('keeps the old address until the new one is confirmed from its own inbox, then tells the old one', function (): void {
     Notification::fake();
 
     $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
-        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test'])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'Salma.New@Example.test'])
         ->assertSessionHasNoErrors();
 
-    Notification::assertSentTo($this->customer->fresh(), VerifyEmail::class);
+    $customer = $this->customer->fresh();
+    expect($customer->email)->toBe('salma@example.test')
+        ->and($customer->hasVerifiedEmail())->toBeTrue()
+        ->and($customer->pending_email)->toBe('salma.new@example.test');
+    Notification::assertNotSentTo($customer, VerifyEmail::class);
+    Notification::assertSentOnDemandTimes(EmailChangedMail::class, 0);
+    $this->actingAs($customer)->get(route('profile.edit'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('pendingEmail', 'salma.new@example.test'));
+
+    // From the new inbox, signed in or not.
+    auth()->logout();
+    $link = ($this->newAddressLink)('salma.new@example.test');
+    $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-change-open')->where('expired', false));
+    expect($customer->fresh()->email)->toBe('salma@example.test');
+
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('changed', true));
+
+    $customer = $customer->fresh();
+    expect($customer->email)->toBe('salma.new@example.test')
+        ->and($customer->hasVerifiedEmail())->toBeTrue()
+        ->and($customer->pending_email)->toBeNull();
     Notification::assertSentOnDemand(EmailChangedMail::class, fn (EmailChangedMail $mail, array $channels, AnonymousNotifiable $to): bool => $to->routes['mail'] === 'salma@example.test');
+
+    // Once.
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+});
+
+it('costs nothing to mistype a new address: the old one still signs in and confirms', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@gmial.test']);
+    $this->travel(4)->hours();
+
+    $this->actingAs($this->customer->fresh())->post(route('password.confirm-by-email'))->assertSessionHas('status', 'confirm-link-sent');
+
+    Notification::assertSentTo($this->customer, ConfirmLinkMail::class);
+});
+
+it('never switches to an address someone else took meanwhile', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test']);
+    $link = ($this->newAddressLink)('salma.new@example.test');
+    User::factory()->create(['email' => 'salma.new@example.test']);
+
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('changed', false)->where('reason', 'taken'));
+
+    expect($this->customer->fresh()->email)->toBe('salma@example.test');
+});
+
+it('switches only to the address last asked for', function (): void {
+    Notification::fake();
+    $session = ['auth.password_confirmed_at' => now()->unix()];
+    $this->actingAs($this->customer)->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'first@example.test']);
+    $first = ($this->newAddressLink)('first@example.test');
+    $this->actingAs($this->customer->fresh())->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'second@example.test']);
+
+    $this->post($first)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+
+    expect($this->customer->fresh()->email)->toBe('salma@example.test');
+});
+
+it('limits profile updates, which mail new addresses', function (): void {
+    Notification::fake();
+    $session = ['auth.password_confirmed_at' => now()->unix()];
+
+    foreach (range(1, 5) as $attempt) {
+        $this->actingAs($this->customer)->withSession($session)
+            ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => "new{$attempt}@example.test"])
+            ->assertSessionHasNoErrors();
+    }
+
+    $this->actingAs($this->customer)->withSession($session)
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'new6@example.test'])
+        ->assertTooManyRequests();
 });
 
 it('changes no address without a recent confirmation (a stale session can\'t move the account)', function (): void {
@@ -216,6 +311,8 @@ it('never confirms with a link mailed to the address before it changed', functio
 });
 
 it('keeps this phone signed in for the year after a first password, and signs other devices out', function (): void {
+    // Sessions in the database, as the app keeps them (config/session.php): the other phone's is a row.
+    config(['session.driver' => 'database']);
     DB::table('sessions')->insert(['id' => 'their-other-phone', 'user_id' => $this->customer->id, 'payload' => '', 'last_activity' => now()->getTimestamp()]);
     $recaller = auth()->guard()->getRecallerName();
 

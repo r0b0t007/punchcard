@@ -11,9 +11,12 @@ import { confirm } from '@/routes/password';
  */
 export default function ConfirmLinkOpen({
     expired,
+    reason,
     action,
 }: {
     expired: boolean;
+    /** Why it can't be used: out of date or used, or another account's. */
+    reason: 'expired' | 'other-account' | null;
     /** The signed link itself, which the button posts to. */
     action: string | null;
 }) {
@@ -25,7 +28,11 @@ export default function ConfirmLinkOpen({
             {expired || action === null ? (
                 <div className="flex flex-col gap-4 text-center">
                     <p className="text-sm text-muted-foreground">
-                        {t('This link has expired or was used already.')}
+                        {reason === 'other-account'
+                            ? t(
+                                  'This link is for another account: sign in to that one to use it.',
+                              )
+                            : t('This link has expired or was used already.')}
                     </p>
                     <Button asChild className="w-full">
                         <Link href={confirm()}>{t('Get a new link')}</Link>
