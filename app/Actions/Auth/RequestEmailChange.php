@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\URL;
  * A new address asked for in settings (CHW-23): kept aside (pending_email)
  * and a link mailed to it, which switches the account to it from that
  * inbox (ApplyEmailChange). Until then the account keeps its address, so a
- * mistyped one costs nothing. A later request replaces an earlier one;
- * the current address again cancels it. At most PER_HOUR new addresses an
- * hour per account (each is mailed): false when over.
+ * mistyped one costs nothing. A later request replaces an earlier one; the
+ * current address changes nothing (the form always sends one), so only
+ * CancelEmailChange drops it. At most PER_HOUR new addresses an hour per
+ * account (each is mailed).
  */
 final readonly class RequestEmailChange
 {
@@ -26,16 +27,21 @@ final readonly class RequestEmailChange
     /** New addresses an account may ask for in an hour. */
     public const int PER_HOUR = 5;
 
-    public function handle(User $user, string $newEmail): bool
+    public const string REQUESTED = 'requested';
+
+    public const string UNCHANGED = 'unchanged';
+
+    public const string LIMITED = 'limited';
+
+    /** @return self::REQUESTED|self::UNCHANGED|self::LIMITED */
+    public function handle(User $user, string $newEmail): string
     {
         if ($newEmail === $user->email) {
-            $user->forceFill(['pending_email' => null, 'pending_email_expires_at' => null])->save();
-
-            return true;
+            return self::UNCHANGED;
         }
 
         if (RateLimiter::tooManyAttempts('email-change:'.$user->id, self::PER_HOUR)) {
-            return false;
+            return self::LIMITED;
         }
 
         RateLimiter::hit('email-change:'.$user->id, 3600);
@@ -50,6 +56,6 @@ final readonly class RequestEmailChange
 
         Notification::route('mail', $newEmail)->notify((new ConfirmNewEmailMail($url))->locale($user->preferredLocale() ?? app()->getLocale()));
 
-        return true;
+        return self::REQUESTED;
     }
 }

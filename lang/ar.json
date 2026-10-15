@@ -680,5 +680,6 @@
     "Your new address": "عنوانك الجديد",
     "Go to punchcard": "الذهاب إلى punchcard",
     "One tap and your account uses it.": "لمسة واحدة ويستخدمه حسابك.",
-    "Too many address changes. Try again later.": "تغييرات كثيرة في العنوان. حاول مرة أخرى لاحقًا."
+    "Too many address changes. Try again later.": "تغييرات كثيرة في العنوان. حاول مرة أخرى لاحقًا.",
+    "New address cancelled.": "تم إلغاء العنوان الجديد."
 }

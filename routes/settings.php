@@ -17,6 +17,8 @@ Route::middleware(['auth'])->group(function (): void {
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).
     Route::get('settings/profile/confirm', fn () => to_route('profile.edit'))->middleware(RequirePassword::class)->name('profile.confirm');
+    // A new address dropped before its link is opened (CHW-23).
+    Route::delete('settings/email-change', [EmailChangeController::class, 'destroy'])->name('email-change.cancel');
 
     // "Confirm it's you" by email, for an account without a password (CHW-23): never cached, the link is in the URL.
     Route::middleware(NeverCache::class)->group(function (): void {

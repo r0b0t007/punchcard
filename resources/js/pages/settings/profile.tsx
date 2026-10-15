@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
+import { cancel as cancelEmailChange } from '@/routes/email-change';
 import { confirm as confirmItsYou, edit } from '@/routes/profile';
 import type { Auth } from '@/types';
 import { send } from '@/routes/verification';
@@ -107,7 +108,16 @@ export default function Profile({
                                                     </bdi>
                                                 ),
                                             },
-                                        )}
+                                        )}{' '}
+                                        <Link
+                                            href={cancelEmailChange()}
+                                            as="button"
+                                            preserveScroll
+                                            className="font-medium text-foreground underline underline-offset-4"
+                                            data-test="cancel-email-change"
+                                        >
+                                            {t('Cancel')}
+                                        </Link>
                                     </p>
                                 ) : null}
                                 {recentlyConfirmed ? null : (
@@ -167,7 +177,10 @@ export default function Profile({
                 </Form>
             </div>
 
-            <DeleteUser hasPassword={hasPassword} />
+            <DeleteUser
+                hasPassword={hasPassword}
+                recentlyConfirmed={recentlyConfirmed}
+            />
         </>
     );
 }

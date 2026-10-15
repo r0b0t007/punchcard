@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * What an email link is for (CHW-23): signing in, or confirming it's you to
  * a signed-in account without a password (settings). One never does the
- * other's job (LoginLink::spend).
+ * other's job (SpendLoginLink, through LoginLink's usable() scope).
  */
 return new class extends Migration
 {

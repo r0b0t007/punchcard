@@ -36,25 +36,24 @@ class ProfileController extends Controller
 
     /**
      * The name at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
-     * then the account keeps its address, so a mistyped one costs nothing. The current address again cancels it.
+     * then the account keeps its address, so a mistyped one costs nothing. Over the limit for new addresses,
+     * nothing is saved, the name neither.
      */
     public function update(ProfileUpdateRequest $request, RequestEmailChange $requestEmailChange): RedirectResponse
     {
         $user = $request->user();
         $email = (string) $request->validated('email');
-        $user->fill(['name' => $request->validated('name')])->save();
+        $emailChange = $requestEmailChange->handle($user, $email);
 
-        if (! $requestEmailChange->handle($user, $email)) {
+        if ($emailChange === RequestEmailChange::LIMITED) {
             return back()->withErrors(['email' => __('Too many address changes. Try again later.')]);
         }
 
-        if ($user->pending_email !== null) {
-            Inertia::flash('toast', ['type' => 'success', 'message' => __('Check :email to confirm your new address.', ['email' => $email])]);
+        $user->fill(['name' => $request->validated('name')])->save();
 
-            return to_route('profile.edit');
-        }
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => $emailChange === RequestEmailChange::REQUESTED
+            ? __('Check :email to confirm your new address.', ['email' => $email])
+            : __('Profile updated.')]);
 
         return to_route('profile.edit');
     }

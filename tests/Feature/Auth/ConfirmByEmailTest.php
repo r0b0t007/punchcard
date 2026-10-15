@@ -86,7 +86,7 @@ it('mails a link to the account\'s own address, whose button confirms it\'s them
     $link = ($this->confirmLinkFor)($this->customer);
 
     // Opening it only shows its button.
-    $this->get($link)->assertOk()->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-link-open')->where('expired', false));
+    $this->get($link)->assertOk()->assertInertia(fn (Assert $page): Assert => $page->component('auth/confirm-link-open')->where('state', 'ready'));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 
     $this->post($link)->assertRedirect(route('security.edit'));
@@ -101,13 +101,13 @@ it('refuses a confirm link opened by another account, or used twice', function (
 
     $someoneElse = User::factory()->create(['password' => null]);
     $this->actingAs($someoneElse)->get($link)
-        ->assertInertia(fn (Assert $page): Assert => $page->where('expired', true)->where('reason', 'other-account'));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('state', 'other-account'));
     $this->actingAs($someoneElse)->post($link)
-        ->assertInertia(fn (Assert $page): Assert => $page->where('expired', true)->where('reason', 'other-account'));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('state', 'other-account'));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 
     $this->actingAs($this->customer)->post($link)->assertRedirect();
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 });
 
 it('never lets a confirm link sign anyone in, nor a sign-in link confirm', function (): void {
@@ -118,7 +118,7 @@ it('never lets a confirm link sign anyone in, nor a sign-in link confirm', funct
 
     // A sign-in link, signed as a confirm link: refused.
     $asConfirm = url(URL::temporarySignedRoute('password.confirm-by-email.show', now()->addMinutes(15), ['link' => $signInLink->id], absolute: false));
-    $this->post($asConfirm)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($asConfirm)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 
     // A confirm link, signed as a sign-in link, opened signed out: refused.
@@ -134,7 +134,7 @@ it('refuses a confirm link past its time', function (): void {
     $link = ($this->confirmLinkFor)($this->customer);
     $this->travel(16)->minutes();
 
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 });
 
 it('limits confirm links per account', function (): void {
@@ -207,10 +207,10 @@ it('keeps the old address until the new one is confirmed from its own inbox, the
     // From the new inbox, signed in or not.
     auth()->logout();
     $link = ($this->newAddressLink)('salma.new@example.test');
-    $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-change-open')->where('expired', false));
+    $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-change-open')->where('state', 'ready'));
     expect($customer->fresh()->email)->toBe('salma@example.test');
 
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('changed', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'changed'));
 
     $customer = $customer->fresh();
     expect($customer->email)->toBe('salma.new@example.test')
@@ -219,7 +219,7 @@ it('keeps the old address until the new one is confirmed from its own inbox, the
     Notification::assertSentOnDemand(EmailChangedMail::class, fn (EmailChangedMail $mail, array $channels, AnonymousNotifiable $to): bool => $to->routes['mail'] === 'salma@example.test');
 
     // Once.
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 });
 
 it('costs nothing to mistype a new address: the old one still signs in and confirms', function (): void {
@@ -240,7 +240,7 @@ it('never switches to an address someone else took meanwhile', function (): void
     $link = ($this->newAddressLink)('salma.new@example.test');
     User::factory()->create(['email' => 'salma.new@example.test']);
 
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('changed', false)->where('reason', 'taken'));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'taken'));
 
     expect($this->customer->fresh()->email)->toBe('salma@example.test');
 });
@@ -252,7 +252,7 @@ it('switches only to the address last asked for', function (): void {
     $first = ($this->newAddressLink)('first@example.test');
     $this->actingAs($this->customer->fresh())->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'second@example.test']);
 
-    $this->post($first)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($first)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 
     expect($this->customer->fresh()->email)->toBe('salma@example.test');
 });
@@ -266,9 +266,9 @@ it('limits the new addresses mailed, never the name', function (): void {
         $save(['name' => $this->customer->name, 'email' => "new{$attempt}@example.test"])->assertSessionHasNoErrors();
     }
 
-    // A sixth new address: a form error, not an error page.
-    $save(['name' => $this->customer->name, 'email' => 'new6@example.test'])->assertSessionHasErrors('email');
-    expect($this->customer->fresh()->pending_email)->toBe('new5@example.test');
+    // A sixth new address: a form error, not an error page, and nothing saved, the name neither.
+    $save(['name' => 'Salma Renamed', 'email' => 'new6@example.test'])->assertSessionHasErrors('email');
+    expect($this->customer->fresh())->pending_email->toBe('new5@example.test')->name->not->toBe('Salma Renamed');
 
     // The name, as often as they like.
     foreach (range(1, 6) as $attempt) {
@@ -276,19 +276,46 @@ it('limits the new addresses mailed, never the name', function (): void {
     }
 });
 
-it('cancels a new address when the current one is saved again', function (): void {
+it('keeps a new address waiting when only the name is saved (the form sends the current address too)', function (): void {
     Notification::fake();
     $session = ['auth.password_confirmed_at' => now()->unix()];
-    $this->actingAs($this->customer)->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@gmial.test']);
-    $link = ($this->newAddressLink)('salma@gmial.test');
+    $this->actingAs($this->customer)->withSession($session)->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test']);
 
     $this->actingAs($this->customer->fresh())->withSession($session)
-        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@example.test'])
+        ->patch(route('profile.update'), ['name' => 'Salma B.', 'email' => 'salma@example.test'])
         ->assertSessionHasNoErrors();
 
+    expect($this->customer->fresh())->name->toBe('Salma B.')->pending_email->toBe('salma.new@example.test');
+    $this->post(($this->newAddressLink)('salma.new@example.test'))->assertInertia(fn (Assert $page): Assert => $page->where('state', 'changed'));
+});
+
+it('cancels a new address from settings: its link stops working', function (): void {
+    Notification::fake();
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma@gmial.test']);
+    $link = ($this->newAddressLink)('salma@gmial.test');
+
+    $this->actingAs($this->customer->fresh())->delete(route('email-change.cancel'))->assertRedirect(route('profile.edit'));
+
     expect($this->customer->fresh()->pending_email)->toBeNull();
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired')->where('action', null));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
     expect($this->customer->fresh()->email)->toBe('salma@example.test');
+});
+
+it('stops the sign-in links and reset tokens mailed to the old address once it changed', function (): void {
+    Notification::fake();
+    $oldSignInLink = LoginLink::for('salma@example.test');
+    DB::table('password_reset_tokens')->insert(['email' => 'salma@example.test', 'token' => Hash::make('reset'), 'created_at' => now()]);
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->patch(route('profile.update'), ['name' => $this->customer->name, 'email' => 'salma.new@example.test']);
+    $this->post(($this->newAddressLink)('salma.new@example.test'))->assertInertia(fn (Assert $page): Assert => $page->where('state', 'changed'));
+    auth()->logout();
+
+    // Opened afterwards, it would sign up a second account on the old address.
+    $this->post($oldSignInLink->signedUrl())->assertInertia(fn (Assert $page): Assert => $page->component('auth/email-link-open')->where('expired', true));
+    $this->assertGuest();
+    expect(DB::table('password_reset_tokens')->where('email', 'salma@example.test')->exists())->toBeFalse();
 });
 
 it('stops showing a new address once its link is out of date', function (): void {
@@ -310,7 +337,7 @@ it('never puts an address back on a deleted account', function (): void {
     $this->customer->fresh()->forceFill(['email' => 'deleted-x@deleted.invalid', 'anonymised_at' => now()])->save();
     auth()->logout();
 
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 
     expect($this->customer->fresh()->email)->toBe('deleted-x@deleted.invalid');
 });
@@ -323,7 +350,7 @@ it('says whose a confirm link is only once its signature holds', function (): vo
     // Unsigned, from another account: nothing about whose it is.
     $this->actingAs(User::factory()->create(['password' => null]))
         ->post(route('password.confirm-by-email.confirm', $theirs->id))
-        ->assertInertia(fn (Assert $page): Assert => $page->where('reason', 'expired'));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
 });
 
 it('changes no address without a recent confirmation (a stale session can\'t move the account)', function (): void {
@@ -350,7 +377,7 @@ it('confirms by email only an account a link could sign in anyway (no password, 
 
     // Nor does a confirm link for it count.
     $link = LoginLink::for($user->email, LoginLink::CONFIRM);
-    $this->post($link->signedUrl())->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link->signedUrl())->assertInertia(fn (Assert $page): Assert => $page->where('state', 'expired'));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 })->with(['with a password', 'with two-factor', 'unconfirmed address']);
 
@@ -360,7 +387,7 @@ it('never confirms with a link mailed to the address before it changed', functio
     $link = ($this->confirmLinkFor)($this->customer);
     $this->customer->forceFill(['email' => 'salma.new@example.test'])->save();
 
-    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('expired', true));
+    $this->post($link)->assertInertia(fn (Assert $page): Assert => $page->where('action', null));
     expect(session()->has('auth.password_confirmed_at'))->toBeFalse();
 });
 

@@ -10,14 +10,12 @@ import { confirm } from '@/routes/password';
  * Out of date or used already: back to confirming, for a new one.
  */
 export default function ConfirmLinkOpen({
-    expired,
-    reason,
+    state,
     action,
 }: {
-    expired: boolean;
-    /** Why it can't be used: out of date or used, or another account's. */
-    reason: 'expired' | 'other-account' | null;
-    /** The signed link itself, which the button posts to. */
+    /** Ready to use; or why not: out of date or used, or another account's. */
+    state: 'ready' | 'expired' | 'other-account';
+    /** The signed link itself, which the button posts to (when ready). */
     action: string | null;
 }) {
     const { t } = useTranslation();
@@ -25,10 +23,10 @@ export default function ConfirmLinkOpen({
     return (
         <>
             <Head title={t("Confirm it's you")} />
-            {expired || action === null ? (
+            {state !== 'ready' || action === null ? (
                 <div className="flex flex-col gap-4 text-center">
                     <p className="text-sm text-muted-foreground">
-                        {reason === 'other-account'
+                        {state === 'other-account'
                             ? t(
                                   'This link is for another account: sign in to that one to use it.',
                               )

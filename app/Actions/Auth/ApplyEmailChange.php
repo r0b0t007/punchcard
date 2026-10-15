@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Auth;
 
+use App\Models\LoginLink;
 use App\Models\User;
 use App\Notifications\EmailChangedMail;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -14,8 +15,9 @@ use Illuminate\Support\Facades\Notification;
  * Switches an account to the new address it asked for (CHW-23), from that
  * address's own inbox (a signed link, RequestEmailChange): confirmed at
  * once, and the old address hears of it. Only the address last asked for
- * (the link carries its hash), once, and never one another account took
- * meanwhile.
+ * (FindPendingEmailChange), once, and never one another account took
+ * meanwhile. Links and reset tokens mailed to the old address stop working:
+ * opened later, a sign-in link would otherwise sign up a new account there.
  */
 final readonly class ApplyEmailChange
 {
@@ -25,19 +27,20 @@ final readonly class ApplyEmailChange
 
     public const string TAKEN = 'taken';
 
+    public function __construct(private FindPendingEmailChange $findPendingEmailChange) {}
+
     /** @return self::CHANGED|self::EXPIRED|self::TAKEN */
     public function handle(int $userId, string $hash): string
     {
         try {
             $outcome = DB::transaction(function () use ($userId, $hash): array {
-                $user = User::query()->lockForUpdate()->find($userId);
+                $user = $this->findPendingEmailChange->handle($userId, $hash, lock: true);
 
-                // Out of date, replaced or cancelled, or the account deleted since: no address goes on it.
-                $pending = $user instanceof User && ! $user->isAnonymised() ? $user->pendingEmail() : null;
-
-                if ($pending === null || ! hash_equals(sha1($pending), $hash)) {
+                if (! $user instanceof User) {
                     return [self::EXPIRED, null];
                 }
+
+                $pending = (string) $user->pending_email;
 
                 if (User::query()->where('email', $pending)->exists()) {
                     return [self::TAKEN, null];
@@ -45,6 +48,9 @@ final readonly class ApplyEmailChange
 
                 $old = $user->email;
                 $user->forceFill(['email' => $pending, 'email_verified_at' => now(), 'pending_email' => null, 'pending_email_expires_at' => null])->save();
+
+                LoginLink::query()->where('email', $old)->whereNull('used_at')->update(['used_at' => now()]);
+                DB::table('password_reset_tokens')->where('email', $old)->delete();
 
                 return [self::CHANGED, [$user, $old]];
             });

@@ -22,11 +22,19 @@ import { confirm as confirmItsYou } from '@/routes/profile';
 /**
  * Deleting the account: with its password, or, for an account without one
  * (signed up by email link, CHW-23), once it confirmed it's them (a passkey
- * or a link by email, then back here).
+ * or a link by email, then back here): until then the dialog says so, and
+ * its button waits.
  */
-export default function DeleteUser({ hasPassword }: { hasPassword: boolean }) {
+export default function DeleteUser({
+    hasPassword,
+    recentlyConfirmed,
+}: {
+    hasPassword: boolean;
+    recentlyConfirmed: boolean;
+}) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const { t } = useTranslation();
+    const mustConfirmFirst = !hasPassword && !recentlyConfirmed;
 
     return (
         <div className="space-y-6">
@@ -104,8 +112,15 @@ export default function DeleteUser({ hasPassword }: { hasPassword: boolean }) {
                                             </>
                                         ) : null}
 
+                                        {mustConfirmFirst ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                {t("Confirm it's you first.")}
+                                            </p>
+                                        ) : null}
                                         <InputError message={errors.password} />
-                                        {!hasPassword && errors.password ? (
+                                        {!hasPassword &&
+                                        (mustConfirmFirst ||
+                                            errors.password) ? (
                                             <Link
                                                 href={confirmItsYou()}
                                                 className="text-sm font-medium underline underline-offset-4"
@@ -130,7 +145,9 @@ export default function DeleteUser({ hasPassword }: { hasPassword: boolean }) {
 
                                         <Button
                                             variant="destructive"
-                                            disabled={processing}
+                                            disabled={
+                                                processing || mustConfirmFirst
+                                            }
                                             asChild
                                         >
                                             <button
