@@ -13,9 +13,10 @@ use Illuminate\Notifications\Notification;
 /**
  * An invitation to a business's staff (CHW-146, InviteStaff): its signed
  * link, good for StaffInvitation::DAYS days, once. The business and location
- * names are the owner's own text, read as plain text: the mail's Markdown
- * never turns them into a link or formatting, so nobody can send a link of
- * their own from punchcard's address.
+ * names are the owner's own text: their brackets are escaped, the one way
+ * they could become a link in the mail's Markdown (no autolinks, and Blade
+ * escapes <url> first), so nobody sends a link of their own from punchcard's
+ * address. Ordinary names read the same in the plain-text part.
  */
 final class StaffInvitationMail extends Notification implements ShouldQueue
 {
@@ -46,9 +47,9 @@ final class StaffInvitationMail extends Notification implements ShouldQueue
             ->line(__('The link works for :days days. If you weren\'t expecting it, you can ignore this email.', ['days' => StaffInvitation::DAYS]));
     }
 
-    /** Text with every Markdown character escaped, so it renders as written (a URL in it never becomes a link). */
+    /** Text whose brackets are escaped, so [text](url) in it never becomes a link. */
     private function plain(string $text): string
     {
-        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|~:\/])/', '\\\\$1', $text);
+        return str_replace(['[', ']'], ['\\[', '\\]'], $text);
     }
 }

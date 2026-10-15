@@ -14,8 +14,10 @@ use App\Models\StaffInvitation;
 use App\Models\User;
 use App\Notifications\StaffInvitationMail;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Mail\Markdown;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -75,7 +77,9 @@ it('shows the owner the staff page with the invite form and pending invitations'
         ->assertInertia(fn (Assert $page): Assert => $page->component('business/staff')
             ->has('locations', 1)
             ->has('invitations', 1)
-            ->where('invitations.0.email', 'karim@example.test'));
+            ->where('invitations.0.email', 'karim@example.test')
+            // Its date reads in the location's time.
+            ->where('invitations.0.timezone', $this->tenants->locationOf($this->tenants->a1)->timezone));
 });
 
 it('mails an invitation link from the owner, never from staff', function (): void {
@@ -192,9 +196,11 @@ it('asks a guest whose address has an account to sign in first, then brings them
     $this->get($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'sign-in'));
     expect(session('url.intended'))->toBe($link);
 
-    // Nothing joins without signing in.
+    // Nothing joins without signing in, and signing in still comes back here, on the app's own address.
+    session()->forget('url.intended');
     $this->post($link)->assertRedirect(route('login'));
     $this->assertGuest();
+    expect(session('url.intended'))->toBe($link);
 });
 
 it('never lets another account use the invitation', function (): void {
@@ -323,4 +329,63 @@ it('mails the business name as written, never as a link the owner put in it', fu
 
         return true;
     });
+});
+
+it('invites to the whole business from the form\'s "Every location" choice', function (): void {
+    ($this->invite)(['email' => 'karim@example.test', 'location_id' => 'all'])->assertSessionHasNoErrors();
+
+    expect(($this->invitations)()->sole()->location_id)->toBeNull();
+});
+
+it('lets an account with a passkey but no password join as it is', function (): void {
+    $salma = User::factory()->create(['email' => 'salma@example.test', 'password' => null]);
+    $salma->passkeys()->create(['name' => 'iPhone', 'credential_id' => 'cred-1', 'credential' => []]);
+    ($this->invite)(['email' => 'salma@example.test']);
+    $link = ($this->linkFor)('salma@example.test');
+
+    $this->actingAs($salma)->get($link)->assertInertia(fn (Assert $page): Assert => $page->where('state', 'join'));
+    $this->actingAs($salma)->post($link)->assertRedirect(route('dashboard'));
+
+    expect(($this->memberships)($salma))->toHaveCount(1)
+        ->and($salma->fresh()->hasPassword())->toBeFalse();
+});
+
+it('prunes an invitation a month after it was used or ran out, never a pending one', function (): void {
+    $karim = User::factory()->create(['email' => 'karim@example.test']);
+    ($this->invite)(['email' => 'karim@example.test']);
+    $this->actingAs($karim)->post(($this->linkFor)('karim@example.test'));
+    $this->travel(32)->days();
+    ($this->invite)(['email' => 'nadia@example.test']);
+
+    Artisan::call('model:prune', ['--model' => [StaffInvitation::class]]);
+
+    expect(($this->invitations)()->pluck('email')->all())->toBe(['nadia@example.test']);
+});
+
+it('mails an ordinary business name exactly as written, in the plain-text part too', function (): void {
+    $this->context->bypass(fn () => Business::query()->whereKey($this->tenants->a1->id)->update(['name' => 'Café St. Jean - Rabat (centre)']));
+
+    ($this->invite)(['email' => 'karim@example.test']);
+
+    Notification::assertSentOnDemand(StaffInvitationMail::class, function (StaffInvitationMail $mail): bool {
+        $text = (string) app(Markdown::class)->renderText('notifications::email', $mail->toMail(new AnonymousNotifiable)->data());
+
+        expect($text)->toContain('Café St. Jean - Rabat (centre) invites you');
+
+        return true;
+    });
+});
+
+it('brings a guest back on the app\'s own address after signing in, whatever host the request came in on', function (): void {
+    config(['app.url' => 'https://punchcard.test']);
+    User::factory()->create(['email' => 'karim@example.test']);
+    ($this->invite)(['email' => 'karim@example.test']);
+    $link = ($this->linkFor)('karim@example.test');
+    auth()->logout();
+    // The same signed path and query, through another host (a proxy that changed it).
+    $path = parse_url($link, PHP_URL_PATH).'?'.parse_url($link, PHP_URL_QUERY);
+
+    $this->post('http://internal.example'.$path)->assertRedirect(route('login'));
+
+    expect(session('url.intended'))->toBe($link);
 });

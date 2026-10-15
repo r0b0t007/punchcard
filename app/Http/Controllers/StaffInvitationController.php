@@ -34,8 +34,7 @@ final class StaffInvitationController extends Controller
         $state = $request->state();
 
         if ($state === DescribeStaffInvitation::SIGN_IN) {
-            // Signing in (password, passkey or email link) comes back here.
-            redirect()->setIntendedUrl(rtrim((string) config('app.url'), '/').$request->getRequestUri());
+            $this->comeBackHere($request);
         }
 
         return $this->page($request, $request->invitation(), $state);
@@ -51,7 +50,9 @@ final class StaffInvitationController extends Controller
         }
 
         if ($state === DescribeStaffInvitation::SIGN_IN) {
-            return redirect()->guest(route('login'));
+            $this->comeBackHere($request);
+
+            return to_route('login');
         }
 
         $signedIn = $request->user();
@@ -77,6 +78,15 @@ final class StaffInvitationController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('You\'re on the staff of :business.', ['business' => $invitation->business->name])]);
 
         return to_route('dashboard');
+    }
+
+    /**
+     * Signing in (password, passkey or email link) comes back to this link: on the app's own address (app.url),
+     * never a host or scheme a proxy may have changed.
+     */
+    private function comeBackHere(AcceptStaffInvitationRequest $request): void
+    {
+        redirect()->setIntendedUrl(rtrim((string) config('app.url'), '/').$request->getRequestUri());
     }
 
     private function page(AcceptStaffInvitationRequest $request, ?StaffInvitation $invitation, ?string $state): Response

@@ -29,11 +29,16 @@ final readonly class AcceptStaffInvitation
     public function handle(int $invitationId, User $user): bool
     {
         return $this->context->bypass(fn (): bool => DB::transaction(function () use ($invitationId, $user): bool {
+            // The business first, then the invitation: the order InviteStaff locks them in, so the two never deadlock.
+            $site = StaffInvitation::query()->whereKey($invitationId)->first(['business_id', 'location_id']);
+
+            if (! $site instanceof StaffInvitation || ! ArchivedSites::isOpen($site->business_id, $site->location_id, lock: true)) {
+                return false;
+            }
+
             $invitation = StaffInvitation::query()->whereKey($invitationId)->pending()->lockForUpdate()->first();
 
-            if (! $invitation instanceof StaffInvitation
-                || $invitation->email !== $user->email
-                || ! ArchivedSites::isOpen($invitation->business_id, $invitation->location_id, lock: true)) {
+            if (! $invitation instanceof StaffInvitation || $invitation->email !== $user->email) {
                 return false;
             }
 

@@ -29,6 +29,10 @@ class AcceptStaffInvitationRequest extends FormRequest
 
     private bool $looked = false;
 
+    private ?string $state = null;
+
+    private bool $described = false;
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -71,14 +75,18 @@ class AcceptStaffInvitationRequest extends FormRequest
         return $this->invitation;
     }
 
-    /** What the invitation asks of whoever opened it; null without a usable one. */
+    /** What the invitation asks of whoever opened it, worked out once (rules and the controller agree); null without a usable one. */
     public function state(): ?string
     {
-        $invitation = $this->invitation();
-        $user = $this->user();
+        if (! $this->described) {
+            $this->described = true;
+            $invitation = $this->invitation();
+            $user = $this->user();
+            $this->state = $invitation instanceof StaffInvitation
+                ? app(DescribeStaffInvitation::class)->handle($invitation, $user instanceof User ? $user : null)
+                : null;
+        }
 
-        return $invitation instanceof StaffInvitation
-            ? app(DescribeStaffInvitation::class)->handle($invitation, $user instanceof User ? $user : null)
-            : null;
+        return $this->state;
     }
 }

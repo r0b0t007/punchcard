@@ -21,6 +21,8 @@ type Invitation = {
     email: string;
     location: string | null;
     expiresAt: string;
+    /** The location's timezone, the date shows in. */
+    timezone: string;
 };
 
 /**
@@ -35,7 +37,11 @@ export default function Staff({
     invitations: Invitation[];
 }) {
     const { t, locale } = useTranslation();
-    const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
+    const date = (invitation: Invitation) =>
+        new Intl.DateTimeFormat(locale, {
+            dateStyle: 'medium',
+            timeZone: invitation.timezone,
+        }).format(new Date(invitation.expiresAt));
 
     return (
         <>
@@ -78,7 +84,10 @@ export default function Staff({
                                         <Label htmlFor="location_id">
                                             {t('Location')}
                                         </Label>
-                                        <Select name="location_id">
+                                        <Select
+                                            name="location_id"
+                                            defaultValue="all"
+                                        >
                                             <SelectTrigger
                                                 id="location_id"
                                                 className="w-full"
@@ -90,6 +99,9 @@ export default function Staff({
                                                 />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="all">
+                                                    {t('Every location')}
+                                                </SelectItem>
                                                 {locations.map((location) => (
                                                     <SelectItem
                                                         key={location.id}
@@ -141,9 +153,7 @@ export default function Staff({
                                             t('Every location')}
                                         {' · '}
                                         {t('Link works until :date', {
-                                            date: date.format(
-                                                new Date(invitation.expiresAt),
-                                            ),
+                                            date: date(invitation),
                                         })}
                                     </span>
                                 </li>

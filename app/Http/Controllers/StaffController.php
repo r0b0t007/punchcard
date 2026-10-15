@@ -35,13 +35,16 @@ final class StaffController extends Controller
         }
 
         Gate::authorize('viewAny', [BusinessMember::class, $business]);
+        $locations = Location::query()->where('business_id', $business->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name', 'timezone']);
+        // An invitation to the whole business reads in its first location's time (times show in the location's timezone).
+        $businessTimezone = $locations->sortBy('id')->first()->timezone ?? config('app.timezone');
 
         return Inertia::render('business/staff', [
-            'locations' => Location::query()->where('business_id', $business->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name']),
+            'locations' => $locations->map(fn (Location $location): array => ['id' => $location->id, 'name' => $location->name])->values(),
             'invitations' => StaffInvitation::query()
                 ->where('business_id', $business->id)
                 ->pending()
-                ->with('location:id,name')
+                ->with('location:id,name,timezone')
                 ->latest('id')
                 ->get()
                 ->map(fn (StaffInvitation $invitation): array => [
@@ -49,6 +52,7 @@ final class StaffController extends Controller
                     'email' => $invitation->email,
                     'location' => $invitation->location?->name,
                     'expiresAt' => $invitation->expires_at->toIso8601String(),
+                    'timezone' => $invitation->location->timezone ?? $businessTimezone,
                 ]),
         ]);
     }

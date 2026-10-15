@@ -77,5 +77,10 @@ class InviteStaffRequest extends FormRequest
         if (is_string($this->input('email'))) {
             $this->merge(['email' => User::normalizeEmail($this->input('email'))]);
         }
+
+        // The form's "Every location" choice: the whole business.
+        if ($this->input('location_id') === 'all') {
+            $this->merge(['location_id' => null]);
+        }
     }
 }

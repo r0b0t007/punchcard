@@ -13,8 +13,8 @@ use Throwable;
 
 /**
  * Joins a business's staff from an invitation's link (CHW-146), all or
- * nothing: someone new gets their account first (the invited address,
- * confirmed: the link came to its inbox), an account without a password
+ * nothing: someone new gets their account first (the invited address), an
+ * account without a password
  * chooses one (staff never sign in by email link), then the account joins
  * (AcceptStaffInvitation). Should the invitation stop working meanwhile
  * (used in another tab, replaced, the site closed), none of it stays. The
@@ -38,8 +38,8 @@ final readonly class JoinStaff
 
         try {
             if ($state === DescribeStaffInvitation::SIGN_UP) {
+                // Confirmed as it joins (AcceptStaffInvitation): the link came to its inbox.
                 $user = $this->createNewUser->create([...$input, 'email' => $invitation->email]);
-                $user->markEmailAsVerified();
             }
 
             if (! $user instanceof User) {

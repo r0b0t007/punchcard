@@ -9,8 +9,8 @@ use App\Models\User;
 
 /**
  * What an invitation's page asks of whoever opened it (CHW-146): the invited
- * address, signed in, joins, choosing a password first if it has none (staff
- * never sign in by email link, MaySignInByLink); another account can't use
+ * address, signed in, joins, choosing a password first if it has neither one
+ * nor a passkey (staff never sign in by email link, MaySignInByLink); another account can't use
  * it; a guest signs in to the address's account, or signs up with it.
  */
 final readonly class DescribeStaffInvitation
@@ -31,7 +31,7 @@ final readonly class DescribeStaffInvitation
         if ($user instanceof User) {
             return match (true) {
                 $user->email !== $invitation->email => self::OTHER_ACCOUNT,
-                $user->hasPassword() => self::JOIN,
+                $user->hasPassword() || $user->passkeys()->exists() => self::JOIN,
                 default => self::CHOOSE_PASSWORD,
             };
         }

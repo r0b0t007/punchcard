@@ -85,7 +85,9 @@ class StaffInvitation extends Model implements TenantModel
     /** @return Builder<static> */
     public function prunable(): Builder
     {
-        return static::query()->where('expires_at', '<', now()->subMonth());
+        return static::query()->where(fn (Builder $query) => $query
+            ->where('expires_at', '<', now()->subMonth())
+            ->orWhere('accepted_at', '<', now()->subMonth()));
     }
 
     /** The scheduled model:prune runs outside a tenant: every business's old invitations, in bypass(). */
