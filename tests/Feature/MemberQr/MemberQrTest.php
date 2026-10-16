@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Account\DeleteAccount;
 use App\Actions\MemberQr\MemberQrRefusal;
 use App\Actions\MemberQr\MemberQrRefused;
+use App\Actions\MemberQr\MemberQrScan;
 use App\Actions\MemberQr\VerifyMemberQr;
 use App\Models\User;
 use App\Support\MemberQr\MemberQrToken;
@@ -58,10 +59,10 @@ it('accepts the previous window\'s code only in the next one\'s first seconds, n
     // Shown at 10:00:05, in the window from 10:00:00; the next starts at 10:00:30.
     $token = MemberQrToken::issue($this->customer)['token'];
 
-    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(VerifyMemberQr::GRACE_SECONDS - 1));
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(MemberQrScan::GRACE_SECONDS - 1));
     expect(($this->refusalOf)($token, 'card:previous'))->toBeNull();
 
-    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(VerifyMemberQr::GRACE_SECONDS));
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(MemberQrScan::GRACE_SECONDS));
     expect(($this->refusalOf)($token, 'card:late'))->toBe(MemberQrRefusal::Expired);
 
     $later = MemberQrToken::issue($this->customer, now()->addSeconds(30))['token'];
@@ -131,4 +132,16 @@ it('still refuses the next code for the same card when the first was scanned as 
 
     $this->travelTo(Carbon::parse('2026-10-16 10:00:46'));
     expect(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:1'))->toBe(MemberQrRefusal::Replayed);
+});
+
+it('makes a scan only out of a checked token: no other way to one', function (): void {
+    $class = new ReflectionClass(MemberQrScan::class);
+    $makers = array_filter(
+        $class->getMethods(ReflectionMethod::IS_PUBLIC),
+        fn (ReflectionMethod $method): bool => $method->getReturnType() instanceof ReflectionNamedType
+            && in_array($method->getReturnType()->getName(), ['self', 'static', MemberQrScan::class], true),
+    );
+
+    expect($class->getConstructor()?->isPrivate())->toBeTrue()
+        ->and(array_values(array_map(fn (ReflectionMethod $method): string => $method->getName(), $makers)))->toBe(['fromToken']);
 });

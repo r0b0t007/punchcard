@@ -4,25 +4,84 @@ declare(strict_types=1);
 
 namespace App\Actions\MemberQr;
 
+use App\Models\User;
+use App\Support\MemberQr\MemberQrToken;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
+use SensitiveParameter;
 
 /**
- * A member QR that counts (VerifyMemberQr, CHW-28): whose it is, the window
- * it was shown in, and when it was scanned, for the stamp or redemption it
- * proves presence for (CHW-30). Made only by VerifyMemberQr, so holding one
- * means the code was checked: a request can never pass one in.
+ * A member QR that counts (CHW-28): whose it is, the window it was shown
+ * in, and when it was scanned, for the stamp or redemption it proves
+ * presence for (CHW-30). The only way to get one is fromToken(), which
+ * checks the scanned token itself: there is no other way in, so no code
+ * can make a scan out of a request's values, only out of a real QR.
+ *
+ * It counts when it is a real token (MemberQrToken) of a customer whose
+ * account still exists, from the current window, or the previous one
+ * during the first GRACE_SECONDS of this one (a code scanned as it
+ * changed): never more than window + grace old. Used once per customer and
+ * scope while a code of theirs can count: the caller names the scope (the
+ * card it stamps on, the reward it redeems), so a second scan for it, of
+ * this code or of the next one shown meanwhile (a screenshot passed on, a
+ * double scan), is refused. The use is kept in the cache until then.
+ * Always by the server's clock. VerifyMemberQr is the Action callers use.
  */
 final readonly class MemberQrScan
 {
+    /** How long into a window the previous window's code still counts. */
+    public const int GRACE_SECONDS = 10;
+
     private function __construct(
         public int $userId,
         public int $window,
         public CarbonImmutable $scannedAt,
     ) {}
 
-    /** @internal VerifyMemberQr only. */
-    public static function verified(int $userId, int $window, CarbonImmutable $scannedAt): self
+    /**
+     * How long a use is remembered: two windows and the grace, the longest any code of the customer's shown by
+     * then can count, and a little slack.
+     */
+    public static function rememberedSeconds(): int
     {
-        return new self($userId, $window, $scannedAt);
+        return 2 * MemberQrToken::windowSeconds() + self::GRACE_SECONDS + 5;
+    }
+
+    /**
+     * The scan of a token, if it counts for this scope; else MemberQrRefused, saying why.
+     *
+     * @throws MemberQrRefused
+     */
+    public static function fromToken(#[SensitiveParameter] string $token, string $scope): self
+    {
+        $at = CarbonImmutable::now();
+        $fields = MemberQrToken::fields($token) ?? throw new MemberQrRefused(MemberQrRefusal::Malformed);
+
+        if (! MemberQrToken::authentic($fields)) {
+            throw new MemberQrRefused(MemberQrRefusal::Forged);
+        }
+
+        $now = MemberQrToken::windowAt($at);
+        $intoWindow = $at->getTimestamp() - $now * MemberQrToken::windowSeconds();
+        $current = $fields['window'] === $now;
+        $justBefore = $fields['window'] === $now - 1 && $intoWindow < self::GRACE_SECONDS;
+
+        if (! $current && ! $justBefore) {
+            throw new MemberQrRefused(MemberQrRefusal::Expired);
+        }
+
+        $user = User::query()->find($fields['userId']);
+
+        if (! $user instanceof User || $user->isAnonymised()) {
+            throw new MemberQrRefused(MemberQrRefusal::UnknownUser);
+        }
+
+        // Kept while any code of theirs shown by then could still count: the next window's code lasts until two
+        // windows and a grace from the start of this one, at the latest.
+        if (! Cache::add('member-qr:'.$fields['userId'].':'.$scope, true, $at->addSeconds(self::rememberedSeconds()))) {
+            throw new MemberQrRefused(MemberQrRefusal::Replayed);
+        }
+
+        return new self($fields['userId'], $fields['window'], $at);
     }
 }
