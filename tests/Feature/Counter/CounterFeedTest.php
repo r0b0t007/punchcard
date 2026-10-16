@@ -10,7 +10,6 @@ use App\Models\Location;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
-use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Tenants;
 
