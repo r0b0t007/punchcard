@@ -728,5 +728,7 @@
     "No stamper here yet: it appears once it is placed.": "لا يوجد جهاز ختم هنا بعد: يظهر بعد تركيبه.",
     "No tap yet": "لا نقرات بعد",
     "This stamper can't be armed now: it is off, or the site is closed.": "لا يمكن تجهيز جهاز الختم هذا الآن: إنه متوقف، أو الموقع مغلق.",
-    "This stamper is off.": "جهاز الختم هذا متوقف."
+    "This stamper is off.": "جهاز الختم هذا متوقف.",
+    "Last stamps": "آخر الأختام",
+    "No stamp here yet.": "لا أختام هنا بعد."
 }

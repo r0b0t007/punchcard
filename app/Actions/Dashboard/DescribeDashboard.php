@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Dashboard;
 
+use App\Actions\Stamps\RecentStamps;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
@@ -48,12 +49,14 @@ final readonly class DescribeDashboard
 
     private const int LISTED = 10;
 
+    public function __construct(private RecentStamps $recentStamps) {}
+
     /**
      * @param  int|null  $locationId  one of the business's open locations; any other id means all of them
      * @return array{
      *     kpis: array{activeCustomers: array{value: int, change: ?int}, visits: array{value: int, change: ?int}, returnRate: array{value: int, change: ?int}, rewardsRedeemed: array{value: int, change: ?int}},
      *     visitsPerDay: list<array{date: string, visits: int}>,
-     *     recentStamps: list<array{id: int, customer: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>,
+     *     recentStamps: list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>,
      *     topCustomers: list<array{id: int, name: string, visits: int, lastVisit: string}>,
      *     locations: list<array{id: int, name: string}>,
      *     location: ?int,
@@ -88,7 +91,7 @@ final readonly class DescribeDashboard
                 'date' => $today->addDays($day - self::DAYS + 1)->format('Y-m-d'),
                 'visits' => $current['perDay'][$day] ?? 0,
             ], range(0, self::DAYS - 1)),
-            'recentStamps' => $this->recentStamps($business, $location?->id, $now),
+            'recentStamps' => $this->recentStamps->handle($business, $location?->id, $now),
             'topCustomers' => $this->topCustomers($visits, $timezone),
             'locations' => array_values($locations->map(fn (Location $open): array => ['id' => $open->id, 'name' => $open->name])->all()),
             'location' => $location?->id,
@@ -194,34 +197,6 @@ final readonly class DescribeDashboard
             'previous' => $redeemed($midnights[0], $midnights[self::DAYS]),
             'current' => $redeemed($midnights[self::DAYS], $midnights[count($midnights) - 1]),
         ];
-    }
-
-    /**
-     * The latest stamps here, newest first. A customer the user may not see
-     * (CardEnrollment's scope) shows without a name.
-     *
-     * @return list<array{id: int, customer: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>
-     */
-    private function recentStamps(Business $business, ?int $locationId, CarbonImmutable $now): array
-    {
-        return array_values(StampEvent::query()
-            ->where('business_id', $business->id)
-            ->when($locationId !== null, fn ($query) => $query->where('location_id', $locationId))
-            ->with(['enrollment.user:id,name', 'location:id,name,timezone'])
-            ->latest('created_at')
-            ->latest('id')
-            ->limit(self::LISTED)
-            ->get()
-            ->map(fn (StampEvent $event): array => [
-                'id' => $event->id,
-                'customer' => $event->enrollment?->user?->name,
-                'location' => $event->location?->name,
-                'source' => $event->source->value,
-                'sourceLabel' => $event->source->getLabel(),
-                'qty' => $event->qty,
-                'at' => LocalMoment::of($event->created_at, LocalMoment::timezoneOf($event->location), $now),
-            ])
-            ->all());
     }
 
     /**

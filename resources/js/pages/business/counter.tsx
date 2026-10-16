@@ -9,6 +9,17 @@ import { dashboard } from '@/routes';
 import { arm, disarm } from '@/routes/counter';
 import { edit as settings } from '@/routes/profile';
 
+type FeedStamp = {
+    id: number;
+    /** First name, or null for a customer the business can't see. */
+    customer: string | null;
+    card: string | null;
+    location: string | null;
+    sourceLabel: string;
+    qty: number;
+    at: { day: 'today' | 'other'; date: string; time: string };
+};
+
 type CounterStamper = {
     id: number;
     label: string | null;
@@ -24,25 +35,28 @@ type CounterStamper = {
 /**
  * S1, counter mode (CHW-29): built for a morning rush, at arm's length on a
  * phone or a tablet. Each stamper the user may arm, its last tap, and "Next
- * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel".
- * The stampers refresh every POLL_MS: an arming a tap took, or one made on
- * another phone, shows within seconds.
+ * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel";
+ * then the last stamps given here, as they land. Stampers and feed refresh
+ * every POLL_MS: an arming a tap took, or one made on another phone, and each
+ * new stamp show within seconds.
  */
 export default function Counter({
     businessName,
     stampers,
+    feed,
     armSeconds,
     quantities,
 }: {
     businessName: string;
     stampers: CounterStamper[];
+    feed: FeedStamp[];
     armSeconds: number;
     quantities: number[];
 }) {
     const { t } = useTranslation();
     const { nav, errors } = usePage<{ errors: Record<string, string> }>().props;
 
-    usePoll(POLL_MS, { only: ['stampers'] });
+    usePoll(POLL_MS, { only: ['stampers', 'feed'] });
 
     return (
         <>
@@ -89,6 +103,58 @@ export default function Counter({
                         ))}
                     </div>
                 )}
+
+                <section
+                    aria-labelledby="counter-feed"
+                    className="mx-auto mt-8 max-w-5xl"
+                >
+                    <h2
+                        id="counter-feed"
+                        className="mb-3 text-lg font-semibold"
+                    >
+                        {t('Last stamps')}
+                    </h2>
+                    {feed.length === 0 ? (
+                        <p className="text-muted-foreground">
+                            {t('No stamp here yet.')}
+                        </p>
+                    ) : (
+                        <ul
+                            className="divide-y rounded-2xl border bg-card text-card-foreground"
+                            data-test="counter-feed"
+                        >
+                            {feed.map((stamp) => (
+                                <li
+                                    key={stamp.id}
+                                    className="flex items-center gap-4 p-4"
+                                >
+                                    <span className="w-12 shrink-0 text-xl font-bold tabular-nums">
+                                        <bdi dir="ltr">+{stamp.qty}</bdi>
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate font-medium">
+                                            {stamp.customer ?? t('A customer')}
+                                            {stamp.card
+                                                ? ` · ${stamp.card}`
+                                                : null}
+                                        </p>
+                                        <p className="truncate text-sm text-muted-foreground">
+                                            {stamp.sourceLabel}
+                                            {stamp.location
+                                                ? ` · ${stamp.location}`
+                                                : null}
+                                        </p>
+                                    </div>
+                                    <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+                                        {stamp.at.day === 'today'
+                                            ? stamp.at.time
+                                            : stamp.at.date}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
             </div>
         </>
     );
