@@ -20,7 +20,8 @@ void createInertiaApp({
     layout: (name, page) => {
         switch (true) {
             // The customer's home and rewards (CHW-27): full screen with the bottom tab bar.
-            case name.startsWith('app/') || name === 'rewards/index':
+            case (name.startsWith('app/') && name !== 'app/qr') ||
+                name === 'rewards/index':
                 return [I18nLayout, CustomerLayout];
             case name === 'welcome' ||
                 name.startsWith('dev/') ||
@@ -30,6 +31,8 @@ void createInertiaApp({
                 // The join page and the printable QR stand (CHW-31): full screen.
                 name.startsWith('join/') ||
                 name === 'business/qr-stand' ||
+                // "My QR" (CHW-28, C10): full screen, the code alone.
+                name === 'app/qr' ||
                 // Counter mode (CHW-29, S1): full screen, for the counter's tablet or phone.
                 name === 'business/counter':
                 return I18nLayout;

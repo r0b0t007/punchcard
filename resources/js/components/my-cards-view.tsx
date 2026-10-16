@@ -1,11 +1,18 @@
 import { Link } from '@inertiajs/react';
-import { ChevronRight, CloudOff, Gift, SmartphoneNfc } from 'lucide-react';
+import {
+    ChevronRight,
+    CloudOff,
+    Gift,
+    SmartphoneNfc,
+    QrCode,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { show } from '@/routes/app/cards';
+import { qr as memberQr } from '@/routes/app';
 import { index as rewards } from '@/routes/rewards';
 import type { MyCard } from '@/types/my-cards';
 
@@ -66,15 +73,28 @@ export default function MyCardsView({
                 </section>
             ) : null}
 
-            <header className="flex flex-col gap-1">
-                <h1 className="font-display text-2xl font-bold">
-                    {firstName
-                        ? t('Hello :name', { name: firstName })
-                        : t('Hello')}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                    {t('Your loyalty cards')}
-                </p>
+            <header className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                    <h1 className="font-display text-2xl font-bold">
+                        {firstName
+                            ? t('Hello :name', { name: firstName })
+                            : t('Hello')}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        {t('Your loyalty cards')}
+                    </p>
+                </div>
+                {/* "My QR" (CHW-28, C10), for a phone without NFC; the code comes from the server, so never offline. */}
+                {offline ? null : (
+                    <Link
+                        href={memberQr()}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
+                        data-test="my-qr-link"
+                    >
+                        <QrCode aria-hidden="true" className="size-4" />
+                        {t('My QR')}
+                    </Link>
+                )}
             </header>
 
             {rewardsReady > 0 ? (
