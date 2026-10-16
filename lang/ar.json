@@ -712,5 +712,10 @@
     "They can no longer stamp or redeem here. Their account and the stamps they gave stay.": "لن يستطيع الختم أو استبدال المكافآت هنا بعد الآن. يبقى حسابه والأختام التي منحها.",
     "Removed from your staff.": "تمت الإزالة من فريقك.",
     "Invitation cancelled.": "تم إلغاء الدعوة.",
-    "They stamp cards and redeem rewards at the counter.": "يختمون البطاقات ويستبدلون المكافآت عند الشباك."
+    "They stamp cards and redeem rewards at the counter.": "يختمون البطاقات ويستبدلون المكافآت عند الشباك.",
+    "Cancel the invitation to :email?": "إلغاء الدعوة المرسلة إلى :email؟",
+    "Its link stops working. You can invite them again later.": "سيتوقف رابطها عن العمل. يمكنك دعوته مجددًا لاحقًا.",
+    "Cancel the invitation": "إلغاء الدعوة",
+    "Keep it": "الإبقاء عليها",
+    "That invitation was already used or has run out.": "هذه الدعوة استُخدمت بالفعل أو انتهت صلاحيتها."
 }

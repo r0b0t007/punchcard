@@ -50,7 +50,9 @@ final readonly class DescribeStaffPage
         return [
             'members' => $memberships
                 ->filter(fn (BusinessMember $membership): bool => $users->has($membership->user_id))
-                ->sortBy(fn (BusinessMember $membership): string => ($membership->role === BusinessRole::Owner ? '0' : '1').$users->get($membership->user_id)?->name)
+                // Owners first, then by name, whatever its case or script.
+                ->sort(fn (BusinessMember $a, BusinessMember $b): int => [$a->role !== BusinessRole::Owner, mb_strtolower((string) $users->get($a->user_id)?->name)]
+                    <=> [$b->role !== BusinessRole::Owner, mb_strtolower((string) $users->get($b->user_id)?->name)])
                 ->map(function (BusinessMember $membership) use ($users, $memberLocations): array {
                     /** @var User $user */
                     $user = $users->get($membership->user_id);

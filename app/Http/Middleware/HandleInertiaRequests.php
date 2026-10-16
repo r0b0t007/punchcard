@@ -3,8 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Actions\Tenancy\HasMemberships;
-use App\Models\Business;
-use App\Models\BusinessMember;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\PasskeyOffer;
@@ -79,12 +77,14 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    /** Whether the user runs the business worked in, so manages its staff; no business, no staff page. */
+    /**
+     * Whether the user runs the business worked in, so manages its staff (BusinessMemberPolicy::viewAny, read
+     * from the tenant with no query); no business, no staff page.
+     */
     private function managesStaff(Request $request): bool
     {
-        $businessId = app(TenantContext::class)->businessId();
-        $business = $businessId === null ? null : Business::query()->find($businessId);
+        $context = app(TenantContext::class);
 
-        return $business instanceof Business && ($request->user()?->can('viewAny', [BusinessMember::class, $business]) ?? false);
+        return $request->user() instanceof User && $context->businessId() !== null && $context->canManageMembers();
     }
 }

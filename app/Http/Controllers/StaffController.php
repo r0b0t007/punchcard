@@ -8,7 +8,6 @@ use App\Actions\Staff\CancelStaffInvitation;
 use App\Actions\Staff\DescribeStaffPage;
 use App\Actions\Staff\InviteStaff;
 use App\Actions\Staff\RemoveStaffMember;
-use App\Enums\BusinessRole;
 use App\Http\Requests\Staff\InviteStaffRequest;
 use App\Models\Business;
 use App\Models\BusinessMember;
@@ -61,11 +60,12 @@ final class StaffController extends Controller
     public function cancelInvitation(int $invitation, TenantContext $context, CancelStaffInvitation $cancelStaffInvitation): RedirectResponse
     {
         $business = $this->business($context);
-        $pending = StaffInvitation::query()->whereKey($invitation)->where('business_id', $business->id)->pending()->first() ?? abort(404);
-        Gate::authorize('create', [BusinessMember::class, $business]);
+        $staffInvitation = StaffInvitation::query()->whereKey($invitation)->where('business_id', $business->id)->first() ?? abort(404);
+        Gate::authorize('delete', $staffInvitation);
 
-        $cancelStaffInvitation->handle($pending);
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Invitation cancelled.')]);
+        Inertia::flash('toast', $cancelStaffInvitation->handle($staffInvitation)
+            ? ['type' => 'success', 'message' => __('Invitation cancelled.')]
+            : ['type' => 'error', 'message' => __('That invitation was already used or has run out.')]);
 
         return to_route('staff.index');
     }
@@ -76,12 +76,11 @@ final class StaffController extends Controller
         $membership = BusinessMember::query()->whereKey($member)->where('business_id', $business->id)->first() ?? abort(404);
         Gate::authorize('delete', $membership);
 
-        // Owners are handed over (CHW-140), never removed from this page.
-        if ($membership->role !== BusinessRole::Staff) {
+        // Staff only (RemoveStaffMember): an owner is handed over (CHW-140), never removed here.
+        if (! $removeStaffMember->handle($membership)) {
             abort(403);
         }
 
-        $removeStaffMember->handle($membership);
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Removed from your staff.')]);
 
         return to_route('staff.index');

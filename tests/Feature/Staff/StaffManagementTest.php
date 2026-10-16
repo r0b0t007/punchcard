@@ -128,3 +128,31 @@ it('shows the staff page in the sidebar to the owner only', function (): void {
     ($this->as)($this->staff, $this->tenants->a1)->get(route('dashboard'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('nav.staff', false));
 });
+
+it('lists owners first, then by name whatever its case, never by a number in it', function (): void {
+    $this->tenants->member(User::factory()->create(['name' => '9999']), $this->tenants->a1, BusinessRole::Owner);
+    $this->tenants->member(User::factory()->create(['name' => '11']), $this->tenants->a1);
+    $this->tenants->member(User::factory()->create(['name' => 'alice']), $this->tenants->a1);
+    $this->tenants->member(User::factory()->create(['name' => 'Zoe']), $this->tenants->a1);
+
+    ($this->as)($this->owner, $this->tenants->a1)->get(route('staff.index'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('members', fn ($members): bool => collect($members)->pluck('name')->all() === ['9999', 'Nour Owner', '11', 'alice', 'Karim Staff', 'Zoe']));
+});
+
+it('keeps an invitation used meanwhile, with its member, when the owner cancels it', function (): void {
+    $nadia = User::factory()->create(['email' => 'nadia@example.test']);
+    ($this->as)($this->owner, $this->tenants->a1)->post(route('staff.invitations.store'), ['email' => 'nadia@example.test']);
+    $urls = new ArrayObject;
+    Notification::assertSentOnDemand(StaffInvitationMail::class, function (StaffInvitationMail $mail) use ($urls): bool {
+        $urls[] = $mail->url;
+
+        return true;
+    });
+    $invitation = $this->context->bypass(fn () => StaffInvitation::query()->sole());
+    $this->actingAs($nadia)->post((string) $urls[0])->assertRedirect(route('dashboard'));
+
+    ($this->as)($this->owner, $this->tenants->a1)->delete(route('staff.invitations.destroy', $invitation->id))->assertRedirect(route('staff.index'));
+
+    expect($this->context->bypass(fn () => StaffInvitation::query()->whereKey($invitation->id)->exists()))->toBeTrue()
+        ->and(($this->membershipOf)($nadia, $this->tenants->a1))->not->toBeNull();
+});

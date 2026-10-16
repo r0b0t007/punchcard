@@ -712,5 +712,10 @@
     "They can no longer stamp or redeem here. Their account and the stamps they gave stay.": "Cette personne ne pourra plus tamponner ni valider de récompenses ici. Son compte et les tampons donnés restent.",
     "Removed from your staff.": "Retiré de votre équipe.",
     "Invitation cancelled.": "Invitation annulée.",
-    "They stamp cards and redeem rewards at the counter.": "Elle tamponne les cartes et valide les récompenses au comptoir."
+    "They stamp cards and redeem rewards at the counter.": "Elle tamponne les cartes et valide les récompenses au comptoir.",
+    "Cancel the invitation to :email?": "Annuler l’invitation envoyée à :email ?",
+    "Its link stops working. You can invite them again later.": "Son lien ne fonctionnera plus. Vous pourrez réinviter cette personne plus tard.",
+    "Cancel the invitation": "Annuler l’invitation",
+    "Keep it": "La garder",
+    "That invitation was already used or has run out.": "Cette invitation a déjà été utilisée ou a expiré."
 }

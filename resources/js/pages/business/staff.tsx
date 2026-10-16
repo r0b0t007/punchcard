@@ -1,4 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
 import { destroy, index } from '@/routes/staff';
 import { destroy as cancelInvitation, store } from '@/routes/staff/invitations';
+import type { RouteDefinition } from '@/wayfinder';
 
 type Member = {
     /** The membership's id (business_user), which removing it names. */
@@ -98,7 +100,20 @@ export default function Staff({
                                     </span>
                                 </div>
                                 {member.removable ? (
-                                    <RemoveMember member={member} />
+                                    <ConfirmAction
+                                        trigger={t('Remove')}
+                                        title={t(
+                                            'Remove :name from your staff?',
+                                            { name: member.name },
+                                        )}
+                                        description={t(
+                                            'They can no longer stamp or redeem here. Their account and the stamps they gave stay.',
+                                        )}
+                                        confirmLabel={t('Remove')}
+                                        keepLabel={t('Cancel')}
+                                        href={destroy(member.id)}
+                                        test="remove-member"
+                                    />
                                 ) : null}
                             </li>
                         ))}
@@ -216,18 +231,22 @@ export default function Staff({
                                             })}
                                         </span>
                                     </div>
-                                    <Button asChild variant="ghost" size="sm">
-                                        <Link
-                                            href={cancelInvitation(
-                                                invitation.id,
-                                            )}
-                                            as="button"
-                                            preserveScroll
-                                            data-test="cancel-invitation"
-                                        >
-                                            {t('Cancel')}
-                                        </Link>
-                                    </Button>
+                                    <ConfirmAction
+                                        trigger={t('Cancel')}
+                                        title={t(
+                                            'Cancel the invitation to :email?',
+                                            { email: invitation.email },
+                                        )}
+                                        description={t(
+                                            'Its link stops working. You can invite them again later.',
+                                        )}
+                                        confirmLabel={t(
+                                            'Cancel the invitation',
+                                        )}
+                                        keepLabel={t('Keep it')}
+                                        href={cancelInvitation(invitation.id)}
+                                        test="cancel-invitation"
+                                    />
                                 </li>
                             ))}
                         </ul>
@@ -238,38 +257,54 @@ export default function Staff({
     );
 }
 
-/** Removing a staff member, once confirmed: their membership ends, their account stays. */
-function RemoveMember({ member }: { member: Member }) {
-    const { t } = useTranslation();
+/**
+ * A destructive action behind a confirmation (removing staff, cancelling an
+ * invitation). The dialog closes as the request starts: the row it sits in
+ * is gone once it succeeds, and an open dialog must never outlive it (it
+ * would leave the page untappable).
+ */
+function ConfirmAction({
+    trigger,
+    title,
+    description,
+    confirmLabel,
+    keepLabel,
+    href,
+    test,
+}: {
+    trigger: string;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    keepLabel: string;
+    href: RouteDefinition<'delete'>;
+    test: string;
+}) {
+    const [open, setOpen] = useState(false);
 
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" data-test="remove-member">
-                    {t('Remove')}
+                <Button variant="ghost" size="sm" data-test={test}>
+                    {trigger}
                 </Button>
             </DialogTrigger>
             <DialogContent>
-                <DialogTitle>
-                    {t('Remove :name from your staff?', { name: member.name })}
-                </DialogTitle>
-                <DialogDescription>
-                    {t(
-                        'They can no longer stamp or redeem here. Their account and the stamps they gave stay.',
-                    )}
-                </DialogDescription>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
                 <DialogFooter>
                     <DialogClose asChild>
-                        <Button variant="secondary">{t('Cancel')}</Button>
+                        <Button variant="secondary">{keepLabel}</Button>
                     </DialogClose>
                     <Button variant="destructive" asChild>
                         <Link
-                            href={destroy(member.id)}
+                            href={href}
                             as="button"
                             preserveScroll
-                            data-test="confirm-remove-member"
+                            onStart={() => setOpen(false)}
+                            data-test={`confirm-${test}`}
                         >
-                            {t('Remove')}
+                            {confirmLabel}
                         </Link>
                     </Button>
                 </DialogFooter>

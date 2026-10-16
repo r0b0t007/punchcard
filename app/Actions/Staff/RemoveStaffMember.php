@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace App\Actions\Staff;
 
-use App\Models\Business;
+use App\Enums\BusinessRole;
 use App\Models\BusinessMember;
 
 /**
  * Takes a staff member off a business's staff (CHW-146): their membership
  * ends, their account stays (their stamps keep their name, and they may
- * belong to other businesses or collect stamps themselves). Through the
- * guarded pivot (Business::members()), in the owner's tenant. Their next
- * request is no longer in this business (ResolveTenant).
+ * belong to other businesses or collect stamps themselves). Staff only, in
+ * the same statement that deletes, so an owner (or someone made one
+ * meanwhile) is never removed here: owners are handed over (CHW-140).
+ * Through the guarded pivot model, in the owner's tenant. Their next
+ * request is no longer in this business (ResolveTenant). Whether they were
+ * removed.
  */
 final readonly class RemoveStaffMember
 {
-    public function handle(BusinessMember $membership): void
+    public function handle(BusinessMember $membership): bool
     {
-        Business::query()->findOrFail($membership->business_id)->members()->detach($membership->user_id);
+        return BusinessMember::query()->whereKey($membership->id)->where('role', BusinessRole::Staff)->delete() === 1;
     }
 }
