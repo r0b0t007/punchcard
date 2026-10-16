@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Stamps\RecentStamps;
 use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
@@ -9,6 +10,7 @@ use App\Models\BusinessMember;
 use App\Models\Location;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Tenants;
@@ -94,4 +96,24 @@ it('keeps full names on the owner\'s dashboard feed', function (): void {
     ($this->as)($owner)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
         ->where('stats.recentStamps.0.customer', 'Salma Tazi')
         ->where('stats.recentStamps.0.card', 'A card'));
+});
+
+it('takes the first word of any name, and no name from a blank one', function (): void {
+    ($this->stampFor)("Salma\u{00A0}Tazi", $this->tenants->a1, ['created_at' => now()->subMinute()]);
+    ($this->stampFor)('   ', $this->tenants->a1);
+
+    ($this->feed)($this->staff)->assertInertia(fn (Assert $page): Assert => $page
+        ->where('feed.0.customer', null)
+        ->where('feed.1.customer', 'Salma'));
+});
+
+it('keeps staff to their location whatever the feed is asked for', function (): void {
+    $terrace = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace']));
+    ($this->stampFor)('Main Room', $this->tenants->a1);
+    ($this->stampFor)('Terrace Guest', $this->tenants->a1, ['location_id' => $terrace->id]);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff, locationId: $terrace->id);
+
+    $feed = app(RecentStamps::class)->handle($this->tenants->a1, null, CarbonImmutable::now(), firstNames: true);
+
+    expect(array_column($feed, 'customer'))->toBe(['Terrace']);
 });

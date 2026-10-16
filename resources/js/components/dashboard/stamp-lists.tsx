@@ -3,11 +3,17 @@ import { useTranslation } from '@/hooks/use-translation';
 import { calendarDate, momentLabel } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 
-/** The latest stamps here, newest first; a correction shows as a minus. */
+/**
+ * The latest stamps here, newest first, with the customer and their card; a
+ * correction shows as a minus. The owner's dashboard (B3), and counter mode's
+ * live feed (S1, CHW-29), larger to read at arm's length.
+ */
 export function RecentStamps({
     stamps,
+    large = false,
 }: {
     stamps: DashboardStats['recentStamps'];
+    large?: boolean;
 }) {
     const { t, locale } = useTranslation();
 
@@ -24,13 +30,27 @@ export function RecentStamps({
             {stamps.map((stamp) => (
                 <li
                     key={stamp.id}
-                    className="flex items-center justify-between gap-3 py-2"
+                    className={cn(
+                        'flex items-center justify-between gap-3',
+                        large ? 'py-3' : 'py-2',
+                    )}
                 >
                     <div className="min-w-0">
-                        <p className="truncate font-medium">
+                        <p
+                            className={cn(
+                                'truncate font-medium',
+                                large && 'text-lg',
+                            )}
+                        >
                             {stamp.customer ?? t('A customer')}
+                            {stamp.card ? ` · ${stamp.card}` : null}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p
+                            className={cn(
+                                'truncate text-muted-foreground',
+                                large ? 'text-sm' : 'text-xs',
+                            )}
+                        >
                             {[
                                 stamp.sourceLabel,
                                 stamp.location,
@@ -50,6 +70,7 @@ export function RecentStamps({
                         dir="ltr"
                         className={cn(
                             'shrink-0 font-display font-bold tabular-nums',
+                            large && 'text-2xl',
                             stamp.qty < 0 && 'text-destructive',
                         )}
                     >

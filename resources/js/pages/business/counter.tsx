@@ -1,5 +1,7 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { useCallback, useSyncExternalStore } from 'react';
+import { RecentStamps } from '@/components/dashboard/stamp-lists';
+import type { DashboardStats } from '@/components/dashboard/types';
 import InputError from '@/components/input-error';
 import CountdownRing from '@/components/rewards/countdown-ring';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -8,17 +10,6 @@ import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { arm, disarm } from '@/routes/counter';
 import { edit as settings } from '@/routes/profile';
-
-type FeedStamp = {
-    id: number;
-    /** First name, or null for a customer the business can't see. */
-    customer: string | null;
-    card: string | null;
-    location: string | null;
-    sourceLabel: string;
-    qty: number;
-    at: { day: 'today' | 'other'; date: string; time: string };
-};
 
 type CounterStamper = {
     id: number;
@@ -49,7 +40,7 @@ export default function Counter({
 }: {
     businessName: string;
     stampers: CounterStamper[];
-    feed: FeedStamp[];
+    feed: DashboardStats['recentStamps'];
     armSeconds: number;
     quantities: number[];
 }) {
@@ -114,46 +105,12 @@ export default function Counter({
                     >
                         {t('Last stamps')}
                     </h2>
-                    {feed.length === 0 ? (
-                        <p className="text-muted-foreground">
-                            {t('No stamp here yet.')}
-                        </p>
-                    ) : (
-                        <ul
-                            className="divide-y rounded-2xl border bg-card text-card-foreground"
-                            data-test="counter-feed"
-                        >
-                            {feed.map((stamp) => (
-                                <li
-                                    key={stamp.id}
-                                    className="flex items-center gap-4 p-4"
-                                >
-                                    <span className="w-12 shrink-0 text-xl font-bold tabular-nums">
-                                        <bdi dir="ltr">+{stamp.qty}</bdi>
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate font-medium">
-                                            {stamp.customer ?? t('A customer')}
-                                            {stamp.card
-                                                ? ` · ${stamp.card}`
-                                                : null}
-                                        </p>
-                                        <p className="truncate text-sm text-muted-foreground">
-                                            {stamp.sourceLabel}
-                                            {stamp.location
-                                                ? ` · ${stamp.location}`
-                                                : null}
-                                        </p>
-                                    </div>
-                                    <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
-                                        {stamp.at.day === 'today'
-                                            ? stamp.at.time
-                                            : stamp.at.date}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <div
+                        className="rounded-2xl border bg-card px-4 text-card-foreground"
+                        data-test="counter-feed"
+                    >
+                        <RecentStamps stamps={feed} large />
+                    </div>
                 </section>
             </div>
         </>

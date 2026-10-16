@@ -10,7 +10,6 @@ use App\Actions\Counter\DisarmStamper;
 use App\Actions\Stamps\RecentStamps;
 use App\Http\Requests\Counter\ArmStamperRequest;
 use App\Models\Stamper;
-use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -43,10 +42,9 @@ final class CounterController extends Controller
 
         return Inertia::render('business/counter', [
             ...$describeCounter->handle($business, $locationId),
-            // The live feed (S1): the latest stamps where they work, by first name; refreshed with the stampers.
-            'feed' => fn (): array => Gate::allows('viewFeed', [StampEvent::class, $business])
-                ? $recentStamps->handle($business, $locationId, CarbonImmutable::now(), firstNames: true)
-                : [],
+            // The live feed (S1): the latest stamps where they work (RecentStamps keeps a staff member to their
+            // location), by first name; refreshed with the stampers.
+            'feed' => fn (): array => $recentStamps->handle($business, $locationId, CarbonImmutable::now(), firstNames: true),
         ]);
     }
 

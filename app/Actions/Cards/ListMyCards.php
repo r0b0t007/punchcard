@@ -17,7 +17,6 @@ use App\Support\Cards\CustomerCard;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
 
 /**
  * My cards (CHW-27, C5): every card the customer holds, the most recently
@@ -96,7 +95,7 @@ final readonly class ListMyCards
             }
 
             return [
-                'firstName' => Str::before(trim($user->name).' ', ' '),
+                'firstName' => $user->firstName() ?? '',
                 'rewardsReady' => array_sum(array_column($list, 'rewardsReady')),
                 'cards' => $list,
             ];

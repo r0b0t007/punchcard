@@ -28,16 +28,6 @@ final class StampEventPolicy
         return $this->runs($business->organization_id, $business->id);
     }
 
-    /**
-     * Counter mode's live feed (CHW-29, S1): whoever works in the business sees
-     * its latest stamps (staff limited to one location, that location's: the
-     * caller filters them), by first name.
-     */
-    public function viewFeed(User $user, Business $business): bool
-    {
-        return $this->worksIn($business->id);
-    }
-
     public function view(User $user, StampEvent $event): bool
     {
         return $this->runs($event->organization_id, $event->business_id);
