@@ -4,6 +4,7 @@ import {
     CreditCard,
     FolderGit2,
     LayoutGrid,
+    Nfc,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as cards } from '@/routes/cards';
+import { show as counter } from '@/routes/counter';
 import { index as staff } from '@/routes/staff';
 import type { NavItem } from '@/types';
 
@@ -36,6 +38,12 @@ const cardsNavItem: NavItem = {
     title: 'Cards',
     href: cards(),
     icon: CreditCard,
+};
+
+const counterNavItem: NavItem = {
+    title: 'Counter mode',
+    href: counter(),
+    icon: Nfc,
 };
 
 const staffNavItem: NavItem = {
@@ -61,6 +69,7 @@ export function AppSidebar() {
     const { nav } = usePage().props;
     const items = [
         ...mainNavItems,
+        ...(nav.counter ? [counterNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
         ...(nav.staff ? [staffNavItem] : []),
     ];

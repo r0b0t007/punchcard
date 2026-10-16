@@ -155,7 +155,7 @@ final readonly class ApplyTap
                 $enrollment = $this->enrollCustomer->handle($business, $user)
                     ?? throw new StampRejected(StampRejection::NotHonoured);
 
-                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at));
+                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at, $tap->armed_by));
             });
         } catch (StampRejected $rejected) {
             return $this->finish($tap, [

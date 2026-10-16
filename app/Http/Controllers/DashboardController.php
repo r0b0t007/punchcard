@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Dashboard\DescribeDashboard;
 use App\Actions\Onboarding\DescribeChecklist;
 use App\Actions\Tenancy\HasMemberships;
+use App\Enums\BusinessRole;
 use App\Models\Business;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -34,6 +35,11 @@ final class DashboardController extends Controller
         // A customer's home is My cards (CHW-27). With a tenant the user is a member: no need to ask.
         if ($context->organizationId() === null && $user instanceof User && ! $hasMemberships->handle($user)) {
             return to_route('app.cards');
+        }
+
+        // Staff have no stats or checklist: their screen is the counter (CHW-29, S1).
+        if ($context->businessRole() === BusinessRole::Staff) {
+            return to_route('counter.show');
         }
 
         $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());

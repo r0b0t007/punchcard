@@ -125,7 +125,7 @@ it('cancels only this business\'s invitations, and only from its owner', functio
 it('shows the staff page in the sidebar to the owner only', function (): void {
     ($this->as)($this->owner, $this->tenants->a1)->get(route('dashboard'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('nav.staff', true));
-    ($this->as)($this->staff, $this->tenants->a1)->get(route('dashboard'))
+    ($this->as)($this->staff, $this->tenants->a1)->get(route('counter.show'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('nav.staff', false));
 });
 

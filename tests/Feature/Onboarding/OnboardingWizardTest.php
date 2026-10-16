@@ -223,7 +223,9 @@ it('leaves staff of a business being set up out of its wizard', function (): voi
     $staff = User::factory()->create();
     $this->context->bypass(fn () => $this->business->members()->attach($staff, ['role' => BusinessRole::Staff->value]));
 
-    $this->actingAs($staff)->get(route('dashboard'))->assertOk();
+    // To their counter (CHW-29), never the owner's wizard.
+    $this->actingAs($staff)->get(route('dashboard'))->assertRedirect(route('counter.show'));
+    $this->actingAs($staff)->get(route('counter.show'))->assertOk();
 });
 
 it('never moves an owner back when an earlier step is done again', function (): void {

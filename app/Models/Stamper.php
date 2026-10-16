@@ -41,6 +41,7 @@ use LogicException;
  * @property StamperStatus $status
  * @property int|null $armed_qty
  * @property Carbon|null $armed_until
+ * @property int|null $armed_by who armed it (CHW-29, ArmStamper)
  * @property Carbon|null $unassigned_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at

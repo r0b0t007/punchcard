@@ -720,5 +720,13 @@
     "That invitation was already used or has run out.": "هذه الدعوة استُخدمت بالفعل أو انتهت صلاحيتها.",
     "Team": "الفريق",
     "Remove from the team": "إزالة من الفريق",
-    "Owners are handed over, not removed here.": "يُنقل المالك ولا يُزال من هنا."
+    "Owners are handed over, not removed here.": "يُنقل المالك ولا يُزال من هنا.",
+    "Counter mode": "وضع الشباك",
+    "Last tap :ago": "آخر نقرة :ago",
+    "Next tap gives": "النقرة التالية تمنح",
+    "Next tap gives :count": "النقرة التالية تمنح :count",
+    "No stamper here yet: it appears once it is placed.": "لا يوجد جهاز ختم هنا بعد: يظهر بعد تركيبه.",
+    "No tap yet": "لا نقرات بعد",
+    "This stamper can't be armed now: it is off, or the site is closed.": "لا يمكن تجهيز جهاز الختم هذا الآن: إنه متوقف، أو الموقع مغلق.",
+    "This stamper is off.": "جهاز الختم هذا متوقف."
 }

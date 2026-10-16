@@ -49,6 +49,13 @@ trait ChangesBusinessStatus
 
             $guard($locked);
             $locked->forceFill($fields($locked))->save();
+
+            // A suspended business stamps nothing (SuspendBusiness): an arming made before it never lands on the
+            // first tap after a reinstatement (CHW-29). Its stampers are locked already.
+            if ($lockStampers) {
+                Stamper::query()->current()->where('business_id', $locked->id)->whereNotNull('armed_qty')
+                    ->update(['armed_qty' => null, 'armed_until' => null, 'armed_by' => null]);
+            }
             $this->recordAudit->handle($action, $locked, $reason);
 
             return $locked;

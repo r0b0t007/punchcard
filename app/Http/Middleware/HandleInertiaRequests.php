@@ -61,6 +61,8 @@ class HandleInertiaRequests extends Middleware
             'pwa' => null,
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
+                // Counter mode (CHW-29): whoever works in the business worked in.
+                'counter' => $request->user() instanceof User && app(TenantContext::class)->businessId() !== null,
                 // The staff page (CHW-146): whoever runs the business worked in.
                 'staff' => $this->managesStaff($request),
             ],

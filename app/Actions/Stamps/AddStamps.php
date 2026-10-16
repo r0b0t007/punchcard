@@ -199,7 +199,9 @@ final readonly class AddStamps
      */
     private function assertStaff(StampRequest $request): void
     {
-        if ($request->staffId === null) {
+        // A tap's staff is who armed the stamper (CHW-29): recorded, not checked again here. StamperPolicy::arm
+        // checked them when they armed it, and they may have left the staff within the minute since.
+        if ($request->staffId === null || $request->source === StampSource::Nfc) {
             return;
         }
 

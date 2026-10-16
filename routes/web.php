@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CardController;
+use App\Http\Controllers\CounterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinishSignUpController;
 use App\Http\Controllers\JoinController;
@@ -64,6 +65,10 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
         Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');
         Route::post('cards/{card}/banner', [CardController::class, 'banner'])->whereNumber('card')->name('cards.banner');
+        // Counter mode (CHW-29, S1): whoever works in the business; {stamper} resolves in the tenant.
+        Route::get('counter', [CounterController::class, 'show'])->name('counter.show');
+        Route::post('counter/stampers/{stamper}/arm', [CounterController::class, 'arm'])->whereNumber('stamper')->middleware('throttle:counter-arm')->name('counter.arm');
+        Route::delete('counter/stampers/{stamper}/arm', [CounterController::class, 'disarm'])->whereNumber('stamper')->name('counter.disarm');
         // The staff and their invitations (CHW-146), the owner's; {member} is a business_user row.
         Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
         Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');

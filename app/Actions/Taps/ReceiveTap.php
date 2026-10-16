@@ -139,14 +139,18 @@ final readonly class ReceiveTap
         $armed = $stamper->armed_qty !== null && $stamper->armed_until?->isFuture();
         $qty = $armed ? $stamper->armed_qty : 1;
 
+        $armedBy = $armed ? $stamper->armed_by : null;
+
         if ($stamper->armed_qty !== null) {
-            $stamper->forceFill(['armed_qty' => null, 'armed_until' => null])->save();
+            $stamper->forceFill(['armed_qty' => null, 'armed_until' => null, 'armed_by' => null])->save();
         }
 
         return $this->record([
             ...$trusted,
             'qty' => $qty,
             'armed' => $armed,
+            // Who armed it (CHW-29): the stamp it gives carries their name (ApplyTap).
+            'armed_by' => $armedBy,
             'status' => TapStatus::Pending,
             'expires_at' => now()->addMinutes((int) config('punchcard.taps.pending_minutes')),
             // Waiting in the session that tapped, committed with the spent counter (TapSession).

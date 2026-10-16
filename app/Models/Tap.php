@@ -36,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $claim_token_hash
  * @property int $qty
  * @property bool $armed it took stamps staff had armed (ReceiveTap)
+ * @property int|null $armed_by who armed them (CHW-29), whom its stamp names as staff
  * @property TapStatus $status
  * @property TapRejection|null $rejection
  * @property int|null $stamp_event_id
