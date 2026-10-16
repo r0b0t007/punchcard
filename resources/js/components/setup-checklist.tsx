@@ -3,6 +3,7 @@ import { CheckCircle2, Circle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { qrStand } from '@/routes/business';
+import { index as staff } from '@/routes/staff';
 
 export type Checklist = {
     qrStand: boolean;
@@ -55,9 +56,16 @@ export default function SetupChecklist({
                     </p>
                 </Item>
                 <Item done={checklist.staffInvited}>
-                    <p className="font-medium">{t('Invite your staff')}</p>
+                    <Link
+                        href={staff()}
+                        className="font-medium underline underline-offset-4"
+                    >
+                        {t('Invite your staff')}
+                    </Link>
                     <p className="text-sm text-muted-foreground">
-                        {t('Staff invitations are coming soon.')}
+                        {t(
+                            'They stamp cards and redeem rewards at the counter.',
+                        )}
                     </p>
                 </Item>
             </ul>

@@ -62,9 +62,7 @@ class InviteStaffRequest extends FormRequest
     /** The business worked in (TenantContext), which the invitation is for. */
     public function business(): ?Business
     {
-        $businessId = app(TenantContext::class)->businessId();
-
-        return $this->business ??= $businessId === null ? null : Business::query()->find($businessId);
+        return $this->business ??= app(TenantContext::class)->business();
     }
 
     public function locationId(): ?int

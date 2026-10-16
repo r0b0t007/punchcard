@@ -465,7 +465,6 @@
     "Place your stamper": "ضع جهاز الختم",
     "Put it by the till. It is ticked with its first tap.": "ضعه بجانب الصندوق. تُعلَّم هذه الخطوة عند أول نقرة.",
     "Invite your staff": "ادعُ فريقك",
-    "Staff invitations are coming soon.": "دعوات الفريق قادمة قريبًا.",
     "To do": "للقيام به",
     "Cyclic": "دورية",
     "Progressive": "تدريجية",
@@ -707,5 +706,19 @@
     "This invitation can't be used any more: ask for a new one.": "لم يعد بالإمكان استخدام هذه الدعوة: اطلب دعوة جديدة.",
     "This invitation is for :email: sign out, then open it again.": "هذه الدعوة لـ :email: سجّل الخروج ثم افتحها مجددًا.",
     "Waiting to join": "بانتظار الانضمام",
-    "You're on the staff of :business.": "أصبحت ضمن فريق :business."
+    "You're on the staff of :business.": "أصبحت ضمن فريق :business.",
+    "Your staff": "فريقك",
+    "Remove :name from your staff?": "إزالة :name من فريقك؟",
+    "They can no longer stamp or redeem here. Their account and the stamps they gave stay.": "لن يستطيع الختم أو استبدال المكافآت هنا بعد الآن. يبقى حسابه والأختام التي منحها.",
+    "Removed from your staff.": "تمت الإزالة من فريقك.",
+    "Invitation cancelled.": "تم إلغاء الدعوة.",
+    "They stamp cards and redeem rewards at the counter.": "يختمون البطاقات ويستبدلون المكافآت عند الشباك.",
+    "Cancel the invitation to :email?": "إلغاء الدعوة المرسلة إلى :email؟",
+    "Its link stops working. You can invite them again later.": "سيتوقف رابطها عن العمل. يمكنك دعوته مجددًا لاحقًا.",
+    "Cancel the invitation": "إلغاء الدعوة",
+    "Keep it": "الإبقاء عليها",
+    "That invitation was already used or has run out.": "هذه الدعوة استُخدمت بالفعل أو انتهت صلاحيتها.",
+    "Team": "الفريق",
+    "Remove from the team": "إزالة من الفريق",
+    "Owners are handed over, not removed here.": "يُنقل المالك ولا يُزال من هنا."
 }

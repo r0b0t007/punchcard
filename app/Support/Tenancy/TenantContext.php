@@ -138,6 +138,12 @@ final class TenantContext
         return $this->businessId;
     }
 
+    /** The business worked in, read fresh; null outside one (an org admin across the organization, a customer). */
+    public function business(): ?Business
+    {
+        return $this->businessId === null ? null : Business::query()->find($this->businessId);
+    }
+
     /**
      * Runs the callback with tenant scopes switched off.
      *

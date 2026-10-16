@@ -7,6 +7,7 @@ use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -60,6 +61,8 @@ class HandleInertiaRequests extends Middleware
             'pwa' => null,
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
+                // The staff page (CHW-146): whoever runs the business worked in.
+                'staff' => $this->managesStaff($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
@@ -72,5 +75,17 @@ class HandleInertiaRequests extends Middleware
             'translations' => Inertia::once(fn (): array => Locales::translations($locale))
                 ->as('translations-'.$locale),
         ];
+    }
+
+    /**
+     * Whether the user runs the business worked in, so manages its staff; no business, no staff page. The same
+     * rule as BusinessMemberPolicy::viewAny (owner or org admin there), read from the tenant so no page pays a
+     * query: change one, change the other.
+     */
+    private function managesStaff(Request $request): bool
+    {
+        $context = app(TenantContext::class);
+
+        return $request->user() instanceof User && $context->businessId() !== null && $context->canManageMembers();
     }
 }

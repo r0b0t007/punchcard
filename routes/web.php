@@ -64,9 +64,11 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
         Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');
         Route::post('cards/{card}/banner', [CardController::class, 'banner'])->whereNumber('card')->name('cards.banner');
-        // The staff and their invitations (CHW-146), the owner's.
+        // The staff and their invitations (CHW-146), the owner's; {member} is a business_user row.
         Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
         Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');
+        Route::delete('staff/invitations/{invitation}', [StaffController::class, 'cancelInvitation'])->whereNumber('invitation')->name('staff.invitations.destroy');
+        Route::delete('staff/{member}', [StaffController::class, 'destroy'])->whereNumber('member')->name('staff.destroy');
     });
 });
 
