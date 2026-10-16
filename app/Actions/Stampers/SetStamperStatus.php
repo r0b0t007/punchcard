@@ -39,7 +39,7 @@ final readonly class SetStamperStatus
             }
 
             $previous = $current->status;
-            $current->forceFill(['status' => $status] + ($status === StamperStatus::Disabled ? ['armed_qty' => null, 'armed_until' => null] : []))->save();
+            $current->forceFill(['status' => $status] + ($status === StamperStatus::Disabled ? Stamper::DISARMED : []))->save();
 
             if ($previous !== $status) {
                 $this->recordAudit->handle($status === StamperStatus::Disabled ? 'stamper.disabled' : 'stamper.enabled', $tag, context: ['stamper_id' => $current->id]);

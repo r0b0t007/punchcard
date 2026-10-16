@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  * meanwhile) is never removed here: owners are handed over (CHW-140). The
  * business is locked first, the order every staff Action locks in (inviting,
  * joining, cancelling). Through the guarded pivot model, in the owner's
- * tenant. Their next request is no longer in this business (ResolveTenant).
+ * tenant. Their next request is no longer in this business (ResolveTenant),
+ * and an arming they made there gives nothing more (ReceiveTap, CHW-29).
  * Whether they were removed.
  */
 final readonly class RemoveStaffMember

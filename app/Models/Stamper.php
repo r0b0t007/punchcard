@@ -41,6 +41,7 @@ use LogicException;
  * @property StamperStatus $status
  * @property int|null $armed_qty
  * @property Carbon|null $armed_until
+ * @property int|null $armed_by who armed it (CHW-29, ArmStamper)
  * @property Carbon|null $unassigned_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -56,6 +57,9 @@ class Stamper extends Model implements TenantModel
 
     /** @use HasFactory<StamperFactory> */
     use HasFactory;
+
+    /** An arming's columns, cleared (CHW-29): a tap that took it, Cancel, disabling, a suspension. */
+    public const array DISARMED = ['armed_qty' => null, 'armed_until' => null, 'armed_by' => null];
 
     /** @var array<string, mixed> The database default, also in memory before a refresh. */
     protected $attributes = ['status' => 'active'];
@@ -100,6 +104,12 @@ class Stamper extends Model implements TenantModel
         if (array_key_exists('unassigned_at', $values)) {
             throw new LogicException('Ending a tag\'s assignment is an admin action, in TenantContext::bypass().');
         }
+    }
+
+    /** Whether its next tap gives what staff armed it with: armed, and not run out. */
+    public function isArmed(): bool
+    {
+        return $this->armed_qty !== null && $this->armed_until?->isFuture() === true;
     }
 
     /**

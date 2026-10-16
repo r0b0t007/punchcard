@@ -29,7 +29,9 @@ void createInertiaApp({
                 name.startsWith('rewards/') ||
                 // The join page and the printable QR stand (CHW-31): full screen.
                 name.startsWith('join/') ||
-                name === 'business/qr-stand':
+                name === 'business/qr-stand' ||
+                // Counter mode (CHW-29, S1): full screen, for the counter's tablet or phone.
+                name === 'business/counter':
                 return I18nLayout;
             case name.startsWith('auth/'):
                 return [I18nLayout, AuthLayout];

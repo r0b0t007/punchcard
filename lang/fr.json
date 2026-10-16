@@ -720,5 +720,13 @@
     "That invitation was already used or has run out.": "Cette invitation a déjà été utilisée ou a expiré.",
     "Team": "Équipe",
     "Remove from the team": "Retirer de l’équipe",
-    "Owners are handed over, not removed here.": "Un propriétaire se transmet, il ne se retire pas ici."
+    "Owners are handed over, not removed here.": "Un propriétaire se transmet, il ne se retire pas ici.",
+    "Counter mode": "Mode comptoir",
+    "Last tap :ago": "Dernier passage :ago",
+    "Next tap gives": "Le prochain passage donne",
+    "Next tap gives :count": "Le prochain passage donne :count",
+    "No stamper here yet: it appears once it is placed.": "Pas encore de borne ici : elle apparaît une fois installée.",
+    "No tap yet": "Aucun passage pour l’instant",
+    "This stamper can't be armed now: it is off, or the site is closed.": "Cette borne ne peut pas être armée maintenant : elle est désactivée, ou le site est fermé.",
+    "This stamper is off.": "Cette borne est désactivée."
 }

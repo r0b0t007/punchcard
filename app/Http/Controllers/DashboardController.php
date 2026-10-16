@@ -36,6 +36,12 @@ final class DashboardController extends Controller
             return to_route('app.cards');
         }
 
+        // Staff have no stats or checklist: their screen is the counter (CHW-29, S1). An org admin who is also staff
+        // there runs the business: the dashboard is theirs.
+        if ($context->businessId() !== null && ! $context->canManageMembers()) {
+            return to_route('counter.show');
+        }
+
         $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
 
         return Inertia::render('dashboard', [

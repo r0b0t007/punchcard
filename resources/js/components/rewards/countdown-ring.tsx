@@ -13,10 +13,13 @@ export default function CountdownRing({
     seconds,
     total,
     onDone,
+    compact = false,
 }: {
     seconds: number;
     total: number;
     onDone: () => void;
+    /** The counter screen's smaller ring (CHW-29), beside its stamper. */
+    compact?: boolean;
 }) {
     const { t } = useTranslation();
     const [left, setLeft] = useState(seconds);
@@ -42,7 +45,7 @@ export default function CountdownRing({
             aria-label={t(':count second left|:count seconds left', {
                 count: left,
             })}
-            className="relative size-55"
+            className={compact ? 'relative size-28' : 'relative size-55'}
         >
             <svg
                 aria-hidden="true"
@@ -72,7 +75,13 @@ export default function CountdownRing({
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-display text-8xl leading-none font-bold tabular-nums">
+                <span
+                    className={
+                        compact
+                            ? 'font-display text-4xl leading-none font-bold tabular-nums'
+                            : 'font-display text-8xl leading-none font-bold tabular-nums'
+                    }
+                >
                     {Math.max(left, 0)}
                 </span>
                 <span className="text-muted-foreground">{t('seconds')}</span>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
+use App\Actions\Stamps\WorksAt;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -50,6 +51,7 @@ final readonly class ReceiveTap
         private TenantContext $context,
         private SunVerifier $verifier,
         private KeyDiversifier $keys,
+        private WorksAt $worksAt,
     ) {}
 
     public function handle(
@@ -136,17 +138,24 @@ final readonly class ReceiveTap
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::SiteClosed]);
         }
 
-        $armed = $stamper->armed_qty !== null && $stamper->armed_until?->isFuture();
+        // An arming counts while whoever armed it still works at this stamper's site (CHW-29): taken off the staff,
+        // limited to another location, or their account deleted, it gives one stamp like any tap.
+        $armed = $stamper->isArmed()
+            && ($stamper->armed_by === null || $this->worksAt->handle($stamper->armed_by, $stamper->business_id, $stamper->location_id));
         $qty = $armed ? $stamper->armed_qty : 1;
 
+        $armedBy = $armed ? $stamper->armed_by : null;
+
         if ($stamper->armed_qty !== null) {
-            $stamper->forceFill(['armed_qty' => null, 'armed_until' => null])->save();
+            $stamper->forceFill(Stamper::DISARMED)->save();
         }
 
         return $this->record([
             ...$trusted,
             'qty' => $qty,
             'armed' => $armed,
+            // Who armed it (CHW-29): the stamp it gives carries their name (ApplyTap).
+            'armed_by' => $armedBy,
             'status' => TapStatus::Pending,
             'expires_at' => now()->addMinutes((int) config('punchcard.taps.pending_minutes')),
             // Waiting in the session that tapped, committed with the spent counter (TapSession).

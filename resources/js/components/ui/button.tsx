@@ -27,6 +27,8 @@ const buttonVariants = cva(
         sm: "h-9 px-3 has-[>svg]:px-2.5",
         lg: "h-14 px-7 text-base has-[>svg]:px-5",
         icon: "size-11",
+        // Counter mode (CHW-29, S1): 72 px targets, read at arm's length in a morning rush.
+        counter: "min-h-18 px-6 text-2xl font-bold tabular-nums",
       },
     },
     defaultVariants: {

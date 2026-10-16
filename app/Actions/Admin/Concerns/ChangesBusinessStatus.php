@@ -29,10 +29,11 @@ trait ChangesBusinessStatus
      * @param  Closure(Business): array<string, mixed>  $fields  the columns to write, from the locked row
      * @param  bool  $lockStampers  lock the business's current stampers first and again after the
      *                              business row (see SuspendBusiness)
+     * @param  (Closure(Business): void)|null  $afterSave  more of the change, in its transaction, on the saved row
      */
-    private function transition(Business $business, Closure $guard, Closure $fields, string $action, ?string $reason = null, bool $lockStampers = false): Business
+    private function transition(Business $business, Closure $guard, Closure $fields, string $action, ?string $reason = null, bool $lockStampers = false, ?Closure $afterSave = null): Business
     {
-        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $guard, $fields, $action, $reason, $lockStampers): Business {
+        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $guard, $fields, $action, $reason, $lockStampers, $afterSave): Business {
             if ($lockStampers) {
                 $this->lockStampers($business);
             }
@@ -49,6 +50,10 @@ trait ChangesBusinessStatus
 
             $guard($locked);
             $locked->forceFill($fields($locked))->save();
+
+            if ($afterSave instanceof Closure) {
+                $afterSave($locked);
+            }
             $this->recordAudit->handle($action, $locked, $reason);
 
             return $locked;

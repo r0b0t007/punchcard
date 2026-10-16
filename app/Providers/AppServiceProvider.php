@@ -196,6 +196,9 @@ class AppServiceProvider extends ServiceProvider
         // address. Customers register through Fortify's route, which this never limits.
         RateLimiter::for('business-signup', fn (Request $request): Limit => Limit::perHour(10)->by(ClientAddress::rateLimitKey($request->ip())));
 
+        // Counter mode (CHW-29): arming at the counter's pace, never a script's.
+        RateLimiter::for('counter-arm', fn (Request $request): Limit => Limit::perMinute(60)->by('counter-arm:'.$request->user()?->getAuthIdentifier()));
+
         // Staff invitations (CHW-146): each mails an address, so a few an hour per owner.
         RateLimiter::for('staff-invite', fn (Request $request): Limit => Limit::perHour(20)->by('staff-invite:'.$request->user()?->getAuthIdentifier()));
 

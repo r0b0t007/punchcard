@@ -270,8 +270,10 @@ it('shows staff no figures, and HQ at the organization level a note instead', fu
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1);
     $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
 
-    ($this->as)($staff, 'business:'.$this->tenants->b1->id)->get(route('dashboard'))->assertOk()
-        ->assertInertia(fn ($page) => $page->where('stats', null)->where('atOrganization', false));
+    // Staff go to the counter (CHW-29), which shows no figures.
+    ($this->as)($staff, 'business:'.$this->tenants->b1->id)->get(route('dashboard'))->assertRedirect(route('counter.show'));
+    ($this->as)($staff, 'business:'.$this->tenants->b1->id)->get(route('counter.show'))->assertOk()
+        ->assertInertia(fn ($page) => $page->missing('stats'));
     ($this->as)($hq, 'org:'.$this->tenants->orgA->id)->get(route('dashboard'))->assertOk()
         ->assertInertia(fn ($page) => $page->where('stats', null)->where('atOrganization', true));
 });

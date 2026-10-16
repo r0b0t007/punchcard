@@ -330,7 +330,8 @@ it('offers the cards page in the sidebar to owners and org admins, never to staf
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1);
 
     ($this->inB1)()->get(route('dashboard'))->assertInertia(fn ($page) => $page->where('nav.cards', true));
-    ($this->as)($staff, 'business:'.$this->tenants->b1->id)->get(route('dashboard'))->assertInertia(fn ($page) => $page->where('nav.cards', false));
+    // Staff work from the counter (CHW-29): its sidebar flags are theirs.
+    ($this->as)($staff, 'business:'.$this->tenants->b1->id)->get(route('counter.show'))->assertInertia(fn ($page) => $page->where('nav.cards', false));
 });
 
 it('leaves out the other mode\'s fields the form still holds', function (): void {

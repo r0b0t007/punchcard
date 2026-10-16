@@ -41,9 +41,11 @@ final readonly class StampRequest
     /**
      * A verified tap on the stamper (1 stamp, or what staff armed it with), at its counter.
      * $at is when the tap happened, if it is applied later (a signed-out tap claimed after
-     * sign-in): the cooldown, the cap's day and the stamp's time are the tap's.
+     * sign-in): the cooldown, the cap's day and the stamp's time are the tap's. An armed tap
+     * (CHW-29) carries who armed it as its staff: it gave stamps on their word, and the
+     * ledger keeps their name.
      */
-    public static function nfc(Stamper $stamper, int $counter, int $qty = 1, ?CarbonInterface $at = null): self
+    public static function nfc(Stamper $stamper, int $counter, int $qty = 1, ?CarbonInterface $at = null, ?int $armedBy = null): self
     {
         self::assertBetween($qty, 1, self::MAX_TAP);
 
@@ -51,7 +53,7 @@ final readonly class StampRequest
             throw new InvalidArgumentException('A tap counter is never negative.');
         }
 
-        return new self(StampSource::Nfc, $qty, (int) $stamper->business_id, (int) $stamper->location_id, $stamper->id, (int) $stamper->nfc_tag_id, $counter, at: $at?->toImmutable());
+        return new self(StampSource::Nfc, $qty, (int) $stamper->business_id, (int) $stamper->location_id, $stamper->id, (int) $stamper->nfc_tag_id, $counter, staffId: $armedBy, at: $at?->toImmutable());
     }
 
     /** Staff scanned the customer's member QR. */
