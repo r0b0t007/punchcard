@@ -231,6 +231,69 @@ test.describe('in English, light', () => {
         await expectNothingOffTheSides(page);
         await attach(page, testInfo, 'card-light');
     });
+
+    test('dims a My QR code restored with Back until the next one comes (CHW-222)', async ({
+        page,
+    }, testInfo) => {
+        await page.goto('/app');
+        await page.locator('[data-test="my-qr-link"]').click();
+        const code = page.locator('[data-test="member-qr"]');
+        await expect(code).toBeVisible();
+        await expect(code).not.toHaveClass(/opacity-20/);
+
+        // Hold the request for the next code, so the restored page shows before it comes.
+        let release = () => {};
+        const held = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        let asked = 0;
+        await page.route('**/app/qr', async (route) => {
+            if (route.request().headers()['x-inertia-partial-data']) {
+                asked++;
+                await held;
+            }
+
+            await route.continue();
+        });
+
+        await page.getByRole('link', { name: 'My cards' }).click();
+        await expect(page).toHaveURL(/\/app$/);
+
+        // Whether the code is dimmed, every 25 ms from the moment Back shows it: never at full strength.
+        await page.evaluate(() => {
+            const sampled = globalThis as unknown as { dimmed: boolean[] };
+            sampled.dimmed = [];
+            window.setInterval(() => {
+                const img = document.querySelector('[data-test="member-qr"]');
+
+                if (img) {
+                    sampled.dimmed.push(img.classList.contains('opacity-20'));
+                }
+            }, 25);
+        });
+        await page.goBack();
+        await expect(code).toBeVisible();
+        await page.waitForTimeout(1500);
+        const dimmed = await page.evaluate(
+            () => (globalThis as unknown as { dimmed: boolean[] }).dimmed,
+        );
+        expect(dimmed.length).toBeGreaterThan(20);
+        expect(dimmed.every(Boolean)).toBe(true);
+
+        await expect(code).toHaveClass(/opacity-20/);
+        await expect(page.getByRole('progressbar')).toHaveAttribute(
+            'aria-valuenow',
+            '0',
+        );
+        await expect(
+            page.getByText('Getting a new code…').first(),
+        ).toBeVisible();
+        await attach(page, testInfo, 'my-qr-restored');
+
+        release();
+        await expect(code).not.toHaveClass(/opacity-20/);
+        expect(asked).toBeGreaterThan(0);
+    });
 });
 
 test.describe('in dark mode', () => {

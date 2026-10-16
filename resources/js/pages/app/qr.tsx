@@ -126,6 +126,12 @@ const RETRY_MS = 3000;
 let newestShown = 0;
 
 /**
+ * The deadline of a code shown before: long gone. Never "now", which a few
+ * milliseconds later still rounds up to a second left (CHW-222).
+ */
+const PAST = 0;
+
+/**
  * Keeps the code current, and says the seconds it has left. Counted down to
  * a deadline set when a code arrives (never ticks: a phone that slept or a
  * late timer reads the real time), then the next code is asked for, one
@@ -137,7 +143,7 @@ let newestShown = 0;
  */
 function useCurrentCode(secondsLeft: number, issuedAt: number): number {
     const [deadline, setDeadline] = useState(() =>
-        issuedAt <= newestShown ? Date.now() : Date.now() + secondsLeft * 1000,
+        issuedAt <= newestShown ? PAST : Date.now() + secondsLeft * 1000,
     );
     const [now, setNow] = useState(() => Date.now());
     const asking = useRef(false);
@@ -160,7 +166,7 @@ function useCurrentCode(secondsLeft: number, issuedAt: number): number {
 
     useEffect(() => {
         if (issuedAt <= newestShown) {
-            setDeadline(Date.now());
+            setDeadline(PAST);
             askForCode();
 
             return;
