@@ -21,6 +21,12 @@ beforeEach(function (): void {
     Carbon::setTestNow('2026-10-16 10:00:05');
     config(['app.key' => 'base64:'.base64_encode(str_repeat('k', 32)), 'punchcard.member_qr.window_seconds' => 30]);
     $this->user = (new User)->forceFill(['id' => 42]);
+    // As MemberQrScan checks one: its parts, then its signature.
+    $this->read = function (string $token): ?array {
+        $fields = MemberQrToken::fields($token);
+
+        return $fields !== null && MemberQrToken::authentic($fields) ? ['userId' => $fields['userId'], 'window' => $fields['window']] : null;
+    };
 });
 
 afterEach(function (): void {
@@ -33,7 +39,7 @@ it('issues a token for the user and the current window, and reads it back', func
     expect($issued['token'])->toStartWith('PC1.42.')
         ->and($issued['window'])->toBe(intdiv(now()->getTimestamp(), 30))
         ->and($issued['secondsLeft'])->toBe(25)
-        ->and(MemberQrToken::read($issued['token']))->toBe(['userId' => 42, 'window' => $issued['window']]);
+        ->and(($this->read)($issued['token']))->toBe(['userId' => 42, 'window' => $issued['window']]);
 });
 
 it('changes the token every window', function (): void {
@@ -60,12 +66,12 @@ it('refuses a token changed in any part, or not a token at all', function (strin
         'not a token' => 'https://example.test/',
     };
 
-    expect(MemberQrToken::read($changed))->toBeNull();
+    expect(($this->read)($changed))->toBeNull();
 })->with(['another user', 'another window', 'another mac', 'another version', 'cut short', 'zero-padded window', 'zero-padded user', 'overlong user', 'not a token']);
 
 it('only reads tokens made with this app\'s key', function (): void {
     $token = MemberQrToken::issue($this->user)['token'];
     config(['app.key' => 'base64:'.base64_encode(str_repeat('x', 32))]);
 
-    expect(MemberQrToken::read($token))->toBeNull();
+    expect(($this->read)($token))->toBeNull();
 });

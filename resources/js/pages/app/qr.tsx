@@ -25,12 +25,12 @@ export default function MemberQr({
     qrCode: string;
     secondsLeft: number;
     windowSeconds: number;
-    /** When the server issued it (ms): a page restored from history holds an old one. */
+    /** When the server issued it (ms): tells a code restored from history from a new one. */
     issuedAt: number;
     firstName: string | null;
 }) {
     const { t } = useTranslation();
-    const left = useCurrentCode(qrCode, secondsLeft, issuedAt);
+    const left = useCurrentCode(secondsLeft, issuedAt);
     const due = left === 0;
 
     useScreenAwake();
@@ -93,15 +93,16 @@ export default function MemberQr({
                             }
                         />
                     </div>
-                    <p
-                        className="text-sm text-muted-foreground tabular-nums"
-                        aria-live="polite"
-                    >
+                    <p className="text-sm text-muted-foreground tabular-nums">
                         {due
                             ? t('Getting a new code…')
                             : t(':count second left|:count seconds left', {
                                   count: left,
                               })}
+                    </p>
+                    {/* Announced when the code runs out, never each second. */}
+                    <p className="sr-only" aria-live="polite">
+                        {due ? t('Getting a new code…') : ''}
                     </p>
                 </div>
 
@@ -117,33 +118,30 @@ export default function MemberQr({
 /** How long to wait before asking again for a code that did not come (offline, a slow network). */
 const RETRY_MS = 3000;
 
-/** How far the issue time may be from now before a code counts as old (a page restored from history). */
-const STALE_MS = 5000;
+/**
+ * When the newest code this page has shown was issued, across visits in the
+ * app: props restored from history (Back) hold that code or an older one,
+ * whatever the phone's clock says.
+ */
+let newestShown = 0;
 
 /**
  * Keeps the code current, and says the seconds it has left. Counted down to
  * a deadline set when a code arrives (never ticks: a phone that slept or a
  * late timer reads the real time), then the next code is asked for, one
  * request at a time (a slow answer is never cancelled by a retry), again
- * RETRY_MS after one that brought nothing. Asked for at once when the page
- * comes back into view, or opens with an old code (restored from history);
- * a code the server has just sent is used as is.
+ * RETRY_MS after one that brought nothing, and only while the page shows
+ * (it asks at once when it comes back). A code shown before, restored from
+ * history, is past its time from the start; a code the server has just
+ * sent is used as is.
  */
-function useCurrentCode(
-    qrCode: string,
-    secondsLeft: number,
-    issuedAt: number,
-): number {
-    const [deadline, setDeadline] = useState(
-        () => Date.now() + secondsLeft * 1000,
+function useCurrentCode(secondsLeft: number, issuedAt: number): number {
+    const [deadline, setDeadline] = useState(() =>
+        issuedAt <= newestShown ? Date.now() : Date.now() + secondsLeft * 1000,
     );
     const [now, setNow] = useState(() => Date.now());
     const asking = useRef(false);
     const lastAnswer = useRef(0);
-
-    useEffect(() => {
-        setDeadline(Date.now() + secondsLeft * 1000);
-    }, [qrCode, secondsLeft]);
 
     const askForCode = useCallback(() => {
         if (asking.current) {
@@ -161,6 +159,18 @@ function useCurrentCode(
     }, []);
 
     useEffect(() => {
+        if (issuedAt <= newestShown) {
+            setDeadline(Date.now());
+            askForCode();
+
+            return;
+        }
+
+        newestShown = issuedAt;
+        setDeadline(Date.now() + secondsLeft * 1000);
+    }, [secondsLeft, issuedAt, askForCode]);
+
+    useEffect(() => {
         const timer = window.setInterval(() => setNow(Date.now()), 1000);
         const onVisible = () => {
             if (document.visibilityState === 'visible') {
@@ -169,21 +179,20 @@ function useCurrentCode(
             }
         };
 
-        if (Math.abs(Date.now() - issuedAt) > STALE_MS) {
-            askForCode();
-        }
-
         document.addEventListener('visibilitychange', onVisible);
 
         return () => {
             window.clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisible);
         };
-        // The issue time on opening only: later codes come with their own deadline.
     }, [askForCode]);
 
     useEffect(() => {
-        if (now >= deadline && now - lastAnswer.current >= RETRY_MS) {
+        if (
+            now >= deadline &&
+            now - lastAnswer.current >= RETRY_MS &&
+            document.visibilityState === 'visible'
+        ) {
             askForCode();
         }
     }, [now, deadline, askForCode]);

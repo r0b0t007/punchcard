@@ -19,10 +19,10 @@ void createInertiaApp({
     // direction from the page props.
     layout: (name, page) => {
         switch (true) {
-            // The customer's home and rewards (CHW-27): full screen with the bottom tab bar.
             // "My QR" (CHW-28, C10): full screen, the code alone, before the app's other pages.
             case name === 'app/qr':
                 return I18nLayout;
+            // The customer's home and rewards (CHW-27): full screen with the bottom tab bar.
             case name.startsWith('app/') || name === 'rewards/index':
                 return [I18nLayout, CustomerLayout];
             case name === 'welcome' ||

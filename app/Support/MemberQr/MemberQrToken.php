@@ -53,19 +53,6 @@ final class MemberQrToken
     }
 
     /**
-     * The user and window a token was made for, if it is one and its
-     * signature holds (compared in constant time); else null.
-     *
-     * @return array{userId: int, window: int}|null
-     */
-    public static function read(string $token): ?array
-    {
-        $fields = self::fields($token);
-
-        return $fields !== null && self::authentic($fields) ? ['userId' => $fields['userId'], 'window' => $fields['window']] : null;
-    }
-
-    /**
      * Whether a token's parts carry its own signature (compared in constant time).
      *
      * @param  array{userId: int, window: int, mac: string}  $fields
