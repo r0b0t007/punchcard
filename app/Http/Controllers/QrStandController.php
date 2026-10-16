@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Onboarding\MarkQrStandOpened;
 use App\Models\Business;
-use App\Support\Cards\JoinQrCode;
+use App\Support\QrCode;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -34,7 +34,7 @@ final class QrStandController extends Controller
             'businessName' => $business->name,
             'logoUrl' => $business->organization->logoUrl(),
             'joinUrl' => $joinUrl,
-            'qrCode' => JoinQrCode::dataUrl($joinUrl),
+            'qrCode' => QrCode::dataUrl($joinUrl),
         ]);
     }
 

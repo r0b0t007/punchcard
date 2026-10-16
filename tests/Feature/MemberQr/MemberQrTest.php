@@ -112,6 +112,7 @@ it('shows a signed-in customer their own code, never cached, and a new one each 
             ->where('qrCode', QrCode::dataUrl($issued['token']))
             ->where('secondsLeft', 25)
             ->where('windowSeconds', 30)
+            ->where('issuedAt', now()->getTimestampMs())
             ->where('firstName', 'Salma'));
 
     $this->travel(30)->seconds();
@@ -121,4 +122,13 @@ it('shows a signed-in customer their own code, never cached, and a new one each 
 
 it('asks a guest to sign in first', function (): void {
     $this->get(route('app.qr'))->assertRedirect(route('login'));
+});
+
+it('still refuses the next code for the same card when the first was scanned as its window ended', function (): void {
+    // Scanned at 10:00:29, the last second of its window; the next code shows from 10:00:30.
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:29'));
+    expect(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:1'))->toBeNull();
+
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:46'));
+    expect(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:1'))->toBe(MemberQrRefusal::Replayed);
 });

@@ -62,9 +62,17 @@ final class MemberQrToken
     {
         $fields = self::fields($token);
 
-        return $fields !== null && hash_equals(self::mac($fields['userId'], $fields['window']), $fields['mac'])
-            ? ['userId' => $fields['userId'], 'window' => $fields['window']]
-            : null;
+        return $fields !== null && self::authentic($fields) ? ['userId' => $fields['userId'], 'window' => $fields['window']] : null;
+    }
+
+    /**
+     * Whether a token's parts carry its own signature (compared in constant time).
+     *
+     * @param  array{userId: int, window: int, mac: string}  $fields
+     */
+    public static function authentic(array $fields): bool
+    {
+        return hash_equals(self::mac($fields['userId'], $fields['window']), $fields['mac']);
     }
 
     /**

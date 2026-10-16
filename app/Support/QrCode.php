@@ -12,7 +12,8 @@ use BaconQrCode\Writer;
 /**
  * A QR code made on the server (bacon/bacon-qr-code, also Fortify's for
  * 2FA), as an SVG: 320 px with the 4-module quiet zone the QR standard asks
- * for. The join page's link (JoinQrCode), the member QR (C10, CHW-28).
+ * for. The join page's link on the QR stand (CHW-31), the member QR (C10,
+ * CHW-28).
  */
 final class QrCode
 {

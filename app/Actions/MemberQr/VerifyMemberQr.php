@@ -26,16 +26,28 @@ final readonly class VerifyMemberQr
     /** How long into a window the previous window's code still counts. */
     public const int GRACE_SECONDS = 10;
 
+    /**
+     * How long a use is remembered: two windows and the grace, the longest any code of the customer's shown by
+     * then can count, and a little slack.
+     */
+    public static function rememberedSeconds(): int
+    {
+        return 2 * MemberQrToken::windowSeconds() + self::GRACE_SECONDS + 5;
+    }
+
     public function handle(#[SensitiveParameter] string $token, string $scope): MemberQrScan
     {
         $at = CarbonImmutable::now();
         $fields = MemberQrToken::fields($token) ?? throw new MemberQrRefused(MemberQrRefusal::Malformed);
-        $read = MemberQrToken::read($token) ?? throw new MemberQrRefused(MemberQrRefusal::Forged);
+
+        if (! MemberQrToken::authentic($fields)) {
+            throw new MemberQrRefused(MemberQrRefusal::Forged);
+        }
 
         $now = MemberQrToken::windowAt($at);
         $intoWindow = $at->getTimestamp() - $now * MemberQrToken::windowSeconds();
-        $current = $read['window'] === $now;
-        $justBefore = $read['window'] === $now - 1 && $intoWindow < self::GRACE_SECONDS;
+        $current = $fields['window'] === $now;
+        $justBefore = $fields['window'] === $now - 1 && $intoWindow < self::GRACE_SECONDS;
 
         if (! $current && ! $justBefore) {
             throw new MemberQrRefused(MemberQrRefusal::Expired);
@@ -47,13 +59,14 @@ final readonly class VerifyMemberQr
             throw new MemberQrRefused(MemberQrRefusal::UnknownUser);
         }
 
-        // Kept while any code of theirs could still count: the rest of this window and the next one's grace.
-        $expires = $at->addSeconds(MemberQrToken::windowSeconds() - $intoWindow + self::GRACE_SECONDS + 5);
+        // Kept while any code of theirs shown by then could still count: the next window's code lasts until two
+        // windows and a grace from the start of this one, at the latest.
+        $expires = $at->addSeconds(self::rememberedSeconds());
 
-        if (! Cache::add('member-qr:'.$read['userId'].':'.$scope, true, $expires)) {
+        if (! Cache::add('member-qr:'.$fields['userId'].':'.$scope, true, $expires)) {
             throw new MemberQrRefused(MemberQrRefusal::Replayed);
         }
 
-        return MemberQrScan::verified($read['userId'], $read['window'], $at);
+        return MemberQrScan::verified($fields['userId'], $fields['window'], $at);
     }
 }

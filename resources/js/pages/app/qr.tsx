@@ -3,29 +3,35 @@ import { ChevronLeft, Sun } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
+import { cn } from '@/lib/utils';
 import { cards } from '@/routes/app';
 
 /**
  * C10, "My QR" (CHW-28): for a phone without NFC, the customer's member QR,
  * which staff scan at the counter. Full screen, the code on its own white
  * card (scanners need the contrast, dark mode or not), a bar for the time
- * it has left, then the next one. The screen stays on while it shows
- * (Screen Wake Lock, where the browser has it).
+ * it has left, then the next one. A code past its time is dimmed until the
+ * next arrives, so nobody scans one that no longer counts. The screen stays
+ * on while it shows (Screen Wake Lock, where the browser has it).
  */
 export default function MemberQr({
     qrCode,
     secondsLeft,
     windowSeconds,
+    issuedAt,
     firstName,
 }: {
     /** The current window's code, as an SVG data URL. */
     qrCode: string;
     secondsLeft: number;
     windowSeconds: number;
+    /** When the server issued it (ms): a page restored from history holds an old one. */
+    issuedAt: number;
     firstName: string | null;
 }) {
     const { t } = useTranslation();
-    const left = useCurrentCode(qrCode, secondsLeft);
+    const left = useCurrentCode(qrCode, secondsLeft, issuedAt);
+    const due = left === 0;
 
     useScreenAwake();
 
@@ -61,7 +67,10 @@ export default function MemberQr({
                     <img
                         src={qrCode}
                         alt={t('Your member QR code')}
-                        className="size-72"
+                        className={cn(
+                            'size-72 transition-opacity',
+                            due && 'opacity-20',
+                        )}
                         data-test="member-qr"
                     />
                 </div>
@@ -79,15 +88,20 @@ export default function MemberQr({
                             className="h-full w-(--left) rounded-full bg-primary transition-all duration-1000 ease-linear motion-reduce:transition-none"
                             style={
                                 {
-                                    '--left': `${(Math.max(left, 0) / windowSeconds) * 100}%`,
+                                    '--left': `${(left / windowSeconds) * 100}%`,
                                 } as CSSProperties
                             }
                         />
                     </div>
-                    <p className="text-sm text-muted-foreground tabular-nums">
-                        {t(':count second left|:count seconds left', {
-                            count: Math.max(left, 0),
-                        })}
+                    <p
+                        className="text-sm text-muted-foreground tabular-nums"
+                        aria-live="polite"
+                    >
+                        {due
+                            ? t('Getting a new code…')
+                            : t(':count second left|:count seconds left', {
+                                  count: left,
+                              })}
                     </p>
                 </div>
 
@@ -100,32 +114,50 @@ export default function MemberQr({
     );
 }
 
-/** The seconds the code has left, from the server's count; at zero, the next code. */
 /** How long to wait before asking again for a code that did not come (offline, a slow network). */
 const RETRY_MS = 3000;
+
+/** How far the issue time may be from now before a code counts as old (a page restored from history). */
+const STALE_MS = 5000;
 
 /**
  * Keeps the code current, and says the seconds it has left. Counted down to
  * a deadline set when a code arrives (never ticks: a phone that slept or a
- * late timer reads the real time), then the next code is asked for, again
- * every RETRY_MS until it comes. Asked for at once when the page opens or
- * comes back into view: a locked phone, or one gone back in history, may
- * still hold an old code.
+ * late timer reads the real time), then the next code is asked for, one
+ * request at a time (a slow answer is never cancelled by a retry), again
+ * RETRY_MS after one that brought nothing. Asked for at once when the page
+ * comes back into view, or opens with an old code (restored from history);
+ * a code the server has just sent is used as is.
  */
-function useCurrentCode(qrCode: string, secondsLeft: number): number {
+function useCurrentCode(
+    qrCode: string,
+    secondsLeft: number,
+    issuedAt: number,
+): number {
     const [deadline, setDeadline] = useState(
         () => Date.now() + secondsLeft * 1000,
     );
     const [now, setNow] = useState(() => Date.now());
-    const lastAsked = useRef(0);
+    const asking = useRef(false);
+    const lastAnswer = useRef(0);
 
     useEffect(() => {
         setDeadline(Date.now() + secondsLeft * 1000);
     }, [qrCode, secondsLeft]);
 
     const askForCode = useCallback(() => {
-        lastAsked.current = Date.now();
-        router.reload({ only: ['qrCode', 'secondsLeft'] });
+        if (asking.current) {
+            return;
+        }
+
+        asking.current = true;
+        router.reload({
+            only: ['qrCode', 'secondsLeft', 'issuedAt'],
+            onFinish: () => {
+                asking.current = false;
+                lastAnswer.current = Date.now();
+            },
+        });
     }, []);
 
     useEffect(() => {
@@ -137,17 +169,21 @@ function useCurrentCode(qrCode: string, secondsLeft: number): number {
             }
         };
 
-        askForCode();
+        if (Math.abs(Date.now() - issuedAt) > STALE_MS) {
+            askForCode();
+        }
+
         document.addEventListener('visibilitychange', onVisible);
 
         return () => {
             window.clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisible);
         };
+        // The issue time on opening only: later codes come with their own deadline.
     }, [askForCode]);
 
     useEffect(() => {
-        if (now >= deadline && now - lastAsked.current >= RETRY_MS) {
+        if (now >= deadline && now - lastAnswer.current >= RETRY_MS) {
             askForCode();
         }
     }, [now, deadline, askForCode]);
@@ -155,13 +191,18 @@ function useCurrentCode(qrCode: string, secondsLeft: number): number {
     return Math.max(0, Math.ceil((deadline - now) / 1000));
 }
 
-/** Keeps the screen on while the code shows, where the browser can; asked again when the page comes back. */
+/**
+ * Keeps the screen on while the code shows, where the browser can; asked
+ * again when the page comes back. A lock granted after the page was left is
+ * released at once, so the screen never stays on elsewhere in the app.
+ */
 function useScreenAwake(): void {
     useEffect(() => {
         if (!('wakeLock' in navigator)) {
             return;
         }
 
+        let left = false;
         let lock: WakeLockSentinel | null = null;
         const request = () => {
             if (document.visibilityState !== 'visible') {
@@ -171,6 +212,12 @@ function useScreenAwake(): void {
             navigator.wakeLock
                 .request('screen')
                 .then((sentinel) => {
+                    if (left) {
+                        void sentinel.release();
+
+                        return;
+                    }
+
                     lock = sentinel;
                 })
                 .catch(() => {
@@ -182,6 +229,7 @@ function useScreenAwake(): void {
         document.addEventListener('visibilitychange', request);
 
         return () => {
+            left = true;
             document.removeEventListener('visibilitychange', request);
             void lock?.release();
         };
