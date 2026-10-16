@@ -7,18 +7,27 @@ namespace App\Actions\Counter;
 use App\Enums\StamperStatus;
 use App\Models\Business;
 use App\Models\Stamper;
-use App\Models\StampEvent;
+use App\Models\Tap;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 
 /**
  * The counter screen of a business (CHW-29, S1), as one who works there
  * sees it: the current stampers they may arm (staff limited to one location,
  * that location's only), each with its location, whether it is enabled, its
- * last tap (the last stamp it gave: the business's own ledger, never the
- * platform's tap log) and its arming while it lasts.
+ * last tap and its arming while it lasts. The last tap is the last one the
+ * stamper received, waiting for sign-in or refused by the cooldown or cap
+ * included (staff see it landed and never arm again for it); never a
+ * malformed, forged or replayed URL. Read from the platform's tap log in
+ * bypass(), this business's stampers only.
  */
 final readonly class DescribeCounter
 {
+    /** Refusals of a URL rather than of a tap: nobody tapped this stamper. */
+    private const array NOT_A_TAP = ['malformed', 'unknown_tag', 'bad_mac', 'replay'];
+
+    public function __construct(private TenantContext $context) {}
+
     /**
      * @return array{
      *     businessName: string,
@@ -38,12 +47,13 @@ final readonly class DescribeCounter
             ->orderBy('id')
             ->get();
 
-        $lastTaps = StampEvent::query()
+        $lastTaps = $this->context->bypass(fn () => Tap::query()
             ->where('business_id', $business->id)
             ->whereIn('stamper_id', $stampers->pluck('id'))
+            ->where(fn ($query) => $query->whereNull('rejection')->orWhereNotIn('rejection', self::NOT_A_TAP))
             ->groupBy('stamper_id')
             ->selectRaw('stamper_id, max(created_at) as last_tap_at')
-            ->pluck('last_tap_at', 'stamper_id');
+            ->pluck('last_tap_at', 'stamper_id'));
 
         return [
             'businessName' => $business->name,

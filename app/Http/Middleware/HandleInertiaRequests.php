@@ -62,7 +62,7 @@ class HandleInertiaRequests extends Middleware
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
                 // Counter mode (CHW-29): whoever works in the business worked in.
-                'counter' => $request->user() instanceof User && app(TenantContext::class)->businessId() !== null,
+                'counter' => $this->worksInBusiness($request),
                 // The staff page (CHW-146): whoever runs the business worked in.
                 'staff' => $this->managesStaff($request),
             ],
@@ -77,6 +77,12 @@ class HandleInertiaRequests extends Middleware
             'translations' => Inertia::once(fn (): array => Locales::translations($locale))
                 ->as('translations-'.$locale),
         ];
+    }
+
+    /** Whether the user works in a business (owner, staff or HQ), so has a counter there; no business, no counter. */
+    private function worksInBusiness(Request $request): bool
+    {
+        return $request->user() instanceof User && app(TenantContext::class)->businessId() !== null;
     }
 
     /**

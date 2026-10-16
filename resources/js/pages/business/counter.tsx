@@ -1,5 +1,5 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
+import { useCallback, useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import CountdownRing from '@/components/rewards/countdown-ring';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -25,6 +25,8 @@ type CounterStamper = {
  * S1, counter mode (CHW-29): built for a morning rush, at arm's length on a
  * phone or a tablet. Each stamper the user may arm, its last tap, and "Next
  * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel".
+ * The stampers refresh every POLL_MS: an arming a tap took, or one made on
+ * another phone, shows within seconds.
  */
 export default function Counter({
     businessName,
@@ -39,7 +41,8 @@ export default function Counter({
 }) {
     const { t } = useTranslation();
     const { nav, errors } = usePage<{ errors: Record<string, string> }>().props;
-    const now = useNow();
+
+    usePoll(POLL_MS, { only: ['stampers'] });
 
     return (
         <>
@@ -80,7 +83,6 @@ export default function Counter({
                             <StamperPanel
                                 key={stamper.id}
                                 stamper={stamper}
-                                now={now}
                                 armSeconds={armSeconds}
                                 quantities={quantities}
                             />
@@ -94,17 +96,19 @@ export default function Counter({
 
 function StamperPanel({
     stamper,
-    now,
     armSeconds,
     quantities,
 }: {
     stamper: CounterStamper;
-    now: number;
     armSeconds: number;
     quantities: number[];
 }) {
-    const { t } = useTranslation();
-    const lastTap = useLastTap(stamper.lastTapAt, now);
+    const { t, tn } = useTranslation();
+    // Stable, so the ring's timer is not reset by each render (as on the redeem screen).
+    const reloadStampers = useCallback(
+        () => router.reload({ only: ['stampers'] }),
+        [],
+    );
     const armed =
         stamper.armedQty !== null && stamper.armedSecondsLeft !== null;
 
@@ -131,7 +135,11 @@ function StamperPanel({
                         {stamper.location ? ` · ${stamper.location}` : null}
                     </h2>
                     <p className="text-muted-foreground">
-                        {stamper.enabled ? lastTap : t('This stamper is off.')}
+                        {stamper.enabled ? (
+                            <LastTap at={stamper.lastTapAt} />
+                        ) : (
+                            t('This stamper is off.')
+                        )}
                     </p>
                 </div>
             </div>
@@ -142,12 +150,13 @@ function StamperPanel({
                         compact
                         seconds={stamper.armedSecondsLeft ?? 0}
                         total={armSeconds}
-                        onDone={() => router.reload({ only: ['stampers'] })}
+                        onDone={reloadStampers}
                     />
                     <div className="flex flex-1 flex-col gap-3">
                         <p className="text-2xl font-bold">
-                            {t('Next tap gives :count', {
-                                count: `+${stamper.armedQty}`,
+                            {/* "+5" reads left to right, also in an Arabic sentence. */}
+                            {tn('Next tap gives :count', {
+                                count: <bdi dir="ltr">+{stamper.armedQty}</bdi>,
                             })}
                         </p>
                         <Button asChild variant="outline" size="counter">
@@ -173,8 +182,12 @@ function StamperPanel({
                                 data={{ qty }}
                                 as="button"
                                 preserveScroll
-                                className={buttonVariants({
-                                    size: 'counter',
+                                // cn() merges the base text-sm away, so the counter size's text-2xl shows.
+                                className={cn(
+                                    buttonVariants({ size: 'counter' }),
+                                )}
+                                aria-label={t('Next tap gives :count', {
+                                    count: `+${qty}`,
                                 })}
                                 data-test={`counter-arm-${qty}`}
                             >
@@ -188,8 +201,15 @@ function StamperPanel({
     );
 }
 
-/** The time now, every second: "last tap 12 s ago" keeps counting. */
-function useNow(): number {
+/** How often the stampers refresh: an arming a tap took shows within seconds. */
+const POLL_MS = 3000;
+
+/**
+ * "Last tap 12 seconds ago", in the page's language, "No tap yet" before the
+ * first; it keeps counting each second, this line alone.
+ */
+function LastTap({ at }: { at: string | null }) {
+    const { t, locale } = useTranslation();
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -197,13 +217,6 @@ function useNow(): number {
 
         return () => window.clearInterval(timer);
     }, []);
-
-    return now;
-}
-
-/** "Last tap 12 seconds ago", in the page's language; "No tap yet" before the first. */
-function useLastTap(at: string | null, now: number): string {
-    const { t, locale } = useTranslation();
 
     if (at === null) {
         return t('No tap yet');

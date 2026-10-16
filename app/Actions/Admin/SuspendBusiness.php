@@ -7,6 +7,7 @@ namespace App\Actions\Admin;
 use App\Actions\Admin\Concerns\ChangesBusinessStatus;
 use App\Enums\BusinessStatus;
 use App\Models\Business;
+use App\Models\Stamper;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -47,6 +48,12 @@ final readonly class SuspendBusiness
             'business.suspended',
             $reason,
             lockStampers: true,
+            // A suspended business stamps nothing: an arming made before never lands on the first tap after a
+            // reinstatement (CHW-29). Its stampers are locked already.
+            afterSave: function (Business $locked): void {
+                Stamper::query()->current()->where('business_id', $locked->id)->whereNotNull('armed_qty')
+                    ->update(['armed_qty' => null, 'armed_until' => null, 'armed_by' => null]);
+            },
         );
     }
 }

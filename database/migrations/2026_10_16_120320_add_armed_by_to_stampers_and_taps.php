@@ -25,7 +25,7 @@ return new class extends Migration
         }
 
         // The counter's "last tap" per stamper (DescribeCounter) reads one row, not the stamper's whole history.
-        Schema::table('stamp_events', function (Blueprint $table): void {
+        Schema::table('taps', function (Blueprint $table): void {
             $table->index(['stamper_id', 'created_at']);
         });
 
@@ -45,7 +45,7 @@ return new class extends Migration
             DB::statement('alter table stampers drop constraint stampers_armed_by_foreign');
         }
 
-        Schema::table('stamp_events', function (Blueprint $table): void {
+        Schema::table('taps', function (Blueprint $table): void {
             $table->dropIndex(['stamper_id', 'created_at']);
         });
 

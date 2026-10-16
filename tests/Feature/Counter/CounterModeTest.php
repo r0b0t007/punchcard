@@ -65,8 +65,8 @@ afterEach(function (): void {
 });
 
 it('shows the owner and staff the stampers they may arm, with each one\'s last tap', function (string $who): void {
-    $enrollment = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
-    $this->tenants->stamp($enrollment, $this->tenants->a1, ['source' => 'nfc', 'stamper_id' => $this->stamper->id, 'nfc_tag_id' => $this->stamper->nfc_tag_id, 'counter' => 1, 'staff_id' => null, 'idempotency_key' => null, 'created_at' => now()->subMinute()]);
+    ($this->tap)($this->stamper, 1);
+    $this->travel(1)->minutes();
 
     ($this->as)($this->{$who})->get(route('counter.show'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('business/counter')
@@ -230,4 +230,32 @@ it('limits arming to the counter\'s pace', function (): void {
     }
 
     ($this->arm)($this->staff, $this->stamper, 1)->assertTooManyRequests();
+});
+
+it('shows as the last tap one still waiting for sign-in, never a forged URL', function (): void {
+    $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
+    $this->get(route('taps.receive', app(FakeTap::class)->build($tag->uid, 1)));
+    $this->travel(10)->seconds();
+    // A replayed URL: the same counter again.
+    $this->get(route('taps.receive', app(FakeTap::class)->build($tag->uid, 1)));
+
+    ($this->as)($this->staff)->get(route('counter.show'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.lastTapAt', now()->subSeconds(10)->toIso8601String()));
+});
+
+it('ends the armings of a staff member taken off the staff', function (): void {
+    ($this->arm)($this->staff, $this->stamper, 5);
+    $membership = $this->context->bypass(fn (): BusinessMember => BusinessMember::query()->where('user_id', $this->staff->id)->sole());
+
+    ($this->as)($this->owner)->delete(route('staff.destroy', $membership->id))->assertRedirect(route('staff.index'));
+
+    expect(($this->fresh)($this->stamper)->armed_qty)->toBeNull()
+        ->and(($this->tap)($this->stamper, 1))->toBe(1);
+});
+
+it('keeps the dashboard for an org admin who is also staff there', function (): void {
+    $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $this->tenants->member($hq, $this->tenants->a1);
+
+    ($this->as)($hq)->get(route('dashboard'))->assertOk();
 });
