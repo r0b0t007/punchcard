@@ -125,7 +125,13 @@ final readonly class ApplyTap
         // A redeem window open at the tap's time (Redeem now, CHW-26): this tap redeems instead of
         // stamping. Not on a paused stamper (AddStamps refuses it below), and not an armed tap:
         // the stamps staff armed were paid for, so they land first and the window stays open.
-        $reward = $stamper->status === StamperStatus::Active && ! $tap->armed ? $this->rewardToRedeem($tap, $user) : null;
+        // An arming never pays whoever made it (CHW-29): staff tapping their own card get one stamp, as anyone unarmed.
+        $armedForThem = $tap->armed && $tap->armed_by !== $user->id;
+        $qty = $armedForThem || ! $tap->armed ? $tap->qty : 1;
+        // Who armed it, while their account exists: a deleted one names nobody.
+        $armedBy = $armedForThem && $tap->armed_by !== null && User::query()->whereKey($tap->armed_by)->exists() ? $tap->armed_by : null;
+
+        $reward = $stamper->status === StamperStatus::Active && ! $armedForThem ? $this->rewardToRedeem($tap, $user) : null;
         if ($reward instanceof Reward) {
             try {
                 $redemption = $this->redeemReward->handle($reward, $user, RedeemPresence::tap($tap));
@@ -151,11 +157,11 @@ final readonly class ApplyTap
         // The tap keeps the card it is judged on and that card's stamps, refused (AddStamps
         // says which, StampRejected::onCard) or not, for its result page.
         try {
-            $result = DB::transaction(function () use ($tap, $stamper, $business, $user): StampResult {
+            $result = DB::transaction(function () use ($tap, $stamper, $business, $user, $qty, $armedBy): StampResult {
                 $enrollment = $this->enrollCustomer->handle($business, $user)
                     ?? throw new StampRejected(StampRejection::NotHonoured);
 
-                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $tap->qty, $tap->created_at, $tap->armed_by));
+                return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $qty, $tap->created_at, $armedBy));
             });
         } catch (StampRejected $rejected) {
             return $this->finish($tap, [

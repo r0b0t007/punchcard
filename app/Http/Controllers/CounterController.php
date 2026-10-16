@@ -48,7 +48,8 @@ final class CounterController extends Controller
         $user = $request->user();
 
         if (! $armStamper->handle($current, $request->qty(), $user)) {
-            return back()->withErrors(['qty' => __('This stamper can\'t be armed now: it is off, or the site is closed.')]);
+            // A toast, not a form error: the next poll would clear that before staff at arm's length read it.
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('This stamper can\'t be armed now: it is off, or the site is closed.')]);
         }
 
         return to_route('counter.show');

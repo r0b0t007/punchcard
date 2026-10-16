@@ -52,7 +52,7 @@ final readonly class SuspendBusiness
             // reinstatement (CHW-29). Its stampers are locked already.
             afterSave: function (Business $locked): void {
                 Stamper::query()->current()->where('business_id', $locked->id)->whereNotNull('armed_qty')
-                    ->update(['armed_qty' => null, 'armed_until' => null, 'armed_by' => null]);
+                    ->update(Stamper::DISARMED);
             },
         );
     }

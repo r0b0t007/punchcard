@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stamps;
 
-use App\Enums\BusinessRole;
 use App\Enums\CardMode;
-use App\Enums\OrganizationRole;
 use App\Enums\RewardStatus;
 use App\Enums\RewardType;
 use App\Enums\StamperStatus;
@@ -14,12 +12,10 @@ use App\Enums\StampRejection;
 use App\Enums\StampSource;
 use App\Events\EnrollmentChanged;
 use App\Models\Business;
-use App\Models\BusinessMember;
 use App\Models\CardBusiness;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
-use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
@@ -59,7 +55,7 @@ use LogicException;
  */
 final readonly class AddStamps
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private WorksAt $worksAt) {}
 
     public function handle(CardEnrollment $enrollment, StampRequest $request): StampResult
     {
@@ -199,24 +195,13 @@ final readonly class AddStamps
      */
     private function assertStaff(StampRequest $request): void
     {
-        // A tap's staff is who armed the stamper (CHW-29): recorded, not checked again here. StamperPolicy::arm
-        // checked them when they armed it, and they may have left the staff within the minute since.
+        // A tap's staff is who armed the stamper (CHW-29): checked when the tap took the arming (ReceiveTap), and
+        // recorded as it was then, even if they have left the staff since.
         if ($request->staffId === null || $request->source === StampSource::Nfc) {
             return;
         }
 
-        $member = BusinessMember::query()
-            ->where('business_id', $request->businessId)
-            ->where('user_id', $request->staffId)
-            ->where(fn ($membership) => $membership->where('role', BusinessRole::Owner)->orWhereNull('location_id')->orWhere('location_id', $request->locationId))
-            ->exists()
-            || OrganizationMember::query()
-                ->where('user_id', $request->staffId)
-                ->where('role', OrganizationRole::OrgAdmin)
-                ->whereIn('organization_id', Business::query()->whereKey($request->businessId)->select('organization_id'))
-                ->exists();
-
-        if (! $member) {
+        if (! $this->worksAt->handle($request->staffId, $request->businessId, $request->locationId)) {
             throw new LogicException('Only the business\'s staff, owners or org admins give stamps there.');
         }
     }

@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import InputError from '@/components/input-error';
 import CountdownRing from '@/components/rewards/countdown-ring';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -201,7 +201,37 @@ function StamperPanel({
     );
 }
 
+/**
+ * One ticker for the whole page, each second, whatever the number of
+ * stampers: every "last tap" line reads it (useSyncExternalStore).
+ */
+const secondListeners = new Set<() => void>();
+let secondTimer: number | undefined;
+let second = Date.now();
+
+function subscribeToSeconds(listener: () => void): () => void {
+    secondListeners.add(listener);
+    secondTimer ??= window.setInterval(() => {
+        second = Date.now();
+        secondListeners.forEach((notify) => notify());
+    }, 1000);
+
+    return () => {
+        secondListeners.delete(listener);
+
+        if (secondListeners.size === 0) {
+            window.clearInterval(secondTimer);
+            secondTimer = undefined;
+        }
+    };
+}
+
+function readSecond(): number {
+    return second;
+}
+
 /** How often the stampers refresh: an arming a tap took shows within seconds. */
+
 const POLL_MS = 3000;
 
 /**
@@ -210,13 +240,11 @@ const POLL_MS = 3000;
  */
 function LastTap({ at }: { at: string | null }) {
     const { t, locale } = useTranslation();
-    const [now, setNow] = useState(() => Date.now());
-
-    useEffect(() => {
-        const timer = window.setInterval(() => setNow(Date.now()), 1000);
-
-        return () => window.clearInterval(timer);
-    }, []);
+    const now = useSyncExternalStore(
+        subscribeToSeconds,
+        readSecond,
+        readSecond,
+    );
 
     if (at === null) {
         return t('No tap yet');

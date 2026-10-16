@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\Schema;
  * arming (stampers.armed_by) to the tap (taps.armed_by) to the stamp it
  * gives (stamp_events.staff_id, which outlives the tap log). The foreign
  * keys are Postgres only: on SQLite adding one rebuilds the table, which
- * drops the stampers' triggers. A deleted account leaves the column empty.
+ * drops the stampers' triggers. On Postgres a deleted account empties the
+ * column; anywhere, a tap whose armer is gone names nobody (ApplyTap) and its
+ * arming gives one stamp (ReceiveTap).
  */
 return new class extends Migration
 {

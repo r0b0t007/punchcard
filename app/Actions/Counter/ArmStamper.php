@@ -9,6 +9,7 @@ use App\Models\Stamper;
 use App\Models\User;
 use App\Support\Tenancy\ArchivedSites;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * "Next tap gives" (CHW-29, S1): the next verified tap on the stamper within
@@ -34,7 +35,9 @@ final readonly class ArmStamper
         return DB::transaction(function () use ($stamper, $qty, $armedBy): bool {
             $locked = Stamper::query()->current()->whereKey($stamper->id)->lockForUpdate()->first();
 
+            // Checked again on the locked row: a stamper moved meanwhile may be beyond a staff member's location.
             if (! $locked instanceof Stamper
+                || Gate::forUser($armedBy)->denies('arm', $locked)
                 || $locked->status !== StamperStatus::Active
                 || ! ArchivedSites::isOpen($locked->business_id, $locked->location_id, counter: true)) {
                 return false;

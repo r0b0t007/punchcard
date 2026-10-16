@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Account\DeleteAccount;
 use App\Actions\Admin\SuspendBusiness;
 use App\Actions\Counter\ArmStamper;
 use App\Enums\BusinessRole;
@@ -127,7 +128,8 @@ it('offers +1, +2, +3 and +5 only', function (mixed $qty): void {
 it('never arms a disabled stamper', function (): void {
     $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Disabled])->save());
 
-    ($this->arm)($this->staff, $this->stamper, 3)->assertSessionHasErrors('qty');
+    ($this->arm)($this->staff, $this->stamper, 3)->assertRedirect(route('counter.show'))->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'This stamper can\'t be armed now: it is off, or the site is closed.']);
 
     expect(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
 });
@@ -249,8 +251,7 @@ it('ends the armings of a staff member taken off the staff', function (): void {
 
     ($this->as)($this->owner)->delete(route('staff.destroy', $membership->id))->assertRedirect(route('staff.index'));
 
-    expect(($this->fresh)($this->stamper)->armed_qty)->toBeNull()
-        ->and(($this->tap)($this->stamper, 1))->toBe(1);
+    expect(($this->tap)($this->stamper, 1))->toBe(1);
 });
 
 it('keeps the dashboard for an org admin who is also staff there', function (): void {
@@ -258,4 +259,51 @@ it('keeps the dashboard for an org admin who is also staff there', function (): 
     $this->tenants->member($hq, $this->tenants->a1);
 
     ($this->as)($hq)->get(route('dashboard'))->assertOk();
+});
+
+it('never pays an arming to whoever made it: their own tap gives one stamp', function (): void {
+    ($this->arm)($this->staff, $this->stamper, 5);
+    $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
+
+    $this->actingAs($this->staff)->get(route('taps.receive', app(FakeTap::class)->build($tag->uid, 1)));
+
+    $stamp = $this->context->bypass(fn (): StampEvent => StampEvent::query()->where('stamper_id', $this->stamper->id)->sole());
+    expect($stamp->qty)->toBe(1)
+        ->and($stamp->staff_id)->toBeNull();
+});
+
+it('gives one stamp for an arming whose armer no longer works there', function (string $how): void {
+    ($this->arm)($this->staff, $this->stamper, 5);
+
+    match ($how) {
+        'account deleted' => app(DeleteAccount::class)->handle($this->staff),
+        'limited to another location' => $this->context->bypass(function (): void {
+            $terrace = Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace']);
+            BusinessMember::query()->where('user_id', $this->staff->id)->update(['location_id' => $terrace->id]);
+        }),
+    };
+
+    expect(($this->tap)($this->stamper, 1))->toBe(1);
+})->with(['account deleted', 'limited to another location']);
+
+it('names nobody on a tap whose armer\'s account went before it was claimed', function (): void {
+    ($this->arm)($this->staff, $this->stamper, 5);
+    $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
+    auth()->logout();
+    $this->get(route('taps.receive', app(FakeTap::class)->build($tag->uid, 1)));
+    $this->context->bypass(fn () => $this->staff->delete());
+
+    $this->actingAs(User::factory()->create())->get(route('taps.claim'))->assertRedirect(route('taps.result'));
+
+    $stamp = $this->context->bypass(fn (): StampEvent => StampEvent::query()->where('stamper_id', $this->stamper->id)->sole());
+    expect($stamp->qty)->toBe(5)
+        ->and($stamp->staff_id)->toBeNull();
+});
+
+it('checks the location limit again on the locked stamper', function (): void {
+    $terrace = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace']));
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff, locationId: $terrace->id);
+
+    expect(app(ArmStamper::class)->handle($this->stamper, 3, $this->staff))->toBeFalse()
+        ->and(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
 });

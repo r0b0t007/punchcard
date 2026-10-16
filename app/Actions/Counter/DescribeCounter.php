@@ -9,6 +9,7 @@ use App\Models\Business;
 use App\Models\Stamper;
 use App\Models\Tap;
 use App\Support\Tenancy\TenantContext;
+use DateTimeInterface;
 use Illuminate\Support\Carbon;
 
 /**
@@ -47,18 +48,21 @@ final readonly class DescribeCounter
             ->orderBy('id')
             ->get();
 
-        $lastTaps = $this->context->bypass(fn () => Tap::query()
-            ->where('business_id', $business->id)
-            ->whereIn('stamper_id', $stampers->pluck('id'))
-            ->where(fn ($query) => $query->whereNull('rejection')->orWhereNotIn('rejection', self::NOT_A_TAP))
-            ->groupBy('stamper_id')
-            ->selectRaw('stamper_id, max(created_at) as last_tap_at')
-            ->pluck('last_tap_at', 'stamper_id'));
+        // One newest-first lookup per stamper on (stamper_id, created_at): it stops at the first real tap, however
+        // long the stamper's history, on every poll (a counter has a few stampers).
+        $lastTaps = $this->context->bypass(fn () => $stampers->mapWithKeys(fn (Stamper $stamper): array => [
+            $stamper->id => Tap::query()
+                ->where('stamper_id', $stamper->id)
+                ->where('business_id', $business->id)
+                ->where(fn ($query) => $query->whereNull('rejection')->orWhereNotIn('rejection', self::NOT_A_TAP))
+                ->latest('created_at')
+                ->value('created_at'),
+        ]));
 
         return [
             'businessName' => $business->name,
             'stampers' => $stampers->map(function (Stamper $stamper) use ($lastTaps): array {
-                $armed = $stamper->armed_qty !== null && $stamper->armed_until?->isFuture() === true;
+                $armed = $stamper->isArmed();
                 $lastTap = $lastTaps->get($stamper->id);
 
                 return [
@@ -66,7 +70,7 @@ final readonly class DescribeCounter
                     'label' => $stamper->label,
                     'location' => $stamper->location?->name,
                     'enabled' => $stamper->status === StamperStatus::Active,
-                    'lastTapAt' => is_string($lastTap) ? Carbon::parse($lastTap)->toIso8601String() : null,
+                    'lastTapAt' => $lastTap instanceof DateTimeInterface || is_string($lastTap) ? Carbon::parse($lastTap)->toIso8601String() : null,
                     'armedQty' => $armed ? $stamper->armed_qty : null,
                     'armedSecondsLeft' => $armed ? (int) max(0, ceil(now()->diffInSeconds($stamper->armed_until))) : null,
                 ];

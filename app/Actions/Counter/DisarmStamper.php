@@ -15,6 +15,6 @@ final readonly class DisarmStamper
 {
     public function handle(Stamper $stamper): void
     {
-        Stamper::query()->whereKey($stamper->id)->whereNotNull('armed_qty')->update(['armed_qty' => null, 'armed_until' => null, 'armed_by' => null]);
+        Stamper::query()->whereKey($stamper->id)->whereNotNull('armed_qty')->update(Stamper::DISARMED);
     }
 }
