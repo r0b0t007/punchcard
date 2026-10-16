@@ -78,8 +78,9 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Whether the user runs the business worked in, so manages its staff (BusinessMemberPolicy::viewAny, read
-     * from the tenant with no query); no business, no staff page.
+     * Whether the user runs the business worked in, so manages its staff; no business, no staff page. The same
+     * rule as BusinessMemberPolicy::viewAny (owner or org admin there), read from the tenant so no page pays a
+     * query: change one, change the other.
      */
     private function managesStaff(Request $request): bool
     {

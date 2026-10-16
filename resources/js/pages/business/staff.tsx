@@ -72,7 +72,7 @@ export default function Staff({
 
     return (
         <>
-            <Head title={t('Staff')} />
+            <Head title={t('Team')} />
             <div className="flex max-w-2xl flex-col gap-8 p-4">
                 <section className="space-y-4">
                     <Heading variant="small" title={t('Your staff')} />
@@ -101,7 +101,7 @@ export default function Staff({
                                 </div>
                                 {member.removable ? (
                                     <ConfirmAction
-                                        trigger={t('Remove')}
+                                        trigger={t('Remove from the team')}
                                         title={t(
                                             'Remove :name from your staff?',
                                             { name: member.name },
@@ -109,7 +109,7 @@ export default function Staff({
                                         description={t(
                                             'They can no longer stamp or redeem here. Their account and the stamps they gave stay.',
                                         )}
-                                        confirmLabel={t('Remove')}
+                                        confirmLabel={t('Remove from the team')}
                                         keepLabel={t('Cancel')}
                                         href={destroy(member.id)}
                                         test="remove-member"
@@ -316,7 +316,7 @@ function ConfirmAction({
 Staff.layout = {
     breadcrumbs: [
         {
-            title: 'Staff',
+            title: 'Team',
             href: index(),
         },
     ],

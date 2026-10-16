@@ -39,7 +39,7 @@ const cardsNavItem: NavItem = {
 };
 
 const staffNavItem: NavItem = {
-    title: 'Staff',
+    title: 'Team',
     href: staff(),
     icon: Users,
 };

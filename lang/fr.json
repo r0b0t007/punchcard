@@ -717,5 +717,8 @@
     "Its link stops working. You can invite them again later.": "Son lien ne fonctionnera plus. Vous pourrez réinviter cette personne plus tard.",
     "Cancel the invitation": "Annuler l’invitation",
     "Keep it": "La garder",
-    "That invitation was already used or has run out.": "Cette invitation a déjà été utilisée ou a expiré."
+    "That invitation was already used or has run out.": "Cette invitation a déjà été utilisée ou a expiré.",
+    "Team": "Équipe",
+    "Remove from the team": "Retirer de l’équipe",
+    "Owners are handed over, not removed here.": "Un propriétaire se transmet, il ne se retire pas ici."
 }

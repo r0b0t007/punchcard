@@ -74,7 +74,7 @@ it('lets neither staff remove anyone, nor an owner be removed here', function ()
     ($this->as)($this->staff, $this->tenants->a1)->delete(route('staff.destroy', ($this->membershipOf)($other, $this->tenants->a1)->id))->assertForbidden();
     // An owner, even one of two (so not the last): handed over (CHW-140), never removed here.
     $coOwner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
-    ($this->as)($this->owner, $this->tenants->a1)->delete(route('staff.destroy', ($this->membershipOf)($coOwner, $this->tenants->a1)->id))->assertForbidden();
+    ($this->as)($this->owner, $this->tenants->a1)->delete(route('staff.destroy', ($this->membershipOf)($coOwner, $this->tenants->a1)->id))->assertRedirect(route('staff.index'));
 
     expect(($this->membershipOf)($other, $this->tenants->a1))->not->toBeNull()
         ->and(($this->membershipOf)($coOwner, $this->tenants->a1))->not->toBeNull();
@@ -134,9 +134,10 @@ it('lists owners first, then by name whatever its case, never by a number in it'
     $this->tenants->member(User::factory()->create(['name' => '11']), $this->tenants->a1);
     $this->tenants->member(User::factory()->create(['name' => 'alice']), $this->tenants->a1);
     $this->tenants->member(User::factory()->create(['name' => 'Zoe']), $this->tenants->a1);
+    $this->tenants->member(User::factory()->create(['name' => 'Émile']), $this->tenants->a1);
 
     ($this->as)($this->owner, $this->tenants->a1)->get(route('staff.index'))
-        ->assertInertia(fn (Assert $page): Assert => $page->where('members', fn ($members): bool => collect($members)->pluck('name')->all() === ['9999', 'Nour Owner', '11', 'alice', 'Karim Staff', 'Zoe']));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('members', fn ($members): bool => collect($members)->pluck('name')->all() === ['9999', 'Nour Owner', '11', 'alice', 'Émile', 'Karim Staff', 'Zoe']));
 });
 
 it('keeps an invitation used meanwhile, with its member, when the owner cancels it', function (): void {

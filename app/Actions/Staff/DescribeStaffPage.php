@@ -10,6 +10,7 @@ use App\Models\BusinessMember;
 use App\Models\Location;
 use App\Models\StaffInvitation;
 use App\Models\User;
+use Collator;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -45,14 +46,16 @@ final readonly class DescribeStaffPage
 
         $memberships = BusinessMember::query()->where('business_id', $business->id)->get();
         $users = User::query()->whereIn('id', $memberships->pluck('user_id'))->get()->keyBy('id');
+        $collator = new Collator(app()->getLocale());
         $memberLocations = Location::query()->whereIn('id', $memberships->pluck('location_id')->filter())->pluck('name', 'id');
 
         return [
             'members' => $memberships
                 ->filter(fn (BusinessMember $membership): bool => $users->has($membership->user_id))
-                // Owners first, then by name, whatever its case or script.
-                ->sort(fn (BusinessMember $a, BusinessMember $b): int => [$a->role !== BusinessRole::Owner, mb_strtolower((string) $users->get($a->user_id)?->name)]
-                    <=> [$b->role !== BusinessRole::Owner, mb_strtolower((string) $users->get($b->user_id)?->name)])
+                // Owners first, then by name in the page's language's order (accents, case, any script), then as added.
+                ->sort(fn (BusinessMember $a, BusinessMember $b): int => ($a->role !== BusinessRole::Owner) <=> ($b->role !== BusinessRole::Owner)
+                    ?: (int) $collator->compare((string) $users->get($a->user_id)?->name, (string) $users->get($b->user_id)?->name)
+                    ?: $a->id <=> $b->id)
                 ->map(function (BusinessMember $membership) use ($users, $memberLocations): array {
                     /** @var User $user */
                     $user = $users->get($membership->user_id);

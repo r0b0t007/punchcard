@@ -76,12 +76,10 @@ final class StaffController extends Controller
         $membership = BusinessMember::query()->whereKey($member)->where('business_id', $business->id)->first() ?? abort(404);
         Gate::authorize('delete', $membership);
 
-        // Staff only (RemoveStaffMember): an owner is handed over (CHW-140), never removed here.
-        if (! $removeStaffMember->handle($membership)) {
-            abort(403);
-        }
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Removed from your staff.')]);
+        // Staff only (RemoveStaffMember): an owner (or someone made one meanwhile) is handed over (CHW-140), never removed here.
+        Inertia::flash('toast', $removeStaffMember->handle($membership)
+            ? ['type' => 'success', 'message' => __('Removed from your staff.')]
+            : ['type' => 'error', 'message' => __('Owners are handed over, not removed here.')]);
 
         return to_route('staff.index');
     }
@@ -89,12 +87,6 @@ final class StaffController extends Controller
     /** The business worked in (TenantContext); none (an org admin across the organization) is a 403. */
     private function business(TenantContext $context): Business
     {
-        $business = $context->businessId() === null ? null : Business::query()->find($context->businessId());
-
-        if (! $business instanceof Business) {
-            abort(403);
-        }
-
-        return $business;
+        return $context->business() ?? abort(403);
     }
 }
