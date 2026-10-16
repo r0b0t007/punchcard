@@ -728,5 +728,6 @@
     "No stamper here yet: it appears once it is placed.": "Pas encore de borne ici : elle apparaît une fois installée.",
     "No tap yet": "Aucun passage pour l’instant",
     "This stamper can't be armed now: it is off, or the site is closed.": "Cette borne ne peut pas être armée maintenant : elle est désactivée, ou le site est fermé.",
-    "This stamper is off.": "Cette borne est désactivée."
+    "This stamper is off.": "Cette borne est désactivée.",
+    "Last stamps": "Derniers tampons"
 }

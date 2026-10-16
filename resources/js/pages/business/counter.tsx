@@ -1,5 +1,7 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { useCallback, useSyncExternalStore } from 'react';
+import { RecentStamps } from '@/components/dashboard/stamp-lists';
+import type { DashboardStats } from '@/components/dashboard/types';
 import InputError from '@/components/input-error';
 import CountdownRing from '@/components/rewards/countdown-ring';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -24,25 +26,28 @@ type CounterStamper = {
 /**
  * S1, counter mode (CHW-29): built for a morning rush, at arm's length on a
  * phone or a tablet. Each stamper the user may arm, its last tap, and "Next
- * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel".
- * The stampers refresh every POLL_MS: an arming a tap took, or one made on
- * another phone, shows within seconds.
+ * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel";
+ * then the last stamps given here, as they land. Stampers and feed refresh
+ * every POLL_MS: an arming a tap took, or one made on another phone, and each
+ * new stamp show within seconds.
  */
 export default function Counter({
     businessName,
     stampers,
+    feed,
     armSeconds,
     quantities,
 }: {
     businessName: string;
     stampers: CounterStamper[];
+    feed: DashboardStats['recentStamps'];
     armSeconds: number;
     quantities: number[];
 }) {
     const { t } = useTranslation();
     const { nav, errors } = usePage<{ errors: Record<string, string> }>().props;
 
-    usePoll(POLL_MS, { only: ['stampers'] });
+    usePoll(POLL_MS, { only: ['stampers', 'feed'] });
 
     return (
         <>
@@ -89,6 +94,24 @@ export default function Counter({
                         ))}
                     </div>
                 )}
+
+                <section
+                    aria-labelledby="counter-feed"
+                    className="mx-auto mt-8 max-w-5xl"
+                >
+                    <h2
+                        id="counter-feed"
+                        className="mb-3 text-lg font-semibold"
+                    >
+                        {t('Last stamps')}
+                    </h2>
+                    <div
+                        className="rounded-2xl border bg-card px-4 text-card-foreground"
+                        data-test="counter-feed"
+                    >
+                        <RecentStamps stamps={feed} large />
+                    </div>
+                </section>
             </div>
         </>
     );

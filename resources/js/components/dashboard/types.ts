@@ -18,6 +18,8 @@ export type DashboardStats = {
         id: number;
         /** Null for a customer the user may not see. */
         customer: string | null;
+        /** The card it went on (CHW-29). */
+        card: string | null;
         location: string | null;
         source: string;
         sourceLabel: string;

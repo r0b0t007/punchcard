@@ -109,6 +109,17 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
         return Attribute::make(set: fn (string $value): string => self::normalizeEmail($value));
     }
 
+    /**
+     * The first word of the name ("Salma" for "Salma Tazi"): split on any space, a no-break or Arabic one too.
+     * Null for a blank name, so a page says "A customer" instead (CHW-29).
+     */
+    public function firstName(): ?string
+    {
+        $words = preg_split('/[\s\p{Z}]+/u', (string) $this->name, -1, PREG_SPLIT_NO_EMPTY);
+
+        return is_array($words) && $words !== [] ? $words[0] : null;
+    }
+
     /** The new address it asked for, while its link still works (RequestEmailChange). */
     public function pendingEmail(): ?string
     {
