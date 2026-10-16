@@ -729,5 +729,14 @@
     "No tap yet": "لا نقرات بعد",
     "This stamper can't be armed now: it is off, or the site is closed.": "لا يمكن تجهيز جهاز الختم هذا الآن: إنه متوقف، أو الموقع مغلق.",
     "This stamper is off.": "جهاز الختم هذا متوقف.",
-    "Last stamps": "آخر الأختام"
+    "Last stamps": "آخر الأختام",
+    ":name, show this to staff": ":name، أظهِر هذا للموظّف",
+    "My QR": "رمز QR الخاص بي",
+    "New code in": "رمز جديد خلال",
+    "No NFC? Show my QR": "لا يوجد NFC؟ أظهِر رمز QR",
+    "Show this to staff": "أظهِر هذا للموظّف",
+    "Turn your screen brightness up so it scans easily.": "ارفع سطوع الشاشة ليُمسح الرمز بسهولة.",
+    "Use this if your phone has no NFC.": "استخدمه إن لم يكن في هاتفك NFC.",
+    "Your member QR code": "رمز QR الخاص بعضويتك",
+    "Getting a new code…": "جارٍ جلب رمز جديد…"
 }

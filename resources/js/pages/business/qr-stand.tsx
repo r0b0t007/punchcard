@@ -9,7 +9,7 @@ type Props = {
     businessName: string;
     logoUrl: string | null;
     joinUrl: string;
-    /** The QR code as an SVG data URL, made on the server from the app's own link (JoinQrCode). */
+    /** The QR code as an SVG data URL, made on the server from the app's own link (QrCode). */
     qrCode: string;
 };
 

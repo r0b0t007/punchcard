@@ -729,5 +729,14 @@
     "No tap yet": "Aucun passage pour l’instant",
     "This stamper can't be armed now: it is off, or the site is closed.": "Cette borne ne peut pas être armée maintenant : elle est désactivée, ou le site est fermé.",
     "This stamper is off.": "Cette borne est désactivée.",
-    "Last stamps": "Derniers tampons"
+    "Last stamps": "Derniers tampons",
+    ":name, show this to staff": ":name, montrez ceci au personnel",
+    "My QR": "Mon QR",
+    "New code in": "Nouveau code dans",
+    "No NFC? Show my QR": "Pas de NFC ? Montrer mon QR",
+    "Show this to staff": "Montrez ceci au personnel",
+    "Turn your screen brightness up so it scans easily.": "Augmentez la luminosité de l’écran pour qu’il se scanne facilement.",
+    "Use this if your phone has no NFC.": "Utilisez-le si votre téléphone n’a pas le NFC.",
+    "Your member QR code": "Votre code QR de membre",
+    "Getting a new code…": "Nouveau code en cours…"
 }

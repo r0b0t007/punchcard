@@ -42,10 +42,16 @@ export type StaticRoute = {
 
 /**
  * The pages of My cards (C5, C6), which the service worker answers with
- * the cards kept on the phone when they can't load (CHW-35).
+ * the cards kept on the phone when they can't load (CHW-35). Not My QR
+ * (C10, CHW-28): its code comes from the server, so offline it has none,
+ * and the cards list in its place would leave staff nothing to scan.
  */
 export function hasOfflineFallback(url: URL, origin: string): boolean {
-    return url.origin === origin && /^\/app(\/|$)/.test(url.pathname);
+    return (
+        url.origin === origin &&
+        /^\/app(\/|$)/.test(url.pathname) &&
+        url.pathname !== '/app/qr'
+    );
 }
 
 /**

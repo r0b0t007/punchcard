@@ -105,6 +105,7 @@ describe('hasOfflineFallback', () => {
             '/t?e=00',
             '/rewards',
             '/business',
+            '/app/qr',
         ]) {
             expect(fallback(path)).toBe(false);
         }
@@ -214,6 +215,7 @@ describe('isMyCardsVisit', () => {
 
     it('covers no other page, nor a request that is no Inertia visit', () => {
         expect(visit('/rewards')).toBe(false);
+        expect(visit('/app/qr')).toBe(false);
         expect(
             isMyCardsVisit(
                 'GET',

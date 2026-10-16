@@ -7,6 +7,7 @@ import {
     Link2,
     MapPin,
     Phone,
+    QrCode,
 } from 'lucide-react';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
@@ -19,7 +20,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
-import { cards } from '@/routes/app';
+import { cards, qr as memberQr } from '@/routes/app';
 import { follow } from '@/routes/app/cards';
 import { index as rewards } from '@/routes/rewards';
 import { notice as verifyEmail } from '@/routes/verification';
@@ -111,6 +112,16 @@ export default function MyCard({
                     />
                 ) : null}
                 <TapLoyaltyCard card={card} logoUrl={logoUrl} />
+
+                {/* "My QR" (CHW-28, C10): staff scan it when the phone can't tap the stamper. */}
+                <Link
+                    href={memberQr()}
+                    className="flex items-center justify-center gap-2 rounded-card border p-3 text-sm font-medium"
+                    data-test="card-my-qr-link"
+                >
+                    <QrCode aria-hidden="true" className="size-4" />
+                    {t('No NFC? Show my QR')}
+                </Link>
 
                 {paused ? (
                     <p className="rounded-card border p-4 text-sm text-muted-foreground">

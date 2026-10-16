@@ -8,6 +8,7 @@ use App\Http\Controllers\FinishSignUpController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\LoginLinkController;
+use App\Http\Controllers\MemberQrController;
 use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\OfflinePageController;
@@ -112,6 +113,8 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::get('start', StartController::class)->name('start');
     // My cards (CHW-27): the customer's home, and the cards of anyone who collects stamps.
     Route::get('app', [MyCardsController::class, 'index'])->name('app.cards');
+    // "My QR" (CHW-28, C10): the rotating member QR staff scan when the phone has no NFC.
+    Route::get('app/qr', [MemberQrController::class, 'show'])->name('app.qr');
     Route::get('app/cards/{enrollment}', [MyCardsController::class, 'show'])->whereNumber('enrollment')->name('app.cards.show');
     Route::patch('app/cards/{enrollment}/follow', [MyCardsController::class, 'follow'])->whereNumber('enrollment')->name('app.cards.follow');
     Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
