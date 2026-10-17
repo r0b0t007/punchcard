@@ -17,6 +17,7 @@ use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffInvitationController;
+use App\Http\Controllers\StamperController;
 use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
 use App\Http\Middleware\NeverCache;
@@ -77,6 +78,9 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::get('counter/scans/{scan}', [CounterScanController::class, 'show'])->whereUlid('scan')->name('counter.scans.show');
         Route::post('counter/scans/{scan}/stamps', [CounterScanController::class, 'stamp'])->whereUlid('scan')->middleware('throttle:counter-arm')->name('counter.scans.stamp');
         Route::post('counter/scans/{scan}/rewards/{reward}/redeem', [CounterScanController::class, 'redeem'])->whereUlid('scan')->where('reward', '[0-9]{1,18}')->middleware('throttle:counter-arm')->name('counter.scans.redeem');
+        // The stampers and the taps refused (CHW-36, B12), the owner's; {stamper} resolves in the tenant.
+        Route::get('stampers', [StamperController::class, 'index'])->name('stampers.index');
+        Route::patch('stampers/{stamper}/status', [StamperController::class, 'status'])->whereNumber('stamper')->middleware('throttle:counter-arm')->name('stampers.status');
         // The staff and their invitations (CHW-146), the owner's; {member} is a business_user row.
         Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
         Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');

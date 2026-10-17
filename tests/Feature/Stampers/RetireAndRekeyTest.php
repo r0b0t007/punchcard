@@ -189,7 +189,8 @@ describe('disabling and enabling', function (): void {
         expect(Artisan::call('punchcard:stamper:disable', ['uid' => $this->uid]))->toBe(0)
             ->and(Artisan::output())->toContain('was already disabled, perhaps by the business');
 
-        $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Active])->save());
+        // Switched on again once the hold is released (a held stamper is always disabled).
+        $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Active, 'held_at' => null])->save());
 
         expect(Artisan::call('punchcard:stamper:enable', ['uid' => $this->uid]))->toBe(0)
             ->and(Artisan::output())->toContain('was already enabled');

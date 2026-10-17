@@ -5,6 +5,7 @@ import {
     FolderGit2,
     LayoutGrid,
     Nfc,
+    Stamp,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -24,6 +25,7 @@ import { dashboard } from '@/routes';
 import { index as cards } from '@/routes/cards';
 import { show as counter } from '@/routes/counter';
 import { index as staff } from '@/routes/staff';
+import { index as stampers } from '@/routes/stampers';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -44,6 +46,12 @@ const counterNavItem: NavItem = {
     title: 'Counter mode',
     href: counter(),
     icon: Nfc,
+};
+
+const stampersNavItem: NavItem = {
+    title: 'Stampers',
+    href: stampers(),
+    icon: Stamp,
 };
 
 const staffNavItem: NavItem = {
@@ -71,6 +79,7 @@ export function AppSidebar() {
         ...mainNavItems,
         ...(nav.counter ? [counterNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
+        ...(nav.stampers ? [stampersNavItem] : []),
         ...(nav.staff ? [staffNavItem] : []),
     ];
 

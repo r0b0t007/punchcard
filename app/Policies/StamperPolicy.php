@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Models\Business;
 use App\Models\Stamper;
 use App\Models\User;
 use App\Policies\Concerns\ReadsTenant;
@@ -17,6 +18,12 @@ use App\Policies\Concerns\ReadsTenant;
 final class StamperPolicy
 {
     use ReadsTenant;
+
+    /** The stampers page (B12, CHW-36): whoever runs the business, never its staff. */
+    public function viewAny(User $user, Business $business): bool
+    {
+        return $this->runs($business->organization_id, $business->id);
+    }
 
     public function view(User $user, Stamper $stamper): bool
     {

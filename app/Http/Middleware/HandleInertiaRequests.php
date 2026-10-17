@@ -65,6 +65,8 @@ class HandleInertiaRequests extends Middleware
                 'counter' => $this->worksInBusiness($request),
                 // The staff page (CHW-146): whoever runs the business worked in.
                 'staff' => $this->managesStaff($request),
+                // The stampers page (CHW-36, B12): the same people (StamperPolicy::viewAny).
+                'stampers' => $this->managesStaff($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,

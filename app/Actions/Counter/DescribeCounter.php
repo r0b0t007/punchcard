@@ -24,9 +24,6 @@ use Illuminate\Support\Carbon;
  */
 final readonly class DescribeCounter
 {
-    /** Refusals of a URL rather than of a tap: nobody tapped this stamper. */
-    private const array NOT_A_TAP = ['malformed', 'unknown_tag', 'bad_mac', 'replay'];
-
     public function __construct(private TenantContext $context) {}
 
     /**
@@ -54,7 +51,7 @@ final readonly class DescribeCounter
             $stamper->id => Tap::query()
                 ->where('stamper_id', $stamper->id)
                 ->where('business_id', $business->id)
-                ->where(fn ($query) => $query->whereNull('rejection')->orWhereNotIn('rejection', self::NOT_A_TAP))
+                ->onTheStamper()
                 ->latest('created_at')
                 ->value('created_at'),
         ]));

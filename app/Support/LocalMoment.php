@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Location;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -34,6 +35,12 @@ final class LocalMoment
             'date' => $local->format('Y-m-d'),
             'time' => $local->format('H:i'),
         ];
+    }
+
+    /** When a site's day began (its local midnight), as UTC for a query: the day AddStamps' daily cap counts, for B12's taps today. */
+    public static function dayStart(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
+    {
+        return ($now ?? now())->toImmutable()->setTimezone($timezone)->startOfDay()->utc();
     }
 
     /**

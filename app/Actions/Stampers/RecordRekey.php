@@ -19,7 +19,9 @@ use App\Support\Tenancy\TenantContext;
  * bad MAC. Its stamper must be paused first, so no tap signed with the old
  * key races the new version. $from is the version the admin re-provisioned
  * from: recording the same re-key twice would leave the tag at a version its
- * keys do not match, and every tap would fail.
+ * keys do not match, and every tap would fail. Recording it releases the
+ * platform's hold (SetStamperStatus): the stamper stays off, but its
+ * business may now switch it on again (B12).
  */
 final readonly class RecordRekey
 {
@@ -52,6 +54,7 @@ final readonly class RecordRekey
             }
 
             $tag->forceFill(['key_version' => $from + 1])->save();
+            $current?->forceFill(['held_at' => null])->save();
             $this->recordAudit->handle('tag.rekeyed', $tag, context: ['from' => $from, 'to' => $from + 1]);
 
             return $tag->setRelation('currentStamper', $current);
