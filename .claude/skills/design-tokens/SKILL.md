@@ -62,3 +62,24 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 ## Importing designs
 
 Claude Design / Stitch exports are references, not code to paste. Rebuild with our components and tokens, then compare in Playwright screenshots (mobile-safari) in light, dark and Arabic.
+
+## Design sources (Claude Design)
+
+Every built screen has a design in the Claude Design project "Punchcard loyalty card flow"
+(https://claude.ai/design/p/6b6294d1-955e-46f5-92c2-3668f3863d0f). Open the file before restyling a screen; a screen
+built later gets its design first, in the same project, and a row here. `punchcard-ui.css` there mirrors the tokens
+above: keep the two in step.
+
+| Screens                                                                                                         | Design file                             |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| C1 first tap, C2 stamp success, C3 reward unlocked, C4 redeem, cooldown (with states)                           | `Punchcard Tap Flow.dc.html`            |
+| Redeemed (staff glance), C9 My rewards, C4 time's up and verify email                                           | `Punchcard Redemption.dc.html`          |
+| The loyalty card                                                                                                | `LoyaltyCard.dc.html`                   |
+| C5 My cards, C6 card detail, C10 My QR, C12 profile and settings, C13 install sheet, tap refused, offline pages | `Punchcard Customer Home.dc.html`       |
+| Every page in `pages/auth/*` (sign in, sign up, two-factor, email links, confirm it's you, staff invitation)    | `Punchcard Sign In.dc.html`             |
+| B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                     | `Punchcard Business Onboarding.dc.html` |
+| B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                              | `Punchcard Business App.dc.html`        |
+| The six notification emails                                                                                     | `Punchcard Emails.dc.html`              |
+
+Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8–B12, B14–B19, S2, S3 (redemption confirm: the redeemed design is only what staff glance at), M1. Filament (A1–A4) stays
+stock.
