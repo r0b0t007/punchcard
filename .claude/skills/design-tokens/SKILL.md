@@ -81,5 +81,5 @@ above: keep the two in step.
 | B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                              | `Punchcard Business App.dc.html`        |
 | The six notification emails                                                                                     | `Punchcard Emails.dc.html`              |
 
-Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8–B12, B14–B19, S2, M1. Filament (A1–A4) stays
+Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8–B12, B14–B19, S2, S3 (redemption confirm: the redeemed design is only what staff glance at), M1. Filament (A1–A4) stays
 stock.
