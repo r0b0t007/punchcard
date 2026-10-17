@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, Sun } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
@@ -17,6 +17,7 @@ import { cards } from '@/routes/app';
 export default function MemberQr({
     qrCode,
     secondsLeft,
+    shortCode,
     windowSeconds,
     issuedAt,
     firstName,
@@ -24,6 +25,8 @@ export default function MemberQr({
     /** The current window's code, as an SVG data URL. */
     qrCode: string;
     secondsLeft: number;
+    /** The same code to type, when a camera can't read the QR (CHW-30): "{member} {six digits}". */
+    shortCode: string;
     windowSeconds: number;
     /** When the server issued it (ms): tells a code restored from history from a new one. */
     issuedAt: number;
@@ -68,11 +71,27 @@ export default function MemberQr({
                         src={qrCode}
                         alt={t('Your member QR code')}
                         className={cn(
-                            'size-72 transition-opacity',
+                            'size-64 transition-opacity',
                             due && 'opacity-20',
                         )}
                         data-test="member-qr"
                     />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                    <p className="text-sm text-muted-foreground">
+                        {t("Can't scan? Say this code")}
+                    </p>
+                    <p
+                        dir="ltr"
+                        className={cn(
+                            'font-display text-3xl font-bold tracking-wide tabular-nums transition-opacity',
+                            due && 'opacity-20',
+                        )}
+                        data-test="member-short-code"
+                    >
+                        {spoken(shortCode)}
+                    </p>
                 </div>
 
                 <div className="flex w-full max-w-72 flex-col gap-2">
@@ -105,14 +124,16 @@ export default function MemberQr({
                         {due ? t('Getting a new code…') : ''}
                     </p>
                 </div>
-
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Sun aria-hidden="true" className="size-4 shrink-0" />
-                    {t('Turn your screen brightness up so it scans easily.')}
-                </p>
             </main>
         </>
     );
+}
+
+/** The short code as said aloud and typed: the member number, then the six digits in threes. */
+function spoken(shortCode: string): string {
+    const [member, digits = ''] = shortCode.split(' ');
+
+    return `${member} · ${digits.slice(0, 3)} ${digits.slice(3)}`;
 }
 
 /** How long to wait before asking again for a code that did not come (offline, a slow network). */
@@ -154,7 +175,7 @@ function useCurrentCode(secondsLeft: number, issuedAt: number): number {
 
         asking.current = true;
         router.reload({
-            only: ['qrCode', 'secondsLeft', 'issuedAt'],
+            only: ['qrCode', 'shortCode', 'secondsLeft', 'issuedAt'],
             onFinish: () => {
                 asking.current = false;
                 lastAnswer.current = Date.now();

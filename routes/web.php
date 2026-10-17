@@ -3,6 +3,7 @@
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
+use App\Http\Controllers\CounterScanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinishSignUpController;
 use App\Http\Controllers\JoinController;
@@ -70,6 +71,12 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::get('counter', [CounterController::class, 'show'])->name('counter.show');
         Route::post('counter/stampers/{stamper}/arm', [CounterController::class, 'arm'])->whereNumber('stamper')->middleware('throttle:counter-arm')->name('counter.arm');
         Route::delete('counter/stampers/{stamper}/arm', [CounterController::class, 'disarm'])->whereNumber('stamper')->name('counter.disarm');
+        // Scanning a customer's member QR (CHW-30, S2, S3): the staff member's own scans; {scan} resolves in the tenant.
+        Route::get('counter/scan', [CounterScanController::class, 'create'])->name('counter.scan');
+        Route::post('counter/scans', [CounterScanController::class, 'store'])->middleware('throttle:counter-scan')->name('counter.scans.store');
+        Route::get('counter/scans/{scan}', [CounterScanController::class, 'show'])->whereUlid('scan')->name('counter.scans.show');
+        Route::post('counter/scans/{scan}/stamps', [CounterScanController::class, 'stamp'])->whereUlid('scan')->middleware('throttle:counter-arm')->name('counter.scans.stamp');
+        Route::post('counter/scans/{scan}/rewards/{reward}/redeem', [CounterScanController::class, 'redeem'])->whereUlid('scan')->where('reward', '[0-9]{1,18}')->middleware('throttle:counter-arm')->name('counter.scans.redeem');
         // The staff and their invitations (CHW-146), the owner's; {member} is a business_user row.
         Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
         Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');

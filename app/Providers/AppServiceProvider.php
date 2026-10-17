@@ -199,6 +199,10 @@ class AppServiceProvider extends ServiceProvider
         // Counter mode (CHW-29): arming at the counter's pace, never a script's.
         RateLimiter::for('counter-arm', fn (Request $request): Limit => Limit::perMinute(60)->by('counter-arm:'.$request->user()?->getAuthIdentifier()));
 
+        // Scanning member QRs (CHW-30): a counter's pace, which also bounds typed short codes (each staff member's
+        // wrong ones are counted too: ScanMemberQr).
+        RateLimiter::for('counter-scan', fn (Request $request): Limit => Limit::perMinute(20)->by('counter-scan:'.$request->user()?->getAuthIdentifier()));
+
         // Staff invitations (CHW-146): each mails an address, so a few an hour per owner.
         RateLimiter::for('staff-invite', fn (Request $request): Limit => Limit::perHour(20)->by('staff-invite:'.$request->user()?->getAuthIdentifier()));
 

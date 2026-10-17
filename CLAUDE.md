@@ -56,7 +56,7 @@ Full product spec, feature inventory, data model, screen IDs (C1..C14, B1..B16, 
 3. Write the failing Pest test first, then implement. Never delete or weaken a test to make it pass.
 4. Run `vendor/bin/pint --dirty`, `php artisan test`, `npm run check`, `npm run types:check` before calling a task done.
 5. Keep PRs small (under ~400 changed lines). Run the laravel-simplifier agent before opening a PR. Put `Fixes CHW-xx` in the PR description.
-6. UI work: match the screen ID from `docs/spec.md`, use existing shadcn components, check it in Playwright (mobile-safari project) and in dark mode.
+6. UI work: design every new screen, new state or visible change in Claude Design first (the design-tokens skill lists the files), then match the screen ID from `docs/spec.md`, use existing shadcn components, check it in Playwright (mobile-safari project) and in dark mode.
 
 Project skills in `.claude/skills/` cover the tricky parts: `stamp-flow`, `sun-nfc-verification`, `wallet-passes`, `pwa-conventions`, `design-tokens`, `linear-workflow`. Use the `stamp-flow-reviewer` agent on any diff that touches stamping, rewards or the tap endpoint.
 

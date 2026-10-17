@@ -1,4 +1,5 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
+import { ScanLine } from 'lucide-react';
 import { useCallback, useSyncExternalStore } from 'react';
 import { RecentStamps } from '@/components/dashboard/stamp-lists';
 import type { DashboardStats } from '@/components/dashboard/types';
@@ -8,7 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import { arm, disarm } from '@/routes/counter';
+import { arm, disarm, scan } from '@/routes/counter';
 import { edit as settings } from '@/routes/profile';
 
 type CounterStamper = {
@@ -62,14 +63,19 @@ export default function Counter({
                             {businessName}
                         </h1>
                     </div>
-                    {/* Owners have a dashboard; staff, their account settings (signing out). */}
-                    <Link
-                        href={nav.staff ? dashboard() : settings()}
-                        className="shrink-0 text-sm font-medium underline underline-offset-4"
-                    >
-                        {nav.staff ? t('Dashboard') : t('Settings')}
-                    </Link>
+                    <div className="flex shrink-0 items-center gap-5">
+                        {/* Owners have a dashboard; staff, their account settings (signing out). */}
+                        <Link
+                            href={nav.staff ? dashboard() : settings()}
+                            className="text-sm font-medium underline underline-offset-4"
+                        >
+                            {nav.staff ? t('Dashboard') : t('Settings')}
+                        </Link>
+                        <ScanButton className="hidden sm:inline-flex" />
+                    </div>
                 </header>
+                {/* S1's primary action (CHW-30, review 3a): a customer's member QR, for phones without NFC. */}
+                <ScanButton className="mx-auto mb-6 flex w-full max-w-5xl sm:hidden" />
 
                 <InputError
                     message={errors.qty}
@@ -114,6 +120,19 @@ export default function Counter({
                 </section>
             </div>
         </>
+    );
+}
+
+function ScanButton({ className }: { className: string }) {
+    const { t } = useTranslation();
+
+    return (
+        <Button asChild size="lg" className={className}>
+            <Link href={scan()} data-test="counter-scan">
+                <ScanLine aria-hidden="true" className="size-5" />
+                {t('Scan a QR')}
+            </Link>
+        </Button>
     );
 }
 
