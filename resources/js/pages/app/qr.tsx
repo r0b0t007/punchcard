@@ -133,15 +133,19 @@ let newestShown = 0;
  * RETRY_MS after one that brought nothing, and only while the page shows
  * (it asks at once when it comes back). A code shown before, restored from
  * history, is past its time from the start; a code the server has just
- * sent is used as is.
+ * sent counts down from exactly the seconds it has left: the clock and the
+ * deadline are set from one reading, so neither rounds up a second
+ * (CHW-222). The code taken on is kept per mount, so strict mode running
+ * the effect twice in development never mistakes it for a restored one.
  */
 function useCurrentCode(secondsLeft: number, issuedAt: number): number {
-    const [deadline, setDeadline] = useState(() =>
-        issuedAt <= newestShown ? Date.now() : Date.now() + secondsLeft * 1000,
-    );
     const [now, setNow] = useState(() => Date.now());
+    const [deadline, setDeadline] = useState(() =>
+        issuedAt <= newestShown ? now : now + secondsLeft * 1000,
+    );
     const asking = useRef(false);
     const lastAnswer = useRef(0);
+    const taken = useRef<number | null>(null);
 
     const askForCode = useCallback(() => {
         if (asking.current) {
@@ -159,15 +163,23 @@ function useCurrentCode(secondsLeft: number, issuedAt: number): number {
     }, []);
 
     useEffect(() => {
+        if (taken.current === issuedAt) {
+            return;
+        }
+
+        const at = Date.now();
+        setNow(at);
+
         if (issuedAt <= newestShown) {
-            setDeadline(Date.now());
+            setDeadline(at);
             askForCode();
 
             return;
         }
 
+        taken.current = issuedAt;
         newestShown = issuedAt;
-        setDeadline(Date.now() + secondsLeft * 1000);
+        setDeadline(at + secondsLeft * 1000);
     }, [secondsLeft, issuedAt, askForCode]);
 
     useEffect(() => {
