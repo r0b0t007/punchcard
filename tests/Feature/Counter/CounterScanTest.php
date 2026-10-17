@@ -482,7 +482,7 @@ it('never stamps or redeems with a scan of the staff member themselves, whatever
         ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $reward)))->toBe(ScanRefusal::OwnCode);
 });
 
-it('stops a staff member who types too many wrong codes, for any members, while right ones cost nothing', function (): void {
+it('stops a staff member who types too many wrong codes, for any members, from typing, never from scanning QRs', function (): void {
     $colleague = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
     $wrongFor = fn (User $member): string => $member->id.' '.str_pad((string) ((((int) substr(MemberQrToken::shortCode($member), -6)) + 1) % 1_000_000), 6, '0', STR_PAD_LEFT);
     $members = User::factory()->count(ScanMemberQr::STAFF_WRONG_CODES)->create();
@@ -491,8 +491,16 @@ it('stops a staff member who types too many wrong codes, for any members, while 
         expect(($this->reason)(fn () => ($this->scan)($wrongFor($member))))->toBe(MemberQrRefusal::Forged);
     }
 
-    expect(($this->reason)(fn () => ($this->scan)()))->toBe(ScanRefusal::TooManyWrongCodes)
-        ->and(($this->scan)(staff: $colleague)->staff_id)->toBe($colleague->id);
+    expect(($this->reason)(fn () => ($this->scan)(MemberQrToken::shortCode($this->customer))))->toBe(ScanRefusal::TooManyWrongCodes)
+        ->and(($this->scan)(MemberQrToken::shortCode($this->customer), staff: $colleague)->staff_id)->toBe($colleague->id);
+
+    // A QR's token never counts: its signature can't be found by trying, and a bad QR read again and again by the
+    // camera must not lock the staff member out.
+    foreach (range(1, ScanMemberQr::STAFF_WRONG_CODES + 5) as $read) {
+        expect(($this->reason)(fn () => ($this->scan)('PC1.'.$this->customer->id.'.1.AAAAAAAAAAAAAAAAAAAAAA')))->toBe(MemberQrRefusal::Forged);
+    }
+
+    expect(($this->scan)(MemberQrToken::issue(User::factory()->create())['token'])->staff_id)->toBe($this->a1Staff->id);
 
     $this->travel(ScanMemberQr::STAFF_WRONG_CODES_SECONDS)->seconds();
     expect(($this->scan)(MemberQrToken::issue(User::factory()->create())['token'])->staff_id)->toBe($this->a1Staff->id);

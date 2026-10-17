@@ -21,6 +21,8 @@ const buttonVariants = cva(
         "ghost-destructive":
           "text-destructive hover:bg-destructive/10 hover:text-destructive",
         link: "text-primary underline-offset-4 hover:underline",
+        // Saffron, for the action that gives stamps (CHW-30, S2: "Add 2 stamps"); stamps and rewards only.
+        stamp: "bg-stamp text-stamp-foreground shadow-xs hover:bg-stamp/90",
       },
       size: {
         default: "h-11 px-5 py-2 has-[>svg]:px-4",

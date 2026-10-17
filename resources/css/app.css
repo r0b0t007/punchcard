@@ -84,6 +84,10 @@
     --color-stamp: var(--stamp);
     --color-stamp-foreground: var(--stamp-foreground);
 
+    /* The camera view of the scanner (CHW-30): dark in both themes, like a photo. */
+    --color-viewfinder: var(--viewfinder);
+    --color-viewfinder-foreground: var(--viewfinder-foreground);
+
     --color-success: var(--success);
     --color-warning: var(--warning);
 
@@ -144,6 +148,8 @@
     --accent-foreground: #3b2a20;
     --stamp: #f2a541;
     --stamp-foreground: #241a13;
+    --viewfinder: #1b1511;
+    --viewfinder-foreground: #fbf6ee;
     /* Loyalty card defaults (espresso card, saffron stamps); LoyaltyCard overrides them per organization. */
     --card-brand: #3b2a20;
     --card-brand-foreground: #fbf6ee;
@@ -188,6 +194,8 @@
     --accent-foreground: #f5eee4;
     --stamp: #f2a541;
     --stamp-foreground: #241a13;
+    --viewfinder: #1b1511;
+    --viewfinder-foreground: #fbf6ee;
     --success: #6cc48f;
     --warning: #f2b45a;
     --destructive: #f0806b;

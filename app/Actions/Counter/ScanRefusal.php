@@ -17,6 +17,6 @@ enum ScanRefusal: string
     /** A staff member scanned their own member QR: a colleague serves them, as an arming never pays whoever made it. */
     case OwnCode = 'own_code';
 
-    /** The staff member typed or scanned too many wrong codes lately (ScanMemberQr::STAFF_WRONG_CODES): no scans for a while, QR or short code. */
+    /** The staff member typed or scanned too many wrong codes lately (ScanMemberQr::STAFF_WRONG_CODES): no typed codes for a while; the QR still counts. */
     case TooManyWrongCodes = 'too_many_wrong_codes';
 }

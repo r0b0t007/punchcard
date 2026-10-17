@@ -73,14 +73,20 @@ final readonly class ScanMemberQr
     }
 
     /**
-     * The code checked, with the staff member's wrong ones counted (WrongCodes): past STAFF_WRONG_CODES in
-     * STAFF_WRONG_CODES_SECONDS, TooManyWrongCodes for any code, QR or short. The per-member count
-     * (MemberQrScan::fromCode) alone would let one account try a few codes for each of many members.
+     * The code checked. A typed short code counts against the staff member (WrongCodes): past STAFF_WRONG_CODES
+     * wrong ones in STAFF_WRONG_CODES_SECONDS, TooManyWrongCodes for any typed code; the per-member count
+     * (MemberQrScan::fromCode) alone would let one account try a few codes for each of many members. A QR's token
+     * never counts: its signature can't be found by trying, and a bad QR held to the camera, read again and again,
+     * must not lock the staff member out.
      *
      * @throws MemberQrRefused
      */
     private function verified(User $staff, #[SensitiveParameter] string $scanned, string $scope): MemberQrScan
     {
+        if (str_starts_with(trim($scanned), MemberQrToken::VERSION.'.')) {
+            return $this->verifyMemberQr->handle($scanned, $scope);
+        }
+
         return WrongCodes::counted(
             'counter-scan-wrong:'.$staff->id,
             self::STAFF_WRONG_CODES,
