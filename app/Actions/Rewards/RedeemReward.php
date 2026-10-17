@@ -46,11 +46,16 @@ final readonly class RedeemReward
                 throw new RedeemRefused(RedeemRefusal::NotYours);
             }
 
+            // Before the replay below, so a business never gets back a redemption, nor a reward, of a card it doesn't honour.
+            if (! $this->honours($presence->businessId, $enrollment)) {
+                throw new RedeemRefused(RedeemRefusal::NotHonoured);
+            }
+
             if ($locked->status === RewardStatus::Redeemed) {
                 return new RedeemResult($locked, redeemedNow: false);
             }
 
-            $this->assertRedeemable($locked, $enrollment, $user, $presence);
+            $this->assertRedeemable($locked, $user, $presence);
 
             $locked->forceFill([
                 'status' => RewardStatus::Redeemed,
@@ -58,6 +63,7 @@ final readonly class RedeemReward
                 'redeemed_by' => $presence->staffId,
                 'redeemed_business_id' => $presence->businessId,
                 'redeemed_location_id' => $presence->locationId,
+                'redeemed_scan_id' => $presence->scanId,
                 'redeem_window_opened_at' => null,
                 'redeem_window_until' => null,
             ])->save();
@@ -72,13 +78,18 @@ final readonly class RedeemReward
         return $result;
     }
 
-    private function assertRedeemable(Reward $reward, CardEnrollment $enrollment, User $user, RedeemPresence $presence): void
+    /** Whether the business honours the card (any business of the franchise that does). */
+    private function honours(int $businessId, CardEnrollment $enrollment): bool
+    {
+        return CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $businessId)->exists();
+    }
+
+    private function assertRedeemable(Reward $reward, User $user, RedeemPresence $presence): void
     {
         $refusal = match (true) {
             $reward->status !== RewardStatus::Available => RedeemRefusal::Unavailable,
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
             $presence->needsRedeemWindow() && ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
-            ! CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $presence->businessId)->exists() => RedeemRefusal::NotHonoured,
             ! ArchivedSites::isOpen($presence->businessId, $presence->locationId, lock: $presence->staffId !== null, counter: true) => RedeemRefusal::SiteClosed,
             default => null,
         };

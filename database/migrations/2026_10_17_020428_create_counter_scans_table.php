@@ -6,14 +6,14 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * A staff member's scan of a customer's member QR (CHW-30): who, where, by
- * whom, the code's window, until when it can be used, and the one stamp and
- * the one reward redemption it gave (one scan each). A ULID key, so a scan's address can't be guessed. One scan per code
+ * whom, the code's window, until when it can be used, and the one stamp it
+ * gave (one scan per stamp); the rewards it redeemed record it
+ * (rewards.redeemed_scan_id). A ULID key, so a scan's address can't be guessed. One scan per code
  * at a business (business_id, user_id, member_qr_window): the database's
  * guard beside the cache's claim (MemberQrScan), which a cleared cache would
  * lift. Composite foreign keys, as on stamp_events, keep organization_id the
- * business's and location_id inside the business; the stamp_event_id and
- * reward_id keys are plain ones, on this table only (stamp_events and
- * rewards keep their triggers).
+ * business's and location_id inside the business; the stamp_event_id key is
+ * a plain one, on this table only (stamp_events keeps its triggers).
  */
 return new class extends Migration
 {
@@ -30,7 +30,6 @@ return new class extends Migration
             $table->timestamp('scanned_at');
             $table->timestamp('expires_at');
             $table->foreignId('stamp_event_id')->nullable()->unique()->constrained('stamp_events')->nullOnDelete();
-            $table->foreignId('reward_id')->nullable()->unique()->constrained()->nullOnDelete();
             $table->timestamps();
 
             $table->foreign(['business_id', 'organization_id'])

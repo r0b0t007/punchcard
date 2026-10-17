@@ -247,7 +247,7 @@ it('redeems only the scanned customer\'s reward, honoured here, on a scan still 
     expect(($this->reason)(fn () => $redeem($someoneElse)))->toBe(RedeemRefusal::NotYours)
         ->and(($this->reason)(fn () => $redeem($elsewhere)))->toBe(RedeemRefusal::NotHonoured)
         ->and(($this->reason)(fn () => $redeem($theirs, $this->tenants->member(User::factory()->create(), $this->tenants->a1))))->toBe(ScanRefusal::NotYours)
-        ->and($scan->fresh()?->reward_id)->toBeNull();
+        ->and($this->context->bypass(fn () => $someoneElse->fresh()?->status))->toBe(RewardStatus::Available);
 
     $this->travel(CounterScan::SECONDS + 1)->seconds();
     expect(($this->reason)(fn () => $redeem($theirs)))->toBe(ScanRefusal::Expired)
@@ -284,7 +284,6 @@ it('describes a scan for the result screen (S2)', function (): void {
         ->and($new['card'])->toMatchArray(['name' => 'A card', 'stamps' => 0, 'required' => 10, 'new' => true])
         ->and($new['rewards'])->toBe([])
         ->and($new['stamped'])->toBeFalse()
-        ->and($new['redeemed'])->toBeFalse()
         ->and($new['secondsLeft'])->toBe(CounterScan::SECONDS);
 
     ($this->stamp)($scan, 3);
@@ -369,7 +368,7 @@ it('gives the same redemption to a retry after the scan ran out, and nothing els
     $again = app(RedeemScan::class)->handle($scan, $this->a1Staff, $reward);
     expect($again->redeemedNow)->toBeFalse()
         ->and($again->reward->id)->toBe($reward->id)
-        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $other)))->toBe(ScanRefusal::Used);
+        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $other)))->toBe(ScanRefusal::Expired);
 });
 
 it('refuses after the scan ran out a reward redeemed some other way', function (string $how): void {
@@ -423,24 +422,20 @@ it('stops a scan working for staff removed or moved to another site since', func
         ->and($this->context->bypass(fn () => $reward->fresh()?->status))->toBe(RewardStatus::Available);
 })->with(['removed', 'moved to another site']);
 
-it('redeems one reward per scan: the same one again gives that redemption, another needs a new scan', function (): void {
+it('redeems each reward the customer asks for while the scan runs, each once, recording the scan', function (): void {
     $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
     $first = $this->tenants->reward($enrollment);
     $second = $this->context->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create(['milestone' => 2]));
     $scan = ($this->scan)();
-    app(RedeemScan::class)->handle($scan, $this->a1Staff, $first);
 
-    expect(app(RedeemScan::class)->handle($scan, $this->a1Staff, $first)->redeemedNow)->toBeFalse()
-        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $second)))->toBe(ScanRefusal::Used)
-        ->and($scan->fresh()?->reward_id)->toBe($first->id)
-        ->and(app(DescribeScan::class)->handle($scan->fresh() ?? $scan)['redeemed'])->toBeTrue();
-
-    // A visit later, a new code and a new scan.
-    $this->travel(2)->minutes();
-    expect(app(RedeemScan::class)->handle(($this->scan)(), $this->a1Staff, $second)->redeemedNow)->toBeTrue();
+    expect(app(RedeemScan::class)->handle($scan, $this->a1Staff, $first)->redeemedNow)->toBeTrue()
+        ->and(app(RedeemScan::class)->handle($scan, $this->a1Staff, $second)->redeemedNow)->toBeTrue()
+        ->and(app(RedeemScan::class)->handle($scan, $this->a1Staff, $first)->redeemedNow)->toBeFalse()
+        ->and($this->context->bypass(fn (): array => Reward::query()->whereKey([$first->id, $second->id])->pluck('redeemed_scan_id')->unique()->all()))->toBe([$scan->id])
+        ->and(app(DescribeScan::class)->handle($scan->fresh() ?? $scan)['rewards'])->toBe([]);
 });
 
-it('leaves the scan for another reward when the one asked for was redeemed some other way meanwhile', function (): void {
+it('gives back a reward redeemed some other way meanwhile without claiming it for the scan', function (): void {
     $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
     $gone = $this->tenants->reward($enrollment);
     $next = $this->context->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create(['milestone' => 2]));
@@ -448,7 +443,7 @@ it('leaves the scan for another reward when the one asked for was redeemed some 
     $this->context->bypass(fn () => $gone->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id, 'redeemed_location_id' => $this->a1Location->id])->save());
 
     expect(app(RedeemScan::class)->handle($scan, $this->a1Staff, $gone)->redeemedNow)->toBeFalse()
-        ->and($scan->fresh()?->reward_id)->toBeNull()
+        ->and($this->context->bypass(fn () => $gone->fresh()?->redeemed_scan_id))->toBeNull()
         ->and(app(RedeemScan::class)->handle($scan, $this->a1Staff, $next)->redeemedNow)->toBeTrue();
 });
 
@@ -496,7 +491,7 @@ it('stops a staff member who types too many wrong codes, for any members, while 
         expect(($this->reason)(fn () => ($this->scan)($wrongFor($member))))->toBe(MemberQrRefusal::Forged);
     }
 
-    expect(($this->reason)(fn () => ($this->scan)()))->toBe(MemberQrRefusal::TooManyAttempts)
+    expect(($this->reason)(fn () => ($this->scan)()))->toBe(ScanRefusal::TooManyWrongCodes)
         ->and(($this->scan)(staff: $colleague)->staff_id)->toBe($colleague->id);
 
     $this->travel(ScanMemberQr::STAFF_WRONG_CODES_SECONDS)->seconds();
@@ -509,4 +504,19 @@ it('stops a staff member who types too many wrong codes, for any members, while 
     }
 
     expect(($this->scan)(MemberQrToken::issue(User::factory()->create())['token'])->staff_id)->toBe($this->a1Staff->id);
+});
+
+it('never gives back a reward of a card the business doesn\'t honour, even one already redeemed', function (): void {
+    $elsewhere = $this->tenants->reward($this->tenants->enroll($this->customer, $this->tenants->cardB));
+    $this->context->bypass(fn () => $elsewhere->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->b1->id, 'redeemed_location_id' => $this->tenants->locationOf($this->tenants->b1)->id])->save());
+
+    expect(($this->reason)(fn () => app(RedeemScan::class)->handle(($this->scan)(), $this->a1Staff, $elsewhere)))->toBe(RedeemRefusal::NotHonoured);
+});
+
+it('shows a paused card as paused, as the stamp on it is refused', function (): void {
+    $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['active' => false])->save());
+    $scan = ($this->scan)();
+
+    expect(app(DescribeScan::class)->handle($scan)['card'])->toMatchArray(['name' => 'A card', 'paused' => true])
+        ->and(($this->reason)(fn () => ($this->stamp)($scan)))->toBe(StampRejection::CardInactive);
 });

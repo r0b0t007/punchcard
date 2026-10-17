@@ -156,7 +156,7 @@ it('verifies the short code shown under the QR, in its window or the next one\'s
     expect(($this->refusalOf)($code, 'card:previous'))->toBeNull();
 
     $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(MemberQrScan::GRACE_SECONDS));
-    expect(($this->refusalOf)($code, 'card:late'))->toBe(MemberQrRefusal::Forged);
+    expect(($this->refusalOf)($code, 'card:late'))->toBe(MemberQrRefusal::Expired);
 });
 
 it('uses a customer once per scope whether staff scan the QR or type the short code', function (): void {
@@ -181,22 +181,39 @@ it('says why a short code is refused', function (string $how, MemberQrRefusal $r
     'another member' => ['another member', MemberQrRefusal::Forged],
 ]);
 
-it('refuses a member\'s short codes for a while after too many wrong ones, wherever typed, never their QR', function (): void {
+it('refuses a member\'s short codes where too many wrong ones were typed, for a while, never their QR', function (): void {
     $code = MemberQrToken::shortCode($this->customer);
     [$member, $digits] = explode(' ', $code);
     $wrong = $member.' '.str_pad((string) (((int) $digits + 1) % 1_000_000), 6, '0', STR_PAD_LEFT);
     $someoneElse = User::factory()->create();
+    $here = 'scan:business:1';
 
     foreach (range(1, MemberQrScan::WRONG_CODES - 1) as $attempt) {
-        expect(($this->refusalOf)($wrong, 'scan:business:'.$attempt))->toBe(MemberQrRefusal::Forged);
+        expect(($this->refusalOf)($wrong, $here))->toBe(MemberQrRefusal::Forged);
     }
 
-    expect(($this->refusalOf)($code, 'card:before'))->toBeNull()
-        ->and(($this->refusalOf)($wrong, 'scan:business:last'))->toBe(MemberQrRefusal::Forged)
-        ->and(($this->refusalOf)($code, 'card:after'))->toBe(MemberQrRefusal::TooManyAttempts)
+    // A right code gives its attempt back: one more wrong one is still only wrong.
+    expect(($this->refusalOf)($code, $here))->toBeNull()
+        ->and(($this->refusalOf)($wrong, $here))->toBe(MemberQrRefusal::Forged)
+        ->and(($this->refusalOf)($wrong, $here))->toBe(MemberQrRefusal::TooManyAttempts)
+        ->and(($this->refusalOf)($code, 'scan:business:2'))->toBeNull()
         ->and(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:qr'))->toBeNull()
-        ->and(($this->refusalOf)(MemberQrToken::shortCode($someoneElse), 'card:other'))->toBeNull();
+        ->and(($this->refusalOf)(MemberQrToken::shortCode($someoneElse), $here))->toBeNull();
 
     $this->travel(MemberQrScan::WRONG_CODES_SECONDS)->seconds();
-    expect(($this->refusalOf)(MemberQrToken::shortCode($this->customer), 'card:later'))->toBeNull();
+    expect(($this->refusalOf)(MemberQrToken::shortCode($this->customer), $here))->toBeNull();
+});
+
+it('reads a short code typed late as expired, not wrong, so it counts against nobody', function (): void {
+    $code = MemberQrToken::shortCode($this->customer);
+    $this->travel(MemberQrScan::LATE_WINDOWS * 30)->seconds();
+
+    foreach (range(1, MemberQrScan::WRONG_CODES + 1) as $attempt) {
+        expect(($this->refusalOf)($code, 'scan:business:1'))->toBe(MemberQrRefusal::Expired);
+    }
+
+    expect(($this->refusalOf)(MemberQrToken::shortCode($this->customer), 'scan:business:1'))->toBeNull();
+
+    $this->travel(30)->seconds();
+    expect(($this->refusalOf)($code, 'scan:business:2'))->toBe(MemberQrRefusal::Forged);
 });

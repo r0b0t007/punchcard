@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * A staff member's scan of a customer's member QR, or its short code
  * (CHW-30): made only by ScanMemberQr from a checked code, it is that staff
  * member's for SECONDS at one location, stamps once (StampScan) and proves
- * the customer is at the counter to redeem one reward (RedeemScan). Site data: a
+ * the customer is at the counter to redeem their rewards (RedeemScan). Site data: a
  * franchisee sees its own. It names a customer: rows go a day after they ran
  * out.
  *
@@ -38,7 +38,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon $scanned_at
  * @property Carbon $expires_at
  * @property int|null $stamp_event_id the stamp it gave (StampScan)
- * @property int|null $reward_id the reward it redeemed (RedeemScan)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */

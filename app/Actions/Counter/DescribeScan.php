@@ -18,14 +18,15 @@ use App\Support\Tenancy\TenantContext;
  * (so a code passed on from another phone shows), the card the stamp lands
  * on (ChooseCard, as StampScan's EnrollCustomer picks it: "new" when they
  * hold none here), their rewards ready on cards this business honours,
- * whether the scan already stamped or redeemed, and its seconds left.
+ * whether the scan already stamped, and its seconds left. A paused card
+ * shows as paused: a stamp on it is refused (CardInactive).
  */
 final readonly class DescribeScan
 {
     public function __construct(private ChooseCard $chooseCard, private TenantContext $context) {}
 
     /**
-     * @return array{firstName: string|null, card: array{name: string, stamps: int, required: int, reward: string, new: bool}|null, rewards: list<array{id: int, text: string}>, stamped: bool, redeemed: bool, secondsLeft: int}
+     * @return array{firstName: string|null, card: array{name: string, stamps: int, required: int, reward: string, new: bool, paused: bool}|null, rewards: list<array{id: int, text: string}>, stamped: bool, secondsLeft: int}
      */
     public function handle(CounterScan $scan): array
     {
@@ -39,6 +40,7 @@ final readonly class DescribeScan
                 'required' => $here->card->stamps_required,
                 'reward' => $here->card->reward_text,
                 'new' => ! $here->enrollment instanceof CardEnrollment,
+                'paused' => ! $here->card->active,
             ] : null,
             'rewards' => array_values(Reward::query()
                 ->where('status', RewardStatus::Available)
@@ -48,7 +50,6 @@ final readonly class DescribeScan
                 ->map(fn (Reward $reward): array => ['id' => $reward->id, 'text' => $reward->reward_text])
                 ->all()),
             'stamped' => $scan->stamp_event_id !== null,
-            'redeemed' => $scan->reward_id !== null,
             'secondsLeft' => max(0, $scan->expires_at->getTimestamp() - now()->getTimestamp()),
         ]);
     }

@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Support\MemberQr\MemberQrToken;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 use SensitiveParameter;
 
 /**
@@ -39,6 +38,9 @@ final readonly class MemberQrScan
 
     /** How long wrong short codes count against a member. */
     public const int WRONG_CODES_SECONDS = 600;
+
+    /** How many windows back a short code reads as late (Expired), not wrong: five minutes of 30 s windows. */
+    public const int LATE_WINDOWS = 10;
 
     private function __construct(
         public int $userId,
@@ -84,11 +86,14 @@ final readonly class MemberQrScan
     /**
      * The scan of a short code typed in place of the QR (CHW-30), if it counts for this scope; else
      * MemberQrRefused, saying why. The same windows as a token's: its digits are this window's, or the previous
-     * one's during the first GRACE_SECONDS (compared in constant time). An older code reads as Forged: its digits
-     * prove nothing else. The same use per customer and scope as the QR's. Six digits can be found by trying, from
-     * any number of staff accounts: wrong ones are counted per member, wherever typed, and after WRONG_CODES in
-     * WRONG_CODES_SECONDS that member's short codes are refused (TooManyAttempts) until the count runs out; their
-     * QR still counts.
+     * one's during the first GRACE_SECONDS (compared in constant time). A code of one of the LATE_WINDOWS before
+     * reads as Expired, as a late token does: typed slowly, not guessed. Any other reads as Forged. The same use per
+     * customer and scope as the QR's.
+     *
+     * Six digits can be found by trying: wrong ones are counted per member and scope (WrongCodes), so a hostile
+     * business can only lock a member's short codes at its own counter, and after WRONG_CODES in
+     * WRONG_CODES_SECONDS that member's short codes are refused there (TooManyAttempts) until the count runs out;
+     * their QR still counts. Each staff member's wrong codes are counted too (ScanMemberQr).
      *
      * @throws MemberQrRefused
      */
@@ -96,30 +101,37 @@ final readonly class MemberQrScan
     {
         $at = CarbonImmutable::now();
         $fields = MemberQrToken::codeFields($code) ?? throw new MemberQrRefused(MemberQrRefusal::Malformed);
-        $attempts = 'member-qr-code:'.$fields['userId'];
 
-        // Counted before the digits are checked, so a burst of guesses can't all pass the limit at once; a right
-        // code gives its attempt back.
-        if (RateLimiter::hit($attempts, self::WRONG_CODES_SECONDS) > self::WRONG_CODES) {
-            throw new MemberQrRefused(MemberQrRefusal::TooManyAttempts);
-        }
+        return WrongCodes::counted(
+            'member-qr-code:'.$scope.':'.$fields['userId'],
+            self::WRONG_CODES,
+            self::WRONG_CODES_SECONDS,
+            fn (): self => self::claimed($fields['userId'], self::windowOf($fields, $at), $scope, $at),
+            fn (): MemberQrRefused => new MemberQrRefused(MemberQrRefusal::TooManyAttempts),
+        );
+    }
 
+    /**
+     * The window a short code's digits are from, if it still counts: this one, or the previous one in its grace.
+     *
+     * @param  array{userId: int, digits: string}  $fields
+     *
+     * @throws MemberQrRefused
+     */
+    private static function windowOf(array $fields, CarbonImmutable $at): int
+    {
         $now = MemberQrToken::windowAt($at);
         $intoWindow = $at->getTimestamp() - $now * MemberQrToken::windowSeconds();
 
-        $window = match (true) {
-            hash_equals(MemberQrToken::code($fields['userId'], $now), $fields['digits']) => $now,
-            $intoWindow < self::GRACE_SECONDS && hash_equals(MemberQrToken::code($fields['userId'], $now - 1), $fields['digits']) => $now - 1,
-            default => null,
-        };
-
-        if ($window === null) {
-            throw new MemberQrRefused(MemberQrRefusal::Forged);
+        for ($back = 0; $back <= self::LATE_WINDOWS; $back++) {
+            if (hash_equals(MemberQrToken::code($fields['userId'], $now - $back), $fields['digits'])) {
+                return $back === 0 || ($back === 1 && $intoWindow < self::GRACE_SECONDS)
+                    ? $now - $back
+                    : throw new MemberQrRefused(MemberQrRefusal::Expired);
+            }
         }
 
-        RateLimiter::decrement($attempts, self::WRONG_CODES_SECONDS);
-
-        return self::claimed($fields['userId'], $window, $scope, $at);
+        throw new MemberQrRefused(MemberQrRefusal::Forged);
     }
 
     /**

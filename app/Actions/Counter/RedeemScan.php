@@ -15,15 +15,16 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Redeems one reward of the customer a staff member scanned (CHW-30, S3):
- * the scan, still running and by the staff member who scanned while they
- * still work there (LockScan), is the presence proof (RedeemPresence::scan),
- * and RedeemReward does the rest: only that customer's reward (NotYours
- * otherwise), on a card the business honours. One redemption per scan: the
- * customer showed their code once, so another reward needs another scan.
- * The scan records it (reward_id), so a retry of the same reward, even
- * after the scan ran out, gets that redemption again, as a used scan's stamp
- * does (StampScan).
+ * Redeems a reward of the customer a staff member scanned (CHW-30, S3): the
+ * scan, still running and by the staff member who scanned while they still
+ * work there (LockScan), is the presence proof (RedeemPresence::scan), and
+ * RedeemReward does the rest: only that customer's reward (NotYours
+ * otherwise), on a card the business honours, once each. While the scan
+ * runs, it redeems each reward the customer asks for: a rescan of them is
+ * refused for a while (MemberQrScan's claim), so one reward per scan would
+ * keep them waiting. Each reward records the scan (redeemed_scan_id), so a
+ * retry after the scan ran out gets that redemption again, as a used scan's
+ * stamp does (StampScan), and nothing else.
  */
 final readonly class RedeemScan
 {
@@ -41,22 +42,23 @@ final readonly class RedeemScan
     {
         return DB::transaction(function () use ($scan, $staff, $reward): RedeemResult {
             $locked = $this->lockScan->handle($scan, $staff);
+            $presence = RedeemPresence::scan($locked);
 
-            if ($locked->reward_id !== null) {
-                return $locked->reward_id === $reward->id
-                    ? new RedeemResult($this->context->bypass(fn (): Reward => Reward::query()->findOrFail($reward->id)), redeemedNow: false)
-                    : throw new ScanRefused(ScanRefusal::Used);
+            if (! $presence instanceof RedeemPresence) {
+                return $this->redeemedWith($locked, $reward) ?? throw new ScanRefused(ScanRefusal::Expired);
             }
 
-            $presence = RedeemPresence::scan($locked) ?? throw new ScanRefused(ScanRefusal::Expired);
             $customer = $this->context->bypass(fn (): User => User::query()->findOrFail($locked->user_id));
-            $result = $this->redeemReward->handle($reward, $customer, $presence);
 
-            if ($result->redeemedNow) {
-                $locked->forceFill(['reward_id' => $result->reward->id])->save();
-            }
-
-            return $result;
+            return $this->redeemReward->handle($reward, $customer, $presence);
         });
+    }
+
+    /** The redemption this scan made of the reward, for a retry after the scan ran out (recorded on it: redeemed_scan_id). */
+    private function redeemedWith(CounterScan $scan, Reward $reward): ?RedeemResult
+    {
+        $current = $this->context->bypass(fn (): ?Reward => Reward::query()->find($reward->id));
+
+        return $current instanceof Reward && $current->redeemed_scan_id === $scan->id ? new RedeemResult($current, redeemedNow: false) : null;
     }
 }

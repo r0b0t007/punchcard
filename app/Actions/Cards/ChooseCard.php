@@ -25,7 +25,8 @@ final readonly class ChooseCard
     public function handle(int $businessId, int $userId): CardHere
     {
         return $this->context->bypass(function () use ($businessId, $userId): CardHere {
-            $honoured = LoyaltyCard::query()->honouredBy($businessId)->get();
+            // Only what the callers read: EnrollCustomer runs this on every tap.
+            $honoured = LoyaltyCard::query()->honouredBy($businessId)->get(['id', 'active', 'name', 'stamps_required', 'reward_text']);
             /** @var Collection<int, CardEnrollment> $held */
             $held = CardEnrollment::query()->whereIn('card_id', $honoured->modelKeys())->where('user_id', $userId)->lastUsedFirst()->get()->keyBy('card_id');
             $cardId = CardChoice::pick($honoured->modelKeys(), $held->keys()->all(), $honoured->where('active', true)->modelKeys());

@@ -25,6 +25,7 @@ final readonly class RedeemPresence
         public int $locationId,
         public CarbonInterface $at,
         public ?int $staffId = null,
+        public ?string $scanId = null,
     ) {}
 
     /** Whether the customer must have opened a redeem window: when no staff member confirmed them at the counter. */
@@ -63,6 +64,6 @@ final readonly class RedeemPresence
 
         $at = now();
 
-        return $scan->hasExpired($at) ? null : new self($scan->business_id, $scan->location_id, $at, $scan->staff_id);
+        return $scan->hasExpired($at) ? null : new self($scan->business_id, $scan->location_id, $at, $scan->staff_id, $scan->id);
     }
 }

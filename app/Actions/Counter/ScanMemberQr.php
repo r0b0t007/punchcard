@@ -8,6 +8,7 @@ use App\Actions\MemberQr\MemberQrRefusal;
 use App\Actions\MemberQr\MemberQrRefused;
 use App\Actions\MemberQr\MemberQrScan;
 use App\Actions\MemberQr\VerifyMemberQr;
+use App\Actions\MemberQr\WrongCodes;
 use App\Actions\Stamps\WorksAt;
 use App\Models\CounterScan;
 use App\Models\Location;
@@ -15,7 +16,6 @@ use App\Models\User;
 use App\Support\MemberQr\MemberQrToken;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\RateLimiter;
 use LogicException;
 use SensitiveParameter;
 
@@ -73,33 +73,20 @@ final readonly class ScanMemberQr
     }
 
     /**
-     * The code checked, with the staff member's wrong ones counted: before it is checked, so a burst can't pass the
-     * limit at once, and given back unless it was wrong. Past STAFF_WRONG_CODES in STAFF_WRONG_CODES_SECONDS,
-     * TooManyAttempts: the per-member count (MemberQrScan::fromCode) alone would let one account try a few codes
-     * for each of many members.
+     * The code checked, with the staff member's wrong ones counted (WrongCodes): past STAFF_WRONG_CODES in
+     * STAFF_WRONG_CODES_SECONDS, TooManyWrongCodes for any code, QR or short. The per-member count
+     * (MemberQrScan::fromCode) alone would let one account try a few codes for each of many members.
      *
      * @throws MemberQrRefused
      */
     private function verified(User $staff, #[SensitiveParameter] string $scanned, string $scope): MemberQrScan
     {
-        $attempts = 'counter-scan-wrong:'.$staff->id;
-
-        if (RateLimiter::hit($attempts, self::STAFF_WRONG_CODES_SECONDS) > self::STAFF_WRONG_CODES) {
-            throw new MemberQrRefused(MemberQrRefusal::TooManyAttempts);
-        }
-
-        try {
-            $scan = $this->verifyMemberQr->handle($scanned, $scope);
-        } catch (MemberQrRefused $refused) {
-            if ($refused->reason !== MemberQrRefusal::Forged) {
-                RateLimiter::decrement($attempts, self::STAFF_WRONG_CODES_SECONDS);
-            }
-
-            throw $refused;
-        }
-
-        RateLimiter::decrement($attempts, self::STAFF_WRONG_CODES_SECONDS);
-
-        return $scan;
+        return WrongCodes::counted(
+            'counter-scan-wrong:'.$staff->id,
+            self::STAFF_WRONG_CODES,
+            self::STAFF_WRONG_CODES_SECONDS,
+            fn (): MemberQrScan => $this->verifyMemberQr->handle($scanned, $scope),
+            fn (): ScanRefused => new ScanRefused(ScanRefusal::TooManyWrongCodes),
+        );
     }
 }
