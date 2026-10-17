@@ -83,8 +83,8 @@ it('keeps the page and the switch from staff', function (): void {
 });
 
 it('counts the last tap and today\'s taps in the site\'s own day, real taps only', function (): void {
-    $this->context->bypass(fn () => $this->here->forceFill(['timezone' => 'Africa/Casablanca'])->save());
-    // Casablanca is UTC+1: its day began at 2026-10-16 23:00 UTC.
+    $this->context->bypass(fn () => $this->here->forceFill(['timezone' => 'Africa/Lagos'])->save());
+    // Lagos is UTC+1 all year (Morocco's own offsets move with each tz database release): its day began at 2026-10-16 23:00 UTC.
     ($this->tap)($this->stamper, '2026-10-16 22:59:00');
     ($this->tap)($this->stamper, '2026-10-16 23:01:00');
     ($this->tap)($this->stamper, '2026-10-17 09:00:00', TapStatus::Rejected, TapRejection::Cooldown);
@@ -94,7 +94,7 @@ it('counts the last tap and today\'s taps in the site\'s own day, real taps only
 
     ($this->as)($this->owner)->get(route('stampers.index'))
         ->assertInertia(fn (Assert $page): Assert => $page
-            ->where('sites.0.timezone', 'Africa/Casablanca')
+            ->where('sites.0.timezone', 'Africa/Lagos')
             ->where('sites.0.stampers.0.tapsToday', 2)
             ->where('sites.0.stampers.0.lastTapAt', Carbon::parse('2026-10-17 09:00:00')->toIso8601String()));
 });
