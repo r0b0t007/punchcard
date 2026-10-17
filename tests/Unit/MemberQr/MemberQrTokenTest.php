@@ -75,3 +75,39 @@ it('only reads tokens made with this app\'s key', function (): void {
 
     expect(($this->read)($token))->toBeNull();
 });
+
+it('gives a short code to type: the member number and six digits that change every window', function (): void {
+    $code = MemberQrToken::shortCode($this->user);
+
+    expect($code)->toMatch('/^42 [0-9]{6}$/')
+        ->and(MemberQrToken::codeFields($code))->toBe(['userId' => 42, 'digits' => substr($code, 3)]);
+
+    $this->travel(30)->seconds();
+    expect(MemberQrToken::shortCode($this->user))->not->toBe($code);
+});
+
+it('reads a short code however it was typed, and nothing else', function (string $typed, ?array $fields): void {
+    expect(MemberQrToken::codeFields($typed))->toBe($fields);
+})->with([
+    'with a space' => ['42 123456', ['userId' => 42, 'digits' => '123456']],
+    'run together' => ['42123456', ['userId' => 42, 'digits' => '123456']],
+    'with a dash and spaces around' => [' 42-123 456 ', ['userId' => 42, 'digits' => '123456']],
+    'with the middle dot shown' => ['42 · 123 456', ['userId' => 42, 'digits' => '123456']],
+    'too few digits' => ['42 12345', null],
+    'a zero-padded member' => ['042 123456', null],
+    'letters' => ['42 12345a', null],
+    'a token' => ['PC1.42.1.abc', null],
+]);
+
+it('only gives this app\'s short codes', function (): void {
+    $code = MemberQrToken::shortCode($this->user);
+    config(['app.key' => 'base64:'.base64_encode(str_repeat('x', 32))]);
+
+    expect(MemberQrToken::shortCode($this->user))->not->toBe($code);
+});
+
+it('reads a short code typed with Arabic-Indic digits, and refuses a long input', function (): void {
+    expect(MemberQrToken::codeFields('٤٢ ١٢٣٤٥٦'))->toBe(['userId' => 42, 'digits' => '123456'])
+        ->and(MemberQrToken::codeFields('۴۲ ۱۲۳۴۵۶'))->toBe(['userId' => 42, 'digits' => '123456'])
+        ->and(MemberQrToken::codeFields('42 '.str_repeat(' ', 100).'123456'))->toBeNull();
+});

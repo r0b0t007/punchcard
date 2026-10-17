@@ -134,7 +134,7 @@ it('still refuses the next code for the same card when the first was scanned as 
     expect(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:1'))->toBe(MemberQrRefusal::Replayed);
 });
 
-it('makes a scan only out of a checked token: no other way to one', function (): void {
+it('makes a scan only out of a checked token or short code: no other way to one', function (): void {
     $class = new ReflectionClass(MemberQrScan::class);
     $makers = array_filter(
         $class->getMethods(ReflectionMethod::IS_PUBLIC),
@@ -143,5 +143,40 @@ it('makes a scan only out of a checked token: no other way to one', function ():
     );
 
     expect($class->getConstructor()?->isPrivate())->toBeTrue()
-        ->and(array_values(array_map(fn (ReflectionMethod $method): string => $method->getName(), $makers)))->toBe(['fromToken']);
+        ->and(collect($makers)->map(fn (ReflectionMethod $method): string => $method->getName())->sort()->values()->all())->toBe(['fromCode', 'fromToken']);
 });
+
+it('verifies the short code shown under the QR, in its window or the next one\'s first seconds', function (): void {
+    // Shown at 10:00:05, in the window from 10:00:00.
+    $code = MemberQrToken::shortCode($this->customer);
+
+    expect(($this->verify)($code)->userId)->toBe($this->customer->id);
+
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(MemberQrScan::GRACE_SECONDS - 1));
+    expect(($this->refusalOf)($code, 'card:previous'))->toBeNull();
+
+    $this->travelTo(Carbon::parse('2026-10-16 10:00:30')->addSeconds(MemberQrScan::GRACE_SECONDS));
+    expect(($this->refusalOf)($code, 'card:late'))->toBe(MemberQrRefusal::Forged);
+});
+
+it('uses a customer once per scope whether staff scan the QR or type the short code', function (): void {
+    expect(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:1'))->toBeNull()
+        ->and(($this->refusalOf)(MemberQrToken::shortCode($this->customer), 'card:1'))->toBe(MemberQrRefusal::Replayed);
+});
+
+it('says why a short code is refused', function (string $how, MemberQrRefusal $reason): void {
+    $code = MemberQrToken::shortCode($this->customer);
+    [$member, $digits] = explode(' ', $code);
+
+    $typed = match ($how) {
+        'not a code' => 'hello',
+        'wrong digits' => $member.' '.str_pad((string) (((int) $digits + 1) % 1_000_000), 6, '0', STR_PAD_LEFT),
+        'another member' => ($member + 1).' '.$digits,
+    };
+
+    expect(($this->refusalOf)($typed))->toBe($reason);
+})->with([
+    'not a code' => ['not a code', MemberQrRefusal::Malformed],
+    'wrong digits' => ['wrong digits', MemberQrRefusal::Forged],
+    'another member' => ['another member', MemberQrRefusal::Forged],
+]);

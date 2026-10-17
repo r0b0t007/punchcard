@@ -13,9 +13,10 @@ use SensitiveParameter;
 /**
  * A member QR that counts (CHW-28): whose it is, the window it was shown
  * in, and when it was scanned, for the stamp or redemption it proves
- * presence for (CHW-30). The only way to get one is fromToken(), which
- * checks the scanned token itself: there is no other way in, so no code
- * can make a scan out of a request's values, only out of a real QR.
+ * presence for (CHW-30). The only ways to get one are fromToken() and
+ * fromCode() (the short code shown with it), which check what was scanned or
+ * typed: there is no other way in, so no code can make a scan out of a
+ * request's values, only out of a real member QR.
  *
  * It counts when it is a real token (MemberQrToken) of a customer whose
  * account still exists, from the current window, or the previous one
@@ -70,7 +71,41 @@ final readonly class MemberQrScan
             throw new MemberQrRefused(MemberQrRefusal::Expired);
         }
 
-        $user = User::query()->find($fields['userId']);
+        return self::claimed($fields['userId'], $fields['window'], $scope, $at);
+    }
+
+    /**
+     * The scan of a short code typed in place of the QR (CHW-30), if it counts for this scope; else
+     * MemberQrRefused, saying why. The same windows as a token's: its digits are this window's, or the previous
+     * one's during the first GRACE_SECONDS (compared in constant time). An older code reads as Forged: its digits
+     * prove nothing else. The same use per customer and scope as the QR's.
+     *
+     * @throws MemberQrRefused
+     */
+    public static function fromCode(#[SensitiveParameter] string $code, string $scope): self
+    {
+        $at = CarbonImmutable::now();
+        $fields = MemberQrToken::codeFields($code) ?? throw new MemberQrRefused(MemberQrRefusal::Malformed);
+        $now = MemberQrToken::windowAt($at);
+        $intoWindow = $at->getTimestamp() - $now * MemberQrToken::windowSeconds();
+
+        $window = match (true) {
+            hash_equals(MemberQrToken::code($fields['userId'], $now), $fields['digits']) => $now,
+            $intoWindow < self::GRACE_SECONDS && hash_equals(MemberQrToken::code($fields['userId'], $now - 1), $fields['digits']) => $now - 1,
+            default => throw new MemberQrRefused(MemberQrRefusal::Forged),
+        };
+
+        return self::claimed($fields['userId'], $window, $scope, $at);
+    }
+
+    /**
+     * A checked code of a customer whose account still exists, used for this scope.
+     *
+     * @throws MemberQrRefused
+     */
+    private static function claimed(int $userId, int $window, string $scope, CarbonImmutable $at): self
+    {
+        $user = User::query()->find($userId);
 
         if (! $user instanceof User || $user->isAnonymised()) {
             throw new MemberQrRefused(MemberQrRefusal::UnknownUser);
@@ -78,10 +113,10 @@ final readonly class MemberQrScan
 
         // Kept while any code of theirs shown by then could still count: the next window's code lasts until two
         // windows and a grace from the start of this one, at the latest.
-        if (! Cache::add('member-qr:'.$fields['userId'].':'.$scope, true, $at->addSeconds(self::rememberedSeconds()))) {
+        if (! Cache::add('member-qr:'.$userId.':'.$scope, true, $at->addSeconds(self::rememberedSeconds()))) {
             throw new MemberQrRefused(MemberQrRefusal::Replayed);
         }
 
-        return new self($fields['userId'], $fields['window'], $at);
+        return new self($userId, $window, $at);
     }
 }
