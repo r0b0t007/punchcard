@@ -19,6 +19,9 @@ enum MemberQrRefusal: string
     /** This code was already used for this card while it lasts. */
     case Replayed = 'replayed';
 
+    /** Too many wrong short codes typed for this member lately: only their QR counts for now (MemberQrScan::fromCode). */
+    case TooManyAttempts = 'too_many_attempts';
+
     /** The customer's account is gone (deleted since). */
     case UnknownUser = 'unknown_user';
 }

@@ -18,7 +18,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Redeems a reward (CHW-26, stamp-flow skill) with proof that the customer is
  * at the counter (RedeemPresence): their verified tap inside the redeem window
- * they opened (OpenRedeemWindow), at a business that honours the card (any
+ * they opened (OpenRedeemWindow), or a staff member's scan of their member QR
+ * (CHW-30, no window: the scan is the proof), at a business that honours the card (any
  * business of the franchise that does), at an open site of a business not
  * suspended (ArchivedSites' counter, CHW-22). Needs a verified
  * email: an unverified account collects stamps but never cashes out.
@@ -45,11 +46,16 @@ final readonly class RedeemReward
                 throw new RedeemRefused(RedeemRefusal::NotYours);
             }
 
+            // Before the replay below, so a business never gets back a redemption, nor a reward, of a card it doesn't honour.
+            if (! $this->honours($presence->businessId, $enrollment)) {
+                throw new RedeemRefused(RedeemRefusal::NotHonoured);
+            }
+
             if ($locked->status === RewardStatus::Redeemed) {
                 return new RedeemResult($locked, redeemedNow: false);
             }
 
-            $this->assertRedeemable($locked, $enrollment, $user, $presence);
+            $this->assertRedeemable($locked, $user, $presence);
 
             $locked->forceFill([
                 'status' => RewardStatus::Redeemed,
@@ -57,6 +63,7 @@ final readonly class RedeemReward
                 'redeemed_by' => $presence->staffId,
                 'redeemed_business_id' => $presence->businessId,
                 'redeemed_location_id' => $presence->locationId,
+                'redeemed_scan_id' => $presence->scanId,
                 'redeem_window_opened_at' => null,
                 'redeem_window_until' => null,
             ])->save();
@@ -71,13 +78,18 @@ final readonly class RedeemReward
         return $result;
     }
 
-    private function assertRedeemable(Reward $reward, CardEnrollment $enrollment, User $user, RedeemPresence $presence): void
+    /** Whether the business honours the card (any business of the franchise that does). */
+    private function honours(int $businessId, CardEnrollment $enrollment): bool
+    {
+        return CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $businessId)->exists();
+    }
+
+    private function assertRedeemable(Reward $reward, User $user, RedeemPresence $presence): void
     {
         $refusal = match (true) {
             $reward->status !== RewardStatus::Available => RedeemRefusal::Unavailable,
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
-            ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
-            ! CardBusiness::query()->where('card_id', $enrollment->card_id)->where('business_id', $presence->businessId)->exists() => RedeemRefusal::NotHonoured,
+            $presence->needsRedeemWindow() && ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,
             ! ArchivedSites::isOpen($presence->businessId, $presence->locationId, lock: $presence->staffId !== null, counter: true) => RedeemRefusal::SiteClosed,
             default => null,
         };

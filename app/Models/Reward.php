@@ -52,6 +52,7 @@ use LogicException;
  * @property int|null $redeemed_by
  * @property int|null $redeemed_business_id
  * @property int|null $redeemed_location_id
+ * @property string|null $redeemed_scan_id the staff member's scan it was redeemed with (RedeemScan, CHW-30)
  * @property Carbon|null $redeem_window_opened_at when the customer's redeem window opened (OpenRedeemWindow)
  * @property Carbon|null $redeem_window_until when it closes
  * @property Carbon|null $created_at
@@ -84,7 +85,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     private const array WINDOW_COLUMNS = ['redeem_window_opened_at', 'redeem_window_until'];
 
     /** Redemption fields a new reward cannot have outside bypass(). */
-    private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id'];
+    private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id', 'redeemed_scan_id'];
 
     /**
      * A reward's outcome, and its redeem window: only the redeem Actions (the

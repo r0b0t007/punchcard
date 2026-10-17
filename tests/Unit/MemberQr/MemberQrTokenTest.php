@@ -75,3 +75,60 @@ it('only reads tokens made with this app\'s key', function (): void {
 
     expect(($this->read)($token))->toBeNull();
 });
+
+it('gives a short code to type: the member number and six digits that change every window', function (): void {
+    $code = MemberQrToken::shortCode($this->user);
+
+    expect($code)->toMatch('/^42 [0-9]{6}$/')
+        ->and(MemberQrToken::codeFields($code))->toBe(['userId' => 42, 'digits' => substr($code, 3)]);
+
+    $this->travel(30)->seconds();
+    expect(MemberQrToken::shortCode($this->user))->not->toBe($code);
+});
+
+it('reads a short code however it was typed, and nothing else', function (string $typed, ?array $fields): void {
+    expect(MemberQrToken::codeFields($typed))->toBe($fields);
+})->with([
+    'with a space' => ['42 123456', ['userId' => 42, 'digits' => '123456']],
+    'run together' => ['42123456', ['userId' => 42, 'digits' => '123456']],
+    'with a dash and spaces around' => [' 42-123 456 ', ['userId' => 42, 'digits' => '123456']],
+    'with the middle dot shown' => ['42 · 123 456', ['userId' => 42, 'digits' => '123456']],
+    'too few digits' => ['42 12345', null],
+    'a zero-padded member' => ['042 123456', null],
+    'letters' => ['42 12345a', null],
+    'a token' => ['PC1.42.1.abc', null],
+]);
+
+it('only gives this app\'s short codes', function (): void {
+    $code = MemberQrToken::shortCode($this->user);
+    config(['app.key' => 'base64:'.base64_encode(str_repeat('x', 32))]);
+
+    expect(MemberQrToken::shortCode($this->user))->not->toBe($code);
+});
+
+it('reads a short code typed with Arabic-Indic digits, and refuses a long input', function (): void {
+    expect(MemberQrToken::codeFields('٤٢ ١٢٣٤٥٦'))->toBe(['userId' => 42, 'digits' => '123456'])
+        ->and(MemberQrToken::codeFields('۴۲ ۱۲۳۴۵۶'))->toBe(['userId' => 42, 'digits' => '123456'])
+        ->and(MemberQrToken::codeFields('42 '.str_repeat(' ', 100).'123456'))->toBeNull();
+});
+
+it('reads a short code copied or typed on an Arabic phone: bidi marks, no-break spaces, Arabic separators', function (string $typed): void {
+    expect(MemberQrToken::codeFields($typed))->toBe(['userId' => 42, 'digits' => '123456']);
+})->with([
+    'a right-to-left mark around it' => ["\u{200F}42 123456\u{200F}"],
+    'an Arabic letter mark inside' => ["42\u{061C} 123456"],
+    'a no-break space' => ["42\u{00A0}123456"],
+    'a narrow no-break space in the digits' => ["42 123\u{202F}456"],
+    'the Arabic thousands separator' => ['٤٢٬١٢٣٤٥٦'],
+    'the Arabic decimal separator' => ["42\u{066B}123456"],
+]);
+
+it('names the member a token or short code is for, read as the verifier reads it', function (string $scanned, ?int $member): void {
+    expect(MemberQrToken::memberOf($scanned))->toBe($member);
+})->with([
+    'a token' => ['PC1.42.1.AAAAAAAAAAAAAAAAAAAAAA', 42],
+    'a short code' => ['42 123456', 42],
+    'padded with NUL bytes' => ["\0".'42 123456'."\0", 42],
+    'a token padded with NUL bytes' => ["\0PC1.42.1.AAAAAAAAAAAAAAAAAAAAAA\0", 42],
+    'neither' => ['hello', null],
+]);

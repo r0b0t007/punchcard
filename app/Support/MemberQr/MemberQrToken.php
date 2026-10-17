@@ -6,6 +6,7 @@ namespace App\Support\MemberQr;
 
 use App\Models\User;
 use Carbon\CarbonInterface;
+use SensitiveParameter;
 
 /**
  * The member QR's token (CHW-28, C10): PC1.{user}.{window}.{mac}. Who the
@@ -16,10 +17,28 @@ use Carbon\CarbonInterface;
  * dense QR. Anyone can read it; nobody can change it or make one, and each
  * has exactly one spelling. VerifyMemberQr decides whether a scanned one
  * still counts.
+ *
+ * Shown with it, a short code to type when a camera cannot scan it
+ * (CHW-30): the member number and six digits (CODE_DIGITS) of an HMAC with
+ * a key of its own, for the same window. Six digits are found by trying,
+ * not computed: wrong ones are counted per member (MemberQrScan::fromCode),
+ * and a code counts for a window.
  */
 final class MemberQrToken
 {
     public const string VERSION = 'PC1';
+
+    /** How many digits a short code has after the member number. */
+    public const int CODE_DIGITS = 6;
+
+    /** The longest input read as a short code, spaces included. */
+    public const int MAX_TYPED = 40;
+
+    /** Arabic-Indic and Persian digits, read as ASCII ones. */
+    private const array LOCAL_DIGITS = [
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+    ];
 
     /** How long one window lasts: a code shows for this long, then the next. */
     public static function windowSeconds(): int
@@ -76,6 +95,61 @@ final class MemberQrToken
         }
 
         return ['userId' => (int) $parts[1], 'window' => (int) $parts[2], 'mac' => $parts[3]];
+    }
+
+    /** The user's short code now (or at a moment), to type: "{member} {digits}". */
+    public static function shortCode(User $user, ?CarbonInterface $at = null): string
+    {
+        $userId = (int) $user->id;
+
+        return $userId.' '.self::code($userId, self::windowAt($at ?? now()));
+    }
+
+    /** The digits of a member's short code in a window. */
+    public static function code(int $userId, int $window): string
+    {
+        $key = hash_hmac('sha256', 'member-qr-code', (string) config('app.key'), true);
+        $value = unpack('N', hash_hmac('sha256', self::VERSION.'C|'.$userId.'|'.$window, $key, true))[1] ?? 0;
+
+        return str_pad((string) (($value & 0x7FFFFFFF) % 10 ** self::CODE_DIGITS), self::CODE_DIGITS, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * A typed short code's parts, if it has one's shape: the member number (no leading zero), then the six
+     * digits. A space, dot, dash or middle dot after the number ends it, and the same may group the digits;
+     * typed with none, the last six digits are the code. Arabic-Indic and Persian digits (an Arabic keyboard's)
+     * read as theirs, any space (no-break ones too) or Arabic separator as a gap, and invisible marks (bidi, from a
+     * copy) are dropped; anything longer than MAX_TYPED characters is not a code. The digits unchecked.
+     *
+     * @return array{userId: int, digits: string}|null
+     */
+    public static function codeFields(#[SensitiveParameter] string $typed): ?array
+    {
+        if (mb_strlen($typed) > self::MAX_TYPED) {
+            return null;
+        }
+
+        $typed = strtr((string) preg_replace(['/\p{Cf}+/u', '/^\s+|\s+$/u'], '', $typed), self::LOCAL_DIGITS);
+        $gap = '[\s.\-\x{00B7}\x{066B}\x{066C}\x{060C}]';
+
+        if (preg_match('/^([1-9][0-9]{0,17})(?:'.$gap.'+([0-9](?:[0-9]|'.$gap.')*)|([0-9]{'.self::CODE_DIGITS.'}))$/uD', $typed, $parts) !== 1) {
+            return null;
+        }
+
+        $digits = ($parts[2] ?? '') !== '' ? (string) preg_replace('/\D+/', '', $parts[2]) : ($parts[3] ?? '');
+
+        return strlen($digits) === self::CODE_DIGITS ? ['userId' => (int) $parts[1], 'digits' => $digits] : null;
+    }
+
+    /**
+     * The member number a scanned token or typed short code names, unchecked; null if it is neither. Trimmed as
+     * VerifyMemberQr trims it, so both read the same member.
+     */
+    public static function memberOf(#[SensitiveParameter] string $scanned): ?int
+    {
+        $scanned = trim($scanned);
+
+        return (self::fields($scanned) ?? self::codeFields($scanned))['userId'] ?? null;
     }
 
     private static function mac(int $userId, int $window): string
