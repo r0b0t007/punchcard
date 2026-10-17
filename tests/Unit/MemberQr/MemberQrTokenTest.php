@@ -111,3 +111,24 @@ it('reads a short code typed with Arabic-Indic digits, and refuses a long input'
         ->and(MemberQrToken::codeFields('۴۲ ۱۲۳۴۵۶'))->toBe(['userId' => 42, 'digits' => '123456'])
         ->and(MemberQrToken::codeFields('42 '.str_repeat(' ', 100).'123456'))->toBeNull();
 });
+
+it('reads a short code copied or typed on an Arabic phone: bidi marks, no-break spaces, Arabic separators', function (string $typed): void {
+    expect(MemberQrToken::codeFields($typed))->toBe(['userId' => 42, 'digits' => '123456']);
+})->with([
+    'a right-to-left mark around it' => ["\u{200F}42 123456\u{200F}"],
+    'an Arabic letter mark inside' => ["42\u{061C} 123456"],
+    'a no-break space' => ["42\u{00A0}123456"],
+    'a narrow no-break space in the digits' => ["42 123\u{202F}456"],
+    'the Arabic thousands separator' => ['٤٢٬١٢٣٤٥٦'],
+    'the Arabic decimal separator' => ["42\u{066B}123456"],
+]);
+
+it('names the member a token or short code is for, read as the verifier reads it', function (string $scanned, ?int $member): void {
+    expect(MemberQrToken::memberOf($scanned))->toBe($member);
+})->with([
+    'a token' => ['PC1.42.1.AAAAAAAAAAAAAAAAAAAAAA', 42],
+    'a short code' => ['42 123456', 42],
+    'padded with NUL bytes' => ["\0".'42 123456'."\0", 42],
+    'a token padded with NUL bytes' => ["\0PC1.42.1.AAAAAAAAAAAAAAAAAAAAAA\0", 42],
+    'neither' => ['hello', null],
+]);

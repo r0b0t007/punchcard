@@ -180,3 +180,23 @@ it('says why a short code is refused', function (string $how, MemberQrRefusal $r
     'wrong digits' => ['wrong digits', MemberQrRefusal::Forged],
     'another member' => ['another member', MemberQrRefusal::Forged],
 ]);
+
+it('refuses a member\'s short codes for a while after too many wrong ones, wherever typed, never their QR', function (): void {
+    $code = MemberQrToken::shortCode($this->customer);
+    [$member, $digits] = explode(' ', $code);
+    $wrong = $member.' '.str_pad((string) (((int) $digits + 1) % 1_000_000), 6, '0', STR_PAD_LEFT);
+    $someoneElse = User::factory()->create();
+
+    foreach (range(1, MemberQrScan::WRONG_CODES - 1) as $attempt) {
+        expect(($this->refusalOf)($wrong, 'scan:business:'.$attempt))->toBe(MemberQrRefusal::Forged);
+    }
+
+    expect(($this->refusalOf)($code, 'card:before'))->toBeNull()
+        ->and(($this->refusalOf)($wrong, 'scan:business:last'))->toBe(MemberQrRefusal::Forged)
+        ->and(($this->refusalOf)($code, 'card:after'))->toBe(MemberQrRefusal::TooManyAttempts)
+        ->and(($this->refusalOf)(MemberQrToken::issue($this->customer)['token'], 'card:qr'))->toBeNull()
+        ->and(($this->refusalOf)(MemberQrToken::shortCode($someoneElse), 'card:other'))->toBeNull();
+
+    $this->travel(MemberQrScan::WRONG_CODES_SECONDS)->seconds();
+    expect(($this->refusalOf)(MemberQrToken::shortCode($this->customer), 'card:later'))->toBeNull();
+});

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\MemberQr\MemberQrToken;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use SensitiveParameter;
 
 /**
@@ -32,6 +33,12 @@ final readonly class MemberQrScan
 {
     /** How long into a window the previous window's code still counts. */
     public const int GRACE_SECONDS = 10;
+
+    /** Wrong short codes typed for one member before their short codes are refused for a while. */
+    public const int WRONG_CODES = 5;
+
+    /** How long wrong short codes count against a member. */
+    public const int WRONG_CODES_SECONDS = 600;
 
     private function __construct(
         public int $userId,
@@ -78,7 +85,10 @@ final readonly class MemberQrScan
      * The scan of a short code typed in place of the QR (CHW-30), if it counts for this scope; else
      * MemberQrRefused, saying why. The same windows as a token's: its digits are this window's, or the previous
      * one's during the first GRACE_SECONDS (compared in constant time). An older code reads as Forged: its digits
-     * prove nothing else. The same use per customer and scope as the QR's.
+     * prove nothing else. The same use per customer and scope as the QR's. Six digits can be found by trying, from
+     * any number of staff accounts: wrong ones are counted per member, wherever typed, and after WRONG_CODES in
+     * WRONG_CODES_SECONDS that member's short codes are refused (TooManyAttempts) until the count runs out; their
+     * QR still counts.
      *
      * @throws MemberQrRefused
      */
@@ -86,14 +96,28 @@ final readonly class MemberQrScan
     {
         $at = CarbonImmutable::now();
         $fields = MemberQrToken::codeFields($code) ?? throw new MemberQrRefused(MemberQrRefusal::Malformed);
+        $attempts = 'member-qr-code:'.$fields['userId'];
+
+        // Counted before the digits are checked, so a burst of guesses can't all pass the limit at once; a right
+        // code gives its attempt back.
+        if (RateLimiter::hit($attempts, self::WRONG_CODES_SECONDS) > self::WRONG_CODES) {
+            throw new MemberQrRefused(MemberQrRefusal::TooManyAttempts);
+        }
+
         $now = MemberQrToken::windowAt($at);
         $intoWindow = $at->getTimestamp() - $now * MemberQrToken::windowSeconds();
 
         $window = match (true) {
             hash_equals(MemberQrToken::code($fields['userId'], $now), $fields['digits']) => $now,
             $intoWindow < self::GRACE_SECONDS && hash_equals(MemberQrToken::code($fields['userId'], $now - 1), $fields['digits']) => $now - 1,
-            default => throw new MemberQrRefused(MemberQrRefusal::Forged),
+            default => null,
         };
+
+        if ($window === null) {
+            throw new MemberQrRefused(MemberQrRefusal::Forged);
+        }
+
+        RateLimiter::decrement($attempts, self::WRONG_CODES_SECONDS);
 
         return self::claimed($fields['userId'], $window, $scope, $at);
     }

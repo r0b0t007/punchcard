@@ -8,7 +8,6 @@ use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\User;
-use App\Support\Cards\CardChoice;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -35,26 +34,24 @@ final readonly class EnrollCustomer
 
     private const int ATTEMPTS = 3;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ChooseCard $chooseCard) {}
 
     public function handle(Business $business, User $user): ?CardEnrollment
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
-            $honoured = LoyaltyCard::query()->honouredBy($business->id)->get(['id', 'active']);
-            $cards = $honoured->modelKeys();
+            // A running card the customer holds here comes first, so a tap never splits their progress;
+            // one they hold that is paused gives way to the card the business runs now (CHW-148).
+            $here = $this->chooseCard->handle($business->id, $user->id);
 
-            if ($cards === []) {
+            if (! $here->card instanceof LoyaltyCard) {
                 return null;
             }
 
-            // A running card the customer holds here comes first, so a tap never splits their progress;
-            // one they hold that is paused gives way to the card the business runs now (CHW-148).
-            $held = CardEnrollment::query()->whereIn('card_id', $cards)->where('user_id', $user->id)->lastUsedFirst()->get()->keyBy('card_id');
-            $card = (int) CardChoice::pick($cards, $held->keys()->all(), $honoured->where('active', true)->modelKeys());
-
-            if ($held->has($card)) {
-                return $held->get($card);
+            if ($here->enrollment instanceof CardEnrollment) {
+                return $here->enrollment;
             }
+
+            $card = $here->card->id;
 
             for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
                 $existing = CardEnrollment::query()->where('card_id', $card)->where('user_id', $user->id)->first();

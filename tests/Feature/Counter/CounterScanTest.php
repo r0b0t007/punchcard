@@ -10,6 +10,7 @@ use App\Actions\Counter\ScanRefused;
 use App\Actions\Counter\StampScan;
 use App\Actions\MemberQr\MemberQrRefusal;
 use App\Actions\MemberQr\MemberQrRefused;
+use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampResult;
@@ -42,7 +43,7 @@ use Tests\Support\Tenants;
 | checked (MemberQrScan) and becomes a scan record, theirs for two minutes at
 | one location. It stamps once (AddStamps, source qr, the staff device's
 | idempotency key, the customer enrolled if new here) and proves presence to
-| redeem (RedeemReward, without the customer's redeem window).
+| redeem one reward (RedeemReward, without the customer's redeem window).
 |
 */
 
@@ -245,7 +246,8 @@ it('redeems only the scanned customer\'s reward, honoured here, on a scan still 
 
     expect(($this->reason)(fn () => $redeem($someoneElse)))->toBe(RedeemRefusal::NotYours)
         ->and(($this->reason)(fn () => $redeem($elsewhere)))->toBe(RedeemRefusal::NotHonoured)
-        ->and(($this->reason)(fn () => $redeem($theirs, $this->tenants->member(User::factory()->create(), $this->tenants->a1))))->toBe(ScanRefusal::NotYours);
+        ->and(($this->reason)(fn () => $redeem($theirs, $this->tenants->member(User::factory()->create(), $this->tenants->a1))))->toBe(ScanRefusal::NotYours)
+        ->and($scan->fresh()?->reward_id)->toBeNull();
 
     $this->travel(CounterScan::SECONDS + 1)->seconds();
     expect(($this->reason)(fn () => $redeem($theirs)))->toBe(ScanRefusal::Expired)
@@ -281,7 +283,8 @@ it('describes a scan for the result screen (S2)', function (): void {
     expect($new['firstName'])->toBe('Salma')
         ->and($new['card'])->toMatchArray(['name' => 'A card', 'stamps' => 0, 'required' => 10, 'new' => true])
         ->and($new['rewards'])->toBe([])
-        ->and($new['used'])->toBeFalse()
+        ->and($new['stamped'])->toBeFalse()
+        ->and($new['redeemed'])->toBeFalse()
         ->and($new['secondsLeft'])->toBe(CounterScan::SECONDS);
 
     ($this->stamp)($scan, 3);
@@ -289,7 +292,7 @@ it('describes a scan for the result screen (S2)', function (): void {
     $stamped = app(DescribeScan::class)->handle($scan->fresh() ?? $scan);
 
     expect($stamped['card'])->toMatchArray(['stamps' => 3, 'new' => false])
-        ->and($stamped['used'])->toBeTrue()
+        ->and($stamped['stamped'])->toBeTrue()
         ->and($stamped['rewards'])->toBe([['id' => $reward->id, 'text' => $reward->reward_text]]);
 });
 
@@ -366,7 +369,7 @@ it('gives the same redemption to a retry after the scan ran out, and nothing els
     $again = app(RedeemScan::class)->handle($scan, $this->a1Staff, $reward);
     expect($again->redeemedNow)->toBeFalse()
         ->and($again->reward->id)->toBe($reward->id)
-        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $other)))->toBe(ScanRefusal::Expired);
+        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $other)))->toBe(ScanRefusal::Used);
 });
 
 it('refuses after the scan ran out a reward redeemed some other way', function (string $how): void {
@@ -396,4 +399,114 @@ it('prunes scans a day after they ran out', function (): void {
     $this->artisan('model:prune', ['--model' => [CounterScan::class]])->assertSuccessful();
 
     expect($this->context->bypass(fn (): array => CounterScan::query()->pluck('id')->all()))->toBe([$recent->id]);
+});
+
+it('refuses staff scanning their own code, while a colleague can scan them', function (): void {
+    $colleague = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
+
+    expect(($this->reason)(fn () => ($this->scan)(MemberQrToken::issue($this->a1Staff)['token'])))->toBe(ScanRefusal::OwnCode)
+        ->and($this->context->bypass(fn (): int => CounterScan::query()->count()))->toBe(0)
+        ->and(($this->scan)(MemberQrToken::issue($this->a1Staff)['token'], staff: $colleague)->user_id)->toBe($this->a1Staff->id);
+});
+
+it('stops a scan working for staff removed or moved to another site since', function (string $how): void {
+    $reward = $this->tenants->reward($this->tenants->enroll($this->customer, $this->tenants->cardA));
+    $scan = ($this->scan)();
+    $elsewhere = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create());
+
+    $this->context->bypass(fn () => $how === 'removed'
+        ? $this->tenants->a1->members()->detach($this->a1Staff->id)
+        : $this->tenants->a1->members()->updateExistingPivot($this->a1Staff->id, ['location_id' => $elsewhere->id]));
+
+    expect(($this->reason)(fn () => ($this->stamp)($scan)))->toBe(ScanRefusal::NotYours)
+        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $reward)))->toBe(ScanRefusal::NotYours)
+        ->and($this->context->bypass(fn () => $reward->fresh()?->status))->toBe(RewardStatus::Available);
+})->with(['removed', 'moved to another site']);
+
+it('redeems one reward per scan: the same one again gives that redemption, another needs a new scan', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $first = $this->tenants->reward($enrollment);
+    $second = $this->context->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create(['milestone' => 2]));
+    $scan = ($this->scan)();
+    app(RedeemScan::class)->handle($scan, $this->a1Staff, $first);
+
+    expect(app(RedeemScan::class)->handle($scan, $this->a1Staff, $first)->redeemedNow)->toBeFalse()
+        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $second)))->toBe(ScanRefusal::Used)
+        ->and($scan->fresh()?->reward_id)->toBe($first->id)
+        ->and(app(DescribeScan::class)->handle($scan->fresh() ?? $scan)['redeemed'])->toBeTrue();
+
+    // A visit later, a new code and a new scan.
+    $this->travel(2)->minutes();
+    expect(app(RedeemScan::class)->handle(($this->scan)(), $this->a1Staff, $second)->redeemedNow)->toBeTrue();
+});
+
+it('leaves the scan for another reward when the one asked for was redeemed some other way meanwhile', function (): void {
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $gone = $this->tenants->reward($enrollment);
+    $next = $this->context->bypass(fn (): Reward => Reward::factory()->for($enrollment, 'enrollment')->create(['milestone' => 2]));
+    $scan = ($this->scan)();
+    $this->context->bypass(fn () => $gone->forceFill(['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id, 'redeemed_location_id' => $this->a1Location->id])->save());
+
+    expect(app(RedeemScan::class)->handle($scan, $this->a1Staff, $gone)->redeemedNow)->toBeFalse()
+        ->and($scan->fresh()?->reward_id)->toBeNull()
+        ->and(app(RedeemScan::class)->handle($scan, $this->a1Staff, $next)->redeemedNow)->toBeTrue();
+});
+
+it('proves presence now, while the scan runs, confirmed by its staff member', function (): void {
+    $scan = ($this->scan)();
+    $this->travel(CounterScan::SECONDS - 1)->seconds();
+    $presence = RedeemPresence::scan($scan);
+
+    expect($presence?->at->equalTo(now()))->toBeTrue()
+        ->and($presence?->staffId)->toBe($this->a1Staff->id)
+        ->and($presence?->needsRedeemWindow())->toBeFalse();
+
+    $this->travel(1)->seconds();
+    expect(RedeemPresence::scan($scan))->toBeNull()
+        ->and(fn (): ?RedeemPresence => RedeemPresence::scan(CounterScan::factory()->make()))->toThrow(LogicException::class);
+});
+
+it('refuses staff their own short code however it is padded', function (string $padding): void {
+    $code = MemberQrToken::shortCode($this->a1Staff);
+
+    expect(($this->reason)(fn () => ($this->scan)($padding.$code.$padding)))->toBe(ScanRefusal::OwnCode)
+        ->and($this->context->bypass(fn (): int => CounterScan::query()->count()))->toBe(0);
+})->with(['a NUL byte' => ["\0"], 'a tab' => ["\t"], 'a no-break space' => ["\u{00A0}"]]);
+
+it('never stamps or redeems with a scan of the staff member themselves, whatever made it', function (): void {
+    $reward = $this->tenants->reward($this->tenants->enroll($this->a1Staff, $this->tenants->cardA));
+    $scan = $this->context->bypass(fn (): CounterScan => CounterScan::factory()->create([
+        'business_id' => $this->tenants->a1->id,
+        'location_id' => $this->a1Location->id,
+        'user_id' => $this->a1Staff->id,
+        'staff_id' => $this->a1Staff->id,
+    ]));
+    ($this->as)($this->a1Staff, $this->tenants->a1);
+
+    expect(($this->reason)(fn () => ($this->stamp)($scan)))->toBe(ScanRefusal::OwnCode)
+        ->and(($this->reason)(fn () => app(RedeemScan::class)->handle($scan, $this->a1Staff, $reward)))->toBe(ScanRefusal::OwnCode);
+});
+
+it('stops a staff member who types too many wrong codes, for any members, while right ones cost nothing', function (): void {
+    $colleague = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
+    $wrongFor = fn (User $member): string => $member->id.' '.str_pad((string) ((((int) substr(MemberQrToken::shortCode($member), -6)) + 1) % 1_000_000), 6, '0', STR_PAD_LEFT);
+    $members = User::factory()->count(ScanMemberQr::STAFF_WRONG_CODES)->create();
+
+    foreach ($members as $member) {
+        expect(($this->reason)(fn () => ($this->scan)($wrongFor($member))))->toBe(MemberQrRefusal::Forged);
+    }
+
+    expect(($this->reason)(fn () => ($this->scan)()))->toBe(MemberQrRefusal::TooManyAttempts)
+        ->and(($this->scan)(staff: $colleague)->staff_id)->toBe($colleague->id);
+
+    $this->travel(ScanMemberQr::STAFF_WRONG_CODES_SECONDS)->seconds();
+    expect(($this->scan)(MemberQrToken::issue(User::factory()->create())['token'])->staff_id)->toBe($this->a1Staff->id);
+
+    // Right codes, and refusals that are not guesses, give their attempt back.
+    foreach (range(1, ScanMemberQr::STAFF_WRONG_CODES + 1) as $visit) {
+        ($this->scan)(MemberQrToken::issue(User::factory()->create())['token']);
+        ($this->reason)(fn () => ($this->scan)('hello'));
+    }
+
+    expect(($this->scan)(MemberQrToken::issue(User::factory()->create())['token'])->staff_id)->toBe($this->a1Staff->id);
 });

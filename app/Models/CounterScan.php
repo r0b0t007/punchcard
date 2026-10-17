@@ -9,6 +9,7 @@ use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use Carbon\CarbonInterface;
 use Database\Factories\CounterScanFactory;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +24,7 @@ use Illuminate\Support\Carbon;
  * A staff member's scan of a customer's member QR, or its short code
  * (CHW-30): made only by ScanMemberQr from a checked code, it is that staff
  * member's for SECONDS at one location, stamps once (StampScan) and proves
- * the customer is at the counter to redeem (RedeemScan). Site data: a
+ * the customer is at the counter to redeem one reward (RedeemScan). Site data: a
  * franchisee sees its own. It names a customer: rows go a day after they ran
  * out.
  *
@@ -37,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $scanned_at
  * @property Carbon $expires_at
  * @property int|null $stamp_event_id the stamp it gave (StampScan)
+ * @property int|null $reward_id the reward it redeemed (RedeemScan)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -69,9 +71,10 @@ class CounterScan extends Model implements TenantModel
         return app(TenantContext::class)->bypass(fn (): int => $this->pruneAllRows($chunkSize));
     }
 
-    public function hasExpired(): bool
+    /** Whether it ran out by then (now by default). */
+    public function hasExpired(?CarbonInterface $at = null): bool
     {
-        return ! $this->expires_at->isFuture();
+        return ! $this->expires_at->greaterThan($at ?? now());
     }
 
     /**

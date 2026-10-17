@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\DB;
  * Stamps the customer a staff member scanned (CHW-30, S2): source qr, the
  * staff device's idempotency key, the card the customer holds here or the
  * one they are enrolled on now (EnrollCustomer, as a first tap does). One
- * stamp per scan, by the staff member who scanned, while it runs.
+ * stamp per scan, by the staff member who scanned while they still work
+ * there (LockScan), while it runs.
  *
  * With the scan row locked, the key comes first: a scan that already
  * stamped with this key gives that stamp again (AddStamps' replay), even
@@ -38,6 +39,7 @@ final readonly class StampScan
     public function __construct(
         private AddStamps $addStamps,
         private EnrollCustomer $enrollCustomer,
+        private LockScan $lockScan,
         private TenantContext $context,
     ) {}
 
@@ -48,11 +50,7 @@ final readonly class StampScan
     public function handle(CounterScan $scan, User $staff, int $qty, string $idempotencyKey): StampResult
     {
         return DB::transaction(function () use ($scan, $staff, $qty, $idempotencyKey): StampResult {
-            $locked = CounterScan::query()->whereKey($scan->getKey())->lockForUpdate()->firstOrFail();
-
-            if ($locked->staff_id !== $staff->id) {
-                throw new ScanRefused(ScanRefusal::NotYours);
-            }
+            $locked = $this->lockScan->handle($scan, $staff);
 
             $request = StampRequest::qr($this->context->bypass(fn (): Location => Location::query()->findOrFail($locked->location_id)), $staff, $idempotencyKey, $qty);
 

@@ -21,7 +21,8 @@ use SensitiveParameter;
  * Shown with it, a short code to type when a camera cannot scan it
  * (CHW-30): the member number and six digits (CODE_DIGITS) of an HMAC with
  * a key of its own, for the same window. Six digits are found by trying,
- * not computed: staff entry is throttled, and a code counts for a window.
+ * not computed: wrong ones are counted per member (MemberQrScan::fromCode),
+ * and a code counts for a window.
  */
 final class MemberQrToken
 {
@@ -117,7 +118,8 @@ final class MemberQrToken
      * A typed short code's parts, if it has one's shape: the member number (no leading zero), then the six
      * digits. A space, dot, dash or middle dot after the number ends it, and the same may group the digits;
      * typed with none, the last six digits are the code. Arabic-Indic and Persian digits (an Arabic keyboard's)
-     * read as theirs; anything longer than MAX_TYPED characters is not a code. The digits unchecked.
+     * read as theirs, any space (no-break ones too) or Arabic separator as a gap, and invisible marks (bidi, from a
+     * copy) are dropped; anything longer than MAX_TYPED characters is not a code. The digits unchecked.
      *
      * @return array{userId: int, digits: string}|null
      */
@@ -127,16 +129,27 @@ final class MemberQrToken
             return null;
         }
 
-        $typed = strtr(trim($typed), self::LOCAL_DIGITS);
-        $gap = '[\s.\-\x{00B7}]';
+        $typed = strtr((string) preg_replace(['/\p{Cf}+/u', '/^\s+|\s+$/u'], '', $typed), self::LOCAL_DIGITS);
+        $gap = '[\s.\-\x{00B7}\x{066B}\x{066C}\x{060C}]';
 
-        if (preg_match('/^([1-9][0-9]{0,17})(?:'.$gap.'+([0-9][0-9\s.\-\x{00B7}]*)|([0-9]{'.self::CODE_DIGITS.'}))$/uD', $typed, $parts) !== 1) {
+        if (preg_match('/^([1-9][0-9]{0,17})(?:'.$gap.'+([0-9](?:[0-9]|'.$gap.')*)|([0-9]{'.self::CODE_DIGITS.'}))$/uD', $typed, $parts) !== 1) {
             return null;
         }
 
         $digits = ($parts[2] ?? '') !== '' ? (string) preg_replace('/\D+/', '', $parts[2]) : ($parts[3] ?? '');
 
         return strlen($digits) === self::CODE_DIGITS ? ['userId' => (int) $parts[1], 'digits' => $digits] : null;
+    }
+
+    /**
+     * The member number a scanned token or typed short code names, unchecked; null if it is neither. Trimmed as
+     * VerifyMemberQr trims it, so both read the same member.
+     */
+    public static function memberOf(#[SensitiveParameter] string $scanned): ?int
+    {
+        $scanned = trim($scanned);
+
+        return (self::fields($scanned) ?? self::codeFields($scanned))['userId'] ?? null;
     }
 
     private static function mac(int $userId, int $window): string
