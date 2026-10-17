@@ -235,13 +235,47 @@ test.describe('in English, light', () => {
     test('dims a My QR code restored with Back until the next one comes (CHW-222)', async ({
         page,
     }, testInfo) => {
+        type Sample = { dimmed: boolean; overWindow: boolean };
+        type Sampled = { samples: Sample[]; sampler: number };
+        const samples = () =>
+            page.evaluate(() => (globalThis as unknown as Sampled).samples);
+        const enoughSamples = () =>
+            expect
+                .poll(async () => (await samples()).length)
+                .toBeGreaterThan(40);
+
         await page.goto('/app');
+        // Every 25 ms while a code shows (the page stays one document across visits): dimmed or not, and whether
+        // the seconds left ever exceed the code's window.
+        await page.evaluate(() => {
+            const sampled = globalThis as unknown as Sampled;
+            sampled.samples = [];
+            sampled.sampler = window.setInterval(() => {
+                const img = document.querySelector('[data-test="member-qr"]');
+                const bar = document.querySelector('[role="progressbar"]');
+
+                if (img && bar) {
+                    sampled.samples.push({
+                        dimmed: img.classList.contains('opacity-20'),
+                        overWindow:
+                            Number(bar.getAttribute('aria-valuenow')) >
+                            Number(bar.getAttribute('aria-valuemax')),
+                    });
+                }
+            }, 25);
+        });
+
         await page.locator('[data-test="my-qr-link"]').click();
         const code = page.locator('[data-test="member-qr"]');
         await expect(code).toBeVisible();
-        await expect(code).not.toHaveClass(/opacity-20/);
+        await enoughSamples();
+        // A code just sent counts down from its seconds, never one more.
+        expect((await samples()).some((s) => s.overWindow)).toBe(false);
 
-        // Hold the request for the next code, so the restored page shows before it comes.
+        await page.getByRole('link', { name: 'My cards' }).click();
+        await expect(page).toHaveURL(/\/app$/);
+
+        // Hold the restored page's request for the next code, so it shows before that comes.
         let release = () => {};
         const held = new Promise<void>((resolve) => {
             release = resolve;
@@ -256,29 +290,14 @@ test.describe('in English, light', () => {
             await route.continue();
         });
 
-        await page.getByRole('link', { name: 'My cards' }).click();
-        await expect(page).toHaveURL(/\/app$/);
-
-        // Whether the code is dimmed, every 25 ms from the moment Back shows it: never at full strength.
         await page.evaluate(() => {
-            const sampled = globalThis as unknown as { dimmed: boolean[] };
-            sampled.dimmed = [];
-            window.setInterval(() => {
-                const img = document.querySelector('[data-test="member-qr"]');
-
-                if (img) {
-                    sampled.dimmed.push(img.classList.contains('opacity-20'));
-                }
-            }, 25);
+            (globalThis as unknown as Sampled).samples = [];
         });
         await page.goBack();
         await expect(code).toBeVisible();
-        await page.waitForTimeout(1500);
-        const dimmed = await page.evaluate(
-            () => (globalThis as unknown as { dimmed: boolean[] }).dimmed,
-        );
-        expect(dimmed.length).toBeGreaterThan(20);
-        expect(dimmed.every(Boolean)).toBe(true);
+        await enoughSamples();
+        // Dimmed from the moment Back shows it: never at full strength.
+        expect((await samples()).every((s) => s.dimmed)).toBe(true);
 
         await expect(code).toHaveClass(/opacity-20/);
         await expect(page.getByRole('progressbar')).toHaveAttribute(
@@ -292,7 +311,10 @@ test.describe('in English, light', () => {
 
         release();
         await expect(code).not.toHaveClass(/opacity-20/);
-        expect(asked).toBeGreaterThan(0);
+        expect(asked).toBe(1);
+        await page.evaluate(() => {
+            window.clearInterval((globalThis as unknown as Sampled).sampler);
+        });
     });
 });
 
