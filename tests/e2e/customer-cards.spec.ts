@@ -235,7 +235,7 @@ test.describe('in English, light', () => {
     test('dims a My QR code restored with Back until the next one comes (CHW-222)', async ({
         page,
     }, testInfo) => {
-        type Sample = { dimmed: boolean; overWindow: boolean };
+        type Sample = { dimmed: boolean; shown: number };
         type Sampled = { samples: Sample[]; sampler: number };
         const samples = () =>
             page.evaluate(() => (globalThis as unknown as Sampled).samples);
@@ -243,10 +243,33 @@ test.describe('in English, light', () => {
             expect
                 .poll(async () => (await samples()).length)
                 .toBeGreaterThan(40);
+        // The seconds shown while the code that just came is on screen (its first unbroken run at full strength).
+        const shownForNewCode = async () => {
+            const all = await samples();
+            const from = all.findIndex((s) => !s.dimmed);
+            const end = all.findIndex((s, i) => i > from && s.dimmed);
+
+            return all
+                .slice(from, end === -1 ? undefined : end)
+                .map((s) => s.shown);
+        };
+        const codeAnswer = (partial: boolean) =>
+            page.waitForResponse(
+                (r) =>
+                    new URL(r.url()).pathname === '/app/qr' &&
+                    !!r.request().headers()['x-inertia-partial-data'] ===
+                        partial,
+            );
+        const sentSeconds = async (answer: ReturnType<typeof codeAnswer>) =>
+            (
+                (await (await answer).json()) as {
+                    props: { secondsLeft: number };
+                }
+            ).props.secondsLeft;
 
         await page.goto('/app');
-        // Every 25 ms while a code shows (the page stays one document across visits): dimmed or not, and whether
-        // the seconds left ever exceed the code's window.
+        // Every 25 ms while a code shows (the page stays one document across visits): dimmed or not, and the
+        // seconds it shows left.
         await page.evaluate(() => {
             const sampled = globalThis as unknown as Sampled;
             sampled.samples = [];
@@ -257,20 +280,21 @@ test.describe('in English, light', () => {
                 if (img && bar) {
                     sampled.samples.push({
                         dimmed: img.classList.contains('opacity-20'),
-                        overWindow:
-                            Number(bar.getAttribute('aria-valuenow')) >
-                            Number(bar.getAttribute('aria-valuemax')),
+                        shown: Number(bar.getAttribute('aria-valuenow')),
                     });
                 }
             }, 25);
         });
 
+        const opened = codeAnswer(false);
         await page.locator('[data-test="my-qr-link"]').click();
         const code = page.locator('[data-test="member-qr"]');
         await expect(code).toBeVisible();
         await enoughSamples();
-        // A code just sent counts down from its seconds, never one more.
-        expect((await samples()).some((s) => s.overWindow)).toBe(false);
+        // A code just sent counts down from the seconds the server gave it, never one more.
+        expect(Math.max(...(await shownForNewCode()))).toBeLessThanOrEqual(
+            await sentSeconds(opened),
+        );
 
         await page.getByRole('link', { name: 'My cards' }).click();
         await expect(page).toHaveURL(/\/app$/);
@@ -309,9 +333,17 @@ test.describe('in English, light', () => {
         ).toBeVisible();
         await attach(page, testInfo, 'my-qr-restored');
 
+        const answered = codeAnswer(true);
         release();
         await expect(code).not.toHaveClass(/opacity-20/);
         expect(asked).toBe(1);
+        // The next code, too, from the seconds the server gave it: the page's clock was read up to a second before.
+        await expect
+            .poll(async () => (await shownForNewCode()).length)
+            .toBeGreaterThan(20);
+        expect(Math.max(...(await shownForNewCode()))).toBeLessThanOrEqual(
+            await sentSeconds(answered),
+        );
         await page.evaluate(() => {
             window.clearInterval((globalThis as unknown as Sampled).sampler);
         });
