@@ -101,7 +101,7 @@ final readonly class DescribeTap
             if ($tap->rejection === TapRejection::Cooldown) {
                 return ['component' => 'tap/cooldown', 'props' => [
                     'card' => $this->card($tap, $card, $location, $tap->card_stamps),
-                    'nextStamp' => $this->nextStamp($tap, $timezone),
+                    'nextStamp' => LocalMoment::next($tap->available_at, $timezone),
                     'stampedMinutesAgo' => $this->stampedMinutesAgo($tap, $card),
                     'enrollmentId' => $this->enrollmentOf($tap),
                 ]];
@@ -183,35 +183,6 @@ final readonly class DescribeTap
         $carried = $card?->mode === CardMode::Cyclic ? $card->stamps_required * $rewards : 0;
 
         return max(0, min((int) $tap->card_stamps + $carried - $tap->qty, $card->stamps_required ?? 0));
-    }
-
-    /**
-     * When the next stamp is possible, in the location's time: now (the
-     * cooldown has passed since), today, tomorrow or a later date (a cooldown
-     * can be a day or more).
-     *
-     * @return array{day: 'now'|'today'|'tomorrow'|'later', date: string, time: string}|null
-     */
-    private function nextStamp(Tap $tap, string $timezone): ?array
-    {
-        $at = $tap->available_at?->setTimezone($timezone);
-
-        if ($at === null) {
-            return null;
-        }
-
-        $days = (int) now($timezone)->startOfDay()->diffInDays($at->copy()->startOfDay());
-
-        return [
-            'day' => match (true) {
-                $at->isPast() => 'now',
-                $days <= 0 => 'today',
-                $days === 1 => 'tomorrow',
-                default => 'later',
-            },
-            'date' => $at->format('Y-m-d'),
-            'time' => $at->format('H:i'),
-        ];
     }
 
     /**

@@ -158,17 +158,23 @@ it('stamps with the scan and says how it went', function (): void {
         ->assertInertiaFlash('stampResult', ['state' => 'used']);
 });
 
-it('says when the next stamp can be given, in the site\'s time', function (): void {
+it('says when the next stamp can be given, in the site\'s time, a day or more ahead too', function (int $cooldown, string $day): void {
     $this->context->bypass(fn () => $this->here->forceFill(['timezone' => 'Africa/Casablanca'])->save());
+    $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['cooldown_min' => $cooldown])->save());
     $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
     $this->tenants->stamp($enrollment, $this->tenants->a1);
     $this->context->bypass(fn () => $enrollment->forceFill(['last_stamp_at' => now()])->save());
     ($this->scanAs)($this->staff);
     $scan = ($this->onlyScan)();
+    $next = now()->addMinutes($cooldown)->setTimezone('Africa/Casablanca');
 
     ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-1'])
-        ->assertInertiaFlash('stampResult', ['state' => 'cooldown', 'availableAt' => now()->addMinutes((int) $this->context->bypass(fn () => $this->tenants->cardA->fresh()?->cooldown_min))->setTimezone('Africa/Casablanca')->format('H:i')]);
-});
+        ->assertInertiaFlash('stampResult', ['state' => 'cooldown', 'availableAt' => ['day' => $day, 'date' => $next->format('Y-m-d'), 'time' => $next->format('H:i')]]);
+})->with([
+    'twenty minutes' => [20, 'today'],
+    'a day' => [24 * 60, 'tomorrow'],
+    'two days' => [48 * 60, 'later'],
+]);
 
 it('stamps 1 to 10, with the device\'s key, and only with the staff member\'s own scan', function (): void {
     ($this->scanAs)($this->staff);

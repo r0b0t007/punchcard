@@ -20,13 +20,15 @@ final readonly class DescribeMemberQr
      */
     public function handle(User $user): array
     {
-        $issued = MemberQrToken::issue($user);
+        // One moment for both: at a window's edge the QR and the short code would otherwise be of two windows.
+        $at = now();
+        $issued = MemberQrToken::issue($user, $at);
 
         return [
             'qrCode' => QrCode::dataUrl($issued['token']),
             'secondsLeft' => $issued['secondsLeft'],
             // To type when a camera can't read the QR (CHW-30): new with every code.
-            'shortCode' => MemberQrToken::shortCode($user),
+            'shortCode' => MemberQrToken::shortCode($user, $at),
             'windowSeconds' => MemberQrToken::windowSeconds(),
             'issuedAt' => now()->getTimestampMs(),
             'firstName' => $user->firstName(),

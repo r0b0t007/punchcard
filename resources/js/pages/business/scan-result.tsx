@@ -19,6 +19,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
+import { calendarDate } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 import { scan as scanner } from '@/routes/counter';
 import { redeem, stamp } from '@/routes/counter/scans';
@@ -38,16 +39,17 @@ type ScanReward = { id: number; text: string };
 /** How the last stamp went (CounterScanController::stamp, flash "stampResult"). */
 type StampResult =
     | { state: 'done'; qty: number; rewards: number }
-    | { state: 'cooldown' | 'cap'; availableAt: string | null }
+    | { state: 'cooldown' | 'cap'; availableAt: NextStamp | null }
     | {
-          state:
-              | 'paused'
-              | 'expired'
-              | 'used'
-              | 'not_yours'
-              | 'own_code'
-              | 'too_many_wrong_codes';
+          state: 'paused' | 'expired' | 'used' | 'not_yours' | 'own_code';
       };
+
+/** When the next stamp is possible, in the site's time (LocalMoment::next): a cooldown can run a day or more. */
+type NextStamp = {
+    day: 'now' | 'today' | 'tomorrow' | 'later';
+    date: string;
+    time: string;
+};
 
 /** A reward just redeemed (flash "redeemed"): what, when, where. */
 type Redeemed = { reward: string; at: string; location: string | null };
@@ -505,6 +507,28 @@ function Stepper({
 }
 
 /** 3i: the outcome in place of the Add button. */
+/** "Next stamp available (tomorrow / on Monday 19 October) at", as the tap's cooldown screen says it. */
+function useNextStampLabel(): (next: NextStamp) => string {
+    const { t, locale } = useTranslation();
+
+    return (next) => {
+        switch (next.day) {
+            case 'later':
+                return t('Next stamp available on :date at', {
+                    date: calendarDate(locale, next.date, {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                    }),
+                });
+            case 'tomorrow':
+                return t('Next stamp available tomorrow at');
+            default:
+                return t('Next stamp available at');
+        }
+    };
+}
+
 function Outcome({
     result,
     stamped,
@@ -521,6 +545,7 @@ function Outcome({
     card: ScanCard | null;
 }) {
     const { t } = useTranslation();
+    const nextStampLabel = useNextStampLabel();
 
     if (result?.state === 'done') {
         return (
@@ -560,14 +585,14 @@ function Outcome({
                         : t('Stamped too recently')}
                 </p>
                 <p className="text-muted-foreground">
-                    {result.availableAt
-                        ? t(
-                              'The next stamp is from :time. Nothing was added.',
-                              {
-                                  time: result.availableAt,
-                              },
-                          )
-                        : t('Nothing was added.')}
+                    {result.availableAt && result.availableAt.day !== 'now' && (
+                        <>
+                            {nextStampLabel(result.availableAt)}{' '}
+                            <bdi dir="ltr">{result.availableAt.time}</bdi>
+                            {'. '}
+                        </>
+                    )}
+                    {t('Nothing was added.')}
                 </p>
             </Note>
         );
@@ -652,12 +677,7 @@ function Note({
     );
 }
 
-type Ending =
-    | 'noCard'
-    | 'paused'
-    | 'own_code'
-    | 'not_yours'
-    | 'too_many_wrong_codes';
+type Ending = 'noCard' | 'paused' | 'own_code' | 'not_yours';
 
 /** What leaves nothing to do on S2 (3j). */
 function endingState(
@@ -665,11 +685,8 @@ function endingState(
     result: StampResult | null,
     hasRewards: boolean,
 ): Ending | null {
-    if (
-        result?.state === 'own_code' ||
-        result?.state === 'not_yours' ||
-        result?.state === 'too_many_wrong_codes'
-    ) {
+    // Defensive: the policy and ScanMemberQr stop these first; LockScan can still say so.
+    if (result?.state === 'own_code' || result?.state === 'not_yours') {
         return result.state;
     }
 
@@ -708,13 +725,6 @@ function Ended({ state, name }: { state: Ending; name: string }) {
             Ban,
             t('This scan is not yours'),
             t('Scan the code yourself to stamp or redeem.'),
-        ],
-        too_many_wrong_codes: [
-            Ban,
-            t('Too many wrong codes'),
-            t(
-                'Typing codes is paused on your account for a while. Scanning the QR still works.',
-            ),
         ],
     } as const;
     const [Glyph, title, body] = content[state];

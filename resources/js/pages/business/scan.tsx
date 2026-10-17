@@ -53,6 +53,7 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
     const [location, setLocation] = useState(locations[0]?.id ?? 0);
     const [digits, setDigits] = useState('');
     const [sending, setSending] = useState(false);
+    const [sentFrom, setSentFrom] = useState<'camera' | 'typed'>('typed');
     const [refusal, setRefusal] = useState<ScanRefusal | null>(flashed ?? null);
 
     useEffect(() => {
@@ -60,18 +61,25 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
     }, [flashed]);
 
     const send = useCallback(
-        (code: string) => {
+        (code: string, from: 'camera' | 'typed') => {
             if (sending || location === 0) {
                 return;
             }
 
             setSending(true);
+            setSentFrom(from);
             router.post(
                 store.url(),
                 { code, location },
                 {
                     preserveState: true,
                     preserveScroll: true,
+                    // Each answer, the same refusal twice in a row too: the page keeps its state between them.
+                    onSuccess: (answer) =>
+                        setRefusal(
+                            (answer.flash as { scanRefusal?: ScanRefusal })
+                                .scanRefusal ?? null,
+                        ),
                     onFinish: () => setSending(false),
                 },
             );
@@ -85,7 +93,7 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        send(digits);
+        send(digits, 'typed');
     };
 
     return (
@@ -134,7 +142,10 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
                             <h1 className="font-display text-2xl font-bold md:text-3xl">
                                 {t("Scan the customer's QR")}
                             </h1>
-                            <CameraView onCode={send} paused={sending} />
+                            <CameraView
+                                onCode={(code) => send(code, 'camera')}
+                                paused={sending}
+                            />
                         </section>
 
                         <form
@@ -159,10 +170,9 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
                                     value={grouped(digits)}
                                     onChange={(event) =>
                                         setDigits(
-                                            event.target.value.replace(
-                                                /\D+/g,
-                                                '',
-                                            ),
+                                            asciiDigits(
+                                                event.target.value,
+                                            ).replace(/\D+/g, ''),
                                         )
                                     }
                                     aria-invalid={Boolean(errors.code)}
@@ -181,7 +191,14 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
                             </div>
                             <InputError
                                 id="code-error"
-                                message={errors.code}
+                                message={
+                                    // A QR the camera read isn't something staff typed: no numbers to check.
+                                    errors.code && sentFrom === 'camera'
+                                        ? t(
+                                              "That QR isn't a punchcard member code: ask the customer to open My QR again, or type the code.",
+                                          )
+                                        : errors.code
+                                }
                                 className="text-base"
                             />
                             <Keypad
@@ -207,6 +224,13 @@ export default function Scan({ locations }: { locations: ScanLocation[] }) {
                 )}
             </div>
         </>
+    );
+}
+
+/** Arabic-Indic (٠-٩) and Persian (۰-۹) digits as ASCII ones, as the server reads them (MemberQrToken::codeFields). */
+function asciiDigits(typed: string): string {
+    return typed.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (digit) =>
+        String(digit.charCodeAt(0) & 0xf),
     );
 }
 
@@ -411,7 +435,7 @@ function CameraView({
                         className="flex h-10 items-center gap-2 rounded-full bg-viewfinder/70 px-3.5 text-sm font-medium backdrop-blur"
                     >
                         <Flashlight aria-hidden="true" className="size-4" />
-                        {t('Light')}
+                        {t('Flashlight')}
                     </button>
                 )}
             </div>
@@ -504,21 +528,9 @@ function Refused({
                     {content.title}
                 </h1>
                 <p className="max-w-md text-muted-foreground">{content.body}</p>
-                {content.action ? (
-                    <Button
-                        size="lg"
-                        className="w-full max-w-sm"
-                        onClick={onAgain}
-                    >
-                        {content.action}
-                    </Button>
-                ) : (
-                    <Button asChild size="lg" className="w-full max-w-sm">
-                        <Link href={counter()}>
-                            {t('Back to counter mode')}
-                        </Link>
-                    </Button>
-                )}
+                <Button size="lg" className="w-full max-w-sm" onClick={onAgain}>
+                    {content.action}
+                </Button>
             </main>
         </>
     );

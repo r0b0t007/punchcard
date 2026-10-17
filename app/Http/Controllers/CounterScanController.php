@@ -23,6 +23,7 @@ use App\Models\CounterScan;
 use App\Models\Location;
 use App\Models\Reward;
 use App\Models\User;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,8 +65,7 @@ final class CounterScanController extends Controller
     public function store(ScanMemberQrRequest $request, TenantContext $context, ScanLocations $scanLocations, ScanMemberQr $scanMemberQr): RedirectResponse
     {
         $business = $context->business() ?? abort(403);
-        $allowed = array_column($scanLocations->handle($business, $context->locationId()), 'id');
-        $location = in_array($request->location(), $allowed, true) ? Location::query()->findOrFail($request->location()) : abort(404);
+        $location = $scanLocations->find($business, $context->locationId(), $request->location()) ?? abort(404);
 
         /** @var User $staff */
         $staff = $request->user();
@@ -141,7 +141,7 @@ final class CounterScanController extends Controller
             $location = $context->bypass(fn (): ?Location => Location::query()->find($scan->location_id));
             Inertia::flash('redeemed', [
                 'reward' => $result->reward->reward_text,
-                'at' => ($result->reward->redeemed_at ?? now())->copy()->setTimezone($location->timezone ?? config('app.timezone'))->format('H:i'),
+                'at' => LocalMoment::of($result->reward->redeemed_at ?? now(), LocalMoment::timezoneOf($location))['time'],
                 'location' => $location?->name,
             ]);
         } catch (RedeemRefused $refused) {
@@ -193,11 +193,12 @@ final class CounterScanController extends Controller
             return;
         }
 
-        $timezone = Location::query()->whereKey($scan->location_id)->value('timezone') ?? config('app.timezone');
+        $location = app(TenantContext::class)->bypass(fn (): ?Location => Location::query()->find($scan->location_id));
 
         Inertia::flash('stampResult', [
             'state' => $state,
-            'availableAt' => $rejected->availableAt?->copy()->setTimezone($timezone)->format('H:i'),
+            // Today, tomorrow or a later day: a cooldown can run a day or more.
+            'availableAt' => LocalMoment::next($rejected->availableAt, LocalMoment::timezoneOf($location)),
         ]);
     }
 

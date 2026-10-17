@@ -35,4 +35,31 @@ final class LocalMoment
             'time' => $local->format('H:i'),
         ];
     }
+
+    /**
+     * When something refused now becomes possible (the next stamp after a cooldown or today's limit), in the
+     * location's time: now (it has passed since), today, tomorrow or a later date (a cooldown can be a day or more).
+     *
+     * @return array{day: 'now'|'today'|'tomorrow'|'later', date: string, time: string}|null
+     */
+    public static function next(?CarbonInterface $at, string $timezone): ?array
+    {
+        if (! $at instanceof CarbonInterface) {
+            return null;
+        }
+
+        $local = $at->copy()->setTimezone($timezone);
+        $days = (int) now($timezone)->startOfDay()->diffInDays($local->copy()->startOfDay());
+
+        return [
+            'day' => match (true) {
+                $local->isPast() => 'now',
+                $days <= 0 => 'today',
+                $days === 1 => 'tomorrow',
+                default => 'later',
+            },
+            'date' => $local->format('Y-m-d'),
+            'time' => $local->format('H:i'),
+        ];
+    }
 }

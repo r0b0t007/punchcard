@@ -759,7 +759,6 @@
     "Typing this customer's code is paused here for a while. Their QR still works.": "La saisie du code de ce client est suspendue ici pour un moment. Son QR fonctionne toujours.",
     "Scan the QR": "Scanner le QR",
     "Too many wrong codes": "Trop de codes erronés",
-    "Back to counter mode": "Retour au mode comptoir",
     "The customer": "Le client",
     "Time left with this scan": "Temps restant pour ce scan",
     "Scanned just now": "Scanné à l’instant",
@@ -782,7 +781,6 @@
     ":name is at :stamps of :required.": ":name est à :stamps sur :required.",
     "Today's limit for this card is reached": "La limite du jour pour cette carte est atteinte",
     "Stamped too recently": "Tamponné trop récemment",
-    "The next stamp is from :time. Nothing was added.": "Le prochain tampon est possible dès :time. Rien n’a été ajouté.",
     "Nothing was added.": "Rien n’a été ajouté.",
     "This scan ran out": "Ce scan a expiré",
     "Ask :name to show their QR again.": "Demandez à :name de montrer à nouveau son QR.",
@@ -810,5 +808,7 @@
     "That reward is not this customer's.": "Cette récompense n’appartient pas à ce client.",
     "Scan the code again: a scan lasts two minutes.": "Scannez à nouveau le code : un scan dure deux minutes.",
     "No stamps for now. Rewards ready can still be redeemed.": "Pas de tampon pour l’instant. Les récompenses prêtes peuvent toujours être remises.",
-    "Typing codes is paused on your account for a while. Scanning the QR still works.": "La saisie de codes est suspendue sur votre compte pour un moment. Le scan du QR fonctionne toujours."
+    "Typing codes is paused on your account for a while. Scanning the QR still works.": "La saisie de codes est suspendue sur votre compte pour un moment. Le scan du QR fonctionne toujours.",
+    "Flashlight": "Lampe",
+    "That QR isn't a punchcard member code: ask the customer to open My QR again, or type the code.": "Ce QR n’est pas un code membre punchcard : demandez au client de rouvrir Mon QR, ou tapez le code."
 }

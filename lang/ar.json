@@ -759,7 +759,6 @@
     "Typing this customer's code is paused here for a while. Their QR still works.": "كتابة رمز هذا العميل متوقفة هنا لبعض الوقت. رمز QR الخاص به ما زال يعمل.",
     "Scan the QR": "امسح رمز QR",
     "Too many wrong codes": "رموز خاطئة كثيرة",
-    "Back to counter mode": "العودة إلى وضع الشباك",
     "The customer": "العميل",
     "Time left with this scan": "الوقت المتبقي لهذا المسح",
     "Scanned just now": "مُسح الآن",
@@ -782,7 +781,6 @@
     ":name is at :stamps of :required.": "وصل :name إلى :stamps من :required.",
     "Today's limit for this card is reached": "بلغت هذه البطاقة حدّها اليومي",
     "Stamped too recently": "خُتمت منذ وقت قصير جدًا",
-    "The next stamp is from :time. Nothing was added.": "الختم التالي ابتداءً من :time. لم يُضف شيء.",
     "Nothing was added.": "لم يُضف شيء.",
     "This scan ran out": "انتهت مدة هذا المسح",
     "Ask :name to show their QR again.": "اطلب من :name إظهار رمز QR مجددًا.",
@@ -810,5 +808,7 @@
     "That reward is not this customer's.": "هذه المكافأة ليست لهذا العميل.",
     "Scan the code again: a scan lasts two minutes.": "امسح الرمز مجددًا: يدوم المسح دقيقتين.",
     "No stamps for now. Rewards ready can still be redeemed.": "لا أختام الآن. ما زال بالإمكان تسليم المكافآت الجاهزة.",
-    "Typing codes is paused on your account for a while. Scanning the QR still works.": "كتابة الرموز متوقفة على حسابك لبعض الوقت. مسح رمز QR ما زال يعمل."
+    "Typing codes is paused on your account for a while. Scanning the QR still works.": "كتابة الرموز متوقفة على حسابك لبعض الوقت. مسح رمز QR ما زال يعمل.",
+    "Flashlight": "المصباح",
+    "That QR isn't a punchcard member code: ask the customer to open My QR again, or type the code.": "رمز QR هذا ليس رمز عضوية punchcard: اطلب من العميل فتح «رمز QR الخاص بي» مجددًا، أو اكتب الرمز."
 }
