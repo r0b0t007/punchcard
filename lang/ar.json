@@ -847,5 +847,15 @@
     "punchcard support switched this stamper off while its keys are changed. It can be switched on once they are.": "أوقف دعم punchcard جهاز الختم هذا ريثما تُغيَّر مفاتيحه. يمكنك تشغيله بعد ذلك.",
     "Hold for re-key": "إيقاف لتغيير المفاتيح",
     "Its business disabled it. Holding it keeps its owner from switching it on until the re-key is recorded: step 1 of a re-key.": "عطّله نشاطه التجاري. إيقافه يمنع مالكه من تشغيله حتى يُسجَّل تغيير المفاتيح: الخطوة 1 من تغيير المفاتيح.",
-    ":stamper was already disabled, perhaps by the business: it is now held, so its owner can't switch it on until the re-key is recorded. Leave it disabled after the re-key.": "كان :stamper معطّلًا من قبل، ربما من النشاط التجاري: أصبح الآن موقوفًا، فلا يستطيع مالكه تشغيله حتى يُسجَّل تغيير المفاتيح. اتركه معطّلًا بعد تغيير المفاتيح."
+    ":stamper was already disabled, perhaps by the business: it is now held, so its owner can't switch it on until the re-key is recorded. Leave it disabled after the re-key.": "كان :stamper معطّلًا من قبل، ربما من النشاط التجاري: أصبح الآن موقوفًا، فلا يستطيع مالكه تشغيله حتى يُسجَّل تغيير المفاتيح. اتركه معطّلًا بعد تغيير المفاتيح.",
+    ":stamper was tapped while switched off": "نُقر على :stamper وهو متوقف",
+    "Hello :name,": "مرحبًا :name،",
+    "Someone tapped :stamper at :site today at :time, while it is switched off. The tap was refused: no stamp was given.": "نقر أحدهم على :stamper في :site اليوم عند :time وهو متوقف. رُفضت النقرة ولم يُمنح أي ختم.",
+    "Someone tapped :stamper at :site on :date at :time, while it is switched off. The tap was refused: no stamp was given.": "نقر أحدهم على :stamper في :site يوم :date عند :time وهو متوقف. رُفضت النقرة ولم يُمنح أي ختم.",
+    "See your stampers": "عرض أجهزة الختم",
+    "If it went missing, keep it off. If you found it, switch it on again from your stampers page. You get this email at most once an hour per stamper.": "إن ضاع الجهاز فأبقِه متوقفًا. وإن وجدته فشغّله مجددًا من صفحة أجهزة الختم. تصلك هذه الرسالة مرة واحدة في الساعة على الأكثر لكل جهاز.",
+    ":customer reached the daily limit :days days in a row": "بلغ :customer حدّ اليوم :days أيام متتالية",
+    ":customer reached the daily limit of :card at :business three days in a row: :dates.": "بلغ :customer حدّ اليوم في :card لدى :business ثلاثة أيام متتالية: :dates.",
+    "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, lower it in the card's settings.": "قد يكون زبونًا وفيًّا، أو شخصًا يجمع الأختام لغيره. إن كان الحدّ مرتفعًا جدًا فاخفضه من إعدادات البطاقة.",
+    ":days and :last": ":days و:last"
 }

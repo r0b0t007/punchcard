@@ -8,6 +8,7 @@ use App\Actions\Stamps\WorksAt;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
+use App\Events\StamperDisabledTapped;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Models\Tap;
@@ -131,7 +132,11 @@ final readonly class ReceiveTap
         }
 
         if ($stamper->status !== StamperStatus::Active) {
-            return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::StamperDisabled]);
+            $refused = $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::StamperDisabled]);
+            // Its owners hear of it (CHW-36): after commit, and queued, so the tap stays fast.
+            StamperDisabledTapped::dispatch($stamper->id, $refused->id);
+
+            return $refused;
         }
 
         // A tap at a suspended business is refused now, so a reinstatement never applies it later.

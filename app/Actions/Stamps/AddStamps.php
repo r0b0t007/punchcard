@@ -10,6 +10,7 @@ use App\Enums\RewardType;
 use App\Enums\StamperStatus;
 use App\Enums\StampRejection;
 use App\Enums\StampSource;
+use App\Events\DailyCapReached;
 use App\Events\EnrollmentChanged;
 use App\Models\Business;
 use App\Models\CardBusiness;
@@ -301,7 +302,14 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::DailyCap);
         }
 
-        return min($request->qty, $room);
+        $qty = min($request->qty, $room);
+
+        if ($qty === $room) {
+            // The day is full now: three such days in a row tell the owners (CHW-36), once the stamp is committed.
+            DailyCapReached::dispatch($enrollment->id, $request->businessId, $location->id, $now->toImmutable()->setTimezone($location->timezone)->toDateString());
+        }
+
+        return $qty;
     }
 
     /**
