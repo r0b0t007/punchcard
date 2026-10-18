@@ -80,7 +80,7 @@ above: keep the two in step.
 | B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                        | `Punchcard Business Onboarding.dc.html` |
 | B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                                 | `Punchcard Business App.dc.html`        |
 | S1 counter mode v3 (Scan a QR), S2a scanner, S2 scan result and its refusals, S3 redeem, C10 My QR v3 (short code) | `Punchcard Staff Scanning.dc.html`      |
-| The six notification emails                                                                                        | `Punchcard Emails.dc.html`              |
+| The eight notification emails, the owner fraud alerts (CHW-36) included                                            | `Punchcard Emails.dc.html`              |
 | B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too           | `BA Stampers.dc.html`                   |
 
 Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8–B11, B14–B19, M1. Filament (A1–A4) stays

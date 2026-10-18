@@ -10,6 +10,7 @@ use App\Enums\RewardType;
 use App\Enums\StamperStatus;
 use App\Enums\StampRejection;
 use App\Enums\StampSource;
+use App\Events\DailyCapReached;
 use App\Events\EnrollmentChanged;
 use App\Models\Business;
 use App\Models\CardBusiness;
@@ -92,6 +93,11 @@ final readonly class AddStamps
             );
         }
 
+        if ($result->dayFilled !== null) {
+            // Three full days in a row tell the owners (CHW-36), once the stamp is committed.
+            DailyCapReached::dispatch($result->enrollment->id, $request->businessId, $result->dayFilled);
+        }
+
         return $result;
     }
 
@@ -136,9 +142,11 @@ final readonly class AddStamps
         $this->assertAllowed($card, $honoured, $location, $stamper, $request);
         $tiers = $card->mode === CardMode::Progressive && $request->qty > 0 ? $this->tiers($card) : [];
 
+        $fillsDay = false;
+
         if ($request->provesPresence()) {
             $this->assertCooldown($enrollment, $card, $now);
-            $qty = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
+            [$qty, $fillsDay] = $this->withinDailyCap($enrollment, $card, $location, $request, $now);
         }
 
         if ($request->isCorrection() && $givenHere + $qty < 0) {
@@ -167,7 +175,7 @@ final readonly class AddStamps
 
         $rewards = $this->progress($enrollment, $card, $tiers, $event, $request, $qty, $now);
 
-        return new StampResult($event, $enrollment, $rewards, replayed: false);
+        return new StampResult($event, $enrollment, $rewards, replayed: false, dayFilled: $fillsDay ? LocalMoment::of($now, $location->timezone)['date'] : null);
     }
 
     /** The key's earlier stamp is this one again (same customer, place, source, quantity, staff and reason), or the key is taken. */
@@ -280,12 +288,14 @@ final readonly class AddStamps
      * midnight to midnight where it is given (a tap applied late counts on its
      * day, not on the next one's stamps). An armed tap gives the room left; a
      * scan or manual stamp that does not fit, or any stamp once the cap is
-     * reached, is refused.
+     * reached, is refused. Also says whether this stamp fills the day.
+     *
+     * @return array{0: int, 1: bool}
      */
-    private function withinDailyCap(CardEnrollment $enrollment, LoyaltyCard $card, Location $location, StampRequest $request, CarbonInterface $now): int
+    private function withinDailyCap(CardEnrollment $enrollment, LoyaltyCard $card, Location $location, StampRequest $request, CarbonInterface $now): array
     {
         if ($card->daily_cap === null) {
-            return $request->qty;
+            return [$request->qty, false];
         }
 
         $today = (int) StampEvent::query()
@@ -301,7 +311,9 @@ final readonly class AddStamps
             throw new StampRejected(StampRejection::DailyCap);
         }
 
-        return min($request->qty, $room);
+        $qty = min($request->qty, $room);
+
+        return [$qty, $qty === $room];
     }
 
     /**
