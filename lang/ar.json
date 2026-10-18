@@ -45,7 +45,6 @@
     "Dark": "داكن",
     "Dashboard": "لوحة التحكم",
     "Delete account": "حذف الحساب",
-    "Delete your account and all of its resources": "احذف حسابك وجميع بياناته",
     "Deploy now": "انشر الآن",
     "Disable 2FA": "تعطيل المصادقة الثنائية",
     "Displays the mobile sidebar.": "يعرض الشريط الجانبي على الهاتف.",
@@ -857,5 +856,15 @@
     ":customer reached the daily limit :days days in a row": "بلغ :customer حدّ اليوم :days أيام متتالية",
     ":customer reached the daily limit of :card at :business :days days in a row: :dates.": "بلغ :customer حدّ اليوم في :card لدى :business :days أيام متتالية: :dates.",
     "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.": "قد يكون زبونًا وفيًّا، أو شخصًا يجمع الأختام لغيره. إن كان الحدّ مرتفعًا جدًا فبإمكان من يدير البطاقة خفضه من إعداداتها.",
-    ":days and :last": ":days و:last"
+    ":days and :last": ":days و:last",
+    "Privacy": "الخصوصية",
+    "Privacy settings": "إعدادات الخصوصية",
+    "News and offers": "الأخبار والعروض",
+    "What we may email you. You can change it at any time.": "ما يمكننا إرساله إليك بالبريد. يمكنك تغييره في أي وقت.",
+    "News from punchcard": "أخبار punchcard",
+    "Off": "متوقف",
+    "On since :date": "مفعّل منذ :date",
+    "Off since :date": "متوقف منذ :date",
+    "Confirm your email first to get news.": "أكّد بريدك أولًا لتلقّي الأخبار.",
+    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "يُحذف حسابك وتسجيل دخولك. تحتفظ الأماكن بأختامك دون اسمك أو بريدك."
 }

@@ -7,6 +7,7 @@ namespace App\Actions\Account;
 use App\Models\AuditLog;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
+use App\Models\ConsentEvent;
 use App\Models\Follow;
 use App\Models\Reward;
 use App\Models\Stamper;
@@ -114,6 +115,8 @@ final readonly class DeleteAccount
         $user->passkeys()->delete();
         // Consent to offers is the person's, not the ledger's (CHW-27).
         Follow::query()->where('user_id', $user->id)->delete();
+        // The consent history is the person's: it goes with them (CHW-58).
+        ConsentEvent::query()->where('user_id', $user->id)->delete();
 
         $user->forceFill([
             'name' => 'Deleted user',
@@ -127,6 +130,7 @@ final readonly class DeleteAccount
             'locale' => null,
             // Consent is the person's, as their follows are: news by email, and that they were 16 or older (CHW-23).
             'marketing_opt_in_at' => null,
+            'marketing_opt_out_at' => null,
             'adult_confirmed_at' => null,
             'pending_email' => null,
             'pending_email_expires_at' => null,

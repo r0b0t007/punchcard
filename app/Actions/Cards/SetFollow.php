@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Cards;
 
 use App\Models\CardEnrollment;
+use App\Models\ConsentEvent;
 use App\Models\Follow;
 use App\Models\Organization;
 use App\Models\User;
@@ -24,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  * - A closed program (archived organization) takes no new follow. Archiving
  *   writes the organization's row: read locked, the check and the follow
  *   never interleave with it.
+ * - Each real change is logged (ConsentEvent, KIND_PROGRAM_OFFERS, from the
+ *   card's page or the settings); the same state again writes nothing.
  * - The user is locked first: one customer's requests run one at a time,
  *   and an account being deleted (DeleteAccount locks it too) never gets
  *   a follow back.
@@ -32,9 +35,9 @@ final readonly class SetFollow
 {
     public function __construct(private TenantContext $context) {}
 
-    public function handle(CardEnrollment $enrollment, bool $follow): void
+    public function handle(CardEnrollment $enrollment, bool $follow, string $source = ConsentEvent::SOURCE_CARD): void
     {
-        $this->context->bypass(fn () => DB::transaction(function () use ($enrollment, $follow): void {
+        $this->context->bypass(fn () => DB::transaction(function () use ($enrollment, $follow, $source): void {
             $user = User::query()->whereKey($enrollment->user_id)->lockForUpdate()->first();
 
             if (! $user instanceof User || $user->isAnonymised()) {
@@ -42,10 +45,18 @@ final readonly class SetFollow
             }
 
             $keys = ['user_id' => $enrollment->user_id, 'organization_id' => $enrollment->organization_id];
+            $following = Follow::query()->where($keys)->first();
 
             if (! $follow) {
-                Follow::query()->where($keys)->first()?->forceFill(['notify' => false])->save();
+                if ($following?->notify === true) {
+                    $following->forceFill(['notify' => false])->save();
+                    ConsentEvent::record($user->id, ConsentEvent::KIND_PROGRAM_OFFERS, false, $source, $enrollment->organization_id);
+                }
 
+                return;
+            }
+
+            if ($following?->notify === true) {
                 return;
             }
 
@@ -60,6 +71,7 @@ final readonly class SetFollow
             }
 
             Follow::query()->updateOrCreate($keys, ['notify' => true]);
+            ConsentEvent::record($user->id, ConsentEvent::KIND_PROGRAM_OFFERS, true, $source, $enrollment->organization_id);
         }));
     }
 }

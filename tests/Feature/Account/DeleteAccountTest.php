@@ -9,6 +9,7 @@ use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
+use App\Models\ConsentEvent;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\Tap;
@@ -57,7 +58,8 @@ it('deletes an account with no history, with its passkeys and unstamped cards', 
 
 it('anonymises a customer with stamps and keeps the ledger, progress and rewards true', function (): void {
     $user = User::factory()->withTwoFactor()->create(['email' => 'salma@example.com', 'locale' => 'fr']);
-    $user->forceFill(['adult_confirmed_at' => now(), 'marketing_opt_in_at' => now(), 'pending_email' => 'salma.new@example.com', 'pending_email_expires_at' => now()->addHour()])->save();
+    ConsentEvent::factory()->create(['user_id' => $user->id]);
+    $user->forceFill(['adult_confirmed_at' => now(), 'marketing_opt_in_at' => now(), 'marketing_opt_out_at' => now(), 'pending_email' => 'salma.new@example.com', 'pending_email_expires_at' => now()->addHour()])->save();
     $user->passkeys()->create(['name' => 'Phone', 'credential_id' => 'cred-1', 'credential' => []]);
     DB::table('sessions')->insert(['id' => 'session-1', 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
     DB::table('password_reset_tokens')->insert(['email' => 'salma@example.com', 'token' => 'x', 'created_at' => now()]);
@@ -78,6 +80,9 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
         ->and($anonymised->locale)->toBeNull()
         // Consent is the person's (CHW-23): news by email, and that they were 16 or older.
         ->and($anonymised->marketing_opt_in_at)->toBeNull()
+        ->and($anonymised->marketing_opt_out_at)->toBeNull()
+        // And its history (CHW-58).
+        ->and(DB::table('consent_events')->where('user_id', $user->id)->count())->toBe(0)
         ->and($anonymised->adult_confirmed_at)->toBeNull()
         // Nor a new address waiting for it (CHW-23).
         ->and($anonymised->pending_email)->toBeNull()

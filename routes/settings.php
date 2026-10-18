@@ -3,6 +3,7 @@
 use App\Http\Controllers\ConfirmByEmailController;
 use App\Http\Controllers\EmailChangeController;
 use App\Http\Controllers\PasskeyOfferController;
+use App\Http\Controllers\Settings\PrivacyController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Middleware\NeverCache;
@@ -18,6 +19,9 @@ Route::middleware(['auth'])->group(function (): void {
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     // From the delete dialog of an account without a password: confirm it's you, then back to the profile (CHW-23).
     Route::get('settings/profile/confirm', fn () => to_route('profile.edit'))->middleware(RequirePassword::class)->name('profile.confirm');
+    // Privacy (CHW-58, C12): punchcard's news on or off, verified or not (turning it off never needs a confirmed email).
+    Route::get('settings/privacy', [PrivacyController::class, 'edit'])->name('privacy.edit');
+    Route::patch('settings/privacy/marketing', [PrivacyController::class, 'updateMarketing'])->middleware('throttle:30,1')->name('privacy.marketing');
     // "Not now" on the passkey offered after an email-link sign-in (CHW-23).
     Route::post('passkey-offer/dismiss', [PasskeyOfferController::class, 'dismiss'])->name('passkey-offer.dismiss');
     // A new address dropped before its link is opened (CHW-23).

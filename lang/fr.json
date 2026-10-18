@@ -45,7 +45,6 @@
     "Dark": "Sombre",
     "Dashboard": "Tableau de bord",
     "Delete account": "Supprimer le compte",
-    "Delete your account and all of its resources": "Supprimez votre compte et toutes ses données",
     "Deploy now": "Déployer maintenant",
     "Disable 2FA": "Désactiver la 2FA",
     "Displays the mobile sidebar.": "Affiche la barre latérale mobile.",
@@ -857,5 +856,15 @@
     ":customer reached the daily limit :days days in a row": ":customer a atteint la limite du jour :days jours de suite",
     ":customer reached the daily limit of :card at :business :days days in a row: :dates.": ":customer a atteint la limite du jour de :card chez :business :days jours de suite : :dates.",
     "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.": "C’est peut-être un habitué fidèle, ou quelqu’un qui collecte des tampons pour d’autres. Si la limite est trop haute, qui gère la carte peut la baisser dans ses réglages.",
-    ":days and :last": ":days et :last"
+    ":days and :last": ":days et :last",
+    "Privacy": "Confidentialité",
+    "Privacy settings": "Paramètres de confidentialité",
+    "News and offers": "Actualités et offres",
+    "What we may email you. You can change it at any time.": "Ce que nous pouvons vous envoyer par e-mail. Vous pouvez le changer à tout moment.",
+    "News from punchcard": "Actualités de punchcard",
+    "Off": "Désactivé",
+    "On since :date": "Activé depuis le :date",
+    "Off since :date": "Désactivé depuis le :date",
+    "Confirm your email first to get news.": "Confirmez d’abord votre e-mail pour recevoir les actualités.",
+    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "Votre compte et votre connexion disparaissent. Les commerces gardent vos tampons, sans votre nom ni votre e-mail."
 }
