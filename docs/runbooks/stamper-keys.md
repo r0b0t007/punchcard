@@ -76,7 +76,8 @@ The meta key is unchanged, so those URLs still decrypt.
 stamper's assignment (`unassigned_at`, one-way) and assigns the tag again (a new stamper) in one transaction.
 The tag keeps its counter, so URLs from the old site stay replays, and the old business can never reclaim the
 tag by re-enabling its stamper. Within a business the stamper keeps its label and status; at another business
-it starts active and unlabelled.
+it starts active and unlabelled. A tag held for a re-key stays disabled and held wherever it moves. Replays of
+its old URLs stay in the old business's refused taps, where they were read.
 
 A **lost or stolen** tag cannot be re-provisioned: retire it with `php artisan punchcard:tag:retire <uid>`
 (`nfc_tags.retired_at`, one-way; its assignment ends too) and register a replacement tag.

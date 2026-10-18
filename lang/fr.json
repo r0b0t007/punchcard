@@ -305,7 +305,7 @@
     "UID, as the reader prints it": "UID, tel que le lecteur l’affiche",
     "Unassigned": "Non attribuée",
     "Updated": "Mise à jour",
-    "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.": "Au sein du commerce, la borne garde son nom et son état ; dans un autre commerce, elle démarre activée et sans nom.",
+    "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled. A tag held for a re-key stays disabled and held.": "Au sein du commerce, la borne garde son nom et son état ; dans un autre commerce, elle démarre activée et sans nom. Une puce retenue pour un changement de clés reste désactivée et retenue.",
     "tag": "puce",
     "tags": "puces",
     "Pending": "En attente",

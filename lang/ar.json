@@ -305,7 +305,7 @@
     "UID, as the reader prints it": "المعرّف كما يعرضه القارئ",
     "Unassigned": "غير مُسندة",
     "Updated": "آخر تحديث",
-    "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.": "داخل النشاط التجاري نفسه يحتفظ جهاز الختم باسمه وحالته؛ وفي نشاط تجاري آخر يبدأ مفعّلًا وبلا اسم.",
+    "Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled. A tag held for a re-key stays disabled and held.": "داخل النشاط التجاري نفسه يحتفظ جهاز الختم باسمه وحالته؛ وفي نشاط تجاري آخر يبدأ مفعّلًا وبلا اسم. وتبقى الشريحة الموقوفة لتغيير المفاتيح متوقفة وموقوفة.",
     "tag": "شريحة",
     "tags": "شرائح",
     "Pending": "قيد الانتظار",

@@ -241,3 +241,26 @@ it('names a refused tap\'s stamper by its number when it has no label', function
     ($this->as)($this->owner)->get(route('stampers.index'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('refused.data.0.stamper', null)->where('refused.data.0.stamperId', $this->stamper->id));
 });
+
+it('counts each site\'s taps today in that site\'s own day', function (): void {
+    // At 10:00 UTC: Lagos (UTC+1) began its day at 23:00 UTC yesterday, Tokyo (UTC+9) at 15:00 UTC yesterday.
+    $this->context->bypass(fn () => $this->here->forceFill(['timezone' => 'Africa/Lagos'])->save());
+    $tokyo = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create(['timezone' => 'Asia/Tokyo']));
+    $there = $this->context->bypass(fn (): Stamper => Stamper::factory()->create(['business_id' => $this->tenants->a1->id, 'location_id' => $tokyo->id]));
+    ($this->tap)($this->stamper, '2026-10-16 16:00:00');
+    ($this->tap)($there, '2026-10-16 16:00:00');
+
+    ($this->as)($this->owner)->get(route('stampers.index'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('sites', function ($sites) use ($there): bool {
+            $today = collect($sites)->flatMap(fn ($site): mixed => $site['stampers'])->pluck('tapsToday', 'id');
+
+            return $today->all() === [$this->stamper->id => 0, $there->id => 1] || $today->all() === [$there->id => 1, $this->stamper->id => 0];
+        }));
+});
+
+it('comes back to the refused taps page the owner was on', function (): void {
+    ($this->as)($this->owner)->patch(route('stampers.status', $this->stamper->id), ['status' => 'disabled', 'page' => 3])
+        ->assertRedirect(route('stampers.index', ['page' => 3]));
+    ($this->as)($this->owner)->patch(route('stampers.status', $this->stamper->id), ['status' => 'active', 'page' => 1])
+        ->assertRedirect(route('stampers.index'));
+});

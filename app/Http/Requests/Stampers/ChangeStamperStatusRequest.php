@@ -19,7 +19,17 @@ class ChangeStamperStatusRequest extends FormRequest
     {
         return [
             'status' => ['required', Rule::enum(StamperStatus::class)],
+            // The refused taps page the owner was on, to come back to it.
+            'page' => ['nullable', 'integer', 'min:1', 'max:10000'],
         ];
+    }
+
+    /** @return array{page?: int} */
+    public function back(): array
+    {
+        $page = $this->integer('page');
+
+        return $page > 1 ? ['page' => $page] : [];
     }
 
     public function status(): StamperStatus

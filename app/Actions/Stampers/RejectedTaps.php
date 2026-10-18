@@ -56,8 +56,8 @@ final readonly class RejectedTaps
             'site' => $tap->location?->name,
             'stamper' => $tap->stamper?->label,
             'stamperId' => $tap->stamper_id,
-            'reason' => ($tap->rejection ?? TapRejection::Replay)->value,
-            'tampering' => $tap->rejection?->isTampering() ?? false,
+            'reason' => $tap->rejection->value ?? '',
+            'tampering' => $tap->rejection?->isTampering() === true,
             'customer' => $names[$tap->card_id.':'.$tap->user_id] ?? null,
         ]);
     }

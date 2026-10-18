@@ -53,7 +53,7 @@ final class StamperController extends Controller
         } catch (StamperRefused $refused) {
             Inertia::flash('toast', ['type' => 'error', 'message' => $refused->getMessage()]);
 
-            return to_route('stampers.index');
+            return to_route('stampers.index', $request->back());
         }
 
         $name = $changed->label ?? __('Stamper :id', ['id' => $changed->id]);
@@ -62,6 +62,6 @@ final class StamperController extends Controller
             ? __(':stamper is switched off: a tap on it is refused.', ['stamper' => $name])
             : __(':stamper is switched on again.', ['stamper' => $name])]);
 
-        return to_route('stampers.index');
+        return to_route('stampers.index', $request->back());
     }
 }

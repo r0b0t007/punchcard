@@ -183,7 +183,10 @@ it('keeps the tag\'s counter across a reassignment', function (): void {
         ]);
     });
 
-    expect(($this->receive)(($this->url)(5))->rejection)->toBe(TapRejection::Replay)
+    $replay = ($this->receive)(($this->url)(5));
+
+    expect($replay->rejection)->toBe(TapRejection::Replay)
+        ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => $this->stamper->id, 'business_id' => $this->tenants->a1->id])
         ->and(($this->receive)(($this->url)(6))->business_id)->toBe($this->tenants->a2->id);
 });
 
@@ -225,3 +228,37 @@ it('locks the tag without blocking a stamp event\'s foreign key check on it', fu
 it('refuses to run inside a caller\'s transaction, where a rollback would revive the counter', function (): void {
     DB::transaction(fn (): Tap => ($this->receive)(($this->url)(5)));
 })->throws(LogicException::class, 'outside any transaction');
+
+it('puts a replay where its URL was read, the next counter we spent, even one we never saw', function (): void {
+    // Counter 4 was read at A1 (a reader app, say) but never sent; 5 was.
+    ($this->receive)(($this->url)(5));
+    $this->context->bypass(function (): void {
+        $this->stamper->forceFill(['unassigned_at' => now()])->save();
+        Stamper::factory()->create([
+            'business_id' => $this->tenants->a2->id,
+            'location_id' => $this->tenants->locationOf($this->tenants->a2)->id,
+            'nfc_tag_id' => $this->tag->id,
+        ]);
+    });
+    ($this->receive)(($this->url)(6));
+
+    $replay = ($this->receive)(($this->url)(4));
+
+    expect($replay->rejection)->toBe(TapRejection::Replay)
+        ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => $this->stamper->id, 'business_id' => $this->tenants->a1->id]);
+});
+
+it('puts a replay of a URL read while nobody held the tag at no business', function (): void {
+    $this->context->bypass(fn () => $this->stamper->forceFill(['unassigned_at' => now()])->save());
+    expect(($this->receive)(($this->url)(5))->rejection)->toBe(TapRejection::UnassignedTag);
+    $this->context->bypass(fn () => Stamper::factory()->create([
+        'business_id' => $this->tenants->a2->id,
+        'location_id' => $this->tenants->locationOf($this->tenants->a2)->id,
+        'nfc_tag_id' => $this->tag->id,
+    ]));
+
+    $replay = ($this->receive)(($this->url)(5));
+
+    expect($replay->rejection)->toBe(TapRejection::Replay)
+        ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => null, 'business_id' => null]);
+});

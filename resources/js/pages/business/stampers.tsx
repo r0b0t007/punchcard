@@ -54,6 +54,7 @@ type Page<T> = {
     to: number | null;
     prev_page_url: string | null;
     next_page_url: string | null;
+    current_page: number;
 };
 
 /**
@@ -109,6 +110,7 @@ export default function Stampers({
                                     <StamperRow
                                         key={stamper.id}
                                         stamper={stamper}
+                                        page={refused.current_page}
                                     />
                                 ))}
                             </ul>
@@ -148,7 +150,14 @@ export default function Stampers({
     );
 }
 
-function StamperRow({ stamper }: { stamper: SiteStamper }) {
+function StamperRow({
+    stamper,
+    page,
+}: {
+    stamper: SiteStamper;
+    /** The refused taps page shown, to come back to after the switch. */
+    page: number;
+}) {
     const { t, locale } = useTranslation();
     const name = stamper.label ?? t('Stamper :id', { id: stamper.id });
 
@@ -192,7 +201,7 @@ function StamperRow({ stamper }: { stamper: SiteStamper }) {
             </span>
             <div className="col-span-2 md:justify-self-end">
                 {stamper.enabled ? (
-                    <DisableStamper stamper={stamper} name={name} />
+                    <DisableStamper stamper={stamper} name={name} page={page} />
                 ) : stamper.held ? (
                     <p
                         className="text-muted-foreground md:text-end"
@@ -208,7 +217,7 @@ function StamperRow({ stamper }: { stamper: SiteStamper }) {
                     >
                         <Link
                             href={status(stamper.id)}
-                            data={{ status: 'active' }}
+                            data={{ status: 'active', page }}
                             as="button"
                             preserveScroll
                             data-test="enable-stamper"
@@ -229,9 +238,11 @@ function StamperRow({ stamper }: { stamper: SiteStamper }) {
 function DisableStamper({
     stamper,
     name,
+    page,
 }: {
     stamper: SiteStamper;
     name: string;
+    page: number;
 }) {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
@@ -263,7 +274,7 @@ function DisableStamper({
                     <Button variant="destructive" asChild>
                         <Link
                             href={status(stamper.id)}
-                            data={{ status: 'disabled' }}
+                            data={{ status: 'disabled', page }}
                             as="button"
                             preserveScroll
                             onStart={() => setOpen(false)}

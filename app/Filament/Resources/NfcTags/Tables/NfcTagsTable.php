@@ -103,7 +103,7 @@ final class NfcTagsTable
             ->label(__('Move'))
             ->authorize(fn (): bool => Gate::allows('move', NfcTag::class))
             ->visible(fn (NfcTag $record): bool => $record->retired_at === null && $record->currentStamper instanceof Stamper)
-            ->modalDescription(__('Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled.'))
+            ->modalDescription(__('Within the business the stamper keeps its label and status; at another business it starts enabled and unlabelled. A tag held for a re-key stays disabled and held.'))
             ->schema(self::siteFields())
             ->action(fn (NfcTag $record, array $data) => self::refusing(function () use ($record, $data): string {
                 $stamper = app(MoveStamper::class)->handle($record->uid, ...self::site($data));
@@ -119,7 +119,8 @@ final class NfcTagsTable
         return Action::make($disabling ? 'disable' : 'enable')
             ->label($disabling ? __('Disable') : __('Enable'))
             ->authorize(fn (): bool => Gate::allows('setStatus', NfcTag::class))
-            ->visible(fn (NfcTag $record): bool => $record->currentStamper instanceof Stamper && $record->currentStamper->status !== $status)
+            // Disable places the platform's hold (held_at) too, so it shows on a stamper its business paused but support has not held yet.
+            ->visible(fn (NfcTag $record): bool => $record->currentStamper instanceof Stamper && ($record->currentStamper->status !== $status || ($disabling && $record->currentStamper->held_at === null)))
             ->requiresConfirmation()
             ->modalDescription($disabling
                 ? __('It refuses every tap and its arming is cleared: step 1 of a re-key.')

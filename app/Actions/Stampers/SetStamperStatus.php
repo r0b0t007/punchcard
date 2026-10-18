@@ -42,10 +42,15 @@ final readonly class SetStamperStatus
             }
 
             $previous = $current->status;
-            $current->forceFill(['status' => $status, 'held_at' => $status === StamperStatus::Disabled ? now() : null] + ($status === StamperStatus::Disabled ? Stamper::DISARMED : []))->save();
+            $wasHeld = $current->held_at !== null;
+            // A hold keeps the moment it was first placed.
+            $current->forceFill(['status' => $status, 'held_at' => $status === StamperStatus::Disabled ? ($current->held_at ?? now()) : null] + ($status === StamperStatus::Disabled ? Stamper::DISARMED : []))->save();
 
             if ($previous !== $status) {
                 $this->recordAudit->handle($status === StamperStatus::Disabled ? 'stamper.disabled' : 'stamper.enabled', $tag, context: ['stamper_id' => $current->id]);
+            } elseif ($status === StamperStatus::Disabled && ! $wasHeld) {
+                // Its business had paused it: the hold is new, so who placed it and when is on record too.
+                $this->recordAudit->handle('stamper.held', $tag, context: ['stamper_id' => $current->id]);
             }
 
             return new StamperStatusChange($current->load(['business', 'location']), $previous);
