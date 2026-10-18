@@ -127,6 +127,7 @@ final readonly class DeleteAccount
             'locale' => null,
             // Consent is the person's, as their follows are: news by email, and that they were 16 or older (CHW-23).
             'marketing_opt_in_at' => null,
+            'marketing_opt_out_at' => null,
             'adult_confirmed_at' => null,
             'pending_email' => null,
             'pending_email_expires_at' => null,

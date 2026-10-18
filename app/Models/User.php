@@ -41,7 +41,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $adult_confirmed_at when they said they are 16 or older (CHW-23)
  * @property string|null $pending_email a new address asked for in settings, until confirmed from its inbox (CHW-23)
  * @property Carbon|null $pending_email_expires_at when its link stops working
- * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: never asked for (CHW-23)
+ * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: not on (CHW-23)
+ * @property Carbon|null $marketing_opt_out_at when they turned news off in the settings (CHW-58)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -82,6 +83,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'anonymised_at' => 'datetime',
             'adult_confirmed_at' => 'datetime',
             'marketing_opt_in_at' => 'datetime',
+            'marketing_opt_out_at' => 'datetime',
             'pending_email_expires_at' => 'datetime',
         ];
     }

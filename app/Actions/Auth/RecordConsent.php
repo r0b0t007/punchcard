@@ -18,7 +18,10 @@ final readonly class RecordConsent
     {
         $user->forceFill([
             'adult_confirmed_at' => $user->adult_confirmed_at ?? now(),
-            'marketing_opt_in_at' => $user->marketing_opt_in_at ?? ($wantsNews ? now() : null),
+            // Once chosen, on or off, only the settings change it (SetMarketingConsent): a later form never opts back in.
+            'marketing_opt_in_at' => $user->marketing_opt_in_at !== null || $user->marketing_opt_out_at !== null
+                ? $user->marketing_opt_in_at
+                : ($wantsNews ? now() : null),
         ])->save();
 
         return $user;

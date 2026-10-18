@@ -41,7 +41,9 @@ export default function DeleteUser({
             <Heading
                 variant="small"
                 title={t('Delete account')}
-                description={t('Delete your account and all of its resources')}
+                description={t(
+                    'Your account and your sign-in go. The places keep your stamps, without your name or email.',
+                )}
             />
             <div className="space-y-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
                 <div className="relative space-y-0.5 text-destructive">

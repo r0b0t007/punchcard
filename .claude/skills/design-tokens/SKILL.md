@@ -75,7 +75,7 @@ above: keep the two in step.
 | C1 first tap, C2 stamp success, C3 reward unlocked, C4 redeem, cooldown (with states)                              | `Punchcard Tap Flow.dc.html`            |
 | Redeemed (staff glance), C9 My rewards, C4 time's up and verify email                                              | `Punchcard Redemption.dc.html`          |
 | The loyalty card                                                                                                   | `LoyaltyCard.dc.html`                   |
-| C5 My cards, C6 card detail, C10 My QR, C12 profile and settings, C13 install sheet, tap refused, offline pages    | `Punchcard Customer Home.dc.html`       |
+| C5 My cards, C6 card detail, C10 My QR, C12 settings and privacy, C13 install sheet, tap refused, offline pages    | `Punchcard Customer Home.dc.html`       |
 | Every page in `pages/auth/*` (sign in, sign up, two-factor, email links, confirm it's you, staff invitation)       | `Punchcard Sign In.dc.html`             |
 | B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                        | `Punchcard Business Onboarding.dc.html` |
 | B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                                 | `Punchcard Business App.dc.html`        |
