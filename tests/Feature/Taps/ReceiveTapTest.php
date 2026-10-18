@@ -6,6 +6,7 @@ use App\Actions\Taps\ReceiveTap;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
+use App\Models\Business;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Models\Tap;
@@ -261,4 +262,69 @@ it('puts a replay of a URL read while nobody held the tag at no business', funct
 
     expect($replay->rejection)->toBe(TapRejection::Replay)
         ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => null, 'business_id' => null]);
+});
+
+it('names no business for a replay it can\'t place: the tag moved between counters, or the old taps were pruned', function (string $case): void {
+    ($this->receive)(($this->url)(5));
+    $this->context->bypass(function (): void {
+        $this->stamper->forceFill(['unassigned_at' => now()])->save();
+        Stamper::factory()->create([
+            'business_id' => $this->tenants->a2->id,
+            'location_id' => $this->tenants->locationOf($this->tenants->a2)->id,
+            'nfc_tag_id' => $this->tag->id,
+        ]);
+    });
+    ($this->receive)(($this->url)(7));
+
+    if ($case === 'pruned') {
+        // The log keeps taps for a while only (taps.retention_days): A1's are gone.
+        DB::table('taps')->where('counter', 5)->delete();
+    }
+
+    // Counter 6 was read between the move and counter 7; counter 3 before A1's pruned taps.
+    $replay = ($this->receive)(($this->url)($case === 'pruned' ? 3 : 6));
+
+    expect($replay->rejection)->toBe(TapRejection::Replay)
+        ->and($replay->only(['stamper_id', 'business_id', 'location_id']))->toBe(['stamper_id' => null, 'business_id' => null, 'location_id' => null]);
+})->with(['moved between', 'pruned']);
+
+it('places a replay of a counter never sent between two spent at the same stamper', function (): void {
+    ($this->receive)(($this->url)(5));
+    $atA2 = $this->context->bypass(function (): Stamper {
+        $this->stamper->forceFill(['unassigned_at' => now()])->save();
+
+        return Stamper::factory()->create([
+            'business_id' => $this->tenants->a2->id,
+            'location_id' => $this->tenants->locationOf($this->tenants->a2)->id,
+            'nfc_tag_id' => $this->tag->id,
+        ]);
+    });
+    ($this->receive)(($this->url)(7));
+    ($this->receive)(($this->url)(9));
+
+    // Counter 8 was read at A2: between 7 and 9, both spent there.
+    $replay = ($this->receive)(($this->url)(8));
+
+    expect($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => $atA2->id, 'business_id' => $this->tenants->a2->id]);
+});
+
+it('names no business for a URL read while the tag was away, once it came back', function (): void {
+    // A1, then A2, then A1 again: each stay is its own stamper.
+    $assign = fn (Business $business): Stamper => $this->context->bypass(function () use ($business): Stamper {
+        Stamper::query()->current()->where('nfc_tag_id', $this->tag->id)->firstOrFail()->forceFill(['unassigned_at' => now()])->save();
+
+        return Stamper::factory()->create([
+            'business_id' => $business->id,
+            'location_id' => $this->tenants->locationOf($business)->id,
+            'nfc_tag_id' => $this->tag->id,
+        ]);
+    });
+    ($this->receive)(($this->url)(5));
+    $assign($this->tenants->a2);
+    ($this->receive)(($this->url)(7));
+    $assign($this->tenants->a1);
+    ($this->receive)(($this->url)(9));
+
+    // Counter 8 was read at A2 or back at A1: no telling.
+    expect(($this->receive)(($this->url)(8))->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => null, 'business_id' => null]);
 });

@@ -20,6 +20,7 @@ use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Support\Cards\ProgressiveTiers;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
@@ -287,13 +288,12 @@ final readonly class AddStamps
             return $request->qty;
         }
 
-        $dayStart = $now->toImmutable()->setTimezone($location->timezone)->startOfDay();
         $today = (int) StampEvent::query()
             ->where('enrollment_id', $enrollment->id)
             ->where('business_id', $request->businessId)
             ->whereIn('source', StampSource::presenceValues())
-            ->where('created_at', '>=', $dayStart->utc())
-            ->where('created_at', '<', $dayStart->addDay()->utc())
+            ->where('created_at', '>=', LocalMoment::dayStart($location->timezone, $now))
+            ->where('created_at', '<', LocalMoment::dayEnd($location->timezone, $now))
             ->sum('qty');
         $room = $card->daily_cap - $today;
 

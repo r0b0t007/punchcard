@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Stampers;
 
 use App\Actions\Admin\RecordAudit;
+use App\Actions\Stampers\Concerns\SwitchesStampers;
 use App\Enums\StamperStatus;
-use App\Models\AuditLog;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Support\Tenancy\TenantContext;
@@ -26,6 +26,8 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class ChangeStamperStatus
 {
+    use SwitchesStampers;
+
     public function __construct(private RecordAudit $recordAudit, private TenantContext $context) {}
 
     public function handle(Stamper $stamper, StamperStatus $status): Stamper
@@ -41,14 +43,8 @@ final readonly class ChangeStamperStatus
                 throw StamperRefused::held();
             }
 
-            $locked->forceFill(['status' => $status] + ($status === StamperStatus::Disabled ? Stamper::DISARMED : []))->save();
-
-            // The audit log and the tag are platform data.
-            $this->context->bypass(fn (): AuditLog => $this->recordAudit->handle(
-                $status === StamperStatus::Disabled ? 'stamper.disabled' : 'stamper.enabled',
-                NfcTag::query()->findOrFail($locked->nfc_tag_id),
-                context: ['stamper_id' => $locked->id],
-            ));
+            // The tag is platform data.
+            $this->switchStamper($locked, $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($locked->nfc_tag_id)), $status);
 
             return $locked;
         });

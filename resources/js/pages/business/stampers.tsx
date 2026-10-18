@@ -426,13 +426,16 @@ function lastTap(t: Translate, locale: string, at: string | null): string {
         return t('Never tapped yet');
     }
 
-    const seconds = Math.round((new Date(at).getTime() - Date.now()) / 1000);
+    // Rounded first, so 59.7 minutes reads "1 hour ago", never "60 minutes ago".
+    const seconds = (new Date(at).getTime() - Date.now()) / 1000;
+    const minutes = Math.round(seconds / 60);
+    const hours = Math.round(seconds / 3600);
     const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
     const ago =
-        Math.abs(seconds) < 3600
-            ? format.format(Math.round(seconds / 60), 'minute')
-            : Math.abs(seconds) < 86_400
-              ? format.format(Math.round(seconds / 3600), 'hour')
+        Math.abs(minutes) < 60
+            ? format.format(minutes, 'minute')
+            : Math.abs(hours) < 24
+              ? format.format(hours, 'hour')
               : format.format(Math.round(seconds / 86_400), 'day');
 
     return t('Last tap :ago', { ago });
@@ -458,7 +461,11 @@ function when(
         return t('Today :time', { time });
     }
 
-    if (day(moment) === day(new Date(Date.now() - 86_400_000))) {
+    // The calendar day before today's, not 24 hours ago: a 23 or 25 hour day (Morocco's Ramadan clock) shifts that.
+    const yesterday = new Date(`${day(new Date())}T00:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    if (day(moment) === yesterday.toISOString().slice(0, 10)) {
         return t('Yesterday :time', { time });
     }
 

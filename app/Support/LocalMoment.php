@@ -37,7 +37,13 @@ final class LocalMoment
         ];
     }
 
-    /** When a site's day began (its local midnight), as UTC for a query: the day AddStamps' daily cap counts, for B12's taps today. */
+    /** When a site's day ends (its next local midnight), as UTC: a 23 or 25 hour day ends when it does. */
+    public static function dayEnd(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
+    {
+        return ($now ?? now())->toImmutable()->setTimezone($timezone)->startOfDay()->addDay()->utc();
+    }
+
+    /** When a site's day began (its local midnight), as UTC for a query: AddStamps' daily cap and B12's taps today. */
     public static function dayStart(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
     {
         return ($now ?? now())->toImmutable()->setTimezone($timezone)->startOfDay()->utc();

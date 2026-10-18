@@ -6,7 +6,6 @@ namespace App\Actions\Stampers;
 
 use App\Actions\Admin\RecordAudit;
 use App\Actions\Stampers\Concerns\LocksTags;
-use App\Enums\StamperStatus;
 use App\Models\NfcTag;
 use App\Models\Stamper;
 use App\Support\Tenancy\TenantContext;
@@ -16,9 +15,10 @@ use App\Support\Tenancy\TenantContext;
  * docs/runbooks/stamper-keys.md): only once keys 2, 3, 4 and then 0 all
  * changed on the tag, off-server. The counter stays, so every URL from
  * before still fails as a replay, and those signed with the old key as a
- * bad MAC. Its stamper must be paused first, so no tap signed with the old
- * key races the new version. $from is the version the admin re-provisioned
- * from: recording the same re-key twice would leave the tag at a version its
+ * bad MAC. Its stamper must be held first (SetStamperStatus), so no tap
+ * signed with the old key races the new version: a pause its business made
+ * is not enough, since its owner can switch it on again (B12). $from is the
+ * version the admin re-provisioned from: recording the same re-key twice would leave the tag at a version its
  * keys do not match, and every tap would fail. Recording it releases the
  * platform's hold (SetStamperStatus): the stamper stays off, but its
  * business may now switch it on again (B12).
@@ -49,7 +49,7 @@ final readonly class RecordRekey
 
             $current = $this->lockCurrentStamper($tag);
 
-            if ($current instanceof Stamper && $current->status === StamperStatus::Active) {
+            if ($current instanceof Stamper && $current->held_at === null) {
                 throw new StamperRefused(__('Disable stamper #:id first, so no tap signed with the old key races the new version.', ['id' => $current->id]));
             }
 

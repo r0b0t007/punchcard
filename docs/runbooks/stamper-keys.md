@@ -57,7 +57,8 @@ version from going back.
 
 1. Disable the tag's stamper, so it rejects every tap while you work: `php artisan punchcard:stamper:disable <uid>`.
    Note whether the business had already disabled it, so step 4 does not turn on a stamper they paused.
-   Disabling also holds it: its owner can't switch it back on from their stampers page until the re-key.
+   Disabling also holds it: its owner can't switch it back on from their stampers page until the re-key. Do it
+   even when the business had paused it (the panel says "Hold for re-key"): step 3 refuses a stamper not held.
 2. Re-provision the tag: keys 2, 3 and 4, then key 0, all derived from `key_version + 1`, authenticating with
    the current version's key 0.
 3. Only after every key has changed, record the version the tag now has:

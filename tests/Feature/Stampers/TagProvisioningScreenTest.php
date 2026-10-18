@@ -162,7 +162,9 @@ it('holds a stamper its business had paused, so its owner can\'t switch it on du
 
     ($this->screen)(fn (Testable $page) => $page
         ->assertActionVisible(TestAction::make('disable')->table($this->tag))
+        ->assertActionHasLabel(TestAction::make('disable')->table($this->tag), 'Hold for re-key')
         ->callAction(TestAction::make('disable')->table($this->tag))
+        ->assertNotified("Stamper #{$this->stamper->id} at A1, A1 site (#".$this->tenants->locationOf($this->tenants->a1)->id.') was already disabled, perhaps by the business: it is now held, so its owner can\'t switch it on until the re-key is recorded. Leave it disabled after the re-key.')
         ->assertActionHidden(TestAction::make('disable')->table($this->tag)));
 
     expect(($this->fresh)($this->stamper)->held_at)->not->toBeNull()

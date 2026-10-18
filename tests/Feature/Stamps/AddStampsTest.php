@@ -176,6 +176,15 @@ describe('daily cap, per customer per business', function (): void {
         expect(($this->add)(($this->qr)())->enrollment->lifetime_stamps)->toBe(6);
     });
 
+    it('ends a 25 hour day at its own midnight, not 24 hours after it began', function (): void {
+        // Paris leaves summer time on 25 October 2026: that day runs from 22:00 UTC the day before to 23:00 UTC.
+        $this->context->bypass(fn () => $this->a1Location->forceFill(['timezone' => 'Europe/Paris'])->save());
+        Carbon::setTestNow('2026-10-25 22:10:00');
+        ($this->add)(($this->qr)(5));
+
+        Carbon::setTestNow('2026-10-25 22:30:00');
+        expect(($this->rejection)(fn () => ($this->add)(($this->qr)())))->toBe(StampRejection::DailyCap);
+    });
     it('has no cap when the card sets none', function (): void {
         ($this->card)(['daily_cap' => null]);
         ($this->add)(($this->qr)(40));

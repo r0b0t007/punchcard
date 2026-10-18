@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\Schema;
  * and off (B12), the hold keeps them from switching that one back on before
  * the re-key: set by the admin's disable, released by the admin's enable or
  * by recording the re-key. A held stamper is always disabled (Postgres check).
- * Until now only the platform could disable a stamper, so every one disabled
- * today is held: one mid re-key stays off for its owner too.
+ * Nothing is held at first: a stamper paused at its business's request
+ * stays its business's to switch. One mid re-key when this ships is held by
+ * running punchcard:stamper:disable on it again.
  */
 return new class extends Migration
 {
@@ -22,8 +23,6 @@ return new class extends Migration
         Schema::table('stampers', function (Blueprint $table): void {
             $table->timestamp('held_at')->nullable();
         });
-
-        DB::table('stampers')->where('status', 'disabled')->whereNull('unassigned_at')->update(['held_at' => now()]);
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement("alter table stampers add constraint stampers_held_check check (held_at is null or status = 'disabled')");

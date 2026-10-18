@@ -13,6 +13,8 @@ final readonly class StamperStatusChange
     public function __construct(
         public Stamper $stamper,
         public StamperStatus $previous,
+        /** Disabling held a stamper its business had already paused. */
+        public bool $held = false,
     ) {}
 
     public function changed(): bool
@@ -34,6 +36,7 @@ final readonly class StamperStatusChange
         $disabled = $this->stamper->status === StamperStatus::Disabled;
 
         return match (true) {
+            $this->held => __(':stamper was already disabled, perhaps by the business: it is now held, so its owner can\'t switch it on until the re-key is recorded. Leave it disabled after the re-key.', ['stamper' => $stamper]),
             ! $this->changed() && $disabled => __(':stamper was already disabled, perhaps by the business: leave it disabled after the re-key.', ['stamper' => $stamper]),
             ! $this->changed() => __(':stamper was already enabled.', ['stamper' => $stamper]),
             $disabled => __(':stamper is disabled: it refuses every tap, and its arming is cleared.', ['stamper' => $stamper]),

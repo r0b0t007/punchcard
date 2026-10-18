@@ -45,7 +45,9 @@ beforeEach(function (): void {
     $this->uid = $this->context->bypass(fn (): string => $this->stamper->tag()->firstOrFail()->uid);
     $this->tag = fn (): NfcTag => $this->context->bypass(fn (): NfcTag => NfcTag::query()->where('uid', $this->uid)->firstOrFail());
     $this->fresh = fn (Stamper $stamper): Stamper => $this->context->bypass(fn (): Stamper => $stamper->refresh());
+    // Its business pauses it (B12), or the platform holds it for a re-key (runbook step 1).
     $this->pause = fn () => $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Disabled])->save());
+    $this->hold = fn () => app(SetStamperStatus::class)->handle($this->uid, StamperStatus::Disabled);
 });
 
 describe('retiring', function (): void {
@@ -96,7 +98,7 @@ describe('retiring', function (): void {
 
 describe('re-keying', function (): void {
     it('records the next key version, keeping the counter', function (): void {
-        ($this->pause)();
+        ($this->hold)();
         $this->context->bypass(fn () => NfcTag::query()->where('uid', $this->uid)->update(['last_counter' => 41]));
 
         $tag = $this->rekey->handle($this->uid, from: 1);
@@ -112,15 +114,16 @@ describe('re-keying', function (): void {
         expect($this->rekey->handle($free->uid, from: 1)->key_version)->toBe(2);
     });
 
-    it('refuses a tag that is unknown, retired, still active, at another version or at the last one', function (string $state, string $reason): void {
+    it('refuses a tag that is unknown, retired, still active or only paused, at another version or at the last one', function (string $state, string $reason): void {
         $from = 1;
         $uid = $this->uid;
         match ($state) {
             'unknown' => $uid = '04A1B2C3D4E5F6',
             'retired' => $uid = $this->context->bypass(fn (): string => NfcTag::factory()->create(['retired_at' => now()])->uid),
             'active' => null,
-            'another version' => [($this->pause)(), $from = 2],
-            'the last version' => [($this->pause)(), $this->context->bypass(fn () => NfcTag::query()->where('uid', $this->uid)->update(['key_version' => NfcTag::LAST_KEY_VERSION])), $from = NfcTag::LAST_KEY_VERSION],
+            'paused by its business' => ($this->pause)(),
+            'another version' => [($this->hold)(), $from = 2],
+            'the last version' => [($this->hold)(), $this->context->bypass(fn () => NfcTag::query()->where('uid', $this->uid)->update(['key_version' => NfcTag::LAST_KEY_VERSION])), $from = NfcTag::LAST_KEY_VERSION],
         };
 
         expect(fn () => $this->rekey->handle($uid, from: $from))->toThrow(StamperRefused::class, $reason)
@@ -129,19 +132,21 @@ describe('re-keying', function (): void {
         'unknown' => ['unknown', 'No tag'],
         'retired' => ['retired', 'retired'],
         'active' => ['active', 'Disable stamper'],
+        // Its owner could switch it on mid re-key: only the platform's hold will do.
+        'paused by its business' => ['paused by its business', 'Disable stamper'],
         'another version' => ['another version', 'is at key version 1, not 2'],
         'the last version' => ['the last version', 'last key version'],
     ]);
 
     it('still re-keys the version before the last one', function (): void {
-        ($this->pause)();
+        ($this->hold)();
         $this->context->bypass(fn () => NfcTag::query()->where('uid', $this->uid)->update(['key_version' => NfcTag::LAST_KEY_VERSION - 1]));
 
         expect($this->rekey->handle($this->uid, from: NfcTag::LAST_KEY_VERSION - 1)->key_version)->toBe(NfcTag::LAST_KEY_VERSION);
     });
 
     it('takes the version the tag now has, asks which keys changed, and says what is next', function (): void {
-        ($this->pause)();
+        ($this->hold)();
 
         $this->artisan('punchcard:tag:rekeyed', ['uid' => $this->uid, 'version' => '2'])
             ->expectsConfirmation("Have keys 2, 3, 4 and then 0 all been changed on tag {$this->uid} to key version 2?", 'no')
@@ -157,7 +162,7 @@ describe('re-keying', function (): void {
     });
 
     it('refuses the same re-key run twice, as after a dropped session', function (): void {
-        ($this->pause)();
+        ($this->hold)();
         Artisan::call('punchcard:tag:rekeyed', ['uid' => $this->uid, 'version' => '2', '--force' => true]);
 
         expect(Artisan::call('punchcard:tag:rekeyed', ['uid' => $this->uid, 'version' => '2', '--force' => true]))->toBe(1)
@@ -250,9 +255,9 @@ describe('the tap path', function (): void {
     it('refuses URLs signed with the old key after a re-key, keeps old counters replays, and takes the new key', function (): void {
         expect(($this->receive)(5, 1)->rejection)->toBeNull();
 
-        ($this->pause)();
+        ($this->hold)();
         $this->rekey->handle($this->uid, from: 1);
-        $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Active])->save());
+        app(SetStamperStatus::class)->handle($this->uid, StamperStatus::Active);
 
         expect(($this->receive)(6, 1)->rejection)->toBe(TapRejection::BadMac)
             ->and(($this->receive)(5, 2)->rejection)->toBe(TapRejection::Replay)
@@ -267,7 +272,7 @@ describe('the tap path', function (): void {
     });
 
     it('locks the tag, then its stamper, as the tap path does', function (string $operation): void {
-        ($this->pause)();
+        ($this->hold)();
         DB::enableQueryLog();
 
         match ($operation) {

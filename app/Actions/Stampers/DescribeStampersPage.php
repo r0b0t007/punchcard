@@ -21,8 +21,8 @@ use Illuminate\Support\Carbon;
  * the site's own timezone (LocalMoment::dayStart, as the daily cap counts
  * it). Taps on the stamper only (Tap::onTheStamper): a copied link replayed
  * says nothing about it being used. Taps are platform data, read in
- * bypass() for this business's own stampers: two grouped queries for the
- * whole page, however many stampers.
+ * bypass() for this business's own stampers: two queries for the whole
+ * page, however many stampers, each on the (stamper_id, created_at) index.
  */
 final readonly class DescribeStampersPage
 {
@@ -67,18 +67,20 @@ final readonly class DescribeStampersPage
             return [[], []];
         }
 
-        return $this->context->bypass(function () use ($business, $stampers, $timezones): array {
-            $taps = fn (): Builder => Tap::query()->where('business_id', $business->id)->whereIn('stamper_id', $stampers->modelKeys())->onTheStamper()->groupBy('stamper_id');
-            $today = $taps()->where(function (Builder $sinceDayStart) use ($stampers, $timezones): void {
+        // Built in bypass() (taps are platform data), run on the business's own stampers: the newest tap of each.
+        // selectSub() compiles the subquery at once, so in bypass(); the stampers query keeps its tenant scope.
+        $withLastTap = Stamper::query()->whereKey($stampers->modelKeys())->select('stampers.id');
+        $this->context->bypass(fn (): Builder => $withLastTap->selectSub(Tap::query()->select('taps.created_at')->whereColumn('taps.stamper_id', 'stampers.id')->where('taps.business_id', $business->id)->onTheStamper()->latest('taps.created_at')->limit(1), 'last_tap_at'));
+        $lastTaps = $withLastTap->pluck('last_tap_at', 'id')->filter()->map(fn (mixed $at): string => (string) $at)->all();
+
+        return [$lastTaps, $this->context->bypass(function () use ($business, $stampers, $timezones): array {
+            $today = Tap::query()->where('business_id', $business->id)->whereIn('stamper_id', $stampers->modelKeys())->onTheStamper()->groupBy('stamper_id')->where(function (Builder $sinceDayStart) use ($stampers, $timezones): void {
                 foreach ($stampers->groupBy('location_id') as $locationId => $atSite) {
                     $sinceDayStart->orWhere(fn (Builder $site): Builder => $site->whereIn('stamper_id', $atSite->modelKeys())->where('created_at', '>=', LocalMoment::dayStart($timezones[$locationId])));
                 }
             });
 
-            return [
-                $taps()->selectRaw('stamper_id, max(created_at) as last_tap_at')->pluck('last_tap_at', 'stamper_id')->map(fn (mixed $at): string => (string) $at)->all(),
-                $today->selectRaw('stamper_id, count(*) as taps')->pluck('taps', 'stamper_id')->map(fn (mixed $count): int => (int) $count)->all(),
-            ];
-        });
+            return $today->selectRaw('stamper_id, count(*) as taps')->pluck('taps', 'stamper_id')->map(fn (mixed $count): int => (int) $count)->all();
+        })];
     }
 }
