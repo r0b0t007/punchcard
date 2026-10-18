@@ -47,7 +47,8 @@ organization  (brand: the card program, brand identity, optional white-label dom
 - **Customer data inside a franchise**: staff at any participating site can see a customer's progress on the shared card
   when the customer is present (needed to stamp and redeem). Customer lists, contact details and marketing audiences for a
   franchisee include only customers with a stamp event at that franchisee. The org_admin sees all program members. The
-  organization is the data controller for the program (to confirm with the CNDP filing, CHW-58).
+  organization is the data controller for the program (to confirm with the CNDP filing, CHW-58; the split and the
+  open question are in `docs/privacy/roles.md`).
 - **Billing entity** is either the organization (one invoice for the network) or each business. Chosen per organization;
   the payment decision itself stays in CHW-51.
 - **MVP scope**: the schema, scopes, roles and isolation tests ship in Phase 1 (CHW-21, CHW-22). The franchise console,

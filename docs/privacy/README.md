@@ -1,0 +1,41 @@
+# Privacy and data protection
+
+punchcard processes personal data of customers (people who collect stamps) and of business users (owners, staff, org
+admins). In Morocco this falls under Law 09-08 and must be declared to the CNDP before real customer data is collected;
+customers in France or elsewhere in the EU are also covered by the GDPR. These documents prepare that work (CHW-58).
+
+**These are drafts, not legal advice.** Have them checked by counsel or with the CNDP before filing or publishing.
+
+| Document                                                     | What it is                                                                   | Status                      |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
+| [processing-register.md](processing-register.md)             | Register of processing activities (one entry per purpose)                    | Draft                       |
+| [cndp-declaration-draft.fr.md](cndp-declaration-draft.fr.md) | The declaration to the CNDP, in French, following its form, with a checklist | Draft, not filed            |
+| [retention.md](retention.md)                                 | How long each kind of data is kept, and what enforces it                     | Draft; parts built later    |
+| [roles.md](roles.md)                                         | Who is controller and who is processor, franchises included (ADR 0006)       | Draft, open question        |
+| [privacy-notice.draft.md](privacy-notice.draft.md)           | The customer-facing privacy notice                                           | Draft, not published        |
+| [business-data-terms.draft.md](business-data-terms.draft.md) | Data processing clauses for businesses and franchise networks                | Draft, not published        |
+| [ADR 0008](../adr/0008-hosting-location.md)                  | Where the data is hosted (EU or Morocco)                                     | Proposed, decision deferred |
+
+## Still open
+
+- **Hosting location** (ADR 0008). The declaration names the hosting country and any transfer abroad, so it can't be
+  filed until this is decided.
+- **Who files** (roles.md): does each organization declare its loyalty program, with punchcard as its processor, or does
+  punchcard declare everything as the sole controller?
+- **Sub-processors** not chosen yet: the transactional email provider, error monitoring (Sentry planned), Apple and Google
+  Wallet (Phase 2), web push services (Phase 2). Each one abroad is a transfer to declare.
+- **Retention** of the audit log and of backups (retention.md).
+- **Filing** the declaration (the founder's step) and printing its receipt number in the privacy notice.
+- **Publishing** the privacy notice and business terms on the marketing site.
+
+## What the app already does
+
+- Account deletion: an account with no history is deleted; one with history is anonymised and the stamp ledger keeps
+  the businesses' counts without anyone's identity (`app/Actions/Account/DeleteAccount.php`, CHW-139).
+- Consent at sign-up: confirmation of being 16 or older, and an opt-in to punchcard news, both dated
+  (`app/Actions/Auth/RecordConsent.php`); per-program offers through follows, off until turned on (`SetFollow`).
+- Tap log IP and device kept 180 days (`taps` pruning), never written to the logs.
+- Franchise isolation: a franchisee only sees customers who stamped with it in person (ADR 0006).
+
+Built as part of CHW-58: changing consents in the settings (C12), downloading one's data (JSON), and the inactivity rule
+(retention.md).
