@@ -75,10 +75,11 @@ journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois 
 ## 9. Droits des personnes
 
 - Information : notice de confidentialité publiée sur le site et dans l'application (privacy-notice.draft.md).
-- Accès : téléchargement des données au format JSON depuis les réglages.
+- Accès : téléchargement des données au format JSON depuis les réglages **[à mettre en place, CHW-58]**.
 - Rectification : réglages du profil.
-- Opposition : interrupteurs de consentement dans les réglages et sur chaque carte ; lien de désinscription dans chaque
-  message.
+- Opposition : interrupteurs de consentement sur chaque carte, et dans les réglages **[à mettre en place, CHW-58]** ;
+  lien de désinscription dans chaque message **[à mettre en place]**. Chaque changement de consentement est journalisé
+  (date, origine) **[à mettre en place, CHW-58]**.
 - Suppression : suppression du compte depuis les réglages.
 - Contact : **[adresse e-mail dédiée]**, réponse sous 30 jours.
 
@@ -96,6 +97,8 @@ administrateurs ; sauvegardes chiffrées **[ADR 0008, CHW-59]**.
       responsables.
 - [ ] Sous-traitants choisis et listés (e-mails, suivi d'erreurs).
 - [ ] Formulaire en vigueur téléchargé sur www.cndp.ma et rubriques reportées.
+- [ ] Chaque mesure marquée **[à mettre en place]** est en service dans l'application (droits, journal des
+      consentements, désinscription, règle d'inactivité).
 - [ ] Dépôt **avant toute donnée réelle** (avant le pilote, CHW-37).
 - [ ] Numéro de récépissé noté et imprimé dans la notice de confidentialité.
 - [ ] Notice et conditions professionnelles publiées sur le site.

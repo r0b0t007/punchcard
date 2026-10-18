@@ -11,8 +11,11 @@ Common to every entry:
 - **Security**: passwords hashed (bcrypt), optional two-factor and passkeys; tenant isolation enforced in code and tested
   (an organization never reads another's data; a franchisee only its own customers); platform admin actions audited;
   secrets (tag keys, certificates) outside the code and the database; personal data never written to the logs.
-- **Rights**: access and portability (download as JSON in the settings), rectification (profile), erasure (delete the
-  account), objection to marketing (consent switches in the settings). Contact: the privacy address in the notice.
+- **Rights**: access and portability (download as JSON in the settings, CHW-58), rectification (profile), erasure
+  (delete the account), objection to marketing (consent switches on each card and in the settings, CHW-58; an
+  unsubscribe link in news emails, to build). Contact: the privacy address in the notice.
+- **Consent evidence**: the current state on the account (dated), and every change in an append-only log (what, on or
+  off, from a sign-up form or the settings, when), deleted with the account (CHW-58).
 
 ## T1. Customer accounts and sign-in
 

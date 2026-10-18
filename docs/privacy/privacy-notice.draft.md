@@ -39,5 +39,5 @@ are deleted after 180 days.
 ## Your rights
 
 In **Settings**, you can download all your data (a JSON file), change your name and email, turn news and each program's
-offers on or off, and delete your account. For anything else, write to **[privacy email]**; we answer within 30 days. You
+offers on or off, and delete your account **[publish only once each of these is live: CHW-58]**. For anything else, write to **[privacy email]**; we answer within 30 days. You
 can also complain to the CNDP (www.cndp.ma) or, in the EU, to your data protection authority.
