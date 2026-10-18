@@ -33,8 +33,8 @@ We don't sell your data, and we don't show ads.
 ## How long
 
 Until you delete your account. If you don't use it for 23 months, we email you; if you still don't sign in, we delete
-it 30 days later. When an
-account is deleted, the cafés keep their stamp counts without your name or email. Tap records are deleted after 180 days.
+it 30 days later. When an account is deleted, the cafés keep their stamp counts without your name or email. Tap records
+are deleted after 180 days.
 
 ## Your rights
 
