@@ -74,7 +74,7 @@ final readonly class DescribeMyCard
                 'history' => $this->history($enrollment, $now),
                 'venues' => $this->venues($card),
                 // A closed program takes no new follow (SetFollow).
-                'canFollow' => $organization->archived_at === null,
+                'canFollow' => $organization->takesNewFollows(),
                 // Consent comes from whoever owns the inbox (SetFollow).
                 'mustVerify' => ! $viewer->hasVerifiedEmail(),
                 'following' => Follow::query()
