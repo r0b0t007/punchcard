@@ -32,10 +32,14 @@ customers in France or elsewhere in the EU are also covered by the GDPR. These d
 
 - Account deletion: an account with no history is deleted; one with history is anonymised and the stamp ledger keeps
   the businesses' counts without anyone's identity (`app/Actions/Account/DeleteAccount.php`, CHW-139).
-- Consent at sign-up: confirmation of being 16 or older, and an opt-in to punchcard news, both dated
-  (`app/Actions/Auth/RecordConsent.php`); per-program offers through follows, off until turned on (`SetFollow`).
+- Consent at sign-up (`app/Actions/Auth/RecordConsent.php`): the confirmation of being 16 or older, always dated; news
+  from punchcard dated only when the box is ticked (an unticked box records nothing, so nothing is assumed). Per-program
+  offers through follows, off until turned on (`SetFollow`); a follow keeps when it was first turned on and when it last
+  changed.
 - Tap log IP and device kept 180 days (`taps` pruning), never written to the logs.
 - Franchise isolation: a franchisee only sees customers who stamped with it in person (ADR 0006).
 
-Built as part of CHW-58: changing consents in the settings (C12), downloading one's data (JSON), and the inactivity rule
-(retention.md).
+Coming with CHW-58, not live until its parts merge: news on and off in the settings with each change logged (C12,
+`consent_events`), the places followed in the settings, downloading one's data (JSON), an unsubscribe link in news
+emails, and the inactivity rule (retention.md). The drafts below describe the app once they are live: check each one
+before filing or publishing.
