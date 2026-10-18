@@ -66,7 +66,7 @@ final readonly class SetFollow
 
             $organization = Organization::query()->whereKey($enrollment->organization_id)->lockForUpdate()->first(['id', 'archived_at']);
 
-            if (! $organization instanceof Organization || $organization->archived_at !== null) {
+            if (! $organization instanceof Organization || ! $organization->takesNewFollows()) {
                 throw ValidationException::withMessages(['follow' => __('This café has closed: there are no offers to follow.')]);
             }
 

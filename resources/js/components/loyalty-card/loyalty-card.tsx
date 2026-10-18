@@ -1,13 +1,13 @@
 import { Gift } from 'lucide-react';
 import { monogramOf } from '@/components/loyalty-card/monogram';
 import type { CSSProperties } from 'react';
-import { useState } from 'react';
 import {
     gridColumnsClass,
     progressFor,
 } from '@/components/loyalty-card/layout';
 import type { StampStyle } from '@/components/loyalty-card/stamp';
 import Stamp from '@/components/loyalty-card/stamp';
+import { useLogo } from '@/components/loyalty-card/use-logo';
 import { useTranslation } from '@/hooks/use-translation';
 import { cardInks } from '@/lib/color';
 import { cn } from '@/lib/utils';
@@ -73,8 +73,7 @@ export default function LoyaltyCard({
         '--card-stamp': stamp,
     } as CSSProperties;
     // A broken logo falls back to the monogram and plain stamps.
-    const [logoFailed, setLogoFailed] = useState(false);
-    const logo = logoUrl && !logoFailed ? logoUrl : null;
+    const [logo, logoFailed] = useLogo(logoUrl);
 
     return (
         <div
@@ -99,7 +98,7 @@ export default function LoyaltyCard({
                         <img
                             src={logo}
                             alt=""
-                            onError={() => setLogoFailed(true)}
+                            onError={logoFailed}
                             className="size-full object-cover"
                         />
                     ) : (
@@ -139,7 +138,7 @@ export default function LoyaltyCard({
                                 index={index}
                                 stampStyle={stampStyle}
                                 logoUrl={logo}
-                                onLogoError={() => setLogoFailed(true)}
+                                onLogoError={logoFailed}
                                 ghost={ghostNext && index === filled}
                                 landing={isLanding}
                             />

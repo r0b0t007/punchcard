@@ -77,7 +77,7 @@ final readonly class DescribePrivacy
                     'logoUrl' => $organization->logoUrl(),
                     'following' => $follow?->notify === true,
                     'changedAt' => $follow?->updated_at?->toIso8601String(),
-                    'canFollow' => $organization->archived_at === null,
+                    'canFollow' => $organization->takesNewFollows(),
                 ];
             }
 

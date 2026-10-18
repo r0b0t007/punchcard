@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
 import { localDate } from '@/lib/local-moment';
 import { monogramOf } from '@/components/loyalty-card/monogram';
+import { useLogo } from '@/components/loyalty-card/use-logo';
 import { edit, follow, marketing as setMarketing } from '@/routes/privacy';
 import { send } from '@/routes/verification';
 
@@ -32,8 +33,8 @@ type Marketing = {
 /**
  * C12 Privacy (CHW-58, review 7a): what punchcard may send the customer.
  * A checkbox, as on a card's page (C6), each state with its date in the
- * device's timezone (a customer has no site). It waits for one change to
- * land before taking the next.
+ * device's timezone (a customer has no site). The page waits for one change
+ * to land before taking the next, so a second click never cancels the first.
  */
 export default function Privacy({
     marketing,
@@ -47,6 +48,16 @@ export default function Privacy({
     const { t, locale } = useTranslation();
     const { errors } = usePage().props;
     const [saving, setSaving] = useState(false);
+    // The place last changed, whose row shows a refusal.
+    const [changedRow, setChangedRow] = useState<number | null>(null);
+    const save = (url: string, data: Record<string, boolean>) =>
+        router.patch(url, data, {
+            preserveScroll: true,
+            // Keeps which row was changed, so its refusal shows there.
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+        });
     const since =
         marketing.since === null
             ? null
@@ -79,15 +90,9 @@ export default function Privacy({
                             saving || (marketing.mustVerify && !marketing.on)
                         }
                         onCheckedChange={(checked) =>
-                            router.patch(
-                                setMarketing.url(),
-                                { marketing: checked === true },
-                                {
-                                    preserveScroll: true,
-                                    onStart: () => setSaving(true),
-                                    onFinish: () => setSaving(false),
-                                },
-                            )
+                            save(setMarketing.url(), {
+                                marketing: checked === true,
+                            })
                         }
                         data-test="marketing-consent"
                     />
@@ -138,9 +143,19 @@ export default function Privacy({
                 </div>
 
                 <div className="space-y-4">
-                    <p className="text-sm font-medium">
-                        {t('Offers from places you follow')}
-                    </p>
+                    <div className="grid gap-1">
+                        <p className="text-sm font-medium">
+                            {t('Offers from places you follow')}
+                        </p>
+                        {marketing.mustVerify &&
+                        programs.some((program) => !program.following) ? (
+                            <p className="text-sm text-muted-foreground">
+                                {t(
+                                    'Verify your email address to follow offers.',
+                                )}
+                            </p>
+                        ) : null}
+                    </div>
                     {programs.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             {t(
@@ -154,11 +169,22 @@ export default function Privacy({
                                     key={program.enrollmentId}
                                     program={program}
                                     mustVerify={marketing.mustVerify}
+                                    saving={saving}
+                                    error={
+                                        changedRow === program.enrollmentId
+                                            ? errors.follow
+                                            : undefined
+                                    }
+                                    onChange={(following) => {
+                                        setChangedRow(program.enrollmentId);
+                                        save(follow.url(program.enrollmentId), {
+                                            follow: following,
+                                        });
+                                    }}
                                 />
                             ))}
                         </ul>
                     )}
-                    <InputError message={errors.follow} />
                 </div>
             </div>
         </>
@@ -167,19 +193,24 @@ export default function Privacy({
 
 /**
  * A place's offers, followed or not since when (the same Follow as on its
- * card's page, C6). Joining needs a confirmed email and an open program;
- * leaving never does. It waits for one change before taking the next.
+ * card's page, C6), with the error of its own last change. Joining needs a
+ * confirmed email and an open program; leaving never does.
  */
 function ProgramRow({
     program,
     mustVerify,
+    saving,
+    error,
+    onChange,
 }: {
     program: Program;
     mustVerify: boolean;
+    saving: boolean;
+    error?: string;
+    onChange: (following: boolean) => void;
 }) {
     const { t, locale } = useTranslation();
-    const [saving, setSaving] = useState(false);
-    const [logoFailed, setLogoFailed] = useState(false);
+    const [logo, logoFailed] = useLogo(program.logoUrl);
     const id = `follow-${program.enrollmentId}`;
     const changed =
         program.changedAt === null
@@ -190,7 +221,9 @@ function ProgramRow({
                   year: 'numeric',
               });
     const state = program.following
-        ? t('Following since :date', { date: changed ?? '' })
+        ? changed === null
+            ? t('Following')
+            : t('Following since :date', { date: changed })
         : !program.canFollow
           ? t('Closed: no more offers')
           : changed === null
@@ -198,44 +231,43 @@ function ProgramRow({
             : t('Off since :date', { date: changed });
 
     return (
-        <li className="flex items-center gap-3" data-test="privacy-program">
-            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary font-semibold">
-                {program.logoUrl && !logoFailed ? (
-                    <img
-                        src={program.logoUrl}
-                        alt=""
-                        onError={() => setLogoFailed(true)}
-                        className="size-full object-cover"
-                    />
-                ) : (
-                    monogramOf(program.organization)
-                )}
-            </span>
-            <div className="grid min-w-0 flex-1 gap-0.5">
-                <Label htmlFor={id}>
-                    <span className="truncate">{program.organization}</span>
-                </Label>
-                <p className="text-sm text-muted-foreground">{state}</p>
+        <li className="flex flex-col gap-1" data-test="privacy-program">
+            <div className="flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary font-semibold">
+                    {logo ? (
+                        <img
+                            src={logo}
+                            alt=""
+                            onError={logoFailed}
+                            className="size-full object-cover"
+                        />
+                    ) : (
+                        <span aria-hidden="true">
+                            {monogramOf(program.organization)}
+                        </span>
+                    )}
+                </span>
+                {/* A column whose items stretch to its width: a long name ends in an ellipsis instead of pushing the checkbox out. */}
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <Label htmlFor={id}>
+                        <span className="block truncate">
+                            {program.organization}
+                        </span>
+                    </Label>
+                    <p className="text-sm text-muted-foreground">{state}</p>
+                </div>
+                <Checkbox
+                    id={id}
+                    checked={program.following}
+                    disabled={
+                        saving ||
+                        (!program.following &&
+                            (!program.canFollow || mustVerify))
+                    }
+                    onCheckedChange={(checked) => onChange(checked === true)}
+                />
             </div>
-            <Checkbox
-                id={id}
-                checked={program.following}
-                disabled={
-                    saving ||
-                    (!program.following && (!program.canFollow || mustVerify))
-                }
-                onCheckedChange={(checked) =>
-                    router.patch(
-                        follow.url(program.enrollmentId),
-                        { follow: checked === true },
-                        {
-                            preserveScroll: true,
-                            onStart: () => setSaving(true),
-                            onFinish: () => setSaving(false),
-                        },
-                    )
-                }
-            />
+            <InputError message={error} />
         </li>
     );
 }

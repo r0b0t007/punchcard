@@ -157,6 +157,12 @@ class Organization extends Model implements TenantModel
             ->withTimestamps();
     }
 
+    /** Whether the program takes new follows: a closed one can only be left (SetFollow). */
+    public function takesNewFollows(): bool
+    {
+        return $this->archived_at === null;
+    }
+
     /** The logo's public URL (UpdateLogo stores it on the public disk); null without one. */
     public function logoUrl(): ?string
     {

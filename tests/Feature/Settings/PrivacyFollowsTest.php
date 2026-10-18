@@ -110,14 +110,17 @@ it('shows an empty list to someone with no card yet', function (): void {
     ($this->page)(User::factory()->create())->assertInertia(fn (Assert $page): Assert => $page->where('programs', []));
 });
 
-it('shows a program once, however many of its cards the customer holds', function (): void {
+it('shows each program once, through its most recently used card, the most recently used first', function (): void {
     $second = $this->context->bypass(function (): LoyaltyCard {
         $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create(['name' => 'A second card']);
         $card->businesses()->attach([$this->tenants->a1->id]);
+        $this->atA->forceFill(['last_stamp_at' => now()->subDays(3)])->save();
+        $this->atB->forceFill(['last_stamp_at' => now()->subDay()])->save();
 
         return $card;
     });
-    $this->tenants->enroll($this->customer, $second);
+    $newest = $this->tenants->enroll($this->customer, $second);
 
-    ($this->page)()->assertInertia(fn (Assert $page): Assert => $page->has('programs', 2));
+    ($this->page)()->assertInertia(fn (Assert $page): Assert => $page->where('programs', fn ($programs): bool => collect($programs)
+        ->pluck('enrollmentId')->all() === [$newest->id, $this->atB->id]));
 });
