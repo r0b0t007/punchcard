@@ -57,6 +57,8 @@ version from going back.
 
 1. Disable the tag's stamper, so it rejects every tap while you work: `php artisan punchcard:stamper:disable <uid>`.
    Note whether the business had already disabled it, so step 4 does not turn on a stamper they paused.
+   Disabling also holds it: its owner can't switch it back on from their stampers page until the re-key. Do it
+   even when the business had paused it (the panel says "Hold for re-key"): step 3 refuses a stamper not held.
 2. Re-provision the tag: keys 2, 3 and 4, then key 0, all derived from `key_version + 1`, authenticating with
    the current version's key 0.
 3. Only after every key has changed, record the version the tag now has:
@@ -64,7 +66,8 @@ version from going back.
    `key_version` from the version before it, so running it again (after a dropped session, say) is refused
    instead of moving the tag past the keys it holds. It keeps `last_counter`: the tag's read counter keeps
    counting, and the old value still blocks replays. It refuses while the stamper is still enabled.
-4. Re-enable the stamper (`php artisan punchcard:stamper:enable <uid>`) and test one tap.
+4. Re-enable the stamper (`php artisan punchcard:stamper:enable <uid>`) and test one tap. Recording the re-key
+   already released the hold, so a stamper the business had paused stays off and they can switch it on themselves.
 
 Every URL the tag produced before step 2 now fails as `bad_mac`, because its `c` was signed with the old key 2.
 The meta key is unchanged, so those URLs still decrypt.
@@ -74,7 +77,8 @@ The meta key is unchanged, so those URLs still decrypt.
 stamper's assignment (`unassigned_at`, one-way) and assigns the tag again (a new stamper) in one transaction.
 The tag keeps its counter, so URLs from the old site stay replays, and the old business can never reclaim the
 tag by re-enabling its stamper. Within a business the stamper keeps its label and status; at another business
-it starts active and unlabelled.
+it starts active and unlabelled. A tag held for a re-key stays disabled and held wherever it moves. Replays of
+its old URLs stay in the old business's refused taps, where they were read.
 
 A **lost or stolen** tag cannot be re-provisioned: retire it with `php artisan punchcard:tag:retire <uid>`
 (`nfc_tags.retired_at`, one-way; its assignment ends too) and register a replacement tag.

@@ -43,6 +43,7 @@ use LogicException;
  * @property Carbon|null $armed_until
  * @property int|null $armed_by who armed it (CHW-29, ArmStamper)
  * @property Carbon|null $unassigned_at
+ * @property Carbon|null $held_at the platform's hold (CHW-36): disabled by the admin until its keys are changed
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -104,6 +105,10 @@ class Stamper extends Model implements TenantModel
         if (array_key_exists('unassigned_at', $values)) {
             throw new LogicException('Ending a tag\'s assignment is an admin action, in TenantContext::bypass().');
         }
+
+        if (array_key_exists('held_at', $values)) {
+            throw new LogicException('The platform\'s hold on a stamper is an admin action, in TenantContext::bypass().');
+        }
     }
 
     /** Whether its next tap gives what staff armed it with: armed, and not run out. */
@@ -161,6 +166,7 @@ class Stamper extends Model implements TenantModel
             'armed_qty' => 'integer',
             'armed_until' => 'datetime',
             'unassigned_at' => 'datetime',
+            'held_at' => 'datetime',
         ];
     }
 }

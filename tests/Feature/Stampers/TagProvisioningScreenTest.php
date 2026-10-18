@@ -9,6 +9,7 @@ use App\Enums\StamperStatus;
 use App\Filament\Resources\NfcTags\Pages\ManageNfcTags;
 use App\Filament\Resources\NfcTags\Tables\NfcTagsTable;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
+use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\NfcTag;
@@ -154,6 +155,20 @@ it('registers a tag at the location chosen, when the business has several', func
     ($this->screen)(fn (Testable $page) => $page
         ->callAction(TestAction::make('register')->table(), ['uid' => '04A1B2C3D4E5F6', 'business' => $this->tenants->a2->id, 'location' => $terrace->id])
         ->assertNotified('Registered tag 04A1B2C3D4E5F6 at A2, Terrace (#'.$terrace->id.').'));
+});
+
+it('holds a stamper its business had paused, so its owner can\'t switch it on during the re-key', function (): void {
+    $this->context->bypass(fn () => $this->stamper->forceFill(['status' => StamperStatus::Disabled])->save());
+
+    ($this->screen)(fn (Testable $page) => $page
+        ->assertActionVisible(TestAction::make('disable')->table($this->tag))
+        ->assertActionHasLabel(TestAction::make('disable')->table($this->tag), 'Hold for re-key')
+        ->callAction(TestAction::make('disable')->table($this->tag))
+        ->assertNotified("Stamper #{$this->stamper->id} at A1, A1 site (#".$this->tenants->locationOf($this->tenants->a1)->id.') was already disabled, perhaps by the business: it is now held, so its owner can\'t switch it on until the re-key is recorded. Leave it disabled after the re-key.')
+        ->assertActionHidden(TestAction::make('disable')->table($this->tag)));
+
+    expect(($this->fresh)($this->stamper)->held_at)->not->toBeNull()
+        ->and($this->context->bypass(fn (): array => AuditLog::query()->where('action', 'like', 'stamper.%')->pluck('action')->all()))->toBe(['stamper.held']);
 });
 
 it('moves, disables, enables, records a re-key and retires, as the runbook says', function (): void {

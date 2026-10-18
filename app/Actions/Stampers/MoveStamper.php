@@ -24,7 +24,9 @@ use App\Support\Tenancy\TenantContext;
  * starts active and unlabelled: the label and the pause were the old
  * business's, and its site data never reaches another tenant. An arming
  * never follows the tag: staff arm a stamper for the customer standing at
- * that counter.
+ * that counter. The platform's hold (held_at, until the keys are changed)
+ * does follow it, to either business: it is the tag's, not the site's, so
+ * a held tag stays off wherever it goes.
  */
 final readonly class MoveStamper
 {
@@ -56,9 +58,14 @@ final readonly class MoveStamper
             $current->forceFill(['unassigned_at' => now()])->save();
             $sameBusiness = (int) $current->business_id === (int) $site->business_id;
 
+            $held = $current->held_at;
             $moved = $sameBusiness
                 ? $this->assign($tag, $site, $label ?? $current->label, $current->status)
-                : $this->assign($tag, $site, $label, StamperStatus::Active);
+                : $this->assign($tag, $site, $label, $held === null ? StamperStatus::Active : StamperStatus::Disabled);
+
+            if ($held !== null) {
+                $moved->forceFill(['held_at' => $held])->save();
+            }
             $this->recordAudit->handle('tag.moved', $tag, context: [
                 'from_stamper_id' => $current->id,
                 'stamper_id' => $moved->id,

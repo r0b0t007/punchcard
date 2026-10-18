@@ -79,6 +79,42 @@ enum TapRejection: string implements HasLabel
         };
     }
 
+    /**
+     * Refusals of a URL rather than of a tap: nobody tapped the stamper (a malformed or forged URL, an unknown
+     * tag, a copied link replayed). They say nothing about a stamper being in use.
+     *
+     * @return list<self>
+     */
+    public static function notATap(): array
+    {
+        return [self::Malformed, self::UnknownTag, self::BadMac, self::Replay];
+    }
+
+    /**
+     * The refusals a business sees in its own tap log (B12, and the admin's view of a business): those recorded on a
+     * tap tied to it. A malformed URL, an unknown tag or a failed signature is tied to none, a retired tag has no
+     * stamper, and an expired tap has its own status. An unassigned tag reaches a business when its stamper moved
+     * between the tap and the customer's sign-in (ApplyTap).
+     *
+     * @return list<self>
+     */
+    public static function visibleToBusiness(): array
+    {
+        return [
+            self::Replay, self::UnassignedTag, self::StamperDisabled, self::Cooldown, self::DailyCap,
+            self::CardInactive, self::NotHonoured, self::SiteClosed, self::CardMisconfigured, self::AlreadyRedeemed,
+        ];
+    }
+
+    /**
+     * Whether the refusal is a sign of tampering rather than a customer's wait: a copied link replayed, or a tap on
+     * a stamper switched off or no longer where it was. The owner's tap log shows these in red (B12).
+     */
+    public function isTampering(): bool
+    {
+        return in_array($this, [self::Replay, self::StamperDisabled, self::UnassignedTag], true);
+    }
+
     /** The tap equivalent of an AddStamps refusal. */
     public static function fromStamp(StampRejection $rejection): self
     {

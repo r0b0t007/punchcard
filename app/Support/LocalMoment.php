@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Location;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -34,6 +35,18 @@ final class LocalMoment
             'date' => $local->format('Y-m-d'),
             'time' => $local->format('H:i'),
         ];
+    }
+
+    /** When a site's day ends (its next local midnight), as UTC: a 23 or 25 hour day ends when it does. */
+    public static function dayEnd(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
+    {
+        return ($now ?? now())->toImmutable()->setTimezone($timezone)->startOfDay()->addDay()->utc();
+    }
+
+    /** When a site's day began (its local midnight), as UTC for a query: AddStamps' daily cap and B12's taps today. */
+    public static function dayStart(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
+    {
+        return ($now ?? now())->toImmutable()->setTimezone($timezone)->startOfDay()->utc();
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Stampers\MoveStamper;
 use App\Actions\Stampers\RegisterStamper;
+use App\Actions\Stampers\SetStamperStatus;
 use App\Actions\Stampers\StamperRefused;
 use App\Actions\Taps\ReceiveTap;
 use App\Actions\Tenancy\ArchiveBusiness;
@@ -331,8 +332,12 @@ describe('the tap path', function (): void {
 
         $moved = $this->move->handle($uid, $this->tenants->a2);
 
+        $replay = ($this->receive)($uid, 5);
+
         expect($atA1->stamper_id)->toBe($old->id)
-            ->and(($this->receive)($uid, 5)->rejection)->toBe(TapRejection::Replay)
+            ->and($replay->rejection)->toBe(TapRejection::Replay)
+            // Its URL was read at A1: the replay is A1's, never in A2's fraud view.
+            ->and($replay->only(['stamper_id', 'business_id']))->toBe(['stamper_id' => $old->id, 'business_id' => $this->tenants->a1->id])
             ->and(($this->tagOf)($uid)->last_counter)->toBe(5)
             ->and(($this->receive)($uid, 6)->stamper_id)->toBe($moved->id);
     });
@@ -418,3 +423,16 @@ describe('the commands', function (): void {
             ->assertFailed();
     });
 });
+
+it('keeps the platform\'s hold on a moved tag, at its business or another', function (string $to): void {
+    $old = $this->tenants->stamper($this->tenants->a1);
+    $uid = $this->context->bypass(fn (): string => $old->tag()->firstOrFail()->uid);
+    app(SetStamperStatus::class)->handle($uid, StamperStatus::Disabled);
+
+    $moved = $to === 'another site of the business'
+        ? $this->move->handle($uid, $this->tenants->a1, $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create()))
+        : $this->move->handle($uid, $this->tenants->a2);
+
+    expect($moved->status)->toBe(StamperStatus::Disabled)
+        ->and($moved->held_at)->not->toBeNull();
+})->with(['another site of the business', 'another business']);

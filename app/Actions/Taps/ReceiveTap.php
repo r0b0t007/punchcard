@@ -43,7 +43,9 @@ use InvalidArgumentException;
  * nothing here logs the URL or any key. It refuses to run inside a caller's
  * transaction (Outermost): the spent counter must commit on its own. A
  * refused tap whose tag still has a stamper names it, its business and
- * location (a replay too), for the owner's fraud view.
+ * location, for the owner's fraud view; a replay names where its URL was
+ * read instead, or no business when that is not sure (readAt), so a tag
+ * moved since never puts its old URLs in the new business's view.
  */
 final readonly class ReceiveTap
 {
@@ -103,7 +105,7 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
-        // The tag is trusted now: name its stamper on every outcome, a replay included, for the owner's fraud view.
+        // The tag is trusted now: name its stamper on every outcome but a replay, for the owner's fraud view.
         $stamper = Stamper::query()->current()->where('nfc_tag_id', $tag->id)->lockForUpdate()->first();
         $trusted = [
             ...$request,
@@ -111,9 +113,10 @@ final readonly class ReceiveTap
             ...($stamper instanceof Stamper ? ['stamper_id' => $stamper->id, 'business_id' => $stamper->business_id, 'location_id' => $stamper->location_id] : []),
         ];
 
-        // A replay carries no counter: its counter is already on the row that spent it.
+        // A replay carries no counter: its counter is already spent. It names where its URL was read, not the tag's
+        // current holder: a tag moved since keeps its old URLs out of its new owner's fraud view.
         if ($tap->counter <= $tag->last_counter) {
-            return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay]);
+            return $this->record([...$request, 'nfc_tag_id' => $tag->id, ...$this->readAt($tag, $tap->counter), 'status' => TapStatus::Rejected, 'rejection' => TapRejection::Replay]);
         }
 
         $tag->forceFill(['last_counter' => $tap->counter])->save();
@@ -172,6 +175,30 @@ final readonly class ReceiveTap
 
             return $tap;
         });
+    }
+
+    /**
+     * Where a replayed URL was read: the stamper that spent its counter, or that spent the next one (a reader app
+     * or a background read uses counters we never see) when the tag surely was there then: the counter before
+     * was spent there too, or it is the tag's first stamper. Anything else (a tag moved in between, its taps
+     * pruned, a URL read while nobody held it) names no business: a guess could put one business's URLs in
+     * another's view. Indexed lookups, on the replay path only.
+     *
+     * @return array{stamper_id?: int|null, business_id?: int|null, location_id?: int|null}
+     */
+    private function readAt(NfcTag $tag, int $counter): array
+    {
+        $spent = Tap::query()->where('nfc_tag_id', $tag->id)->where('counter', '>=', $counter)->orderBy('counter')->first(['stamper_id', 'business_id', 'location_id', 'counter']);
+
+        if (! $spent instanceof Tap || $spent->stamper_id === null) {
+            return [];
+        }
+
+        $sure = $spent->counter === $counter
+            || Tap::query()->where('nfc_tag_id', $tag->id)->where('counter', '<', $counter)->orderByDesc('counter')->value('stamper_id') === $spent->stamper_id
+            || Stamper::query()->where('nfc_tag_id', $tag->id)->where('id', '<', $spent->stamper_id)->doesntExist();
+
+        return $sure ? ['stamper_id' => $spent->stamper_id, 'business_id' => $spent->business_id, 'location_id' => $spent->location_id] : [];
     }
 
     private function metaVersion(): int

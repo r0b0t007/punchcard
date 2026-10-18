@@ -25,26 +25,6 @@ class RejectedTapsRelationManager extends RelationManager
 {
     protected static string $relationship = 'taps';
 
-    /**
-     * The reasons a business's rejected taps can carry, an unassigned tag
-     * included (its stamper moved between the tap and the customer's sign-in,
-     * ApplyTap). The rest never reach a business: a malformed URL, an unknown
-     * tag or a failed signature is not tied to one, a retired tag has no
-     * stamper, and an expired tap has its own status.
-     */
-    public const array REASONS = [
-        TapRejection::Replay,
-        TapRejection::UnassignedTag,
-        TapRejection::StamperDisabled,
-        TapRejection::Cooldown,
-        TapRejection::DailyCap,
-        TapRejection::CardInactive,
-        TapRejection::NotHonoured,
-        TapRejection::SiteClosed,
-        TapRejection::CardMisconfigured,
-        TapRejection::AlreadyRedeemed,
-    ];
-
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
         return __('Rejected taps');
@@ -64,7 +44,7 @@ class RejectedTapsRelationManager extends RelationManager
             ])
             ->filters([
                 SelectFilter::make('rejection')->label(__('Reason'))
-                    ->options(collect(self::REASONS)->mapWithKeys(fn (TapRejection $reason): array => [$reason->value => $reason->getLabel()])->all()),
+                    ->options(collect(TapRejection::visibleToBusiness())->mapWithKeys(fn (TapRejection $reason): array => [$reason->value => $reason->getLabel()])->all()),
             ]);
     }
 }

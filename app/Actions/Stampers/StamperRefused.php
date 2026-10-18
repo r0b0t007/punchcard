@@ -14,4 +14,10 @@ final class StamperRefused extends RuntimeException
     {
         return new self(__('The business or location no longer exists: check it and try again.'));
     }
+
+    /** The platform holds the stamper while its keys are changed (SetStamperStatus): its owner can't switch it on. */
+    public static function held(): self
+    {
+        return new self(__('punchcard support switched this stamper off while its keys are changed. It can be switched on once they are.'));
+    }
 }

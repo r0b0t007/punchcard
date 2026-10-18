@@ -105,6 +105,18 @@ class Tap extends Model
         $query->whereIn('status', [TapStatus::Pending, TapStatus::Stamped, TapStatus::Redeemed]);
     }
 
+    /**
+     * Taps on the stamper itself: accepted or refused, but not a URL refusal (TapRejection::notATap) that nobody
+     * tapped. What counts as a stamper's last tap and its taps today (counter mode, B12).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function onTheStamper(Builder $query): void
+    {
+        $query->where(fn (Builder $taps) => $taps->whereNull('rejection')->orWhereNotIn('rejection', TapRejection::notATap()));
+    }
+
     public function isPending(): bool
     {
         return $this->status === TapStatus::Pending;
