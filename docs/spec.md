@@ -230,7 +230,7 @@ Nineteen tables cover the whole product; `stamp_events` is the source of truth a
 
 | Table                 | Key columns                                                                                                                                                                                                                               | Notes                                                                                              |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| users                 | id, name, email, phone, dob, locale, marketing\_opt\_in                                                                                                                                                                                   | One row per person; any user is a customer                                                         |
+| users                 | id, name, email, locale, adult\_confirmed\_at, marketing\_opt\_in\_at, anonymised\_at; coming with CHW-58: marketing\_opt\_out\_at, last\_active\_at (phone, dob later)                                                                   | One row per person; any user is a customer; consents per docs/privacy                              |
 | organizations         | id, name, slug, type (independent/chain/franchise), logo\_path, brand\_color, cover\_path, billing\_entity (organization/business), plan, white\_label (bool)                                                                             | Brand and card program owner (ADR 0006)                                                            |
 | organization\_user    | organization\_id, user\_id, role (org\_admin)                                                                                                                                                                                             | Franchise HQ membership                                                                            |
 | organization\_domains | organization\_id, host, verified\_at, tls\_status                                                                                                                                                                                         | Enterprise white-label only (ADR 0007)                                                             |
@@ -700,7 +700,8 @@ Claude's review comments are advisory; only the four check groups block the merg
 - [ ] Nightly off-site DB backups, restore tested once; staging data anonymised.
 - [ ] i18n from the first screen (fr, en, ar with RTL); dates in location timezone.
 - [ ] Accessibility: 44 px minimum targets, contrast AA, Lighthouse accessibility score in CI.
-- [ ] Privacy: consent for marketing push, account deletion, data export, CNDP declaration before real customer data.
+- [ ] Privacy: consent for marketing push, account deletion, data export, CNDP declaration before real customer data
+      (drafts and register in `docs/privacy`, hosting in ADR 0008; CHW-58).
 
 **AI workflow rules**
 
