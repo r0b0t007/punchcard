@@ -11,7 +11,8 @@ use Illuminate\Foundation\Events\Dispatchable;
  * A stamp that proves presence filled a customer's day at a business: the
  * card's daily cap is reached (AddStamps, once the stamp is committed).
  * Three such days in a row tell the business's owners (CHW-36,
- * SendFraudAlerts). $date is the site's local day (Y-m-d). Ids only.
+ * SendFraudAlerts). $date is the stamp's local day at its site (Y-m-d), as
+ * AddStamps counted it. Ids only.
  */
 final readonly class DailyCapReached implements ShouldDispatchAfterCommit
 {
@@ -20,7 +21,6 @@ final readonly class DailyCapReached implements ShouldDispatchAfterCommit
     public function __construct(
         public int $enrollmentId,
         public int $businessId,
-        public int $locationId,
         public string $date,
     ) {}
 }

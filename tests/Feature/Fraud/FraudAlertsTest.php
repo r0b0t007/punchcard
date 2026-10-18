@@ -12,6 +12,8 @@ use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
+use App\Events\DailyCapReached;
+use App\Listeners\SendFraudAlerts;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\Tap;
@@ -21,9 +23,12 @@ use App\Notifications\StamperTappedWhileOffMail;
 use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\Support\SunVectors;
 use Tests\Support\Tenants;
@@ -136,7 +141,17 @@ describe('a switched-off stamper tapped', function (): void {
         Notification::shouldReceive('send')->once()->andThrow(new RuntimeException('The mail server is down.'));
 
         expect(fn () => app(AlertDisabledStamperTap::class)->handle($this->stamper->id, $tap->id))->toThrow(RuntimeException::class)
-            ->and(Cache::has('fraud-alert:stamper:'.$this->stamper->id))->toBeFalse();
+            ->and(Cache::has('fraud-alert:stamper:'.$this->stamper->id.':'.$this->owner->id))->toBeFalse();
+    });
+
+    it('queues the alert, tried three times if the mail fails', function (): void {
+        Queue::fake();
+        ($this->switchOff)();
+
+        ($this->receive)(5);
+
+        Queue::assertPushed(CallQueuedListener::class, fn (CallQueuedListener $job): bool => $job->class === SendFraudAlerts::class
+            && $job->tries === 3 && $job->backoff === [60, 300]);
     });
 
     it('stays quiet for a stamper that is on', function (): void {
@@ -159,6 +174,20 @@ describe('a switched-off stamper tapped', function (): void {
 
             return $locale === 'fr' && str_contains(($this->mail)($mail, $to)[1], '17 octobre à 10:42');
         });
+    });
+});
+
+it('names a stamper with no label in the owner\'s language', function (): void {
+    $this->context->bypass(fn () => $this->owner->forceFill(['locale' => 'fr'])->save());
+    $this->context->bypass(fn () => $this->stamper->forceFill(['label' => null])->save());
+    ($this->switchOff)();
+
+    ($this->receive)(5);
+
+    Notification::assertSentTo($this->owner, StamperTappedWhileOffMail::class, function (StamperTappedWhileOffMail $mail, array $channels, User $to, ?string $locale): bool {
+        app()->setLocale((string) $locale);
+
+        return ($this->mail)($mail, $to)[0] === 'Borne '.$this->stamper->id.' a été touchée alors qu’elle est désactivée';
     });
 });
 
@@ -190,8 +219,8 @@ describe('the daily limit reached three days in a row', function (): void {
 
         Notification::assertSentTo($this->owner, DailyCapStreakMail::class, fn (DailyCapStreakMail $mail): bool => ($this->mail)($mail, $this->owner) === [
             'Salma reached the daily limit 3 days in a row',
-            'Salma reached the daily limit of Hafa loyalty card at Café Hafa three days in a row: 15, 16 and 17 October.',
-            'It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, lower it in the card\'s settings.',
+            'Salma reached the daily limit of Hafa loyalty card at Café Hafa 3 days in a row: 15, 16 and 17 October.',
+            'It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.',
         ]);
         Notification::assertNotSentTo([$this->staff, $this->siblingOwner, $this->otherOwner, $this->customer], DailyCapStreakMail::class);
     });
@@ -234,7 +263,7 @@ describe('the daily limit reached three days in a row', function (): void {
             ($this->stampAt)($day.' 09:00:00');
         }
 
-        app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, $this->here->id, '2026-10-17');
+        app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, '2026-10-17');
 
         Notification::assertSentToTimes($this->owner, DailyCapStreakMail::class, 1);
     });
@@ -246,6 +275,86 @@ describe('the daily limit reached three days in a row', function (): void {
         }
 
         Notification::assertSentToTimes($this->owner, DailyCapStreakMail::class, 2);
+    });
+
+    it('judges each day by the limit it had then', function (): void {
+        // A limit of 5 on the 14th, 3 stamps: not full. Lowered to 2 from the 15th.
+        $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['daily_cap' => 5])->save());
+        ($this->stampAt)('2026-10-14 09:00:00', 3);
+        $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['daily_cap' => 2])->save());
+        ($this->stampAt)('2026-10-15 09:00:00');
+        ($this->stampAt)('2026-10-16 09:00:00');
+        ($this->stampAt)('2026-10-17 09:00:00');
+
+        Notification::assertSentToTimes($this->owner, DailyCapStreakMail::class, 1);
+    });
+
+    it('completes a streak with a day filled late, whatever order the days come in', function (): void {
+        foreach (['2026-10-15', '2026-10-17', '2026-10-16'] as $day) {
+            app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, $day);
+        }
+
+        Notification::assertSentTo($this->owner, DailyCapStreakMail::class, fn (DailyCapStreakMail $mail): bool => $mail->days === ['2026-10-15', '2026-10-16', '2026-10-17']);
+        Notification::assertSentToTimes($this->owner, DailyCapStreakMail::class, 1);
+    });
+
+    it('mails again on a retry only the owners a failed send did not reach', function (): void {
+        $second = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
+        $mailed = new stdClass;
+        $mailed->owners = [];
+        Notification::shouldReceive('send')->andReturnUsing(function (User $owner) use ($second, $mailed): void {
+            if ($owner->is($second)) {
+                throw new RuntimeException('The mail server is down.');
+            }
+
+            $mailed->owners[] = $owner->id;
+        });
+
+        foreach (['2026-10-15', '2026-10-16'] as $day) {
+            app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, $day);
+        }
+
+        expect(fn () => app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, '2026-10-17'))->toThrow(RuntimeException::class);
+
+        // Owners go in order: the first was mailed, the second's send failed.
+        expect($mailed->owners)->toContain($this->owner->id)->not->toContain($second->id);
+
+        // The retry mails only the owner the failed send did not reach.
+        Notification::fake();
+        app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, '2026-10-17');
+
+        Notification::assertSentToTimes($second, DailyCapStreakMail::class, 1);
+        Notification::assertNotSentTo($this->owner, DailyCapStreakMail::class);
+    });
+
+    it('sends one per streak when its first day is handled last', function (): void {
+        foreach (['2026-10-16', '2026-10-17', '2026-10-18', '2026-10-15'] as $day) {
+            app(AlertCapStreak::class)->handle($this->enrollment->id, $this->tenants->a1->id, $day);
+        }
+
+        Notification::assertSentToTimes($this->owner, DailyCapStreakMail::class, 1);
+    });
+
+    it('counts a day filled by a tap, an armed one given only the room left included, and never a refused one', function (): void {
+        Event::fake([DailyCapReached::class]);
+        $this->context->bypass(fn () => $this->stamper->forceFill(['armed_qty' => 3, 'armed_until' => now()->addMinute(), 'armed_by' => $this->staff->id])->save());
+
+        expect(app(ApplyTap::class)->handle(($this->receive)(5), $this->customer)->qty)->toBe(2)
+            ->and(app(ApplyTap::class)->handle(($this->receive)(6), $this->customer)->rejection)->toBe(TapRejection::DailyCap);
+
+        Event::assertDispatchedTimes(DailyCapReached::class, 1);
+        Event::assertDispatched(DailyCapReached::class, fn (DailyCapReached $event): bool => $event->date === '2026-10-17' && $event->businessId === $this->tenants->a1->id);
+    });
+
+    it('counts a stamp once, however often it is replayed', function (): void {
+        Event::fake([DailyCapReached::class]);
+        $request = StampRequest::qr($this->here, $this->staff, 'the-same-scan', 2);
+
+        foreach ([1, 2] as $attempt) {
+            $this->context->bypass(fn () => app(AddStamps::class)->handle(CardEnrollment::query()->findOrFail($this->enrollment->id), $request));
+        }
+
+        Event::assertDispatchedTimes(DailyCapReached::class, 1);
     });
 
     it('never turns a name into a link', function (string $name): void {

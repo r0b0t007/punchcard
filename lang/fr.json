@@ -855,7 +855,7 @@
     "See your stampers": "Voir vos bornes",
     "If it went missing, keep it off. If you found it, switch it on again from your stampers page. You get this email at most once an hour per stamper.": "Si elle a disparu, laissez-la désactivée. Si vous l’avez retrouvée, réactivez-la depuis votre page des bornes. Vous recevez cet e-mail au plus une fois par heure et par borne.",
     ":customer reached the daily limit :days days in a row": ":customer a atteint la limite du jour :days jours de suite",
-    ":customer reached the daily limit of :card at :business three days in a row: :dates.": ":customer a atteint la limite du jour de :card chez :business trois jours de suite : :dates.",
-    "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, lower it in the card's settings.": "C’est peut-être un habitué fidèle, ou quelqu’un qui collecte des tampons pour d’autres. Si la limite est trop haute, baissez-la dans les réglages de la carte.",
+    ":customer reached the daily limit of :card at :business :days days in a row: :dates.": ":customer a atteint la limite du jour de :card chez :business :days jours de suite : :dates.",
+    "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.": "C’est peut-être un habitué fidèle, ou quelqu’un qui collecte des tampons pour d’autres. Si la limite est trop haute, qui gère la carte peut la baisser dans ses réglages.",
     ":days and :last": ":days et :last"
 }

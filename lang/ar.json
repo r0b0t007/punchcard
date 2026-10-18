@@ -855,7 +855,7 @@
     "See your stampers": "عرض أجهزة الختم",
     "If it went missing, keep it off. If you found it, switch it on again from your stampers page. You get this email at most once an hour per stamper.": "إن ضاع الجهاز فأبقِه متوقفًا. وإن وجدته فشغّله مجددًا من صفحة أجهزة الختم. تصلك هذه الرسالة مرة واحدة في الساعة على الأكثر لكل جهاز.",
     ":customer reached the daily limit :days days in a row": "بلغ :customer حدّ اليوم :days أيام متتالية",
-    ":customer reached the daily limit of :card at :business three days in a row: :dates.": "بلغ :customer حدّ اليوم في :card لدى :business ثلاثة أيام متتالية: :dates.",
-    "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, lower it in the card's settings.": "قد يكون زبونًا وفيًّا، أو شخصًا يجمع الأختام لغيره. إن كان الحدّ مرتفعًا جدًا فاخفضه من إعدادات البطاقة.",
+    ":customer reached the daily limit of :card at :business :days days in a row: :dates.": "بلغ :customer حدّ اليوم في :card لدى :business :days أيام متتالية: :dates.",
+    "It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.": "قد يكون زبونًا وفيًّا، أو شخصًا يجمع الأختام لغيره. إن كان الحدّ مرتفعًا جدًا فبإمكان من يدير البطاقة خفضه من إعداداتها.",
     ":days and :last": ":days و:last"
 }

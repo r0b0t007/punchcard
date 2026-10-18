@@ -20,7 +20,8 @@ use Illuminate\Notifications\Notification;
 final class StamperTappedWhileOffMail extends Notification
 {
     public function __construct(
-        public readonly string $stamper,
+        public readonly ?string $label,
+        public readonly int $stamperId,
         public readonly string $site,
         public readonly CarbonImmutable $tappedAt,
         public readonly string $timezone,
@@ -35,11 +36,13 @@ final class StamperTappedWhileOffMail extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $local = $this->tappedAt->setTimezone($this->timezone);
-        $names = ['stamper' => Plain::text($this->stamper), 'site' => Plain::text($this->site), 'time' => $local->format('H:i')];
+        // In the owner's language: toMail runs in their locale.
+        $stamper = $this->label ?? __('Stamper :id', ['id' => $this->stamperId]);
+        $names = ['stamper' => Plain::text($stamper), 'site' => Plain::text($this->site), 'time' => $local->format('H:i')];
         $name = $notifiable instanceof User ? $notifiable->firstName() : null;
 
         return (new MailMessage)
-            ->subject(__(':stamper was tapped while switched off', ['stamper' => $this->stamper]))
+            ->subject(__(':stamper was tapped while switched off', ['stamper' => $stamper]))
             ->greeting($name === null ? __('Hello!') : __('Hello :name,', ['name' => Plain::text($name)]))
             ->line(LocalMoment::of($this->tappedAt, $this->timezone)['day'] === 'today'
                 ? __('Someone tapped :stamper at :site today at :time, while it is switched off. The tap was refused: no stamp was given.', $names)
