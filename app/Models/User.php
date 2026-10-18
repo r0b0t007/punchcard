@@ -150,6 +150,23 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
         return $this->anonymised_at !== null;
     }
 
+    /** Whether punchcard's news may be sent: opted in, a confirmed inbox, an account in use (CHW-58). */
+    public function receivesNews(): bool
+    {
+        return $this->marketing_opt_in_at !== null && $this->hasVerifiedEmail() && ! $this->isAnonymised();
+    }
+
+    /**
+     * The people punchcard's news may be sent to (receivesNews): what any sender starts from.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function newsAudience(Builder $query): void
+    {
+        $query->whereNotNull('marketing_opt_in_at')->whereNotNull('email_verified_at')->whereNull('anonymised_at');
+    }
+
     /**
      * People still behind their account: what campaigns, exports and other
      * fan-outs to users start from.

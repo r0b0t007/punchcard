@@ -26,7 +26,11 @@ final class PrivacyController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('settings/privacy', $describePrivacy->handle($user));
+        return Inertia::render('settings/privacy', [
+            ...$describePrivacy->handle($user),
+            // "A new link is on its way" after Send the link again (verification.send).
+            'status' => $request->session()->get('status'),
+        ]);
     }
 
     public function updateMarketing(MarketingConsentRequest $request, SetMarketingConsent $setMarketingConsent): RedirectResponse

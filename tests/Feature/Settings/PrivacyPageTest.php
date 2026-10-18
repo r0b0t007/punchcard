@@ -31,7 +31,7 @@ it('shows news on, with the day it was turned on', function (): void {
 
     $this->actingAs($user)->get(route('privacy.edit'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('settings/privacy')
-            ->where('marketing', ['on' => true, 'since' => '2026-10-03', 'mustVerify' => false])
+            ->where('marketing', ['on' => true, 'since' => '2026-10-03T08:00:00+00:00', 'mustVerify' => false])
             ->where('customer', true));
 });
 
@@ -41,7 +41,7 @@ it('shows news off, with the day it was turned off, or never chosen', function (
     $this->actingAs($user)->get(route('privacy.edit'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('marketing', ['on' => false, 'since' => $since, 'mustVerify' => false]));
 })->with([
-    'turned off' => ['2026-10-14 17:00:00', '2026-10-14'],
+    'turned off' => ['2026-10-14 17:00:00', '2026-10-14T17:00:00+00:00'],
     'never chosen' => [null, null],
 ]);
 
@@ -50,6 +50,13 @@ it('opens for an unverified email, which must be confirmed to turn news on', fun
 
     $this->actingAs($user)->get(route('privacy.edit'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->where('marketing.mustVerify', true));
+});
+
+it('says a new confirmation link is on its way', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user)->withSession(['status' => 'verification-link-sent'])->get(route('privacy.edit'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('status', 'verification-link-sent'));
 });
 
 it('asks a guest to sign in', function (): void {
