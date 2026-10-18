@@ -22,19 +22,29 @@ final readonly class RecordConsent
     public function handle(User $user, bool $wantsNews): User
     {
         return DB::transaction(function () use ($user, $wantsNews): User {
-            // An existing account is read again under its lock: a settings change made meanwhile is never undone.
-            $current = $user->exists ? User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail() : $user;
-            // Once chosen, on or off, only the settings change it (SetMarketingConsent): a later form never opts back in.
-            $optsIn = $wantsNews && $current->marketing_opt_in_at === null && $current->marketing_opt_out_at === null;
+            if ($user->exists) {
+                // Read again under its lock: a settings change made meanwhile is never undone.
+                $current = User::query()->whereKey($user->id)->lockForUpdate()->first();
 
-            $current->forceFill(['adult_confirmed_at' => $current->adult_confirmed_at ?? now()]
+                if (! $current instanceof User) {
+                    // Deleted meanwhile: nobody's consent to record.
+                    return $user;
+                }
+
+                $user->setRawAttributes($current->getAttributes(), sync: true);
+            }
+
+            // Once chosen, on or off, only the settings change it (SetMarketingConsent): a later form never opts back in.
+            $optsIn = $wantsNews && $user->marketing_opt_in_at === null && $user->marketing_opt_out_at === null;
+
+            $user->forceFill(['adult_confirmed_at' => $user->adult_confirmed_at ?? now()]
                 + ($optsIn ? ['marketing_opt_in_at' => now()] : []))->save();
 
             if ($optsIn) {
-                ConsentEvent::record($current->id, ConsentEvent::KIND_PUNCHCARD_NEWS, true, ConsentEvent::SOURCE_SIGN_UP);
+                ConsentEvent::record($user->id, ConsentEvent::KIND_PUNCHCARD_NEWS, true, ConsentEvent::SOURCE_SIGN_UP);
             }
 
-            return $current;
+            return $user;
         });
     }
 }

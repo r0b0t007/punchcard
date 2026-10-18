@@ -5,6 +5,7 @@ import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
+import { localDate } from '@/lib/local-moment';
 import { edit, marketing as setMarketing } from '@/routes/privacy';
 import { send } from '@/routes/verification';
 
@@ -35,11 +36,11 @@ export default function Privacy({
     const since =
         marketing.since === null
             ? null
-            : new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
+            : localDate(locale, marketing.since, {
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric',
-              }).format(new Date(marketing.since));
+              });
 
     return (
         <>
@@ -87,7 +88,7 @@ export default function Privacy({
                                   ? t('On since :date', { date: since })
                                   : t('Off since :date', { date: since })}
                         </p>
-                        {marketing.mustVerify && !marketing.on ? (
+                        {marketing.mustVerify ? (
                             <Form
                                 {...send.form()}
                                 options={{ preserveScroll: true }}

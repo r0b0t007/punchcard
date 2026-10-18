@@ -9,6 +9,27 @@ export type LocalMoment = {
 
 /** One formatter per locale and options: building an Intl formatter is costly. */
 const calendarFormats = new Map<string, Intl.DateTimeFormat>();
+const deviceFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A moment (ISO 8601) as a date in the device's timezone, with Latin digits:
+ * for what is the customer's own, who has no site (a consent's date, CHW-58).
+ */
+export function localDate(
+    locale: string,
+    iso: string,
+    options: Intl.DateTimeFormatOptions,
+): string {
+    const key = `${locale}|${JSON.stringify(options)}`;
+    let format = deviceFormats.get(key);
+
+    if (!format) {
+        format = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, options);
+        deviceFormats.set(key, format);
+    }
+
+    return format.format(new Date(iso));
+}
 
 /**
  * A calendar date (Y-m-d) in the locale, with Latin digits as everywhere in
