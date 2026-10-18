@@ -866,5 +866,9 @@
     "On since :date": "Activé depuis le :date",
     "Off since :date": "Désactivé depuis le :date",
     "Confirm your email first to get news.": "Confirmez d’abord votre e-mail pour recevoir les actualités.",
-    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "Votre compte et votre connexion disparaissent. Les commerces gardent vos tampons, sans votre nom ni votre e-mail."
+    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "Votre compte et votre connexion disparaissent. Les commerces gardent vos tampons, sans votre nom ni votre e-mail.",
+    "Offers from places you follow": "Offres des commerces que vous suivez",
+    "No places yet: each one you collect stamps at appears here.": "Aucun commerce pour l’instant : chacun où vous collectez des tampons apparaît ici.",
+    "Following since :date": "Suivi depuis le :date",
+    "Closed: no more offers": "Fermé : plus d’offres"
 }

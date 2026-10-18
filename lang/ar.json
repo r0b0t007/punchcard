@@ -866,5 +866,9 @@
     "On since :date": "مفعّل منذ :date",
     "Off since :date": "متوقف منذ :date",
     "Confirm your email first to get news.": "أكّد بريدك أولًا لتلقّي الأخبار.",
-    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "يُحذف حسابك وتسجيل دخولك. تحتفظ الأماكن بأختامك دون اسمك أو بريدك."
+    "Your account and your sign-in go. The places keep your stamps, without your name or email.": "يُحذف حسابك وتسجيل دخولك. تحتفظ الأماكن بأختامك دون اسمك أو بريدك.",
+    "Offers from places you follow": "عروض الأماكن التي تتابعها",
+    "No places yet: each one you collect stamps at appears here.": "لا أماكن بعد: يظهر هنا كل مكان تجمع فيه الأختام.",
+    "Following since :date": "تتابعه منذ :date",
+    "Closed: no more offers": "مغلق: لا عروض بعد اليوم"
 }

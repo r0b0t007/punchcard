@@ -6,8 +6,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
 import { localDate } from '@/lib/local-moment';
-import { edit, marketing as setMarketing } from '@/routes/privacy';
+import { monogramOf } from '@/components/loyalty-card/monogram';
+import { edit, follow, marketing as setMarketing } from '@/routes/privacy';
 import { send } from '@/routes/verification';
+
+type Program = {
+    enrollmentId: number;
+    organization: string;
+    logoUrl: string | null;
+    following: boolean;
+    /** The follow's last change (ISO 8601); null: never followed. */
+    changedAt: string | null;
+    /** A closed program can be left, never joined. */
+    canFollow: boolean;
+};
 
 type Marketing = {
     on: boolean;
@@ -25,9 +37,11 @@ type Marketing = {
  */
 export default function Privacy({
     marketing,
+    programs,
     status,
 }: {
     marketing: Marketing;
+    programs: Program[];
     status?: string;
 }) {
     const { t, locale } = useTranslation();
@@ -122,8 +136,107 @@ export default function Privacy({
                         <InputError message={errors.marketing} />
                     </div>
                 </div>
+
+                <div className="space-y-4">
+                    <p className="text-sm font-medium">
+                        {t('Offers from places you follow')}
+                    </p>
+                    {programs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            {t(
+                                'No places yet: each one you collect stamps at appears here.',
+                            )}
+                        </p>
+                    ) : (
+                        <ul className="space-y-4">
+                            {programs.map((program) => (
+                                <ProgramRow
+                                    key={program.enrollmentId}
+                                    program={program}
+                                    mustVerify={marketing.mustVerify}
+                                />
+                            ))}
+                        </ul>
+                    )}
+                    <InputError message={errors.follow} />
+                </div>
             </div>
         </>
+    );
+}
+
+/**
+ * A place's offers, followed or not since when (the same Follow as on its
+ * card's page, C6). Joining needs a confirmed email and an open program;
+ * leaving never does. It waits for one change before taking the next.
+ */
+function ProgramRow({
+    program,
+    mustVerify,
+}: {
+    program: Program;
+    mustVerify: boolean;
+}) {
+    const { t, locale } = useTranslation();
+    const [saving, setSaving] = useState(false);
+    const [logoFailed, setLogoFailed] = useState(false);
+    const id = `follow-${program.enrollmentId}`;
+    const changed =
+        program.changedAt === null
+            ? null
+            : localDate(locale, program.changedAt, {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+              });
+    const state = program.following
+        ? t('Following since :date', { date: changed ?? '' })
+        : !program.canFollow
+          ? t('Closed: no more offers')
+          : changed === null
+            ? t('Off')
+            : t('Off since :date', { date: changed });
+
+    return (
+        <li className="flex items-center gap-3" data-test="privacy-program">
+            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary font-semibold">
+                {program.logoUrl && !logoFailed ? (
+                    <img
+                        src={program.logoUrl}
+                        alt=""
+                        onError={() => setLogoFailed(true)}
+                        className="size-full object-cover"
+                    />
+                ) : (
+                    monogramOf(program.organization)
+                )}
+            </span>
+            <div className="grid min-w-0 flex-1 gap-0.5">
+                <Label htmlFor={id}>
+                    <span className="truncate">{program.organization}</span>
+                </Label>
+                <p className="text-sm text-muted-foreground">{state}</p>
+            </div>
+            <Checkbox
+                id={id}
+                checked={program.following}
+                disabled={
+                    saving ||
+                    (!program.following && (!program.canFollow || mustVerify))
+                }
+                onCheckedChange={(checked) =>
+                    router.patch(
+                        follow.url(program.enrollmentId),
+                        { follow: checked === true },
+                        {
+                            preserveScroll: true,
+                            onStart: () => setSaving(true),
+                            onFinish: () => setSaving(false),
+                        },
+                    )
+                }
+            />
+        </li>
     );
 }
 

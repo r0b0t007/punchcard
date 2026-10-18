@@ -22,6 +22,8 @@ Route::middleware(['auth'])->group(function (): void {
     // Privacy (CHW-58, C12): punchcard's news on or off, verified or not (turning it off never needs a confirmed email).
     Route::get('settings/privacy', [PrivacyController::class, 'edit'])->name('privacy.edit');
     Route::patch('settings/privacy/marketing', [PrivacyController::class, 'updateMarketing'])->middleware('throttle:30,1')->name('privacy.marketing');
+    // A place followed or left from Privacy (the same Follow as on the card's page): {enrollment} is one of their own cards.
+    Route::patch('settings/privacy/follows/{enrollment}', [PrivacyController::class, 'follow'])->whereNumber('enrollment')->middleware('throttle:30,1')->name('privacy.follow');
     // "Not now" on the passkey offered after an email-link sign-in (CHW-23).
     Route::post('passkey-offer/dismiss', [PasskeyOfferController::class, 'dismiss'])->name('passkey-offer.dismiss');
     // A new address dropped before its link is opened (CHW-23).
