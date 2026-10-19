@@ -53,7 +53,7 @@ export default function Privacy({
     marketing: Marketing;
     programs: Program[];
     /** ready: confirmed it's them in the last 15 minutes, so the file downloads straight away. */
-    download: { ready: boolean };
+    download: { ready: boolean; token: string };
     status?: string;
 }) {
     const { t, locale } = useTranslation();
@@ -214,16 +214,19 @@ export default function Privacy({
                             {t('Download my data')}
                         </Button>
                     ) : download.ready ? (
-                        // A plain link, not an Inertia visit: the browser saves the file and stays here.
-                        <Button asChild>
-                            <a
-                                href={exportData.url()}
-                                data-test="download-data"
-                            >
+                        // A plain form, not an Inertia visit: the browser saves the file and stays here. A POST,
+                        // which no browser preloads, so the service worker leaves it to the network (WebKit).
+                        <form method="post" action={exportData.url()}>
+                            <input
+                                type="hidden"
+                                name="_token"
+                                value={download.token}
+                            />
+                            <Button type="submit" data-test="download-data">
                                 <Download />
                                 {t('Download my data')}
-                            </a>
-                        </Button>
+                            </Button>
+                        </form>
                     ) : (
                         <Button variant="secondary" asChild>
                             <Link

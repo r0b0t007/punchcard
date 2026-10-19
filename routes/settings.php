@@ -25,9 +25,10 @@ Route::middleware(['auth'])->group(function (): void {
     // A place followed or left from Privacy (the same Follow as on the card's page): {enrollment} is one of their own cards.
     Route::patch('settings/privacy/follows/{enrollment}', [PrivacyController::class, 'follow'])->whereNumber('enrollment')->middleware('throttle:30,1')->name('privacy.follow');
     // Download my data (CHW-58): confirm it's you (15 minutes) from the page, then back to it; the file itself never cached, 5 an hour.
+    // A POST page load: browsers never preload one, so the service worker leaves it to the network and the file saves (WebKit).
     Route::get('settings/privacy/confirm', fn () => to_route('privacy.edit'))->middleware(RequirePassword::using(null, PrivacyController::EXPORT_CONFIRM_SECONDS))->name('privacy.confirm');
-    Route::get('settings/privacy/export', [PrivacyController::class, 'export'])
-        ->middleware([NeverCache::class, RequirePassword::using(null, PrivacyController::EXPORT_CONFIRM_SECONDS), 'throttle:data-export'])
+    Route::post('settings/privacy/export', [PrivacyController::class, 'export'])
+        ->middleware([NeverCache::class, 'throttle:data-export'])
         ->name('privacy.export');
     // "Not now" on the passkey offered after an email-link sign-in (CHW-23).
     Route::post('passkey-offer/dismiss', [PasskeyOfferController::class, 'dismiss'])->name('passkey-offer.dismiss');

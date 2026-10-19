@@ -39,7 +39,7 @@ beforeEach(function (): void {
     $this->atB = $this->tenants->enroll($this->customer, $this->tenants->cardB);
     $this->download = fn (?User $as = null, ?int $confirmedAt = null): TestResponse => $this->actingAs($as ?? $this->customer)
         ->withSession(['auth.password_confirmed_at' => $confirmedAt ?? now()->unix()])
-        ->get(route('privacy.export'));
+        ->post(route('privacy.export'));
     $this->data = fn (TestResponse $response): array => json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
 });
 
@@ -47,9 +47,9 @@ afterEach(function (): void {
     Carbon::setTestNow();
 });
 
-it('asks to confirm it\'s you first, within the last 15 minutes', function (): void {
-    $this->actingAs($this->customer)->get(route('privacy.export'))->assertRedirect(route('password.confirm'));
-    ($this->download)(confirmedAt: now()->subMinutes(16)->unix())->assertRedirect(route('password.confirm'));
+it('needs a confirmation within the last 15 minutes, else goes back to the page to confirm first', function (): void {
+    $this->actingAs($this->customer)->post(route('privacy.export'))->assertRedirect(route('privacy.edit'));
+    ($this->download)(confirmedAt: now()->subMinutes(16)->unix())->assertRedirect(route('privacy.edit'));
     ($this->download)(confirmedAt: now()->subMinutes(14)->unix())->assertOk();
 });
 

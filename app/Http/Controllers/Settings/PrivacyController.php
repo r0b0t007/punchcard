@@ -39,7 +39,8 @@ final class PrivacyController extends Controller
         return Inertia::render('settings/privacy', [
             ...$describePrivacy->handle($user),
             // Confirmed lately enough to download (privacy.confirm), else the button confirms first.
-            'download' => ['ready' => RecentConfirmation::holds($request->session(), self::EXPORT_CONFIRM_SECONDS)],
+            // The token goes in the download's plain form (a POST page load, not an Inertia visit).
+            'download' => ['ready' => RecentConfirmation::holds($request->session(), self::EXPORT_CONFIRM_SECONDS), 'token' => csrf_token()],
             // "A new link is on its way" after Send the link again (verification.send), or "export-limited".
             'status' => $request->session()->get('status'),
         ]);
@@ -54,9 +55,18 @@ final class PrivacyController extends Controller
         return to_route('privacy.edit');
     }
 
-    /** Download my data: one JSON file, never cached (NeverCache), after a recent confirmation and within the hourly limit (routes). */
-    public function export(Request $request, ExportMyData $exportMyData): JsonResponse
+    /**
+     * Download my data: one JSON file, never cached (NeverCache), within the
+     * hourly limit (routes). Once the confirmation is older than 15 minutes,
+     * back to the page, which confirms first again (privacy.confirm): a POST
+     * can't come back to itself after the confirm page.
+     */
+    public function export(Request $request, ExportMyData $exportMyData): JsonResponse|RedirectResponse
     {
+        if (! RecentConfirmation::holds($request->session(), self::EXPORT_CONFIRM_SECONDS)) {
+            return to_route('privacy.edit');
+        }
+
         /** @var User $user */
         $user = $request->user();
         $now = CarbonImmutable::now();
