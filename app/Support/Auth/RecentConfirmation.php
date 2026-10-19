@@ -16,10 +16,11 @@ use Illuminate\Validation\Validator;
  */
 final class RecentConfirmation
 {
-    public static function holds(Session $session): bool
+    /** @param  int|null  $seconds  A route's own timeout (RequirePassword::using), else auth.password_timeout. */
+    public static function holds(Session $session, ?int $seconds = null): bool
     {
         // As RequirePassword counts it: confirmed while no longer ago than the timeout.
-        return now()->getTimestamp() - (int) $session->get('auth.password_confirmed_at', 0) <= (int) config('auth.password_timeout');
+        return now()->getTimestamp() - (int) $session->get('auth.password_confirmed_at', 0) <= ($seconds ?? (int) config('auth.password_timeout'));
     }
 
     /**

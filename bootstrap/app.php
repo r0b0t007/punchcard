@@ -6,6 +6,7 @@ use App\Http\Middleware\GiveSessionTapToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\NeverCache;
+use App\Http\Middleware\RequireRecentConfirmation;
 use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SetTenant;
@@ -17,6 +18,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -55,9 +58,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // NeverCache wraps the tap routes' auth and throttle, so a login redirect or a 429 is no-store too.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: NeverCache::class);
+
+        // A stale confirmation goes back before the throttle counts it (Download my data, CHW-58).
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: RequireRecentConfirmation::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request): bool => $request->is('api/*') || $request->expectsJson(),
         );
+        // Download my data (CHW-58) is a plain form, not an Inertia visit: an expired token goes back to the page, which
+        // carries a fresh one, instead of a 419 page the installed app has no way back from.
+        $exceptions->respond(fn (Response $response, Throwable $exception, Request $request): Response => $response->getStatusCode() === 419 && $request->routeIs('privacy.export')
+            ? to_route('privacy.edit')
+            : $response);
     })->create();

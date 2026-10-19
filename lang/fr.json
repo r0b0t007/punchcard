@@ -871,5 +871,11 @@
     "No places yet: each one you collect stamps at appears here.": "Aucun commerce pour l’instant : chacun où vous collectez des tampons apparaît ici.",
     "Following since :date": "Suivi depuis le :date",
     "Closed: no more offers": "Fermé : plus d’offres",
-    "Following": "Suivi"
+    "Following": "Suivi",
+    "Your data": "Vos données",
+    "Everything punchcard keeps about you, in one file (JSON): your cards, stamps, rewards and choices.": "Tout ce que punchcard garde sur vous, dans un seul fichier (JSON) : vos cartes, tampons, récompenses et choix.",
+    "Download my data": "Télécharger mes données",
+    "You downloaded it 5 times this hour. Try again later.": "Vous l’avez téléchargé 5 fois cette heure-ci. Réessayez plus tard.",
+    "Confirmed: download it within 15 minutes.": "C’est confirmé : téléchargez-le dans les 15 minutes.",
+    "You'll confirm it's you first.": "Vous confirmerez d’abord que c’est bien vous."
 }

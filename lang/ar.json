@@ -871,5 +871,11 @@
     "No places yet: each one you collect stamps at appears here.": "لا أماكن بعد: يظهر هنا كل مكان تجمع فيه الأختام.",
     "Following since :date": "تتابعه منذ :date",
     "Closed: no more offers": "مغلق: لا عروض بعد اليوم",
-    "Following": "تتابعه"
+    "Following": "تتابعه",
+    "Your data": "بياناتك",
+    "Everything punchcard keeps about you, in one file (JSON): your cards, stamps, rewards and choices.": "كل ما تحتفظ به punchcard عنك في ملف واحد (JSON): بطاقاتك وأختامك ومكافآتك واختياراتك.",
+    "Download my data": "تنزيل بياناتي",
+    "You downloaded it 5 times this hour. Try again later.": "نزّلته 5 مرات خلال هذه الساعة. حاول مجددًا لاحقًا.",
+    "Confirmed: download it within 15 minutes.": "تم التأكيد: نزّله خلال 15 دقيقة.",
+    "You'll confirm it's you first.": "ستؤكّد أنه أنت أولًا."
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\Settings\PrivacyController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Middleware\NeverCache;
+use App\Http\Middleware\RequireRecentConfirmation;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,13 @@ Route::middleware(['auth'])->group(function (): void {
     Route::patch('settings/privacy/marketing', [PrivacyController::class, 'updateMarketing'])->middleware('throttle:30,1')->name('privacy.marketing');
     // A place followed or left from Privacy (the same Follow as on the card's page): {enrollment} is one of their own cards.
     Route::patch('settings/privacy/follows/{enrollment}', [PrivacyController::class, 'follow'])->whereNumber('enrollment')->middleware('throttle:30,1')->name('privacy.follow');
+    // Download my data (CHW-58): confirm it's you (15 minutes) from the page, then back to it; the file itself never cached, 5 an hour.
+    // A POST page load: browsers never preload one, so the service worker leaves it to the network and the file saves (WebKit).
+    Route::get('settings/privacy/confirm', fn () => to_route('privacy.edit'))->middleware(RequirePassword::using(null, PrivacyController::EXPORT_CONFIRM_SECONDS))->name('privacy.confirm');
+    Route::post('settings/privacy/export', [PrivacyController::class, 'export'])
+        // A confirmation older than 15 minutes goes back to the page, which confirms first again, and never counts against the limit.
+        ->middleware([NeverCache::class, RequireRecentConfirmation::class.':privacy.edit,'.PrivacyController::EXPORT_CONFIRM_SECONDS, 'throttle:data-export'])
+        ->name('privacy.export');
     // "Not now" on the passkey offered after an email-link sign-in (CHW-23).
     Route::post('passkey-offer/dismiss', [PasskeyOfferController::class, 'dismiss'])->name('passkey-offer.dismiss');
     // A new address dropped before its link is opened (CHW-23).
