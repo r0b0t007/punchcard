@@ -1,14 +1,22 @@
-import { Form, Head, router, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
 import { localDate } from '@/lib/local-moment';
 import { monogramOf } from '@/components/loyalty-card/monogram';
 import { useLogo } from '@/components/loyalty-card/use-logo';
-import { edit, follow, marketing as setMarketing } from '@/routes/privacy';
+import {
+    confirm as confirmItsYou,
+    edit,
+    exportMethod as exportData,
+    follow,
+    marketing as setMarketing,
+} from '@/routes/privacy';
 import { send } from '@/routes/verification';
 
 type Program = {
@@ -39,15 +47,20 @@ type Marketing = {
 export default function Privacy({
     marketing,
     programs,
+    download,
     status,
 }: {
     marketing: Marketing;
     programs: Program[];
+    /** ready: confirmed it's them in the last 15 minutes, so the file downloads straight away. */
+    download: { ready: boolean };
     status?: string;
 }) {
     const { t, locale } = useTranslation();
     const { errors } = usePage().props;
     const [saving, setSaving] = useState(false);
+    // Six downloads in an hour come back here (throttle:data-export).
+    const limited = status === 'export-limited';
     // The place last changed, whose row shows a refusal.
     const [changedRow, setChangedRow] = useState<number | null>(null);
     const save = (url: string, data: Record<string, boolean>) =>
@@ -185,6 +198,55 @@ export default function Privacy({
                             ))}
                         </ul>
                     )}
+                </div>
+
+                <div className="space-y-4">
+                    <Heading
+                        variant="small"
+                        title={t('Your data')}
+                        description={t(
+                            'Everything punchcard keeps about you, in one file (JSON): your cards, stamps, rewards and choices.',
+                        )}
+                    />
+                    {limited ? (
+                        <Button variant="secondary" disabled>
+                            <Download />
+                            {t('Download my data')}
+                        </Button>
+                    ) : download.ready ? (
+                        // A plain link, not an Inertia visit: the browser saves the file and stays here.
+                        <Button asChild>
+                            <a
+                                href={exportData.url()}
+                                data-test="download-data"
+                            >
+                                <Download />
+                                {t('Download my data')}
+                            </a>
+                        </Button>
+                    ) : (
+                        <Button variant="secondary" asChild>
+                            <Link
+                                href={confirmItsYou()}
+                                data-test="confirm-download"
+                            >
+                                <Download />
+                                {t('Download my data')}
+                            </Link>
+                        </Button>
+                    )}
+                    <p
+                        className="text-sm text-muted-foreground"
+                        role={limited ? 'status' : undefined}
+                    >
+                        {limited
+                            ? t(
+                                  'You downloaded it 5 times this hour. Try again later.',
+                              )
+                            : download.ready
+                              ? t('Confirmed: download it within 15 minutes.')
+                              : t("You'll confirm it's you first.")}
+                    </p>
                 </div>
             </div>
         </>

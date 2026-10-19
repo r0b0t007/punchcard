@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Settings;
 
 use App\Actions\Account\DescribePrivacy;
+use App\Actions\Account\ExportMyData;
 use App\Actions\Account\SetMarketingConsent;
 use App\Actions\Cards\SetFollow;
 use App\Http\Controllers\Controller;
@@ -12,6 +13,9 @@ use App\Http\Requests\FollowRequest;
 use App\Http\Requests\Settings\MarketingConsentRequest;
 use App\Models\ConsentEvent;
 use App\Models\User;
+use App\Support\Auth\RecentConfirmation;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +28,9 @@ use Inertia\Response;
  */
 final class PrivacyController extends Controller
 {
+    /** Download my data needs a confirmation this recent (RequirePassword on its routes). */
+    public const int EXPORT_CONFIRM_SECONDS = 900;
+
     public function edit(Request $request, DescribePrivacy $describePrivacy): Response
     {
         /** @var User $user */
@@ -31,7 +38,9 @@ final class PrivacyController extends Controller
 
         return Inertia::render('settings/privacy', [
             ...$describePrivacy->handle($user),
-            // "A new link is on its way" after Send the link again (verification.send).
+            // Confirmed lately enough to download (privacy.confirm), else the button confirms first.
+            'download' => ['ready' => RecentConfirmation::holds($request->session(), self::EXPORT_CONFIRM_SECONDS)],
+            // "A new link is on its way" after Send the link again (verification.send), or "export-limited".
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -43,6 +52,18 @@ final class PrivacyController extends Controller
         $setMarketingConsent->handle($user, $request->boolean('marketing'));
 
         return to_route('privacy.edit');
+    }
+
+    /** Download my data: one JSON file, never cached (NeverCache), after a recent confirmation and within the hourly limit (routes). */
+    public function export(Request $request, ExportMyData $exportMyData): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $now = CarbonImmutable::now();
+
+        return response()->json($exportMyData->handle($user, $now), 200, [
+            'Content-Disposition' => 'attachment; filename="punchcard-data-'.$now->utc()->toDateString().'.json"',
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /** A place's offers, followed or left from here: the same Follow as on the card's page (C6), on one of their own cards. */

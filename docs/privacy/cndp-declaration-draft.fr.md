@@ -75,11 +75,10 @@ journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois 
 ## 9. Droits des personnes
 
 - Information : notice de confidentialité publiée sur le site et dans l'application (privacy-notice.draft.md).
-- Accès : téléchargement des données au format JSON depuis les réglages **[à mettre en place, CHW-58]**.
+- Accès : téléchargement des données au format JSON depuis les réglages, après avoir confirmé son identité.
 - Rectification : réglages du profil.
-- Opposition : interrupteurs de consentement sur chaque carte, et dans les réglages **[à mettre en place, CHW-58]** ;
-  lien de désinscription dans chaque message **[à mettre en place]**. Chaque changement de consentement est journalisé
-  (date, origine) **[à mettre en place, CHW-58]**.
+- Opposition : interrupteurs de consentement sur chaque carte et dans les réglages ; lien de désinscription dans chaque
+  message **[à mettre en place]**. Chaque changement de consentement est journalisé (date, origine).
 - Suppression : suppression du compte depuis les réglages.
 - Contact : **[adresse e-mail dédiée]**, réponse sous 30 jours.
 
