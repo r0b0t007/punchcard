@@ -65,9 +65,10 @@ it('confirms it\'s you from the page, then offers the file there', function (): 
         ->get(route('privacy.edit'))->assertInertia(fn (Assert $page): Assert => $page->where('download.ready', false));
 });
 
-it('downloads a JSON file named for the day, never cached', function (): void {
+it('downloads a JSON file named for the day, as a file to save, never cached', function (): void {
     $response = ($this->download)()->assertOk()
-        ->assertHeader('Content-Type', 'application/json')
+        ->assertHeader('Content-Type', 'application/octet-stream')
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
         ->assertHeader('Content-Disposition', 'attachment; filename="punchcard-data-2026-10-18.json"');
 
     expect($response->headers->get('Cache-Control'))->toContain('no-store')

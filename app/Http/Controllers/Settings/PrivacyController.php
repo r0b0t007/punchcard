@@ -71,7 +71,11 @@ final class PrivacyController extends Controller
         $user = $request->user();
         $now = CarbonImmutable::now();
 
+        // A file to save, never a page to show: some browsers (WebKit on Linux) display application/json in place even
+        // as an attachment, which in the installed app leaves no way back.
         return response()->json($exportMyData->handle($user, $now), 200, [
+            'Content-Type' => 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
             'Content-Disposition' => 'attachment; filename="punchcard-data-'.$now->utc()->toDateString().'.json"',
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
