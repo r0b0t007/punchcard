@@ -9,12 +9,15 @@ use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
+use App\Models\CounterScan;
 use App\Models\Follow;
 use App\Models\Location;
+use App\Models\LoginLink;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Reward;
+use App\Models\StaffInvitation;
 use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
@@ -32,8 +35,9 @@ use Illuminate\Support\Facades\DB;
  * - each card, in every organization, with every stamp (where, how many,
  *   how, by whom: you, staff or punchcard, and the staff's reason) and
  *   every reward;
- * - follows, taps of the last 180 days (as long as their IP is kept),
- *   passkeys, sessions, and roles at businesses and organizations.
+ * - follows, taps for as long as they are kept (punchcard.taps.retention_days),
+ *   member QR scans, sign-in links and staff invitations sent to the
+ *   email, passkeys, sessions, and roles at businesses and organizations.
  *
  * Never another person: staff are "staff", never named; a referrer is a
  * yes or no. Never a secret: no password, 2FA secret, passkey credential,
@@ -44,9 +48,6 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class ExportMyData
 {
-    /** How long a tap keeps its IP and user agent (docs/privacy/retention.md). */
-    public const int TAP_DAYS = 180;
-
     public function __construct(private TenantContext $context) {}
 
     /**
@@ -59,21 +60,23 @@ final readonly class ExportMyData
             $enrollmentIds = $enrollments->modelKeys();
             $stamps = StampEvent::query()->whereIn('enrollment_id', $enrollmentIds)->orderBy('id')
                 ->get(['enrollment_id', 'business_id', 'location_id', 'source', 'qty', 'reason', 'created_at'])->groupBy('enrollment_id');
-            $rewards = Reward::query()->ownedBy($user)->orderBy('id')->get()->groupBy('enrollment_id');
+            $rewards = Reward::query()->whereIn('enrollment_id', $enrollmentIds)->orderBy('id')->get()->groupBy('enrollment_id');
             $follows = Follow::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'notify', 'created_at', 'updated_at']);
             $consents = ConsentEvent::query()->where('user_id', $user->id)->orderBy('id')->get();
-            $taps = Tap::query()->where('user_id', $user->id)->where('created_at', '>=', $now->subDays(self::TAP_DAYS))->orderBy('id')
+            $taps = Tap::query()->where('user_id', $user->id)->where('created_at', '>=', $now->subDays((int) config('punchcard.taps.retention_days')))->orderBy('id')
                 ->get(['business_id', 'location_id', 'status', 'ip', 'user_agent', 'created_at']);
+            $scans = CounterScan::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'location_id', 'scanned_at', 'stamp_event_id']);
+            $invitations = StaffInvitation::query()->where('email', $user->email)->orderBy('id')->get(['business_id', 'created_at', 'accepted_at']);
             $businessRoles = BusinessMember::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'business_id', 'role', 'created_at']);
             $organizationRoles = OrganizationMember::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'role', 'created_at']);
 
             $cards = LoyaltyCard::query()->whereKey($enrollments->pluck('card_id')->unique()->all())->pluck('name', 'id');
             $organizations = Organization::query()->whereKey(collect([$enrollments, $follows, $consents, $businessRoles, $organizationRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('organization_id')->all())->filter()->unique()->all())->pluck('name', 'id');
-            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $businessRoles])
+            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $scans, $invitations, $businessRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('business_id')->all())
                 ->merge($rewards->flatten()->pluck('redeemed_business_id'))->filter()->unique()->all())->pluck('name', 'id');
-            $locations = Location::query()->whereKey(collect([$stamps->flatten(), $taps])
+            $locations = Location::query()->whereKey(collect([$stamps->flatten(), $taps, $scans])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('location_id')->all())
                 ->merge($rewards->flatten()->pluck('redeemed_location_id'))->filter()->unique()->all())->pluck('name', 'id');
 
@@ -149,6 +152,24 @@ final readonly class ExportMyData
                     'status' => $tap->status->value,
                     'ip' => $tap->ip,
                     'user_agent' => $tap->user_agent,
+                ])->all(),
+                'member_qr_scans' => $scans->map(fn (CounterScan $scan): array => [
+                    'at' => $this->date($scan->scanned_at),
+                    'business' => $businesses->get($scan->business_id),
+                    'location' => $locations->get($scan->location_id),
+                    'gave_stamp' => $scan->stamp_event_id !== null,
+                ])->all(),
+                'sign_in_links' => LoginLink::query()->where('email', $user->email)->orderBy('id')->get(['purpose', 'created_at', 'used_at'])
+                    ->map(fn (LoginLink $link): array => [
+                        'purpose' => $link->purpose,
+                        'sent_at' => $this->date($link->created_at),
+                        'used_at' => $this->date($link->used_at),
+                    ])->all(),
+                // Never who sent it: only the business.
+                'staff_invitations' => $invitations->map(fn (StaffInvitation $invitation): array => [
+                    'business' => $businesses->get($invitation->business_id),
+                    'sent_at' => $this->date($invitation->created_at),
+                    'accepted_at' => $this->date($invitation->accepted_at),
                 ])->all(),
                 // Not tenant tables: plain reads, kept to the user.
                 'passkeys' => DB::table('passkeys')->where('user_id', $user->id)->orderBy('id')->get(['name', 'created_at', 'last_used_at'])

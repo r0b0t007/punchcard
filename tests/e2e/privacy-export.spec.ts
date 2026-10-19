@@ -4,9 +4,11 @@ import { fillSignUp } from './helpers';
 
 /**
  * Download my data (CHW-58, C12) on a phone: confirm it's you from the
- * Privacy page, come back to it, then the file downloads and the page stays
- * (a plain link, which the service worker leaves to the network). A new
- * account each run, so it shares no sign-in limit with the demo customer.
+ * Privacy page, come back to it, then the file downloads and the page stays.
+ * A plain form POST, not a link: no browser preloads a POST, so the export
+ * never runs twice; the file is octet-stream, which WebKit on Linux saves
+ * (it shows application/json in place). A new account each run, so it
+ * shares no sign-in limit with the demo customer.
  */
 test.skip(
     ({ isMobile }) => !isMobile,

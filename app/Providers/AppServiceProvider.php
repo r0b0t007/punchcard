@@ -232,13 +232,13 @@ class AppServiceProvider extends ServiceProvider
             ->by('confirm-link:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): RedirectResponse => back()->withErrors(['email' => __('Too many links asked for. Try again in a few minutes.')])));
 
-        // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
-        // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
-        // generous cap per client address all the same.
         // Download my data (CHW-58): 5 an hour per account; the sixth goes back to the page, which says so.
         RateLimiter::for('data-export', fn (Request $request): Limit => Limit::perHour(5)->by('data-export:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): RedirectResponse => to_route('privacy.edit')->with('status', 'export-limited')));
 
+        // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
+        // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
+        // generous cap per client address all the same.
         RateLimiter::for('join-page', fn (Request $request): array => [
             Limit::perMinute(60)->by('join-page:session:'.($request->hasSession() ? $request->session()->getId() : ClientAddress::rateLimitKey($request->ip()))),
             Limit::perMinute(600)->by('join-page:address:'.ClientAddress::rateLimitKey($request->ip())),

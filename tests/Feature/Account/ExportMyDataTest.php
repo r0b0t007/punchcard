@@ -7,10 +7,14 @@ use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Enums\TapStatus;
 use App\Models\ConsentEvent;
+use App\Models\CounterScan;
 use App\Models\Follow;
+use App\Models\LoginLink;
+use App\Models\StaffInvitation;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
@@ -203,4 +207,56 @@ it('allows 5 downloads an hour, then says so on the page', function (): void {
 
     Carbon::setTestNow(now()->addHour()->addSecond());
     ($this->download)()->assertOk();
+});
+
+it('holds taps for as long as they are kept', function (): void {
+    config(['punchcard.taps.retention_days' => 365]);
+    $this->context->bypass(fn () => (new Tap)->forceFill(['user_id' => $this->customer->id, 'business_id' => $this->tenants->a1->id, 'status' => TapStatus::Stamped,
+        'ip' => '203.0.113.7', 'created_at' => now()->subDays(200)])->save());
+
+    expect(($this->data)(($this->download)())['taps'])->toHaveCount(1);
+});
+
+it('holds member QR scans, sign-in links and staff invitations, never another person\'s', function (): void {
+    $other = User::factory()->create(['email' => 'other@example.com']);
+    $this->context->bypass(function () use ($other): void {
+        $location = $this->tenants->a1->locations()->firstOrFail();
+
+        foreach ([$this->customer, $other] as $user) {
+            CounterScan::factory()->create(['user_id' => $user->id, 'organization_id' => $this->tenants->orgA->id, 'business_id' => $this->tenants->a1->id, 'location_id' => $location->id]);
+            StaffInvitation::factory()->create(['email' => $user->email, 'organization_id' => $this->tenants->orgA->id, 'business_id' => $this->tenants->a1->id]);
+            LoginLink::for($user->email);
+        }
+    });
+
+    $data = ($this->data)(($this->download)());
+
+    expect($data['member_qr_scans'])->toBe([['at' => '2026-10-18T10:00:00+00:00', 'business' => 'A1', 'location' => 'A1 site', 'gave_stamp' => false]])
+        ->and($data['sign_in_links'])->toBe([['purpose' => LoginLink::SIGN_IN, 'sent_at' => '2026-10-18T10:00:00+00:00', 'used_at' => null]])
+        ->and($data['staff_invitations'])->toBe([['business' => 'A1', 'sent_at' => '2026-10-18T10:00:00+00:00', 'accepted_at' => null]]);
+});
+
+it('never counts a click whose confirmation has expired against the hourly limit', function (): void {
+    foreach (range(1, 6) as $attempt) {
+        ($this->download)(confirmedAt: now()->subMinutes(16)->unix())->assertRedirect(route('privacy.edit'));
+    }
+
+    foreach (range(1, 5) as $attempt) {
+        ($this->download)()->assertOk();
+    }
+});
+
+it('goes back to the page when the form\'s token has expired', function (): void {
+    // Checked here as in a browser without Sec-Fetch-Site, which then needs the token (Laravel skips the check in tests).
+    $this->app->bind(PreventRequestForgery::class, fn ($app): PreventRequestForgery => new class($app, $app['encrypter']) extends PreventRequestForgery
+    {
+        protected function runningUnitTests(): bool
+        {
+            return false;
+        }
+    });
+
+    $this->actingAs($this->customer)->withSession(['auth.password_confirmed_at' => now()->unix()])
+        ->post(route('privacy.export'), ['_token' => 'stale-token'])
+        ->assertRedirect(route('privacy.edit'));
 });

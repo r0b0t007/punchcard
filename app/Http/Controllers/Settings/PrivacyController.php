@@ -56,17 +56,11 @@ final class PrivacyController extends Controller
     }
 
     /**
-     * Download my data: one JSON file, never cached (NeverCache), within the
-     * hourly limit (routes). Once the confirmation is older than 15 minutes,
-     * back to the page, which confirms first again (privacy.confirm): a POST
-     * can't come back to itself after the confirm page.
+     * Download my data: one JSON file, never cached, after a confirmation in
+     * the last 15 minutes and within the hourly limit (routes).
      */
-    public function export(Request $request, ExportMyData $exportMyData): JsonResponse|RedirectResponse
+    public function export(Request $request, ExportMyData $exportMyData): JsonResponse
     {
-        if (! RecentConfirmation::holds($request->session(), self::EXPORT_CONFIRM_SECONDS)) {
-            return to_route('privacy.edit');
-        }
-
         /** @var User $user */
         $user = $request->user();
         $now = CarbonImmutable::now();
