@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Rewards;
 
+use App\Actions\Account\RecordActivity;
 use App\Enums\RedeemRefusal;
 use App\Enums\RewardStatus;
 use App\Events\EnrollmentChanged;
@@ -34,7 +35,7 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class RedeemReward
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private RecordActivity $recordActivity) {}
 
     public function handle(Reward $reward, User $user, RedeemPresence $presence): RedeemResult
     {
@@ -67,6 +68,8 @@ final readonly class RedeemReward
                 'redeem_window_opened_at' => null,
                 'redeem_window_until' => null,
             ])->save();
+            // The customer was there: their account is in use (CHW-58), noted once this commits.
+            $this->recordActivity->later($user->id, $presence->at);
 
             return new RedeemResult($locked, redeemedNow: true);
         }));

@@ -88,7 +88,7 @@ it('holds the account, its consents and follows', function (): void {
 
     expect($data['account'])->toBe([
         'name' => 'Salma Tazi', 'email' => 'salma@example.com', 'email_verified_at' => $this->customer->email_verified_at?->toIso8601String(),
-        'pending_email' => null, 'locale' => 'fr', 'created_at' => '2026-10-18T10:00:00+00:00', 'adult_confirmed_at' => '2026-10-11T10:00:00+00:00',
+        'pending_email' => null, 'locale' => 'fr', 'created_at' => '2026-10-18T10:00:00+00:00', 'last_active_at' => '2026-10-18T10:00:00+00:00', 'inactivity_warned_at' => null, 'adult_confirmed_at' => '2026-10-11T10:00:00+00:00',
         'two_factor_enabled' => false,
     ])
         ->and($data['consents']['punchcard_news'])->toBe(['on' => true, 'on_since' => '2026-10-17T10:00:00+00:00', 'off_since' => null])

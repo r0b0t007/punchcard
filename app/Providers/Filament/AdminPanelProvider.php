@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
+use App\Http\Middleware\RecordLastActive;
 use App\Http\Middleware\SetLocale;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -61,6 +62,8 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 PlatformAdminWorksAcrossTenants::class,
+                // Not the web group: the panel's page loads are activity too (CHW-58).
+                RecordLastActive::class,
             ]);
     }
 }

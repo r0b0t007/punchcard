@@ -6,6 +6,7 @@ use App\Http\Middleware\GiveSessionTapToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\NeverCache;
+use App\Http\Middleware\RecordLastActive;
 use App\Http\Middleware\RequireRecentConfirmation;
 use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
@@ -39,6 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // When an account was last used, for the inactivity rule (CHW-58): signed-in requests, signing in too.
+            RecordLastActive::class,
         ]);
 
         // A changed password (or a deleted, anonymised account) signs out every other device.
