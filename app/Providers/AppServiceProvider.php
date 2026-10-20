@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Account\RecordActivity;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
@@ -48,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerKeyDiversifier();
         $this->registerTenantContext();
+        // One per request or job: RecordLastActive holds the request's activity writes in it until the response is sent (CHW-58).
+        $this->app->scoped(RecordActivity::class);
     }
 
     /**

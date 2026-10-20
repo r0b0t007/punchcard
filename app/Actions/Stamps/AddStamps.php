@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Stamps;
 
+use App\Actions\Account\RecordActivity;
 use App\Enums\CardMode;
 use App\Enums\RewardStatus;
 use App\Enums\RewardType;
@@ -51,13 +52,14 @@ use LogicException;
  *    over, progressive cards unlock each tier once and never reset.
  *
  * A refusal is a StampRejected and writes nothing. EnrollmentChanged follows
- * the commit. Outside bypass() (staff from their tenant) the caller's business
- * must be the stamp's; /t and system jobs call it in bypass(), and the work
- * itself always runs in bypass().
+ * the commit, and so does noting the customer's account in use
+ * (RecordActivity). Outside bypass() (staff from their tenant) the caller's
+ * business must be the stamp's; /t and system jobs call it in bypass(), and
+ * the work itself always runs in bypass().
  */
 final readonly class AddStamps
 {
-    public function __construct(private TenantContext $context, private WorksAt $worksAt) {}
+    public function __construct(private TenantContext $context, private WorksAt $worksAt, private RecordActivity $recordActivity) {}
 
     public function handle(CardEnrollment $enrollment, StampRequest $request): StampResult
     {
@@ -173,9 +175,24 @@ final readonly class AddStamps
         ]);
         $event->save();
 
+        if ($request->provesPresence() && $this->firstPresenceOfDay($enrollment, $now)) {
+            $this->recordActivity->later((int) $enrollment->user_id, $now);
+        }
+
         $rewards = $this->progress($enrollment, $card, $tiers, $event, $request, $qty, $now);
 
         return new StampResult($event, $enrollment, $rewards, replayed: false, dayFilled: $fillsDay ? LocalMoment::of($now, $location->timezone)['date'] : null);
+    }
+
+    /**
+     * Whether this is the card's first stamp proving presence on its day (UTC): only that one notes the customer's
+     * account in use (CHW-58, once the stamp commits), so a second tap on the same card that day costs nothing. Read
+     * before progress() moves last_stamp_at.
+     */
+    private function firstPresenceOfDay(CardEnrollment $enrollment, CarbonInterface $now): bool
+    {
+        return $enrollment->last_stamp_at === null
+            || $enrollment->last_stamp_at->lessThan($now->toImmutable()->utc()->startOfDay());
     }
 
     /** The key's earlier stamp is this one again (same customer, place, source, quantity, staff and reason), or the key is taken. */
