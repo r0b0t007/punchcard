@@ -186,8 +186,8 @@ final readonly class AddStamps
 
     /**
      * Whether this is the card's first stamp proving presence on its day (UTC): only that one notes the customer's
-     * account in use (CHW-58, once the stamp commits), so a second tap the same day costs nothing. Read before
-     * progress() moves last_stamp_at.
+     * account in use (CHW-58, once the stamp commits), so a second tap on the same card that day costs nothing. Read
+     * before progress() moves last_stamp_at.
      */
     private function firstPresenceOfDay(CardEnrollment $enrollment, CarbonInterface $now): bool
     {

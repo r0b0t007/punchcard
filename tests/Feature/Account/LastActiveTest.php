@@ -20,6 +20,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Tests\Support\Tenants;
 
@@ -148,6 +149,34 @@ describe('stamps and redemptions', function (): void {
             ->and(($this->lastActive)())->toBe('2026-10-20 10:00:00');
     });
 
+    it('wait for the response during a web request, with one write for the signed-in customer', function (): void {
+        $test = $this;
+        $seen = new stdClass;
+        Route::middleware('web')->get('/_test/stamp', function () use ($test, $seen): string {
+            ($test->add)(($test->scan)());
+            $seen->during = ($test->lastActive)();
+
+            return 'stamped';
+        });
+
+        expect(($this->userUpdates)(fn () => $this->actingAs($this->customer)->get('/_test/stamp')->assertOk()))->toBe(1)
+            ->and($seen->during)->toBe('2026-07-01 08:00:00')
+            ->and(($this->lastActive)())->toBe('2026-10-20 10:00:00');
+    });
+
+    it('note the customer a staff member scanned, once the staff member\x27s response is sent', function (): void {
+        $test = $this;
+        Route::middleware('web')->get('/_test/scan', function () use ($test): string {
+            ($test->add)(($test->scan)());
+
+            return 'stamped';
+        });
+
+        $this->actingAs($this->staff)->get('/_test/scan')->assertOk();
+
+        expect(($this->lastActive)())->toBe('2026-10-20 10:00:00');
+    });
+
     it('count nothing for a stamp rolled back', function (): void {
         try {
             DB::transaction(function (): void {
@@ -227,8 +256,9 @@ it('never moves back, nor touches an anonymised account', function (): void {
 });
 
 it('starts accounts from before it from what is known, never an anonymised one', function (): void {
-    [$quiet, $stamped, $signedIn, $passkey, $redeemed] = User::factory()->count(5)
-        ->create(['last_active_at' => null, 'created_at' => '2025-03-01 08:00:00'])->all();
+    [$quiet, $stamped, $signedIn, $passkey, $redeemed, $consented, $tapped] = User::factory()->count(7)
+        ->create(['last_active_at' => null, 'created_at' => '2025-03-01 08:00:00', 'updated_at' => '2025-03-01 08:00:00'])->all();
+    $edited = User::factory()->create(['last_active_at' => null, 'created_at' => '2025-03-01 08:00:00', 'updated_at' => '2026-01-01 08:00:00']);
     $gone = User::factory()->create(['last_active_at' => null, 'anonymised_at' => '2026-01-01 08:00:00']);
 
     $this->context->bypass(function () use ($stamped, $redeemed, $gone): void {
@@ -243,16 +273,21 @@ it('starts accounts from before it from what is known, never an anonymised one',
     DB::table('sessions')->insert(['id' => 'session-1', 'user_id' => $signedIn->id, 'payload' => '', 'last_activity' => Carbon::parse('2025-11-01 08:00:00')->getTimestamp()]);
     $passkey->passkeys()->create(['name' => 'Phone', 'credential_id' => 'cred-1', 'credential' => []]);
     DB::table('passkeys')->where('user_id', $passkey->id)->update(['last_used_at' => '2025-12-01 08:00:00']);
+    DB::table('consent_events')->insert(['user_id' => $consented->id, 'kind' => 'punchcard_news', 'granted' => false, 'source' => 'settings', 'created_at' => '2026-02-01 08:00:00']);
+    DB::table('taps')->insert(['user_id' => $tapped->id, 'status' => 'rejected', 'rejection' => 'cooldown', 'created_at' => '2026-03-01 08:00:00', 'updated_at' => '2026-03-01 08:00:00']);
 
     $migration = require database_path('migrations/2026_10_20_002432_add_last_active_at_to_users_table.php');
     $migration->backfill();
 
-    expect(collect([$quiet, $stamped, $signedIn, $passkey, $redeemed, $gone])->map(fn (User $user): ?string => $user->fresh()?->last_active_at?->toDateTimeString())->all())->toBe([
+    expect(collect([$quiet, $stamped, $signedIn, $passkey, $redeemed, $edited, $consented, $tapped, $gone])->map(fn (User $user): ?string => $user->fresh()?->last_active_at?->toDateTimeString())->all())->toBe([
         '2025-03-01 08:00:00',
         '2025-09-01 08:00:00',
         '2025-11-01 08:00:00',
         '2025-12-01 08:00:00',
         '2025-10-01 08:00:00',
+        '2026-01-01 08:00:00',
+        '2026-02-01 08:00:00',
+        '2026-03-01 08:00:00',
         null,
     ]);
 });

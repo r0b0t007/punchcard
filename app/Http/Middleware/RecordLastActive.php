@@ -11,9 +11,10 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * A signed-in request is activity (CHW-58, RecordActivity). Read once the
- * response is sent, so signing in counts too and no response waits for it,
- * with the user the guard already has: at most one write a day.
+ * A signed-in request is activity (CHW-58, RecordActivity). Everything the
+ * request notes, a stamp or a redemption too, is written once the response
+ * is sent: no response waits on the user row, and signing in counts. With the
+ * user the guard already has: at most one change to the row a day.
  */
 final readonly class RecordLastActive
 {
@@ -24,6 +25,8 @@ final readonly class RecordLastActive
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $this->recordActivity->hold();
+
         return $next($request);
     }
 
@@ -31,8 +34,6 @@ final readonly class RecordLastActive
     {
         $user = $request->user();
 
-        if ($user instanceof User) {
-            $this->recordActivity->handle($user, now());
-        }
+        $this->recordActivity->release($user instanceof User ? $user : null, now());
     }
 }

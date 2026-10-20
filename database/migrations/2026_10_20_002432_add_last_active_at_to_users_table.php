@@ -12,12 +12,20 @@ use Illuminate\Support\Facades\Schema;
  * reads. RecordActivity keeps last_active_at, and clears the warning.
  *
  * Accounts from before it start from what is known: the latest of when they
- * signed up, their last stamp proving they were there, their last session,
- * passkey sign-in and redemption. Never an anonymised account: there is
- * nobody behind it to warn.
+ * signed up or last changed their profile, their last stamp proving they
+ * were there, tap, consent change, session, passkey sign-in and redemption.
+ * Each only ever makes it later, the safe side for a rule that deletes.
+ * Never an anonymised account: there is nobody behind it to warn.
+ *
+ * Outside a transaction, so the backfill's row locks are each held for one
+ * UPDATE, not for the whole migration (sign-ins and taps keep going); both
+ * columns are nullable, and a rerun only moves the dates forward.
  */
 return new class extends Migration
 {
+    /** @var bool */
+    public $withinTransaction = false;
+
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table): void {
@@ -33,7 +41,10 @@ return new class extends Migration
     {
         $sources = [
             DB::table('users')->pluck('created_at', 'id'),
+            DB::table('users')->whereNotNull('updated_at')->pluck('updated_at', 'id'),
             DB::table('card_enrollments')->whereNotNull('last_stamp_at')->groupBy('user_id')->selectRaw('user_id, max(last_stamp_at) as at')->pluck('at', 'user_id'),
+            DB::table('taps')->whereNotNull('user_id')->groupBy('user_id')->selectRaw('user_id, max(created_at) as at')->pluck('at', 'user_id'),
+            DB::table('consent_events')->groupBy('user_id')->selectRaw('user_id, max(created_at) as at')->pluck('at', 'user_id'),
             DB::table('sessions')->whereNotNull('user_id')->groupBy('user_id')->selectRaw('user_id, max(last_activity) as at')->pluck('at', 'user_id'),
             DB::table('passkeys')->whereNotNull('last_used_at')->groupBy('user_id')->selectRaw('user_id, max(last_used_at) as at')->pluck('at', 'user_id'),
             DB::table('rewards')->join('card_enrollments', 'card_enrollments.id', '=', 'rewards.enrollment_id')->whereNotNull('rewards.redeemed_at')
