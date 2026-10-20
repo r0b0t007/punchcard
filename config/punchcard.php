@@ -55,6 +55,13 @@ return [
         'max_per_tap' => 10,
     ],
 
+    'privacy' => [
+        // The inactivity rule (CHW-58, docs/privacy/retention.md): an account unused this long is deleted, or anonymised
+        // when it has history. Its owner is emailed this many days before, and always gets that long to sign in.
+        'inactive_after_months' => (int) env('INACTIVE_AFTER_MONTHS', 24),
+        'warning_days' => (int) env('INACTIVITY_WARNING_DAYS', 30),
+    ],
+
     'member_qr' => [
         // Rotating member QR for phones without NFC (TOTP-style window).
         'window_seconds' => 30,
