@@ -15,6 +15,7 @@ use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -43,6 +44,10 @@ use LogicException;
  * are locked first, so a stamp cannot slip in between the check and the
  * delete; should the ledger still refuse the delete, the user is anonymised
  * instead. Works across tenants, in bypass().
+ *
+ * The inactivity sweep (AnonymiseInactiveAccounts) passes stillDue, checked
+ * once the user row is locked: false leaves the account as it is, so a
+ * sign-in racing the sweep wins. Returns whether the account went.
  */
 final readonly class DeleteAccount
 {
@@ -54,12 +59,18 @@ final readonly class DeleteAccount
         private MustHandOverBusiness $mustHandOverBusiness,
     ) {}
 
-    public function handle(User $user): void
+    /** @param  (Closure(): bool)|null  $stillDue */
+    public function handle(User $user, ?Closure $stillDue = null): bool
     {
-        DB::transaction(fn () => $this->context->bypass(function () use ($user): void {
+        return DB::transaction(fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
             // Their taps first, in ApplyTap's order (tap, then enrollment, then the user's key), so the two never deadlock.
             Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
             User::query()->whereKey($user->id)->lockForUpdate()->value('id');
+
+            if ($stillDue instanceof Closure && ! $stillDue()) {
+                return false;
+            }
+
             CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
 
             if ($this->mustHandOverBusiness->handle($user)) {
@@ -74,10 +85,12 @@ final readonly class DeleteAccount
             Stamper::query()->where('armed_by', $user->id)->update(Stamper::DISARMED);
 
             if (! $this->hasHistory($user) && $this->deleted($user)) {
-                return;
+                return true;
             }
 
             $this->anonymise($user);
+
+            return true;
         }));
     }
 

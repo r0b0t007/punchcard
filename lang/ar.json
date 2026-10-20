@@ -877,5 +877,8 @@
     "Download my data": "تنزيل بياناتي",
     "You downloaded it 5 times this hour. Try again later.": "نزّلته 5 مرات خلال هذه الساعة. حاول مجددًا لاحقًا.",
     "Confirmed: download it within 15 minutes.": "تم التأكيد: نزّله خلال 15 دقيقة.",
-    "You'll confirm it's you first.": "ستؤكّد أنه أنت أولًا."
+    "You'll confirm it's you first.": "ستؤكّد أنه أنت أولًا.",
+    "Your punchcard account will be deleted on :date": "سيُحذف حسابك على punchcard في :date",
+    "You haven't used your punchcard account in a long time. To keep no more data than we need, we will delete it on :date, with your cards and any reward you haven't used.": "لم تستخدم حسابك على punchcard منذ مدة طويلة. حتى لا نحتفظ إلا بالبيانات التي نحتاجها، سنحذفه في :date مع بطاقاتك وأي مكافأة لم تستخدمها.",
+    "Signing in before then keeps your account, your stamps and your rewards. If you'd rather it go, there's nothing to do.": "إذا سجّلت الدخول قبل ذلك، تحتفظ بحسابك وأختامك ومكافآتك. وإذا فضّلت حذفه، فلا داعي لفعل أي شيء."
 }

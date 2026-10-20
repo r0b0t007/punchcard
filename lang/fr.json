@@ -877,5 +877,8 @@
     "Download my data": "Télécharger mes données",
     "You downloaded it 5 times this hour. Try again later.": "Vous l’avez téléchargé 5 fois cette heure-ci. Réessayez plus tard.",
     "Confirmed: download it within 15 minutes.": "C’est confirmé : téléchargez-le dans les 15 minutes.",
-    "You'll confirm it's you first.": "Vous confirmerez d’abord que c’est bien vous."
+    "You'll confirm it's you first.": "Vous confirmerez d’abord que c’est bien vous.",
+    "Your punchcard account will be deleted on :date": "Votre compte punchcard sera supprimé le :date",
+    "You haven't used your punchcard account in a long time. To keep no more data than we need, we will delete it on :date, with your cards and any reward you haven't used.": "Vous n’avez pas utilisé votre compte punchcard depuis longtemps. Pour ne garder que les données dont nous avons besoin, nous le supprimerons le :date, avec vos cartes et les récompenses que vous n’avez pas utilisées.",
+    "Signing in before then keeps your account, your stamps and your rewards. If you'd rather it go, there's nothing to do.": "Si vous vous connectez d’ici là, vous gardez votre compte, vos tampons et vos récompenses. Si vous préférez qu’il soit supprimé, vous n’avez rien à faire."
 }
