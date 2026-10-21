@@ -97,13 +97,14 @@ final class RecordActivity
     /** The loaded user as the write left it, so the request asks no more today. */
     private function noted(User $user, CarbonImmutable $at): void
     {
-        $user->forceFill(['last_active_at' => $at, 'inactivity_warned_at' => null])->syncOriginalAttributes(['last_active_at', 'inactivity_warned_at']);
+        $user->forceFill(['last_active_at' => $at, 'inactivity_warned_at' => null, 'inactivity_deletes_at' => null])
+            ->syncOriginalAttributes(['last_active_at', 'inactivity_warned_at', 'inactivity_deletes_at']);
     }
 
     private function write(int $userId, CarbonImmutable $at): int
     {
         return rescue(fn (): int => User::withoutTimestamps(fn (): int => User::query()->whereKey($userId)->notAnonymised()
             ->where(fn (Builder $query): Builder => $query->whereNull('last_active_at')->orWhere('last_active_at', '<', $at->startOfDay()))
-            ->update(['last_active_at' => $at, 'inactivity_warned_at' => null])), 0);
+            ->update(['last_active_at' => $at, 'inactivity_warned_at' => null, 'inactivity_deletes_at' => null])), 0);
     }
 }

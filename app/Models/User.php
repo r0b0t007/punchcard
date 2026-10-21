@@ -45,6 +45,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $marketing_opt_out_at when they turned news off in the settings (CHW-58)
  * @property Carbon|null $last_active_at when the account was last used: signed in, a stamp proving they were there, a redemption (RecordActivity, CHW-58)
  * @property Carbon|null $inactivity_warned_at when it was warned it would go for lack of use; activity withdraws it (CHW-58)
+ * @property Carbon|null $inactivity_deletes_at the day that warning promised: never deleted before it (CHW-58)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -88,6 +89,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'marketing_opt_out_at' => 'datetime',
             'last_active_at' => 'datetime',
             'inactivity_warned_at' => 'datetime',
+            'inactivity_deletes_at' => 'datetime',
             'pending_email_expires_at' => 'datetime',
         ];
     }
