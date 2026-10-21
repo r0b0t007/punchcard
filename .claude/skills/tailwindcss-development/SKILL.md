@@ -86,7 +86,7 @@ If existing pages and components support dark mode, new pages and components mus
 <!-- Dark Mode -->
 
 ```html
-<div class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+<div class="bg-white text-gray-900 dark:bg-gray-900 dark:text-white">
     Content adapts to color scheme
 </div>
 ```
