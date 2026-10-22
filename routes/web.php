@@ -6,6 +6,7 @@ use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterScanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinishSignUpController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\LoginLinkController;
@@ -122,6 +123,8 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
 Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (): void {
     // Home after signing in (CHW-27): the dashboard, the admin panel or My cards.
     Route::get('start', StartController::class)->name('start');
+    // Back to admin, from an owner's business app (CHW-144).
+    Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])->name('impersonation.stop');
     // My cards (CHW-27): the customer's home, and the cards of anyone who collects stamps.
     Route::get('app', [MyCardsController::class, 'index'])->name('app.cards');
     // "My QR" (CHW-28, C10): the rotating member QR staff scan when the phone has no NFC.

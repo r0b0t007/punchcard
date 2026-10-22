@@ -886,5 +886,19 @@
     "Your punchcard account will be deleted on :date.": "Votre compte punchcard sera supprimé le :date.",
     "You haven't signed in or collected a stamp in almost two years, and we don't keep data we no longer need. Your cards, your stamps and any reward you haven't used will go with it.": "Vous n’avez pas utilisé votre compte ni collecté de tampon depuis près de deux ans, et nous ne gardons pas les données dont nous n’avons plus besoin. Vos cartes, vos tampons et les récompenses que vous n’avez pas utilisées partiront avec lui.",
     "Keep my account": "Garder mon compte",
-    "Signing in once before then is enough. If you'd rather it go, there's nothing to do.": "Il suffit de vous connecter une fois d’ici là. Si vous préférez qu’il soit supprimé, vous n’avez rien à faire."
+    "Signing in once before then is enough. If you'd rather it go, there's nothing to do.": "Il suffit de vous connecter une fois d’ici là. Si vous préférez qu’il soit supprimé, vous n’avez rien à faire.",
+    "That account was deleted.": "Ce compte a été supprimé.",
+    "Only the platform admin signs in as an owner.": "Seul l’administrateur de la plateforme peut se connecter en tant que propriétaire.",
+    "You are already signed in as an owner: go back to admin first.": "Vous êtes déjà connecté en tant que propriétaire : revenez d’abord à l’administration.",
+    "That person is not an owner of this business.": "Cette personne n’est pas propriétaire de ce commerce.",
+    "You can't sign in as a platform admin, or as yourself.": "Impossible de vous connecter en tant qu’administrateur de la plateforme, ni en tant que vous-même.",
+    "This business is suspended or closed: its owner sees nothing in it.": "Ce commerce est suspendu ou fermé : son propriétaire n’y voit rien.",
+    "Your time as the owner ran out: you are back in admin.": "Votre temps en tant que propriétaire est écoulé : vous êtes de retour dans l’administration.",
+    "Go back to admin first.": "Revenez d’abord à l’administration.",
+    "Not while you are signed in as the owner: nothing was changed.": "Pas tant que vous êtes connecté en tant que propriétaire : rien n’a été modifié.",
+    "Sign in as the owner": "Se connecter en tant que propriétaire",
+    "You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.": "Vous voyez l’application du commerce comme son propriétaire, en lecture seule, pendant :minutes minutes. Le début et la fin sont conservés dans le journal d’audit.",
+    "Your password": "Votre mot de passe",
+    "The owner's account is no longer available: you are back in admin.": "Le compte du propriétaire n’est plus disponible : vous êtes de retour dans l’administration.",
+    "The owner's app sent you to a page you can't read as them: you are back in admin.": "L’application du propriétaire vous a envoyé vers une page que vous ne pouvez pas lire à sa place : vous êtes de retour dans l’administration."
 }

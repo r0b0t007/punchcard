@@ -12,6 +12,7 @@ use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SetTenant;
 use App\Http\Middleware\UsePwa;
+use App\Http\Middleware\WhileImpersonating;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -40,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // The platform admin signed in as an owner (CHW-144): read the business app only, for a set time.
+            WhileImpersonating::class,
             // When an account was last used, for the inactivity rule (CHW-58): signed-in requests, signing in too.
             RecordLastActive::class,
         ]);
@@ -61,6 +64,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // NeverCache wraps the tap routes' auth and throttle, so a login redirect or a 429 is no-store too.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: NeverCache::class);
+
+        // Signed in as an owner (CHW-144): refused before any route's own middleware (auth, a confirmation, bindings) answers.
+        $middleware->prependToPriorityList(before: NeverCache::class, prepend: WhileImpersonating::class);
 
         // A stale confirmation goes back before the throttle counts it (Download my data, CHW-58).
         $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: RequireRecentConfirmation::class);

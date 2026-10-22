@@ -886,5 +886,19 @@
     "Your punchcard account will be deleted on :date.": "سيُحذف حسابك على punchcard في :date.",
     "You haven't signed in or collected a stamp in almost two years, and we don't keep data we no longer need. Your cards, your stamps and any reward you haven't used will go with it.": "لم تسجّل الدخول ولم تجمع أي ختم منذ قرابة سنتين، ونحن لا نحتفظ بالبيانات التي لم نعد نحتاجها. ستُحذف معه بطاقاتك وأختامك وأي مكافأة لم تستخدمها.",
     "Keep my account": "احتفظ بحسابي",
-    "Signing in once before then is enough. If you'd rather it go, there's nothing to do.": "يكفي أن تسجّل الدخول مرة واحدة قبل ذلك. وإذا فضّلت حذفه، فلا داعي لفعل أي شيء."
+    "Signing in once before then is enough. If you'd rather it go, there's nothing to do.": "يكفي أن تسجّل الدخول مرة واحدة قبل ذلك. وإذا فضّلت حذفه، فلا داعي لفعل أي شيء.",
+    "That account was deleted.": "حُذف هذا الحساب.",
+    "Only the platform admin signs in as an owner.": "وحده مسؤول المنصة يمكنه الدخول باسم المالك.",
+    "You are already signed in as an owner: go back to admin first.": "أنت متصل باسم مالك بالفعل: عُد إلى الإدارة أولًا.",
+    "That person is not an owner of this business.": "هذا الشخص ليس مالكًا لهذا النشاط.",
+    "You can't sign in as a platform admin, or as yourself.": "لا يمكنك الدخول باسم مسؤول المنصة، ولا باسمك أنت.",
+    "This business is suspended or closed: its owner sees nothing in it.": "هذا النشاط معلّق أو مغلق: لا يرى مالكه فيه شيئًا.",
+    "Your time as the owner ran out: you are back in admin.": "انتهى وقتك باسم المالك: عدت إلى الإدارة.",
+    "Go back to admin first.": "عُد إلى الإدارة أولًا.",
+    "Not while you are signed in as the owner: nothing was changed.": "غير ممكن وأنت متصل باسم المالك: لم يتغيّر شيء.",
+    "Sign in as the owner": "الدخول باسم المالك",
+    "You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.": "ترى تطبيق النشاط كما يراه مالكه، للقراءة فقط، لمدة :minutes دقيقة. يُحفظ البدء والانتهاء في سجل التدقيق.",
+    "Your password": "كلمة مرورك",
+    "The owner's account is no longer available: you are back in admin.": "لم يعد حساب المالك متاحًا: عدت إلى الإدارة.",
+    "The owner's app sent you to a page you can't read as them: you are back in admin.": "أرسلك تطبيق المالك إلى صفحة لا يمكنك قراءتها باسمه: عدت إلى الإدارة."
 }
