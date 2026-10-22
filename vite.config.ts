@@ -238,6 +238,17 @@ export default defineConfig({
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',
+            // Written by Laravel Boost (boost.json `skills`): boost:install and boost:update
+            // rewrite them, so formatting them here would only be undone.
+            '.claude/skills/fortify-development/**',
+            '.claude/skills/filament-development/**',
+            '.claude/skills/infer-conventions/**',
+            '.claude/skills/inertia-react-development/**',
+            '.claude/skills/laravel-best-practices/**',
+            '.claude/skills/laravel-permission-development/**',
+            '.claude/skills/tailwindcss-development/**',
+            '.claude/skills/testing-best-practices/**',
+            '.claude/skills/wayfinder-development/**',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],
