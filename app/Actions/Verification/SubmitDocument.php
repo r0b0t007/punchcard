@@ -16,7 +16,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -44,9 +43,8 @@ final readonly class SubmitDocument
 
         $keyId = $this->cipher->keyId();
 
-        if (! $disk->put($path, $this->cipher->encrypt((string) $file->get()))) {
-            throw new RuntimeException('The document could not be stored.');
-        }
+        // The disk throws: a file that can't be written fails here, before any row.
+        $disk->put($path, $this->cipher->encrypt((string) $file->get()));
 
         try {
             [$document, $old] = DB::transaction(fn (): array => $this->context->bypass(function () use ($business, $sender, $kind, $path, $keyId, $mime, $size): array {
@@ -75,7 +73,8 @@ final readonly class SubmitDocument
                 return [$document, $replaced->pluck('path')->all()];
             }));
         } catch (Throwable $failed) {
-            $disk->delete($path);
+            // The refusal is what the sender hears, never a failed cleanup.
+            rescue(fn (): bool => $disk->delete($path));
 
             throw $failed;
         }

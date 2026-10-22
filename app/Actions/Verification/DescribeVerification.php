@@ -6,6 +6,7 @@ namespace App\Actions\Verification;
 
 use App\Enums\BusinessStatus;
 use App\Enums\DocumentKind;
+use App\Http\Requests\Verification\DocumentRequest;
 use App\Models\Business;
 use App\Models\BusinessDocument;
 
@@ -18,17 +19,17 @@ use App\Models\BusinessDocument;
 final readonly class DescribeVerification
 {
     /**
-     * @return array{verified: bool, canSend: bool, documents: list<array{kind: string, status: string|null, sentAt: string|null, reason: string|null, deletesAt: string|null}>}
+     * @return array{verified: bool, canSend: bool, maxMegabytes: int, retentionMonths: int, documents: list<array{kind: string, status: string|null, sentAt: string|null, reason: string|null, deletesAt: string|null}>}
      */
     public function handle(Business $business): array
     {
-        $latest = BusinessDocument::query()->where('business_id', $business->id)->orderByDesc('id')->get()
-            ->unique(fn (BusinessDocument $document): string => $document->kind->value)
-            ->keyBy(fn (BusinessDocument $document): string => $document->kind->value);
+        $latest = BusinessDocument::latestByKind($business->id);
 
         return [
-            'verified' => $business->status === BusinessStatus::Verified,
+            'verified' => $business->verified_at !== null,
             'canSend' => $business->status === BusinessStatus::Pending,
+            'maxMegabytes' => intdiv(DocumentRequest::MAX_KILOBYTES, 1024),
+            'retentionMonths' => (int) config('punchcard.documents.retention_months'),
             'documents' => array_map(function (DocumentKind $kind) use ($latest): array {
                 $document = $latest->get($kind->value);
 

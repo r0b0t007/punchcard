@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Onboarding;
 
 use App\Enums\BusinessRole;
-use App\Enums\BusinessStatus;
 use App\Enums\DocumentKind;
 use App\Enums\DocumentStatus;
 use App\Models\Business;
@@ -45,12 +44,11 @@ final readonly class DescribeChecklist
     /** Both kinds' latest document waiting or accepted, or the business verified already (without them, before CHW-145). */
     private function documentsSent(Business $business): bool
     {
-        if ($business->status === BusinessStatus::Verified) {
+        if ($business->verified_at !== null) {
             return true;
         }
 
-        $latest = BusinessDocument::query()->where('business_id', $business->id)->orderByDesc('id')->get(['kind', 'status'])
-            ->unique(fn (BusinessDocument $document): string => $document->kind->value);
+        $latest = BusinessDocument::latestByKind($business->id);
 
         return $latest->count() === count(DocumentKind::cases())
             && $latest->every(fn (BusinessDocument $document): bool => $document->status !== DocumentStatus::Rejected);

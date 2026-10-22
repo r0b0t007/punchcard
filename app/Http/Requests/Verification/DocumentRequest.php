@@ -8,6 +8,8 @@ use App\Models\Business;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
+use LogicException;
 
 /**
  * A verification document (CHW-145): whoever runs the business worked in
@@ -17,6 +19,9 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 final class DocumentRequest extends FormRequest
 {
+    /** 10 MB: a phone photo of an ID or a scanned bill, never more. */
+    public const int MAX_KILOBYTES = 10240;
+
     public function authorize(): bool
     {
         $business = $this->business();
@@ -30,12 +35,20 @@ final class DocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:image/jpeg,image/png,application/pdf', 'max:10240'],
+            'file' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:image/jpeg,image/png,application/pdf', 'max:'.self::MAX_KILOBYTES],
         ];
     }
 
     public function business(): ?Business
     {
         return app(TenantContext::class)->business();
+    }
+
+    /** The validated file. */
+    public function document(): UploadedFile
+    {
+        $file = $this->file('file');
+
+        return $file instanceof UploadedFile ? $file : throw new LogicException('A validated document request carries one file.');
     }
 }

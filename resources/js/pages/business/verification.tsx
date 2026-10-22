@@ -41,13 +41,21 @@ type Document = {
 export default function Verification({
     verified,
     canSend,
+    maxMegabytes,
+    retentionMonths,
     documents,
 }: {
     verified: boolean;
     canSend: boolean;
+    /** The largest file taken (DocumentRequest::MAX_KILOBYTES). */
+    maxMegabytes: number;
+    /** How long the files are kept after the decision (punchcard.documents.retention_months). */
+    retentionMonths: number;
     documents: Document[];
 }) {
     const { t, locale } = useTranslation();
+    // The row last sent: a validation error is its own, never the other row's.
+    const [lastSent, setLastSent] = useState<Kind | null>(null);
     const rejected = documents.filter((d) => d.status === 'rejected');
     const allSent = documents.every(
         (d) => d.status === 'submitted' || d.status === 'accepted',
@@ -122,6 +130,9 @@ export default function Verification({
                             key={document.kind}
                             document={document}
                             canSend={canSend}
+                            maxMegabytes={maxMegabytes}
+                            showsErrors={lastSent === document.kind}
+                            onSend={() => setLastSent(document.kind)}
                         />
                     ))}
                 </ul>
@@ -129,7 +140,8 @@ export default function Verification({
                 <p className="flex items-start gap-2 text-xs text-muted-foreground">
                     <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
                     {t(
-                        "Only punchcard's team sees these files, and every look is recorded. We delete them 3 months after we decide.",
+                        "Only punchcard's team sees these files, and every look is recorded. We delete them :months months after we decide.",
+                        { months: retentionMonths },
                     )}
                 </p>
             </div>
@@ -174,15 +186,22 @@ function StateBox({
 function DocumentRow({
     document,
     canSend,
+    maxMegabytes,
+    showsErrors,
+    onSend,
 }: {
     document: Document;
     canSend: boolean;
+    maxMegabytes: number;
+    showsErrors: boolean;
+    onSend: () => void;
 }) {
     const { t, locale } = useTranslation();
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const input = useRef<HTMLInputElement>(null);
     const [sending, setSending] = useState(false);
-    const [tried, setTried] = useState(false);
+    // Too large to send at all: said here, before the upload (the server's limit would refuse it less kindly).
+    const [tooLarge, setTooLarge] = useState(false);
     const id = document.kind === 'id_document';
     const Icon = id ? IdCard : FileText;
     const status = {
@@ -213,7 +232,17 @@ function DocumentRow({
     const toSend = document.status === null || document.status === 'rejected';
 
     const send = (file: File) => {
-        setTried(true);
+        onSend();
+        setTooLarge(file.size > maxMegabytes * 1024 * 1024);
+
+        if (file.size > maxMegabytes * 1024 * 1024) {
+            if (input.current) {
+                input.current.value = '';
+            }
+
+            return;
+        }
+
         router.post(
             store(document.kind).url,
             { file },
@@ -247,9 +276,21 @@ function DocumentRow({
                         : t(
                               "A bill or statement from the last 3 months, with the business's address.",
                           )}{' '}
-                    {t('JPG, PNG or PDF, up to 10 MB.')}
+                    {t('JPG, PNG or PDF, up to :size MB.', {
+                        size: maxMegabytes,
+                    })}
                 </p>
-                {tried ? <InputError message={errors.file} /> : null}
+                {showsErrors ? (
+                    <InputError
+                        message={
+                            tooLarge
+                                ? t('The file is larger than :size MB.', {
+                                      size: maxMegabytes,
+                                  })
+                                : errors.file
+                        }
+                    />
+                ) : null}
             </div>
             <span
                 className={cn(

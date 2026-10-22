@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use LogicException;
 
 /**
@@ -84,6 +85,19 @@ class BusinessDocument extends Model implements TenantModel
         if (! app(TenantContext::class)->isBypassed()) {
             throw new LogicException('A verification document changes with its file, through its Actions, in TenantContext::bypass().');
         }
+    }
+
+    /**
+     * Each kind's latest document of a business, by kind: what its page and its checklist read. In the tenant (or
+     * bypass) the caller is in.
+     *
+     * @return Collection<string, self>
+     */
+    public static function latestByKind(int $businessId): Collection
+    {
+        return self::query()->where('business_id', $businessId)->orderByDesc('id')->get()
+            ->unique(fn (self $document): string => $document->kind->value)
+            ->keyBy(fn (self $document): string => $document->kind->value);
     }
 
     /**

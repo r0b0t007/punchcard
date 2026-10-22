@@ -17,10 +17,12 @@ use App\Models\BusinessDocument;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Verification\DocumentCipher;
+use App\Support\Verification\DocumentKeyMissing;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -92,6 +94,8 @@ it('keeps a document encrypted, under a random name, on the private disk only', 
         ->and($stored)->not->toBe($plain)->not->toContain('JFIF')
         ->and(app(DocumentCipher::class)->decrypt((string) $stored))->toBe($plain)
         ->and($document->key_id)->toBe(app(DocumentCipher::class)->keyId())
+        // The raw bytes, encrypted: the size of the file, not twice it.
+        ->and(strlen((string) $stored))->toBe(strlen($plain) + 29)
         ->and(fn () => Crypt::decryptString((string) $stored))->toThrow(DecryptException::class)
         ->and(Storage::disk('public')->allFiles())->toBe([])
         ->and(config('filesystems.disks.documents'))->not->toHaveKeys(['serve', 'url'])
@@ -109,7 +113,37 @@ it('stores nothing without the documents\' key, and reads a file after the key i
     $stored = app(DocumentCipher::class)->encrypt('the scan');
     config(['punchcard.documents.key' => 'base64:'.base64_encode(str_repeat('n', 32)), 'punchcard.documents.previous_keys' => $old]);
 
-    expect(app(DocumentCipher::class)->decrypt($stored))->toBe('the scan');
+    expect(app(DocumentCipher::class)->decrypt($stored))->toBe('the scan')
+        ->and(fn () => app(DocumentCipher::class)->decrypt(substr($stored, 0, -1).'x'))->toThrow(DecryptException::class);
+});
+
+it('tells the owner sending is not set up yet when the key is missing, and reports it', function (): void {
+    config(['punchcard.documents.key' => '']);
+    Exceptions::fake();
+
+    ($this->send)(DocumentKind::IdDocument, ($this->pdf)())->assertRedirect(route('verification.show'))
+        ->assertInertiaFlash('toast.type', 'error');
+
+    Exceptions::assertReported(DocumentKeyMissing::class);
+    expect(($this->documents)())->toBe([])
+        ->and(Storage::disk(BusinessDocument::DISK)->allFiles())->toBe([]);
+});
+
+it('sets DOCUMENTS_KEY in the environment file once, never replacing one set', function (): void {
+    $dir = sys_get_temp_dir().'/punchcard-env-'.uniqid();
+    mkdir($dir);
+    file_put_contents($dir.'/.env', 'APP_NAME=punchcard
+DOCUMENTS_KEY=
+');
+    app()->useEnvironmentPath($dir);
+
+    $this->artisan('punchcard:documents-key')->assertSuccessful();
+    $first = (string) file_get_contents($dir.'/.env');
+    $this->artisan('punchcard:documents-key')->assertSuccessful();
+
+    expect($first)->toMatch('/^DOCUMENTS_KEY=base64:[A-Za-z0-9+\/]{43}=$/m')->toContain('APP_NAME=punchcard')
+        ->and(substr_count($first, 'DOCUMENTS_KEY='))->toBe(1)
+        ->and(file_get_contents($dir.'/.env'))->toBe($first);
 });
 
 it('accepts the documents waiting when the business is verified, deleting them 3 months later', function (): void {

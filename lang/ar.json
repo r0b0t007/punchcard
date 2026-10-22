@@ -916,7 +916,7 @@
     "Proof of address": "إثبات العنوان",
     "The owner's, both sides on one photo or PDF.": "الخاصة بالمالك، الوجهان في صورة أو ملف PDF واحد.",
     "A bill or statement from the last 3 months, with the business's address.": "فاتورة أو كشف حساب من آخر 3 أشهر، بعنوان النشاط.",
-    "JPG, PNG or PDF, up to 10 MB.": "JPG أو PNG أو PDF، حتى 10 ميغابايت.",
+    "JPG, PNG or PDF, up to :size MB.": "JPG أو PNG أو PDF، حتى :size ميغابايت.",
     "Not sent": "لم يُرسَل",
     "Sent on :date": "أُرسِل في :date",
     "New one needed": "مطلوب غيره",
@@ -929,9 +929,11 @@
     "Send the one marked below again.": "أرسل الوثيقة المشار إليها أدناه مجددًا.",
     "Your business is verified": "نشاطك موثّق",
     "We delete the files on :date.": "نحذف الملفات في :date.",
-    "Only punchcard's team sees these files, and every look is recorded. We delete them 3 months after we decide.": "لا يرى هذه الملفات سوى فريق punchcard، وتُسجَّل كل مشاهدة. نحذفها بعد 3 أشهر من قرارنا.",
+    "Only punchcard's team sees these files, and every look is recorded. We delete them :months months after we decide.": "لا يرى هذه الملفات سوى فريق punchcard، وتُسجَّل كل مشاهدة. نحذفها بعد :months أشهر من قرارنا.",
     ":document sent. We check it and let you know.": "أُرسلت :document. نراجعها ونخبرك.",
     "This business has nothing to send: it is verified, suspended or closed.": "ليس لهذا النشاط ما يرسله: فهو موثّق أو معلّق أو مغلق.",
     "Sent: we're checking them.": "أُرسلت: نراجعها.",
-    "Send an ID and a proof of address. Your business works meanwhile.": "أرسل وثيقة هوية وإثبات عنوان. يعمل نشاطك خلال ذلك."
+    "Send an ID and a proof of address. Your business works meanwhile.": "أرسل وثيقة هوية وإثبات عنوان. يعمل نشاطك خلال ذلك.",
+    "Sending documents isn't set up yet. Try again later.": "إرسال الوثائق غير مُعدّ بعد. حاول لاحقًا.",
+    "The file is larger than :size MB.": "الملف أكبر من :size ميغابايت."
 }

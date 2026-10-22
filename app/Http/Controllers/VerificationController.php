@@ -12,8 +12,8 @@ use App\Http\Requests\Verification\DocumentRequest;
 use App\Models\Business;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use App\Support\Verification\DocumentKeyMissing;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -43,17 +43,16 @@ final class VerificationController extends Controller
         $business = $request->business();
         /** @var User $sender */
         $sender = $request->user();
-        $file = $request->file('file');
-
-        if (! $file instanceof UploadedFile) {
-            abort(422);
-        }
 
         try {
-            $submitDocument->handle($business, $sender, $kind, $file);
+            $submitDocument->handle($business, $sender, $kind, $request->document());
             Inertia::flash('toast', ['type' => 'success', 'message' => __(':document sent. We check it and let you know.', ['document' => $kind->label()])]);
         } catch (DocumentRefused $refused) {
             Inertia::flash('toast', ['type' => 'error', 'message' => $refused->getMessage()]);
+        } catch (DocumentKeyMissing $missing) {
+            // A setup error (DOCUMENTS_KEY): reported for us, never a raw error page for the owner.
+            report($missing);
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('Sending documents isn\'t set up yet. Try again later.')]);
         }
 
         return to_route('verification.show');
