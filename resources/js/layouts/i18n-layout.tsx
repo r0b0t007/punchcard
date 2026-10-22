@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import { DirectionProvider } from '@radix-ui/react-direction';
 import type { ReactNode } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import ImpersonationBanner from '@/components/impersonation-banner';
 import PwaHead from '@/components/pwa-head';
 import ServiceWorker from '@/components/service-worker';
 import { createI18n, I18nContext } from '@/hooks/use-translation';
@@ -13,8 +14,9 @@ import type { User } from '@/types/auth';
  * locale and translations from the page props *during render*, so a page
  * never shows the previous language after a switch or a login, and provides
  * them to useTranslation(). Also keeps <html lang dir> in sync and feeds
- * Radix's DirectionProvider, which does not read <html dir>, and registers
- * the service worker on the pages of an installable app (CHW-35).
+ * Radix's DirectionProvider, which does not read <html dir>, registers the
+ * service worker on the pages of an installable app (CHW-35), and shows the
+ * impersonation banner on every page (CHW-144).
  *
  * Outside it (component tests, previews) useTranslation() falls back to the
  * English keys.
@@ -64,7 +66,11 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
 
     return (
         <I18nContext value={i18n}>
-            <DirectionProvider dir={dir}>{children}</DirectionProvider>
+            <DirectionProvider dir={dir}>
+                {/* Above every page while the platform admin is signed in as an owner (CHW-144). */}
+                <ImpersonationBanner />
+                {children}
+            </DirectionProvider>
             {/* The first page of an installable app registers the service worker (CHW-35). */}
             <PwaHead pwa={pwa ?? null} />
             {registersServiceWorker ? (

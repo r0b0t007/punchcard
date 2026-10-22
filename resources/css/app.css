@@ -118,6 +118,17 @@
  * inline: utilities read var(--card-brand) on the element itself, so LoyaltyCard can
  * override these per card. A plain @theme entry would resolve once on :root.
  */
+/*
+ * The platform admin signed in as an owner (CHW-144): the fixed desktop sidebar starts below
+ * the impersonation bar (ImpersonationBanner, h-16 from md), never under it.
+ */
+@media (width >= 48rem) {
+    [data-impersonating] [data-slot='sidebar-container'] {
+        top: 4rem;
+        height: auto;
+    }
+}
+
 /* Animates size only (sidebar collapse), so theme changes don't fade. */
 @utility transition-size {
     transition-property: width, height;
