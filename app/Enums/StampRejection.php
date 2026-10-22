@@ -40,4 +40,7 @@ enum StampRejection: string
 
     /** The correction would take back more stamps than this business gave. */
     case CorrectionExceedsGiven = 'correction_exceeds_given';
+
+    /** The card's owner deleted their account, or it was deleted as unused (CHW-253): it collects no more stamps. */
+    case AccountDeleted = 'account_deleted';
 }

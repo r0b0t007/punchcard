@@ -38,7 +38,9 @@ use Illuminate\Support\Facades\DB;
  * - a tap already applied, refused or expired is returned as it is; one
  *   waiting past its expiry becomes expired; one received by a signed-in
  *   customer, or already claimed, is theirs alone;
- * - the stamper is locked next, as ReceiveTap does (tag, stamper, then the
+ * - the customer's key is locked next (CHW-253), so an account deletion
+ *   waits for this tap or this tap for it, never both;
+ * - then the stamper, as ReceiveTap does (tag, stamper, then the
  *   enrollment in AddStamps): an archive ends stampers before closing
  *   anything (CloseSites), so a stamper still current under the lock keeps
  *   its site open until this commits. An ended stamper, one moved since the
@@ -88,6 +90,10 @@ final readonly class ApplyTap
     private function apply(int $tapId, User $user): Tap
     {
         $tap = $this->context->bypass(fn (): Tap => Tap::query()->whereKey($tapId)->lockForUpdate()->firstOrFail());
+        // The customer's key next, before the stamper, a reward or a card: a deletion holding them waits here, not in a
+        // cycle with this tap (DeleteAccount's order is the user, then their cards and rewards). Key share never waits
+        // on an activity note (RecordActivity), only on the user's row being locked to change it.
+        User::query()->whereKey($user->id)->lock('for key share')->value('id');
 
         if ($tap->user_id !== null && $tap->user_id !== $user->id) {
             throw new TapBelongsToAnotherCustomer;

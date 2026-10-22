@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Cards;
 
+use App\Actions\Stamps\StampRejected;
 use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\User;
@@ -12,7 +13,8 @@ use App\Models\User;
  * "Add to my cards" on a join page (CHW-31): the customer holds the
  * business's card, as a first tap would enrol them (EnrollCustomer, once),
  * but with no stamp: only a tap or a staff scan proves presence. Nothing
- * when the page offers nothing (DescribeJoinPage: the card is switched off).
+ * when the page offers nothing (DescribeJoinPage: the card is switched off),
+ * or the account was deleted meanwhile (CHW-253).
  */
 final readonly class JoinCard
 {
@@ -23,8 +25,14 @@ final readonly class JoinCard
 
     public function handle(Business $business, User $customer): ?CardEnrollment
     {
-        return $this->describeJoinPage->handle($business, $customer)['available']
-            ? $this->enrollCustomer->handle($business, $customer)
-            : null;
+        if (! $this->describeJoinPage->handle($business, $customer)['available']) {
+            return null;
+        }
+
+        try {
+            return $this->enrollCustomer->handle($business, $customer);
+        } catch (StampRejected) {
+            return null;
+        }
     }
 }

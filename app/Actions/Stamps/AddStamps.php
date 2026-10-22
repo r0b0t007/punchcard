@@ -21,6 +21,7 @@ use App\Models\LoyaltyCard;
 use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
+use App\Models\User;
 use App\Support\Cards\ProgressiveTiers;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\ArchivedSites;
@@ -50,6 +51,10 @@ use LogicException;
  * 4. the stamp is appended to the ledger, the progress cache follows it and
  *    stamps that add unlock rewards: cyclic cards carry the extra stamps
  *    over, progressive cards unlock each tier once and never reset.
+ *
+ * A card whose owner's account was deleted takes nothing more but corrections
+ * (CHW-253): read after the enrollment lock, which DeleteAccount also takes,
+ * so a stamp waiting on a deletion is refused once it commits.
  *
  * A refusal is a StampRejected and writes nothing. EnrollmentChanged follows
  * the commit, and so does noting the customer's account in use
@@ -130,6 +135,11 @@ final readonly class AddStamps
 
         if ($earlier instanceof StampEvent) {
             return $this->replay($earlier, $enrollment, $request);
+        }
+
+        // Read, never locked: the user row comes before the cards in DeleteAccount's lock order. The ledger stays fixable.
+        if (! $request->isCorrection() && User::query()->whereKey($enrollment->user_id)->anonymised()->exists()) {
+            throw new StampRejected(StampRejection::AccountDeleted);
         }
 
         $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);

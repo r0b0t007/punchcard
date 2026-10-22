@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Cards;
 
+use App\Actions\Stamps\StampRejected;
+use App\Enums\StampRejection;
 use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
@@ -24,6 +26,12 @@ use RuntimeException;
  * referral code. Two first taps racing for the same card meet on
  * unique(card_id, user_id), and the loser takes the winner's enrollment. Runs
  * in bypass(): the customer has no tenant.
+ *
+ * A deleted (anonymised) account is never enrolled (CHW-253): refused up
+ * front, and again after the insert, which waits on DeleteAccount's lock on
+ * the user, so a card made while the account was going is rolled back.
+ *
+ * @throws StampRejected
  */
 final readonly class EnrollCustomer
 {
@@ -39,6 +47,8 @@ final readonly class EnrollCustomer
     public function handle(Business $business, User $user): ?CardEnrollment
     {
         return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
+            $this->assertNotDeleted($user);
+
             // A running card the customer holds here comes first, so a tap never splits their progress;
             // one they hold that is paused gives way to the card the business runs now (CHW-148).
             $here = $this->chooseCard->handle($business->id, $user->id);
@@ -64,6 +74,7 @@ final readonly class EnrollCustomer
                     return DB::transaction(function () use ($card, $user): CardEnrollment {
                         $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card, 'user_id' => $user->id, 'referral_code' => $this->referralCode()]);
                         $enrollment->save();
+                        $this->assertNotDeleted($user);
 
                         return $enrollment;
                     });
@@ -74,6 +85,13 @@ final readonly class EnrollCustomer
 
             throw new RuntimeException("Could not enroll user {$user->id} on card {$card}.");
         });
+    }
+
+    private function assertNotDeleted(User $user): void
+    {
+        if (User::query()->whereKey($user->id)->anonymised()->exists()) {
+            throw new StampRejected(StampRejection::AccountDeleted);
+        }
     }
 
     private function referralCode(): string

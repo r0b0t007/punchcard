@@ -107,7 +107,8 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
         expect(StampEvent::query()->where('enrollment_id', $enrollment->id)->count())->toBe(1)
             ->and($kept->current_stamps)->toBe(1)
             ->and($kept->referral_code)->toBeNull()
-            ->and(Reward::query()->whereKey($reward->id)->value('status'))->toBe(RewardStatus::Available);
+            // Unused, it goes with the account (CHW-253): expired, still on the ledger.
+            ->and(Reward::query()->whereKey($reward->id)->value('status'))->toBe(RewardStatus::Expired);
     });
 });
 

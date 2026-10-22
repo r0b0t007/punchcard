@@ -24,4 +24,7 @@ enum RedeemRefusal: string
 
     /** That business or location is archived. */
     case SiteClosed = 'site_closed';
+
+    /** The customer's account was deleted (CHW-253). */
+    case AccountDeleted = 'account_deleted';
 }

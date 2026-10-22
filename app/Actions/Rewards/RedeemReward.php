@@ -23,7 +23,9 @@ use Illuminate\Support\Facades\DB;
  * (CHW-30, no window: the scan is the proof), at a business that honours the card (any
  * business of the franchise that does), at an open site of a business not
  * suspended (ArchivedSites' counter, CHW-22). Needs a verified
- * email: an unverified account collects stamps but never cashes out.
+ * email: an unverified account collects stamps but never cashes out. Never
+ * on a deleted account (CHW-253): DeleteAccount expires its rewards, so a
+ * redemption waiting on the reward's lock finds it gone.
  *
  * With the reward row locked (after the tap and the stamper, in ApplyTap): a
  * reward already redeemed returns its first redemption, with redeemedNow
@@ -90,6 +92,7 @@ final readonly class RedeemReward
     private function assertRedeemable(Reward $reward, User $user, RedeemPresence $presence): void
     {
         $refusal = match (true) {
+            User::query()->whereKey($user->id)->anonymised()->exists() => RedeemRefusal::AccountDeleted,
             $reward->status !== RewardStatus::Available => RedeemRefusal::Unavailable,
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
             $presence->needsRedeemWindow() && ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,

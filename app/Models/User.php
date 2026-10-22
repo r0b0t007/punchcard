@@ -185,6 +185,18 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
         $query->whereNull('anonymised_at');
     }
 
+    /**
+     * Deleted accounts kept for the ledger (DeleteAccount): what takes no
+     * more stamps, cards or redemptions (CHW-253), read again after a lock.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function anonymised(Builder $query): void
+    {
+        $query->whereNotNull('anonymised_at');
+    }
+
     /** No mail to an anonymised account: there is nobody to receive it. */
     public function routeNotificationForMail(): ?string
     {

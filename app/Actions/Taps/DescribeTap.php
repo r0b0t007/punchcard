@@ -216,6 +216,7 @@ final readonly class DescribeTap
             TapRejection::RetiredTag, TapRejection::UnassignedTag, TapRejection::StamperDisabled, TapRejection::SiteClosed => 'unavailable',
             TapRejection::CardInactive, TapRejection::NotHonoured, TapRejection::CardMisconfigured => 'card',
             TapRejection::AlreadyRedeemed => 'redeemed',
+            TapRejection::AccountDeleted => 'deleted',
             default => 'invalid',
         };
     }

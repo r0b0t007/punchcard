@@ -186,9 +186,11 @@ final class CounterScanController extends Controller
         };
 
         if ($state === null) {
-            Inertia::flash('toast', ['type' => 'error', 'message' => $rejected->rejection === StampRejection::SiteClosed
-                ? __('This site is closed: nothing was added.')
-                : __('The stamp could not be added. Try again.')]);
+            Inertia::flash('toast', ['type' => 'error', 'message' => match ($rejected->rejection) {
+                StampRejection::SiteClosed => __('This site is closed: nothing was added.'),
+                StampRejection::AccountDeleted => __('This customer\'s account was deleted: nothing was added.'),
+                default => __('The stamp could not be added. Try again.'),
+            }]);
 
             return;
         }
@@ -209,6 +211,7 @@ final class CounterScanController extends Controller
             RedeemRefusal::NotHonoured => __('This business does not honour that card.'),
             RedeemRefusal::SiteClosed => __('This site is closed: nothing was redeemed.'),
             RedeemRefusal::Unavailable => __('That reward is no longer available.'),
+            RedeemRefusal::AccountDeleted => __('This customer\'s account was deleted: nothing was redeemed.'),
             default => __('That reward is not this customer\'s.'),
         };
     }
