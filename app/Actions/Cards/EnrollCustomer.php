@@ -27,7 +27,7 @@ use RuntimeException;
  * unique(card_id, user_id), and the loser takes the winner's enrollment. Runs
  * in bypass(): the customer has no tenant.
  *
- * A deleted (anonymised) account is never enrolled (CHW-253): refused up
+ * A deleted or anonymised account is never enrolled (CHW-253): refused up
  * front, and again after the insert, which waits on DeleteAccount's lock on
  * the user, so a card made while the account was going is rolled back.
  *
@@ -89,7 +89,7 @@ final readonly class EnrollCustomer
 
     private function assertNotDeleted(User $user): void
     {
-        if (User::query()->whereKey($user->id)->anonymised()->exists()) {
+        if (User::isGone($user->id)) {
             throw new StampRejected(StampRejection::AccountDeleted);
         }
     }

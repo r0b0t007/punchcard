@@ -72,12 +72,12 @@ beforeEach(function (): void {
         app(DeleteAccount::class)->handle(User::query()->findOrFail(($user ?? $this->customer)->id));
         expect(($user ?? $this->customer)->fresh()?->isAnonymised())->toBeTrue();
     };
-    $this->tapAt = function (int $counter, ?User $user = null): Tap {
+    $this->tapAt = function (int $counter, ?User $user = null, bool $signedOut = false): Tap {
         $stamper = $this->tenants->stamper($this->tenants->a1);
         $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($stamper->nfc_tag_id));
         $url = app(FakeTap::class)->build($tag->uid, $counter);
 
-        return app(ReceiveTap::class)->handle($url['e'], $url['c'], $user ?? $this->customer, '203.0.113.7', 'Test phone');
+        return app(ReceiveTap::class)->handle($url['e'], $url['c'], $signedOut ? null : ($user ?? $this->customer), '203.0.113.7', 'Test phone');
     };
     $this->scan = function (): CounterScan {
         $this->context->set($this->tenants->orgA, $this->tenants->a1);
@@ -114,6 +114,46 @@ it('refuses a tap made before the deletion, on the card the account keeps', func
         ->and(($this->stamps)())->toBe($before)
         ->and($this->context->bypass(fn (): int => (int) $this->card->fresh()?->current_stamps))->toBe(1)
         ->and(app(DescribeTap::class)->handle($applied))->toBe(['component' => 'tap/refused', 'props' => ['reason' => 'deleted']]);
+});
+
+it('refuses a signed-out tap claimed by an account deleted meanwhile, and scrubs it as the deletion did the others', function (): void {
+    $tap = ($this->tapAt)(5, signedOut: true);
+    ($this->delete)();
+
+    $applied = app(ApplyTap::class)->handle($tap, $this->customer);
+
+    expect($applied->rejection)->toBe(TapRejection::AccountDeleted)
+        ->and($applied->user_id)->toBe($this->customer->id)
+        ->and($this->context->bypass(fn (): array => Tap::query()->whereKey($tap->id)->sole(['ip', 'user_agent'])->only(['ip', 'user_agent'])))
+        ->toBe(['ip' => null, 'user_agent' => null]);
+});
+
+it('refuses a tap, a card and a stamp for an account deleted outright', function (): void {
+    // No history: the account is deleted, not anonymised, and its empty card goes with it.
+    $other = User::factory()->create();
+    $empty = $this->tenants->enroll($other, $this->tenants->cardB);
+    $tap = ($this->tapAt)(5, signedOut: true);
+    app(DeleteAccount::class)->handle($other);
+    expect(User::query()->whereKey($other->id)->exists())->toBeFalse();
+
+    $applied = app(ApplyTap::class)->handle($tap, $other);
+
+    expect($applied->rejection)->toBe(TapRejection::AccountDeleted)
+        ->and($applied->user_id)->toBeNull()
+        ->and(($this->reason)(fn () => app(EnrollCustomer::class)->handle($this->tenants->a1, $other)))->toBe(StampRejection::AccountDeleted)
+        ->and(($this->reason)(fn () => $this->context->bypass(fn () => app(AddStamps::class)->handle($empty, StampRequest::system(StampSource::Bonus, $this->tenants->locationOf($this->tenants->b1), 'key-1')))))
+        ->toBe(StampRejection::AccountDeleted);
+});
+
+it('refuses a staff stamp on an empty card the deletion removed', function (): void {
+    // ChooseCard handed StampScan this card, unlocked, just before the deletion took it away.
+    $empty = $this->tenants->enroll($this->customer, $this->tenants->cardB);
+    ($this->delete)();
+    $staff = $this->tenants->member(User::factory()->create(), $this->tenants->b1);
+
+    expect($this->context->bypass(fn (): bool => CardEnrollment::query()->whereKey($empty->id)->exists()))->toBeFalse()
+        ->and(($this->reason)(fn () => $this->context->bypass(fn () => app(AddStamps::class)->handle($empty, StampRequest::qr($this->tenants->locationOf($this->tenants->b1), $staff, 'key-1')))))
+        ->toBe(StampRejection::AccountDeleted);
 });
 
 it('refuses a tap made before the deletion inside a redeem window, and redeems nothing', function (): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Cards;
 
 use App\Actions\Stamps\StampRejected;
+use App\Enums\StampRejection;
 use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\User;
@@ -31,8 +32,8 @@ final readonly class JoinCard
 
         try {
             return $this->enrollCustomer->handle($business, $customer);
-        } catch (StampRejected) {
-            return null;
+        } catch (StampRejected $rejected) {
+            return $rejected->rejection === StampRejection::AccountDeleted ? null : throw $rejected;
         }
     }
 }

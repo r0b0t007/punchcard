@@ -39,7 +39,8 @@ use Illuminate\Support\Facades\DB;
  *   waiting past its expiry becomes expired; one received by a signed-in
  *   customer, or already claimed, is theirs alone;
  * - the customer's key is locked next (CHW-253), so an account deletion
- *   waits for this tap or this tap for it, never both;
+ *   waits for this tap or this tap for it, never both; an account gone
+ *   meanwhile refuses the tap, its IP and user agent scrubbed;
  * - then the stamper, as ReceiveTap does (tag, stamper, then the
  *   enrollment in AddStamps): an archive ends stampers before closing
  *   anything (CloseSites), so a stamper still current under the lock keeps
@@ -90,10 +91,6 @@ final readonly class ApplyTap
     private function apply(int $tapId, User $user): Tap
     {
         $tap = $this->context->bypass(fn (): Tap => Tap::query()->whereKey($tapId)->lockForUpdate()->firstOrFail());
-        // The customer's key next, before the stamper, a reward or a card: a deletion holding them waits here, not in a
-        // cycle with this tap (DeleteAccount's order is the user, then their cards and rewards). Key share never waits
-        // on an activity note (RecordActivity), only on the user's row being locked to change it.
-        User::query()->whereKey($user->id)->lock('for key share')->value('id');
 
         if ($tap->user_id !== null && $tap->user_id !== $user->id) {
             throw new TapBelongsToAnotherCustomer;
@@ -105,6 +102,22 @@ final readonly class ApplyTap
 
         if ($tap->expires_at === null || $tap->expires_at->isPast()) {
             return $this->finish($tap, ['user_id' => $user->id, 'status' => TapStatus::Expired, 'rejection' => TapRejection::Expired]);
+        }
+
+        // The customer's key next, before the stamper, a reward or a card: a deletion holding them waits here, not in a
+        // cycle with this tap (DeleteAccount's order is the user, then their cards and rewards). Key share never waits
+        // on an activity note (RecordActivity), only on the user's row being locked to change it.
+        $customer = User::query()->whereKey($user->id)->lock('for key share')->first(['id', 'anonymised_at']);
+
+        if (! $customer instanceof User || $customer->isAnonymised()) {
+            // Gone while the tap waited: named only if the row stays, and scrubbed as the deletion scrubbed their other taps.
+            return $this->finish($tap, [
+                'user_id' => $customer?->id,
+                'status' => TapStatus::Rejected,
+                'rejection' => TapRejection::AccountDeleted,
+                'ip' => null,
+                'user_agent' => null,
+            ]);
         }
 
         [$stamper, $business] = $this->context->bypass(fn (): array => [

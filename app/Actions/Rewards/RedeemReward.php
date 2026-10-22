@@ -92,7 +92,7 @@ final readonly class RedeemReward
     private function assertRedeemable(Reward $reward, User $user, RedeemPresence $presence): void
     {
         $refusal = match (true) {
-            User::query()->whereKey($user->id)->anonymised()->exists() => RedeemRefusal::AccountDeleted,
+            User::isGone($user->id) => RedeemRefusal::AccountDeleted,
             $reward->status !== RewardStatus::Available => RedeemRefusal::Unavailable,
             ! $user->hasVerifiedEmail() => RedeemRefusal::Unverified,
             $presence->needsRedeemWindow() && ! $reward->isRedeemWindowOpenAt($presence->at) => RedeemRefusal::OutsideWindow,

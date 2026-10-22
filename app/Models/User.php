@@ -186,15 +186,13 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     }
 
     /**
-     * Deleted accounts kept for the ledger (DeleteAccount): what takes no
-     * more stamps, cards or redemptions (CHW-253), read again after a lock.
-     *
-     * @param  Builder<self>  $query
+     * Whether the account is gone, read fresh (after a lock): deleted, or
+     * anonymised and kept for the ledger (DeleteAccount). A gone account
+     * takes no more stamps, cards or redemptions (CHW-253).
      */
-    #[Scope]
-    protected function anonymised(Builder $query): void
+    public static function isGone(int $id): bool
     {
-        $query->whereNotNull('anonymised_at');
+        return ! self::query()->whereKey($id)->notAnonymised()->exists();
     }
 
     /** No mail to an anonymised account: there is nobody to receive it. */

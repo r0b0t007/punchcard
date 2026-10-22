@@ -27,6 +27,7 @@ use App\Support\LocalMoment;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -80,7 +81,7 @@ final readonly class AddStamps
         }
 
         try {
-            $result = $this->attempt($enrollment->id, $request);
+            $result = $this->attempt($enrollment, $request);
         } catch (UniqueConstraintViolationException $duplicate) {
             // A request with a key may have raced another on it: the second attempt
             // finds the first and replays or refuses it. Anything else rethrows again.
@@ -88,7 +89,7 @@ final readonly class AddStamps
                 throw $duplicate;
             }
 
-            $result = $this->attempt($enrollment->id, $request);
+            $result = $this->attempt($enrollment, $request);
         }
 
         if (! $result->replayed) {
@@ -108,11 +109,18 @@ final readonly class AddStamps
         return $result;
     }
 
-    private function attempt(int $enrollmentId, StampRequest $request): StampResult
+    private function attempt(CardEnrollment $given, StampRequest $request): StampResult
     {
-        return DB::transaction(fn (): StampResult => $this->context->bypass(function () use ($enrollmentId, $request): StampResult {
+        return DB::transaction(fn (): StampResult => $this->context->bypass(function () use ($given, $request): StampResult {
             $stamper = $request->stamperId === null ? null : Stamper::query()->whereKey($request->stamperId)->lockForUpdate()->first();
-            $enrollment = CardEnrollment::query()->whereKey($enrollmentId)->lockForUpdate()->firstOrFail();
+            $enrollment = CardEnrollment::query()->whereKey($given->id)->lockForUpdate()->first();
+
+            if (! $enrollment instanceof CardEnrollment) {
+                // A card with nothing on it goes with a deleted account (DeleteAccount): say so, not "not found".
+                throw User::isGone((int) $given->user_id)
+                    ? new StampRejected(StampRejection::AccountDeleted)
+                    : (new ModelNotFoundException)->setModel(CardEnrollment::class, [$given->id]);
+            }
 
             try {
                 return $this->stampLocked($enrollment, $stamper, $request);
@@ -138,7 +146,7 @@ final readonly class AddStamps
         }
 
         // Read, never locked: the user row comes before the cards in DeleteAccount's lock order. The ledger stays fixable.
-        if (! $request->isCorrection() && User::query()->whereKey($enrollment->user_id)->anonymised()->exists()) {
+        if (! $request->isCorrection() && User::isGone((int) $enrollment->user_id)) {
             throw new StampRejected(StampRejection::AccountDeleted);
         }
 
