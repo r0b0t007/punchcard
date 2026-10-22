@@ -92,6 +92,7 @@ final readonly class ExportMyData
                     'created_at' => $this->date($user->created_at),
                     'last_active_at' => $this->date($user->last_active_at),
                     'inactivity_warned_at' => $this->date($user->inactivity_warned_at),
+                    'inactivity_deletes_at' => $this->date($user->inactivity_deletes_at),
                     'adult_confirmed_at' => $this->date($user->adult_confirmed_at),
                     'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
                 ],

@@ -15,6 +15,7 @@ use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -43,6 +44,11 @@ use LogicException;
  * are locked first, so a stamp cannot slip in between the check and the
  * delete; should the ledger still refuse the delete, the user is anonymised
  * instead. Works across tenants, in bypass().
+ *
+ * The inactivity sweep (AnonymiseInactiveAccounts) passes stillDue, checked
+ * once the user row and their cards are locked: false leaves the account as
+ * it is, so a sign-in or a stamp racing the sweep wins. Returns whether the
+ * account went.
  */
 final readonly class DeleteAccount
 {
@@ -54,13 +60,20 @@ final readonly class DeleteAccount
         private MustHandOverBusiness $mustHandOverBusiness,
     ) {}
 
-    public function handle(User $user): void
+    /** @param  (Closure(): bool)|null  $stillDue */
+    public function handle(User $user, ?Closure $stillDue = null): bool
     {
-        DB::transaction(fn () => $this->context->bypass(function () use ($user): void {
-            // Their taps first, in ApplyTap's order (tap, then enrollment, then the user's key), so the two never deadlock.
+        return DB::transaction(fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
+            // Their taps first, in ApplyTap's order for a tap made signed in (tap, then enrollment, then the user's key), so
+            // the two never deadlock. A signed-out tap being claimed at that moment has no user yet: Postgres may fail one of
+            // the two, and the claim or the next sweep simply runs again.
             Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
             User::query()->whereKey($user->id)->lockForUpdate()->value('id');
             CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
+
+            if ($stillDue instanceof Closure && ! $stillDue()) {
+                return false;
+            }
 
             if ($this->mustHandOverBusiness->handle($user)) {
                 throw new LogicException('An owner or org admin hands over or closes the business before deleting their account.');
@@ -74,10 +87,12 @@ final readonly class DeleteAccount
             Stamper::query()->where('armed_by', $user->id)->update(Stamper::DISARMED);
 
             if (! $this->hasHistory($user) && $this->deleted($user)) {
-                return;
+                return true;
             }
 
             $this->anonymise($user);
+
+            return true;
         }));
     }
 
@@ -134,6 +149,7 @@ final readonly class DeleteAccount
             // Nor when it was last used: there is nobody left to warn (CHW-58).
             'last_active_at' => null,
             'inactivity_warned_at' => null,
+            'inactivity_deletes_at' => null,
             'adult_confirmed_at' => null,
             'pending_email' => null,
             'pending_email_expires_at' => null,

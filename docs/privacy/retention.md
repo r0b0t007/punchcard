@@ -30,3 +30,8 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
   customer asks for: deleted if it has no history, otherwise anonymised.
 - **Never swept**: owners, staff, org admins and platform admins (their accounts follow their membership), and accounts
   already anonymised.
+- **Built** (CHW-58): `users.last_active_at` (`RecordActivity`), then every night at 03:30 UTC `WarnInactiveAccounts`
+  and `AnonymiseInactiveAccounts`, limits in `config/punchcard.php` (`privacy`). A warning is written only after its
+  email went, with the day it promised (`inactivity_deletes_at`): never deleted before that day, whatever the limits
+  say later. A tap, stamp, redemption or sign-in as the sweep runs keeps the account. The jobs log counts, and an
+  account that fails by id only, never a name or address.

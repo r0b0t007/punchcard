@@ -40,6 +40,6 @@ customers in France or elsewhere in the EU are also covered by the GDPR. These d
 - Franchise isolation: a franchisee only sees customers who stamped with it in person (ADR 0006).
 
 Live with CHW-58: news on and off in the settings with each change logged (C12, `consent_events`), the places followed
-in the settings, and downloading one's data (JSON, after confirming it's them). Still to come: an unsubscribe link in
-news emails, and the inactivity rule (retention.md). The drafts below describe the app once they are live: check each
-one before filing or publishing.
+in the settings, downloading one's data (JSON, after confirming it's them), and the inactivity rule (retention.md):
+last use noted, a warning email 30 days ahead, then deletion or anonymisation. Still to come: an unsubscribe link in news
+emails. The drafts below describe the app once they are live: check each one before filing or publishing.
