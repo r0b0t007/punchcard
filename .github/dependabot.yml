@@ -31,8 +31,10 @@ updates:
     cooldown:
       default-days: 5
     groups:
-      # Vite+ pins its own Vite core and Vitest: bump them together, then
-      # align the `vitest` override in package.json to the version `vp --version` shows.
+      # Vite+ pins its own Vite core and Vitest: bump them together. Dependabot only moves
+      # `vite-plus` itself (it cannot follow the `vite` npm: alias), so its PR needs a commit on
+      # top: `vp migrate` to align the `vite` alias to the same vite-plus-core version, then the
+      # `vitest` override in package.json to the version `vp --version` shows (#78, #102).
       vite-plus:
         patterns: ["vite-plus", "vite", "@voidzero-dev/*"]
       react:
