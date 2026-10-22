@@ -21,6 +21,7 @@ use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\StamperController;
 use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
+use App\Http\Controllers\VerificationController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
 use Illuminate\Support\Facades\Route;
@@ -87,6 +88,9 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
         Route::post('staff/invitations', [StaffController::class, 'invite'])->middleware('throttle:staff-invite')->name('staff.invitations.store');
         Route::delete('staff/invitations/{invitation}', [StaffController::class, 'cancelInvitation'])->whereNumber('invitation')->name('staff.invitations.destroy');
         Route::delete('staff/{member}', [StaffController::class, 'destroy'])->whereNumber('member')->name('staff.destroy');
+        // Verify your business (CHW-145): its documents, sent by whoever runs it, never shown back.
+        Route::get('verification', [VerificationController::class, 'show'])->name('verification.show');
+        Route::post('verification/{kind}', [VerificationController::class, 'store'])->middleware('throttle:verification-upload')->name('verification.store');
     });
 });
 

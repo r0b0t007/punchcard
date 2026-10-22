@@ -20,12 +20,13 @@ final readonly class Impersonation
     private const string KEY = 'impersonation';
 
     /**
-     * The business app's pages, to read: the dashboard, cards, counter, onboarding, QR stand, staff and stampers,
-     * and the page an owner who hasn't verified their email is sent to instead (its resend stays refused).
+     * The business app's pages, to read: the dashboard, cards, counter, onboarding, QR stand, staff, stampers and
+     * verification (never its upload), and the page an owner who hasn't verified their email is sent to instead (its
+     * resend stays refused).
      */
     private const array PAGES = [
         'start', 'verification.notice', 'dashboard', 'cards.index', 'cards.create', 'cards.edit', 'counter.show', 'counter.scan', 'counter.scans.show',
-        'onboarding.show', 'onboarding.step', 'business.qr-stand', 'staff.index', 'stampers.index',
+        'onboarding.show', 'onboarding.step', 'business.qr-stand', 'staff.index', 'stampers.index', 'verification.show',
     ];
 
     public function __construct(

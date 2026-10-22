@@ -29,6 +29,7 @@ Run 'composer require --with-all-dependencies filament/filament spatie/laravel-p
 Step 'Environment'
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 Run 'php artisan key:generate --ansi'
+Run 'php artisan punchcard:documents-key --ansi'
 
 Step 'Publishing package config'
 Run 'php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --ansi'

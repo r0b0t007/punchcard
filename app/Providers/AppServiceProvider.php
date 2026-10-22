@@ -239,6 +239,9 @@ class AppServiceProvider extends ServiceProvider
         // Staff invitations (CHW-146): each mails an address, so a few an hour per owner.
         RateLimiter::for('staff-invite', fn (Request $request): Limit => Limit::perHour(20)->by('staff-invite:'.$request->user()?->getAuthIdentifier()));
 
+        // Verification documents (CHW-145): a few tries per document, never a stream of 10 MB files.
+        RateLimiter::for('verification-upload', fn (Request $request): Limit => Limit::perHour(20)->by('verification-upload:'.$request->user()?->getAuthIdentifier()));
+
         // Email sign-in links (CHW-23): a few per address typed from one client address (from elsewhere, the
         // customer still gets theirs), so many per address typed from anywhere (no inbox is flooded; whoever uses
         // it up delays a customer's link by an hour at most, who stays signed in for a year anyway), some per

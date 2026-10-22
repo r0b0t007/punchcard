@@ -23,6 +23,7 @@ composer require --with-all-dependencies filament/filament spatie/laravel-permis
 step "Environment"
 [ -f .env ] || cp .env.example .env
 php artisan key:generate --ansi
+php artisan punchcard:documents-key --ansi
 
 step "Publishing package config"
 php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --ansi

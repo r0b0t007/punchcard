@@ -4,11 +4,14 @@ import type { ReactNode } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { qrStand } from '@/routes/business';
 import { index as staff } from '@/routes/staff';
+import { show as verification } from '@/routes/verification';
 
 export type Checklist = {
     qrStand: boolean;
     stamperPlaced: boolean;
     staffInvited: boolean;
+    /** Both verification documents sent, waiting or accepted (CHW-145). */
+    documentsSent: boolean;
 };
 
 /**
@@ -25,7 +28,8 @@ export default function SetupChecklist({
     if (
         checklist.qrStand &&
         checklist.stamperPlaced &&
-        checklist.staffInvited
+        checklist.staffInvited &&
+        checklist.documentsSent
     ) {
         return null;
     }
@@ -66,6 +70,21 @@ export default function SetupChecklist({
                         {t(
                             'They stamp cards and redeem rewards at the counter.',
                         )}
+                    </p>
+                </Item>
+                <Item done={checklist.documentsSent}>
+                    <Link
+                        href={verification()}
+                        className="font-medium underline underline-offset-4"
+                    >
+                        {t('Verify your business')}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                        {checklist.documentsSent
+                            ? t("Sent: we're checking them.")
+                            : t(
+                                  'Send an ID and a proof of address. Your business works meanwhile.',
+                              )}
                     </p>
                 </Item>
             </ul>

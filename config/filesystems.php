@@ -40,6 +40,17 @@ return [
             'report' => false,
         ],
 
+        // Business verification documents (CHW-145): encrypted, never served by Laravel (no `serve`, no `url`);
+        // only the platform admin reads one, through an audited route.
+        'documents' => [
+            'driver' => 'local',
+            // Not under the `local` disk's root, which Laravel serves to signed URLs.
+            'root' => storage_path('app/documents'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
