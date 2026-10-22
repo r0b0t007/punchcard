@@ -39,6 +39,20 @@ final readonly class StopImpersonation
 
     public function __construct(private TenantContext $context, private RecordAudit $recordAudit) {}
 
+    /** How an end's reason reads in the audit log (A1); stored as its code. */
+    public static function label(string $reason): string
+    {
+        return match ($reason) {
+            self::BACK => __('Back to admin'),
+            self::EXPIRED => __('Time ran out'),
+            self::SIGNED_OUT => __('Signed out'),
+            self::REFUSED_TWICE => __('Sent to refused pages in a row'),
+            self::OWNER_GONE => __('The owner\'s account went'),
+            self::ADMIN_GONE => __('The admin\'s access went'),
+            default => $reason,
+        };
+    }
+
     public function handle(Session $session, string $why): ?Impersonation
     {
         $impersonation = Impersonation::of($session);

@@ -900,5 +900,11 @@
     "You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.": "Vous voyez l’application du commerce comme son propriétaire, en lecture seule, pendant :minutes minutes. Le début et la fin sont conservés dans le journal d’audit.",
     "Your password": "Votre mot de passe",
     "The owner's account is no longer available: you are back in admin.": "Le compte du propriétaire n’est plus disponible : vous êtes de retour dans l’administration.",
-    "The owner's app sent you to a page you can't read as them: you are back in admin.": "L’application du propriétaire vous a envoyé vers une page que vous ne pouvez pas lire à sa place : vous êtes de retour dans l’administration."
+    "The owner's app sent you to a page you can't read as them: you are back in admin.": "L’application du propriétaire vous a envoyé vers une page que vous ne pouvez pas lire à sa place : vous êtes de retour dans l’administration.",
+    "Back to admin": "Retour à l’administration",
+    "Time ran out": "Temps écoulé",
+    "Signed out": "Déconnexion",
+    "Sent to refused pages in a row": "Envoyé vers des pages refusées à la suite",
+    "The owner's account went": "Le compte du propriétaire n’existe plus",
+    "The admin's access went": "L’accès de l’administrateur n’existe plus"
 }

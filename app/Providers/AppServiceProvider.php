@@ -165,11 +165,6 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * A new tap claim token at sign-in (Login fires once the session id is
-     * regenerated), so a session id planted before sign-in can't claim the
-     * taps made later in that browser (TapSession, CHW-142).
-     */
-    /**
      * Signed in as an owner (CHW-144): the database session row names the
      * admin (ImpersonationSessionHandler), and an owner's session signed out
      * under the admin (their password changed elsewhere) still records the
@@ -191,6 +186,11 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * A new tap claim token at sign-in (Login fires once the session id is
+     * regenerated), so a session id planted before sign-in can't claim the
+     * taps made later in that browser (TapSession, CHW-142).
+     */
     private function rekeyTapClaimTokenAtSignIn(): void
     {
         Event::listen(Login::class, function (): void {

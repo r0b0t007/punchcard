@@ -21,13 +21,14 @@ use Symfony\Component\HttpFoundation\Response;
  * on the next request; signing out goes back to admin instead; and only the
  * business app's pages may be read (Impersonation::allows). Every change,
  * the owner's own account, customer side and taps, and the admin panel are
- * refused with a toast, before anything runs. A page refused again before
- * any page showed (the business app itself sends there) goes back to admin,
- * never round in circles. Runs in the web group and the admin panel.
+ * refused with a toast, before anything runs. When the dashboard a refusal
+ * sends to sends on to a refused page itself (the owner lost the business,
+ * say), the admin goes back to admin, never round in circles. Runs in the
+ * web group and the admin panel.
  */
 final readonly class WhileImpersonating
 {
-    /** Set by a refused page, cleared once a page shows: a second refusal in between is a loop. */
+    /** "sent": a page was refused, on to the dashboard; "looping": the dashboard sent on again. */
     private const string REFUSED = 'impersonation.refused';
 
     public function __construct(private StopImpersonation $stopImpersonation) {}
@@ -58,8 +59,11 @@ final readonly class WhileImpersonating
 
         if (Impersonation::allows($request->route(), $request->method())) {
             $response = $next($request);
+            $sentOn = $request->routeIs('dashboard') && $response->isRedirection() && $request->session()->get(self::REFUSED) === 'sent';
 
-            if ($response->isSuccessful()) {
+            if ($sentOn) {
+                $request->session()->put(self::REFUSED, 'looping');
+            } else {
                 $request->session()->forget(self::REFUSED);
             }
 
@@ -108,7 +112,7 @@ final readonly class WhileImpersonating
 
     private function refuse(Request $request, Impersonation $impersonation): Response
     {
-        if ($request->isMethodSafe() && $request->session()->get(self::REFUSED) === true) {
+        if ($request->isMethodSafe() && $request->session()->get(self::REFUSED) === 'looping') {
             return $this->end($request, $impersonation, StopImpersonation::REFUSED_TWICE);
         }
 
@@ -124,7 +128,7 @@ final readonly class WhileImpersonating
             return back(303);
         }
 
-        $request->session()->put(self::REFUSED, true);
+        $request->session()->put(self::REFUSED, 'sent');
 
         return to_route('dashboard');
     }

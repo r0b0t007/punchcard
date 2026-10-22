@@ -6,12 +6,9 @@ namespace App\Filament\Resources\Businesses\Actions;
 
 use App\Actions\Admin\ImpersonationRefused;
 use App\Actions\Admin\StartImpersonation;
-use App\Enums\BusinessStatus;
 use App\Enums\PlatformRole;
-use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
 use App\Models\User;
-use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -37,9 +34,7 @@ final class ImpersonateOwnerAction
             ->icon(Heroicon::OutlinedEye)
             ->color('gray')
             ->authorize(fn (Business $record): bool => Gate::allows('impersonate', $record))
-            ->visible(fn (Business $record): bool => $record->status !== BusinessStatus::Suspended
-                && ! BusinessesTable::archivedAt($record) instanceof CarbonInterface
-                && self::owners($record)->isNotEmpty())
+            ->visible(fn (Business $record): bool => self::operating($record) && self::owners($record)->isNotEmpty())
             ->modalDescription(__('You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.', [
                 'minutes' => (int) config('punchcard.admin.impersonation_minutes'),
             ]))
@@ -67,6 +62,15 @@ final class ImpersonateOwnerAction
 
                 $action->redirect(route('dashboard'));
             });
+    }
+
+    /** Whether it operates (Business::operating, as StartImpersonation checks): read once per record. */
+    private static function operating(Business $record): bool
+    {
+        /** @var WeakMap<Business, bool> $read */
+        static $read = new WeakMap;
+
+        return $read[$record] ??= Business::query()->whereKey($record->id)->operating()->exists();
     }
 
     /**

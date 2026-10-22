@@ -244,19 +244,43 @@ it('shows an owner who hasn\'t verified their email what they see: the page aski
     expect(Auth::id())->toBe($this->owner->id);
 });
 
-it('goes back to admin instead of round in circles when the owner\'s app sends a refused page to another', function (): void {
+it('just refuses pages opened one after another, in one tab or two', function (): void {
     ($this->start)();
 
-    // A refused page, then the dashboard shown: just a toast.
     $this->get(route('app.cards'))->assertRedirect(route('dashboard'));
-    $this->get(route('staff.index'))->assertOk();
     $this->get(route('app.qr'))->assertRedirect(route('dashboard'));
-    expect(Auth::id())->toBe($this->owner->id);
+    $this->get(route('staff.index'))->assertOk();
+    $this->get(route('profile.edit'))->assertRedirect(route('dashboard'));
 
-    // A refused page again before any page showed: back to admin.
-    $this->get(route('profile.edit'))->assertRedirect(route('filament.admin.resources.businesses.view', $this->tenants->a2->id));
+    expect(Auth::id())->toBe($this->owner->id);
+});
+
+it('goes back to admin instead of round in circles when the owner no longer runs the business', function (Closure $change): void {
+    ($this->start)();
+    $change->call($this);
+
+    // No business to resolve: the dashboard sends on to My cards, refused again.
+    $this->get(route('app.cards'))->assertRedirect(route('dashboard'));
+    $this->get(route('dashboard'))->assertRedirect(route('app.cards'));
+    $this->get(route('app.cards'))->assertRedirect(route('filament.admin.resources.businesses.view', $this->tenants->a2->id));
+
     expect(Auth::id())->toBe($this->admin->id)
         ->and(collect(($this->audits)())->last())->toMatchArray(['action' => 'impersonation.ended', 'reason' => StopImpersonation::REFUSED_TWICE]);
+})->with([
+    'removed as owner' => [fn () => $this->context->bypass(fn () => $this->tenants->a2->members()->detach($this->owner->id))],
+    'the business suspended' => [fn () => $this->context->bypass(fn () => $this->tenants->a2->forceFill(['status' => BusinessStatus::Suspended])->save())],
+]);
+
+it('shows each end\'s reason in the admin\'s language in the business\'s audit log', function (): void {
+    ($this->start)();
+    $this->post(route('impersonation.stop'));
+    app()->setLocale('fr');
+    Filament::setCurrentPanel('admin');
+    Filament::setServingStatus();
+
+    $this->context->bypass(fn () => Livewire::test(ViewBusiness::class, ['record' => $this->tenants->a2->getRouteKey()])
+        ->assertSee('Retour à l’administration')
+        ->assertDontSee('>back<', false));
 });
 
 it('ends when either account goes, or the admin loses the panel, and says who it was', function (Closure $change, string $reason, ?bool $adminBack): void {

@@ -65,8 +65,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // NeverCache wraps the tap routes' auth and throttle, so a login redirect or a 429 is no-store too.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: NeverCache::class);
 
-        // Signed in as an owner (CHW-144): refused before any route's own middleware (auth, a confirmation, bindings) answers.
-        $middleware->prependToPriorityList(before: NeverCache::class, prepend: WhileImpersonating::class);
+        // Signed in as an owner (CHW-144): refused before any route's own middleware (auth, a confirmation, bindings) answers,
+        // inside NeverCache, so a refusal is no-store too...
+        $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: WhileImpersonating::class);
         // ...in the language of whoever reads the refusal.
         $middleware->prependToPriorityList(before: WhileImpersonating::class, prepend: SetLocale::class);
 

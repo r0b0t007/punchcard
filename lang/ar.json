@@ -900,5 +900,11 @@
     "You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.": "ترى تطبيق النشاط كما يراه مالكه، للقراءة فقط، لمدة :minutes دقيقة. يُحفظ البدء والانتهاء في سجل التدقيق.",
     "Your password": "كلمة مرورك",
     "The owner's account is no longer available: you are back in admin.": "لم يعد حساب المالك متاحًا: عدت إلى الإدارة.",
-    "The owner's app sent you to a page you can't read as them: you are back in admin.": "أرسلك تطبيق المالك إلى صفحة لا يمكنك قراءتها باسمه: عدت إلى الإدارة."
+    "The owner's app sent you to a page you can't read as them: you are back in admin.": "أرسلك تطبيق المالك إلى صفحة لا يمكنك قراءتها باسمه: عدت إلى الإدارة.",
+    "Back to admin": "العودة إلى الإدارة",
+    "Time ran out": "انتهى الوقت",
+    "Signed out": "تسجيل الخروج",
+    "Sent to refused pages in a row": "أُرسل إلى صفحات مرفوضة على التوالي",
+    "The owner's account went": "لم يعد حساب المالك موجودًا",
+    "The admin's access went": "لم يعد للمسؤول وصول"
 }
