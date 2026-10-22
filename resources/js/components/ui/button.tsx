@@ -21,6 +21,9 @@ const buttonVariants = cva(
         "ghost-destructive":
           "text-destructive hover:bg-destructive/10 hover:text-destructive",
         link: "text-primary underline-offset-4 hover:underline",
+        // An outline on a primary (espresso) surface: the impersonation bar's Back to admin (CHW-144).
+        "on-primary":
+          "border border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10",
         // Saffron, for the action that gives stamps (CHW-30, S2: "Add 2 stamps"); stamps and rewards only.
         stamp: "bg-stamp text-stamp-foreground shadow-xs hover:bg-stamp/90",
       },

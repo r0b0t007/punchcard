@@ -52,7 +52,7 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - `require-static-classes`: no built class names like `` `bg-${color}` ``; map values to full class strings.
 - `components/ui/*` is ignored (shadcn source). `pages/welcome.tsx` skips the colour and arbitrary-value rules until the marketing home replaces it (CHW-62).
 - The plugin reads component files with `oxc-parser` when its native binary loads (CI on Linux) and falls back to `@typescript-eslint/parser` otherwise (a Windows Application Control policy blocks the binary on the main dev machine). The choice cannot be pinned in config, so **CI is authoritative**; if local and CI ever disagree, fix what CI reports.
-- Variants added for treatments the rules would otherwise reject: `Button` `ghost-destructive` (quiet delete actions in lists), `SidebarMenuButton` `trigger` (opens a menu, stays highlighted while open) and `muted` (secondary links). Utility `transition-size` animates width and height only.
+- Variants added for treatments the rules would otherwise reject: `Button` `ghost-destructive` (quiet delete actions in lists), `SidebarMenuButton` `trigger` (opens a menu, stays highlighted while open) and `muted` (secondary links). `Button` `on-primary`: an outline on an espresso surface (the impersonation bar, CHW-144). Utility `transition-size` animates width and height only.
 
 ## RTL and i18n
 

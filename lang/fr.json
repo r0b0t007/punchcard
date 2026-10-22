@@ -908,5 +908,6 @@
     "The owner's account went": "Le compte du propriétaire n’existe plus",
     "The admin's access went": "L’accès de l’administrateur n’existe plus",
     "You're signed in as :name": "Vous êtes connecté en tant que :name",
-    ":business · Read-only · Ends at :time": ":business · Lecture seule · Fin à :time"
+    ":business · Read-only · Ends at :time": ":business · Lecture seule · Fin à :time",
+    "Signed in as the owner": "Connecté en tant que propriétaire"
 }

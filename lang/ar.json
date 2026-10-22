@@ -908,5 +908,6 @@
     "The owner's account went": "لم يعد حساب المالك موجودًا",
     "The admin's access went": "لم يعد للمسؤول وصول",
     "You're signed in as :name": "أنت متصل باسم :name",
-    ":business · Read-only · Ends at :time": ":business · للقراءة فقط · ينتهي عند :time"
+    ":business · Read-only · Ends at :time": ":business · للقراءة فقط · ينتهي عند :time",
+    "Signed in as the owner": "متصل باسم المالك"
 }
