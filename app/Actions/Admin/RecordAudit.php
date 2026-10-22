@@ -26,14 +26,19 @@ final readonly class RecordAudit
 {
     public function __construct(private TenantContext $context) {}
 
-    /** @param  array<string, mixed>  $context */
-    public function handle(string $action, Model $subject, ?string $reason = null, array $context = []): AuditLog
+    /**
+     * The actor is whoever is signed in, unless named: the admin behind an
+     * impersonation (CHW-144) acts while the session is someone else's.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function handle(string $action, Model $subject, ?string $reason = null, array $context = [], ?User $actor = null): AuditLog
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('An audit entry is recorded in its action\'s transaction, so the two commit or roll back together.');
         }
 
-        $actor = Auth::user();
+        $actor ??= Auth::user();
         $reason = trim((string) $reason);
 
         // The actor's row under KEY SHARE: an account deletion (DeleteAccount locks the row) either

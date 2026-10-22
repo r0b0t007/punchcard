@@ -20,6 +20,12 @@ declare module '@inertiajs/core' {
                 counter: boolean;
                 stampers: boolean;
             };
+            /** The platform admin signed in as this owner (CHW-144): read-only until endsAt. */
+            impersonating: {
+                owner: string;
+                business: string;
+                endsAt: string;
+            } | null;
             /** The installable app the page belongs to (UsePwa, CHW-35). */
             pwa: Pwa;
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */

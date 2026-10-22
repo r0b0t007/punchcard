@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\Schemas;
 
+use App\Actions\Admin\StopImpersonation;
 use App\Enums\BusinessRole;
 use App\Filament\AdminTime;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
+use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\Location;
 use App\Models\User;
@@ -71,7 +73,9 @@ final class BusinessInfolist
                         TextEntry::make('created_at')->label(__('When'))->dateTime($at),
                         TextEntry::make('action')->label(__('Action'))->fontFamily('mono'),
                         TextEntry::make('actor_label')->label(__('By')),
-                        TextEntry::make('reason')->label(__('Reason'))->placeholder('—'),
+                        TextEntry::make('reason')->label(__('Reason'))->placeholder('—')
+                            // An impersonation's end is a code (CHW-144): read in the admin's language.
+                            ->formatStateUsing(fn (string $state, AuditLog $record): string => $record->action === 'impersonation.ended' ? StopImpersonation::label($state) : $state),
                     ]),
             ]),
         ]);

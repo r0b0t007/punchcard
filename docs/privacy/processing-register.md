@@ -87,7 +87,9 @@ Common to every entry:
 - **People**: owners, staff, org admins, platform admins.
 - **Data**: the same account data as T1; membership and role per business; staff invitations (email, one month after
   use or expiry); stamps given and rewards handed over (staff identity, visible to their business); the platform audit
-  log (who did what, never key material); later the verification documents (ID and proof of address, CHW-145).
+  log (who did what, never key material), including each time the platform admin signs in as an owner to support
+  them (start and end, read-only, 30 minutes at most, CHW-144); later the verification documents (ID and proof of
+  address, CHW-145).
 - **Recipients**: punchcard; the business's owners for their own staff.
 - **Retention**: while the membership exists; audit log to decide (retention.md).
 

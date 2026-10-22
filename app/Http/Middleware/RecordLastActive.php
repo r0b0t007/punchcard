@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Actions\Account\RecordActivity;
 use App\Models\User;
+use App\Support\Auth\Impersonation;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * A signed-in request is activity (CHW-58, RecordActivity). Everything the
  * request notes, a stamp or a redemption too, is written once the response
  * is sent: no response waits on the user row, and signing in counts. With the
- * user the guard already has: at most one change to the row a day.
+ * user the guard already has: at most one change to the row a day. Never
+ * the owner the platform admin is signed in as (CHW-144): not their use.
  */
 final readonly class RecordLastActive
 {
@@ -33,7 +35,8 @@ final readonly class RecordLastActive
     public function terminate(Request $request): void
     {
         $user = $request->user();
+        $impersonated = $request->hasSession() && Impersonation::of($request->session()) instanceof Impersonation;
 
-        $this->recordActivity->release($user instanceof User ? $user : null, now());
+        $this->recordActivity->release($user instanceof User && ! $impersonated ? $user : null, now());
     }
 }

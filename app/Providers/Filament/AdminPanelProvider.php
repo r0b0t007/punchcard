@@ -7,6 +7,7 @@ namespace App\Providers\Filament;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
 use App\Http\Middleware\RecordLastActive;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\WhileImpersonating;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -52,6 +53,8 @@ class AdminPanelProvider extends PanelProvider
                 StartSession::class,
                 AuthenticateSession::class,
                 SetLocale::class,
+                // Signed in as an owner (CHW-144): back to admin first.
+                WhileImpersonating::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,

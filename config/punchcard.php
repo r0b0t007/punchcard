@@ -64,6 +64,11 @@ return [
         'warnings_per_run' => (int) env('INACTIVITY_WARNINGS_PER_RUN', 500),
     ],
 
+    'admin' => [
+        // The platform admin signed in as a business owner (CHW-144): read-only, back to admin after this long.
+        'impersonation_minutes' => 30,
+    ],
+
     'member_qr' => [
         // Rotating member QR for phones without NFC (TOTP-style window).
         'window_seconds' => 30,

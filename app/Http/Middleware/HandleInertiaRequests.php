@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Actions\Tenancy\HasMemberships;
 use App\Models\LoyaltyCard;
 use App\Models\User;
+use App\Support\Auth\Impersonation;
 use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
 use App\Support\Tenancy\TenantContext;
@@ -57,6 +58,8 @@ class HandleInertiaRequests extends Middleware
             // Face ID or a fingerprint next time, offered after an email-link sign-in (CHW-23).
             'offerPasskey' => fn (): bool => $request->user() instanceof User && $request->hasSession()
                 && PasskeyOffer::holds($request->session(), $request->user()),
+            // The platform admin signed in as an owner (CHW-144): whom, where, until when, for the banner.
+            'impersonating' => fn (): ?array => $this->impersonating($request),
             // The installable app the page belongs to, if any (UsePwa, CHW-35).
             'pwa' => null,
             'nav' => fn (): array => [
@@ -79,6 +82,18 @@ class HandleInertiaRequests extends Middleware
             'translations' => Inertia::once(fn (): array => Locales::translations($locale))
                 ->as('translations-'.$locale),
         ];
+    }
+
+    /** @return array{owner: string, business: string, endsAt: string}|null */
+    private function impersonating(Request $request): ?array
+    {
+        $impersonation = $request->hasSession() ? Impersonation::of($request->session()) : null;
+
+        if (! $impersonation instanceof Impersonation || $request->user()?->getAuthIdentifier() !== $impersonation->ownerId) {
+            return null;
+        }
+
+        return ['owner' => (string) $request->user()->name, 'business' => $impersonation->businessName, 'endsAt' => $impersonation->endsAt->toIso8601String()];
     }
 
     /** Whether the user works in a business (owner, staff or HQ), so has a counter there; no business, no counter. */
