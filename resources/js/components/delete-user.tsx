@@ -71,10 +71,10 @@ export default function DeleteUser({
                         <DialogDescription>
                             {hasPassword
                                 ? t(
-                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Please enter your password to confirm.",
+                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Rewards you haven't used go with it. Please enter your password to confirm.",
                                   )
                                 : t(
-                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct.",
+                                      "Once your account is deleted, you can no longer sign in. Stamps you collected or gave stay in the cafés' records without your name or email, so their counts stay correct. Rewards you haven't used go with it.",
                                   )}
                         </DialogDescription>
 

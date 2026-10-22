@@ -44,7 +44,7 @@ class RejectedTapsRelationManager extends RelationManager
             ])
             ->filters([
                 SelectFilter::make('rejection')->label(__('Reason'))
-                    ->options(collect(TapRejection::visibleToBusiness())->mapWithKeys(fn (TapRejection $reason): array => [$reason->value => $reason->getLabel()])->all()),
+                    ->options(collect([...TapRejection::visibleToBusiness(), TapRejection::AccountDeleted])->mapWithKeys(fn (TapRejection $reason): array => [$reason->value => $reason->getLabel()])->all()),
             ]);
     }
 }

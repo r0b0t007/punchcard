@@ -21,11 +21,13 @@ use App\Models\LoyaltyCard;
 use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
+use App\Models\User;
 use App\Support\Cards\ProgressiveTiers;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -51,6 +53,10 @@ use LogicException;
  *    stamps that add unlock rewards: cyclic cards carry the extra stamps
  *    over, progressive cards unlock each tier once and never reset.
  *
+ * A card whose owner's account was deleted takes nothing more but corrections
+ * (CHW-253): read after the enrollment lock, which DeleteAccount also takes,
+ * so a stamp waiting on a deletion is refused once it commits.
+ *
  * A refusal is a StampRejected and writes nothing. EnrollmentChanged follows
  * the commit, and so does noting the customer's account in use
  * (RecordActivity). Outside bypass() (staff from their tenant) the caller's
@@ -75,7 +81,7 @@ final readonly class AddStamps
         }
 
         try {
-            $result = $this->attempt($enrollment->id, $request);
+            $result = $this->attempt($enrollment, $request);
         } catch (UniqueConstraintViolationException $duplicate) {
             // A request with a key may have raced another on it: the second attempt
             // finds the first and replays or refuses it. Anything else rethrows again.
@@ -83,7 +89,7 @@ final readonly class AddStamps
                 throw $duplicate;
             }
 
-            $result = $this->attempt($enrollment->id, $request);
+            $result = $this->attempt($enrollment, $request);
         }
 
         if (! $result->replayed) {
@@ -103,11 +109,18 @@ final readonly class AddStamps
         return $result;
     }
 
-    private function attempt(int $enrollmentId, StampRequest $request): StampResult
+    private function attempt(CardEnrollment $given, StampRequest $request): StampResult
     {
-        return DB::transaction(fn (): StampResult => $this->context->bypass(function () use ($enrollmentId, $request): StampResult {
+        return DB::transaction(fn (): StampResult => $this->context->bypass(function () use ($given, $request): StampResult {
             $stamper = $request->stamperId === null ? null : Stamper::query()->whereKey($request->stamperId)->lockForUpdate()->first();
-            $enrollment = CardEnrollment::query()->whereKey($enrollmentId)->lockForUpdate()->firstOrFail();
+            $enrollment = CardEnrollment::query()->whereKey($given->id)->lockForUpdate()->first();
+
+            if (! $enrollment instanceof CardEnrollment) {
+                // A card with nothing on it goes with a deleted account (DeleteAccount): say so, not "not found".
+                throw User::isGone((int) $given->user_id)
+                    ? new StampRejected(StampRejection::AccountDeleted)
+                    : (new ModelNotFoundException)->setModel(CardEnrollment::class, [$given->id]);
+            }
 
             try {
                 return $this->stampLocked($enrollment, $stamper, $request);
@@ -130,6 +143,11 @@ final readonly class AddStamps
 
         if ($earlier instanceof StampEvent) {
             return $this->replay($earlier, $enrollment, $request);
+        }
+
+        // Read, never locked: the user row comes before the cards in DeleteAccount's lock order. The ledger stays fixable.
+        if (! $request->isCorrection() && User::isGone((int) $enrollment->user_id)) {
+            throw new StampRejected(StampRejection::AccountDeleted);
         }
 
         $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);

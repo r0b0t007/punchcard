@@ -57,6 +57,9 @@ enum TapRejection: string implements HasLabel
     /** A redeem window was open, but another tap redeemed the reward first: this one hands over nothing. */
     case AlreadyRedeemed = 'already_redeemed';
 
+    /** The customer's account was deleted while the tap was on its way (CHW-253). */
+    case AccountDeleted = 'account_deleted';
+
     /** What the platform admin reads (A1); never shown to the person tapping. */
     public function getLabel(): string
     {
@@ -76,6 +79,7 @@ enum TapRejection: string implements HasLabel
             self::CardMisconfigured => __('Card misconfigured'),
             self::Expired => __('Expired before sign-in'),
             self::AlreadyRedeemed => __('Reward already redeemed'),
+            self::AccountDeleted => __('Account deleted'),
         };
     }
 
@@ -126,6 +130,7 @@ enum TapRejection: string implements HasLabel
             StampRejection::SiteClosed => self::SiteClosed,
             StampRejection::StamperUnavailable => self::StamperDisabled,
             StampRejection::CardMisconfigured => self::CardMisconfigured,
+            StampRejection::AccountDeleted => self::AccountDeleted,
             // A tap carries no idempotency key and never corrects: these cannot happen on /t.
             StampRejection::IdempotencyConflict, StampRejection::CorrectionBelowZero, StampRejection::CorrectionExceedsGiven => throw new \LogicException("A tap cannot be refused as {$rejection->value}."),
         };

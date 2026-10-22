@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Account;
 
+use App\Enums\RewardStatus;
 use App\Models\AuditLog;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
@@ -49,6 +50,10 @@ use LogicException;
  * once the user row and their cards are locked: false leaves the account as
  * it is, so a sign-in or a stamp racing the sweep wins. Returns whether the
  * account went.
+ *
+ * An anonymised account takes no more stamps, cards or redemptions (CHW-253):
+ * AddStamps and EnrollCustomer read anonymised_at after the locks taken
+ * here, and its rewards not yet redeemed expire with it.
  */
 final readonly class DeleteAccount
 {
@@ -64,9 +69,8 @@ final readonly class DeleteAccount
     public function handle(User $user, ?Closure $stillDue = null): bool
     {
         return DB::transaction(fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
-            // Their taps first, in ApplyTap's order for a tap made signed in (tap, then enrollment, then the user's key), so
-            // the two never deadlock. A signed-out tap being claimed at that moment has no user yet: Postgres may fail one of
-            // the two, and the claim or the next sweep simply runs again.
+            // Their taps first, then the user, then their cards (and rewards, in anonymise()): ApplyTap's order, tap then the
+            // user's key, so the two never deadlock. A signed-out tap being claimed has no user yet: it waits on the user.
             Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
             User::query()->whereKey($user->id)->lockForUpdate()->value('id');
             CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
@@ -127,6 +131,10 @@ final readonly class DeleteAccount
         $user->syncRoles([]);
         CardEnrollment::query()->where('user_id', $user->id)->whereDoesntHave('stampEvents')->whereDoesntHave('rewards')->delete();
         CardEnrollment::query()->where('user_id', $user->id)->update(['referral_code' => null]);
+        // Unused rewards go with the account (the inactivity email says so); a status change, the ledger stays.
+        Reward::query()->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
+            ->where('status', RewardStatus::Available)
+            ->update(['status' => RewardStatus::Expired, 'expires_at' => now(), 'redeem_window_opened_at' => null, 'redeem_window_until' => null]);
         $user->passkeys()->delete();
         // Consent to offers is the person's, not the ledger's (CHW-27).
         Follow::query()->where('user_id', $user->id)->delete();
