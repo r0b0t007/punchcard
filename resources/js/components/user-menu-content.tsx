@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings } from 'lucide-react';
 import {
     DropdownMenuGroup,
@@ -20,6 +20,8 @@ type Props = {
 export function UserMenuContent({ user }: Props) {
     const cleanup = useMobileNavigation();
     const { t } = useTranslation();
+    // Signed in as an owner (CHW-144), logging out goes back to admin instead.
+    const { impersonating } = usePage().props;
 
     const handleLogout = () => {
         cleanup();
@@ -58,7 +60,7 @@ export function UserMenuContent({ user }: Props) {
                     data-test="logout-button"
                 >
                     <LogOut className="me-2" />
-                    {t('Log out')}
+                    {impersonating ? t('Back to admin') : t('Log out')}
                 </Link>
             </DropdownMenuItem>
         </>
