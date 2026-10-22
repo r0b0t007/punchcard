@@ -93,9 +93,9 @@ class BusinessDocument extends Model implements TenantModel
      *
      * @return Collection<string, self>
      */
-    public static function latestByKind(int $businessId): Collection
+    public static function latestByKind(Business $business): Collection
     {
-        return self::query()->where('business_id', $businessId)->orderByDesc('id')->get()
+        return $business->documents()->orderByDesc('id')->get()
             ->unique(fn (self $document): string => $document->kind->value)
             ->keyBy(fn (self $document): string => $document->kind->value);
     }

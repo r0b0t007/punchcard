@@ -39,6 +39,15 @@ final class DocumentRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        // PHP dropped it (upload_max_filesize, post_max_size): too large for this server, whatever the rule says.
+        return ['file.uploaded' => __('The file is larger than this server takes. Try a smaller one.')];
+    }
+
     public function business(): ?Business
     {
         return app(TenantContext::class)->business();

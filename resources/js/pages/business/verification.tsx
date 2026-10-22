@@ -15,7 +15,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useTranslation } from '@/hooks/use-translation';
-import { localDate } from '@/lib/local-moment';
+import { calendarDate } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 import { show, store } from '@/routes/verification';
 
@@ -25,11 +25,12 @@ type Document = {
     kind: Kind;
     /** The latest of this kind: null when none was sent. */
     status: 'submitted' | 'accepted' | 'rejected' | null;
-    sentAt: string | null;
+    /** Y-m-d, in the business's time. */
+    sentOn: string | null;
     /** The platform's words, when it asked for a new one. */
     reason: string | null;
-    /** When the file is deleted, once the platform decided. */
-    deletesAt: string | null;
+    /** When the file is deleted (Y-m-d), once the platform decided. */
+    deletesOn: string | null;
 };
 
 /**
@@ -61,7 +62,7 @@ export default function Verification({
         (d) => d.status === 'submitted' || d.status === 'accepted',
     );
     const deletesAt = documents
-        .map((d) => d.deletesAt)
+        .map((d) => d.deletesOn)
         .filter((at): at is string => at !== null)
         .sort()[0];
 
@@ -88,7 +89,7 @@ export default function Verification({
                     >
                         {deletesAt
                             ? t('We delete the files on :date.', {
-                                  date: localDate(locale, deletesAt, {
+                                  date: calendarDate(locale, deletesAt, {
                                       day: 'numeric',
                                       month: 'long',
                                       year: 'numeric',
@@ -211,8 +212,8 @@ function DocumentRow({
         },
         submitted: {
             label: t('Sent on :date', {
-                date: document.sentAt
-                    ? localDate(locale, document.sentAt, {
+                date: document.sentOn
+                    ? calendarDate(locale, document.sentOn, {
                           day: 'numeric',
                           month: 'short',
                       })

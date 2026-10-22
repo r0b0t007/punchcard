@@ -64,12 +64,32 @@ final readonly class DocumentCipher
         return substr(hash('sha256', $this->key((string) config('punchcard.documents.key'))), 0, 16);
     }
 
-    /** @return list<string> the current key first, then the previous ones */
+    /** @return list<string> the current key first, then the previous ones that read as keys (a malformed one is reported, and skipped) */
     private function keys(): array
     {
-        $previous = array_filter(array_map(trim(...), explode(',', (string) config('punchcard.documents.previous_keys'))));
+        $keys = [$this->key((string) config('punchcard.documents.key'))];
 
-        return [$this->key((string) config('punchcard.documents.key')), ...array_values(array_map($this->key(...), $previous))];
+        foreach (array_filter(array_map(trim(...), explode(',', (string) config('punchcard.documents.previous_keys')))) as $previous) {
+            try {
+                $keys[] = $this->key($previous);
+            } catch (DocumentKeyMissing) {
+                once(fn () => report(new DocumentKeyMissing('A key in DOCUMENTS_PREVIOUS_KEYS is not "base64:" and 32 bytes: skipped.')));
+            }
+        }
+
+        return $keys;
+    }
+
+    /** Whether a configured value is a usable key ("base64:" and 32 bytes). */
+    public static function isKey(string $configured): bool
+    {
+        try {
+            (new self)->key($configured);
+
+            return true;
+        } catch (DocumentKeyMissing) {
+            return false;
+        }
     }
 
     private function key(string $configured): string

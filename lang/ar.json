@@ -935,5 +935,6 @@
     "Sent: we're checking them.": "أُرسلت: نراجعها.",
     "Send an ID and a proof of address. Your business works meanwhile.": "أرسل وثيقة هوية وإثبات عنوان. يعمل نشاطك خلال ذلك.",
     "Sending documents isn't set up yet. Try again later.": "إرسال الوثائق غير مُعدّ بعد. حاول لاحقًا.",
-    "The file is larger than :size MB.": "الملف أكبر من :size ميغابايت."
+    "The file is larger than :size MB.": "الملف أكبر من :size ميغابايت.",
+    "The file is larger than this server takes. Try a smaller one.": "الملف أكبر مما يقبله هذا الخادم. جرّب ملفًا أصغر."
 }

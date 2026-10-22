@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Verification;
 
-use App\Enums\BusinessStatus;
 use App\Enums\DocumentKind;
 use App\Http\Requests\Verification\DocumentRequest;
 use App\Models\Business;
 use App\Models\BusinessDocument;
+use App\Support\LocalMoment;
 
 /**
  * The "Verify your business" page (CHW-145, design 9a): where the business
@@ -18,27 +18,31 @@ use App\Models\BusinessDocument;
  */
 final readonly class DescribeVerification
 {
+    public function __construct(private SubmitDocument $submitDocument) {}
+
     /**
-     * @return array{verified: bool, canSend: bool, maxMegabytes: int, retentionMonths: int, documents: list<array{kind: string, status: string|null, sentAt: string|null, reason: string|null, deletesAt: string|null}>}
+     * @return array{verified: bool, canSend: bool, maxMegabytes: int, retentionMonths: int, documents: list<array{kind: string, status: string|null, sentOn: string|null, reason: string|null, deletesOn: string|null}>}
      */
     public function handle(Business $business): array
     {
-        $latest = BusinessDocument::latestByKind($business->id);
+        $latest = BusinessDocument::latestByKind($business);
+        // Dates in the business's own time (its first site's), never the device's.
+        $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
 
         return [
             'verified' => $business->verified_at !== null,
-            'canSend' => $business->status === BusinessStatus::Pending,
+            'canSend' => $this->submitDocument->maySend($business),
             'maxMegabytes' => intdiv(DocumentRequest::MAX_KILOBYTES, 1024),
             'retentionMonths' => (int) config('punchcard.documents.retention_months'),
-            'documents' => array_map(function (DocumentKind $kind) use ($latest): array {
+            'documents' => array_map(function (DocumentKind $kind) use ($latest, $timezone): array {
                 $document = $latest->get($kind->value);
 
                 return [
                     'kind' => $kind->value,
                     'status' => $document?->status->value,
-                    'sentAt' => $document?->created_at?->toIso8601String(),
+                    'sentOn' => $document?->created_at?->setTimezone($timezone)->toDateString(),
                     'reason' => $document?->rejection_reason,
-                    'deletesAt' => $document?->deletes_at?->toIso8601String(),
+                    'deletesOn' => $document?->deletes_at?->setTimezone($timezone)->toDateString(),
                 ];
             }, DocumentKind::cases()),
         ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Admin\StartImpersonation;
 use App\Actions\Admin\VerifyBusiness;
+use App\Actions\Verification\DescribeVerification;
 use App\Actions\Verification\DocumentRefused;
 use App\Actions\Verification\SubmitDocument;
 use App\Enums\BusinessRole;
@@ -129,12 +130,10 @@ it('tells the owner sending is not set up yet when the key is missing, and repor
         ->and(Storage::disk(BusinessDocument::DISK)->allFiles())->toBe([]);
 });
 
-it('sets DOCUMENTS_KEY in the environment file once, never replacing one set', function (): void {
+it('sets DOCUMENTS_KEY in the environment file once, never replacing a usable one', function (string $placeholder): void {
     $dir = sys_get_temp_dir().'/punchcard-env-'.uniqid();
     mkdir($dir);
-    file_put_contents($dir.'/.env', 'APP_NAME=punchcard
-DOCUMENTS_KEY=
-');
+    file_put_contents($dir.'/.env', "APP_NAME=punchcard\n{$placeholder}\n");
     app()->useEnvironmentPath($dir);
 
     $this->artisan('punchcard:documents-key')->assertSuccessful();
@@ -144,6 +143,24 @@ DOCUMENTS_KEY=
     expect($first)->toMatch('/^DOCUMENTS_KEY=base64:[A-Za-z0-9+\/]{43}=$/m')->toContain('APP_NAME=punchcard')
         ->and(substr_count($first, 'DOCUMENTS_KEY='))->toBe(1)
         ->and(file_get_contents($dir.'/.env'))->toBe($first);
+})->with(['DOCUMENTS_KEY=', 'DOCUMENTS_KEY=""', 'DOCUMENTS_KEY=changeme']);
+
+it('reads documents under the current key though an old key is malformed, and says so', function (): void {
+    Exceptions::fake();
+    $stored = app(DocumentCipher::class)->encrypt('the scan');
+    config(['punchcard.documents.previous_keys' => 'not-a-key']);
+
+    expect(app(DocumentCipher::class)->decrypt($stored))->toBe('the scan');
+    Exceptions::assertReported(DocumentKeyMissing::class);
+});
+
+it('offers no upload to a business that is closed, and tells what the server dropped', function (): void {
+    $this->context->bypass(fn () => $this->tenants->a1->forceFill(['archived_at' => now()])->save());
+    expect(app(DescribeVerification::class)->handle($this->tenants->a1)['canSend'])->toBeFalse();
+
+    $this->context->bypass(fn () => $this->tenants->a1->forceFill(['archived_at' => null])->save());
+    $dropped = new UploadedFile((string) tempnam(sys_get_temp_dir(), 'doc'), 'id.pdf', 'application/pdf', UPLOAD_ERR_INI_SIZE, true);
+    ($this->send)(DocumentKind::IdDocument, $dropped)->assertSessionHasErrors(['file' => 'The file is larger than this server takes. Try a smaller one.']);
 });
 
 it('accepts the documents waiting when the business is verified, deleting them 3 months later', function (): void {
@@ -286,8 +303,8 @@ it('shows where each document stands, never a file or where it is', function ():
             ->where('verified', false)
             ->where('canSend', true)
             ->where('documents', [
-                ['kind' => 'id_document', 'status' => 'submitted', 'sentAt' => '2026-10-22T10:00:00+00:00', 'reason' => null, 'deletesAt' => null],
-                ['kind' => 'proof_of_address', 'status' => 'rejected', 'sentAt' => '2026-10-22T10:00:00+00:00', 'reason' => 'The bill is older than 3 months.', 'deletesAt' => '2027-01-22T10:00:00+00:00'],
+                ['kind' => 'id_document', 'status' => 'submitted', 'sentOn' => '2026-10-22', 'reason' => null, 'deletesOn' => null],
+                ['kind' => 'proof_of_address', 'status' => 'rejected', 'sentOn' => '2026-10-22', 'reason' => 'The bill is older than 3 months.', 'deletesOn' => '2027-01-22'],
             ]));
 
     $path = $this->context->bypass(fn (): string => BusinessDocument::query()->where('kind', DocumentKind::IdDocument)->value('path'));

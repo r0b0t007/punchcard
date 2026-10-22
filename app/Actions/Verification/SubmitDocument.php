@@ -36,6 +36,11 @@ final readonly class SubmitDocument
 
     public function handle(Business $business, User $sender, DocumentKind $kind, UploadedFile $file): BusinessDocument
     {
+        // A business that can't send is refused before any work on its file; the check under the lock below decides.
+        if (! $this->maySend($business)) {
+            throw new DocumentRefused(__('This business has nothing to send: it is verified, suspended or closed.'));
+        }
+
         $disk = Storage::disk(BusinessDocument::DISK);
         $path = $business->id.'/'.Str::ulid()->toBase32().'.enc';
         $mime = (string) $file->getMimeType();
@@ -80,10 +85,17 @@ final readonly class SubmitDocument
         }
 
         if ($old !== []) {
-            // The new document is saved either way: a file that won't go is reported, never a failed upload.
+            // The new document is saved either way: a file that won't go is reported, never a failed upload. At once
+            // here; after the caller's own transaction when there is one (Part of it, then).
             DB::afterCommit(fn () => rescue(fn (): bool => $disk->delete($old)));
         }
 
         return $document;
+    }
+
+    /** Waiting to be verified, and operating (neither it nor its organization archived, not suspended). */
+    public function maySend(Business $business): bool
+    {
+        return $this->context->bypass(fn (): bool => Business::query()->whereKey($business->id)->operating()->where('status', BusinessStatus::Pending)->exists());
     }
 }

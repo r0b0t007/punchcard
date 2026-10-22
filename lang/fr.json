@@ -935,5 +935,6 @@
     "Sent: we're checking them.": "Envoyés : nous les vérifions.",
     "Send an ID and a proof of address. Your business works meanwhile.": "Envoyez une pièce d’identité et un justificatif d’adresse. Votre commerce fonctionne entre-temps.",
     "Sending documents isn't set up yet. Try again later.": "L’envoi de documents n’est pas encore configuré. Réessayez plus tard.",
-    "The file is larger than :size MB.": "Le fichier dépasse :size Mo."
+    "The file is larger than :size MB.": "Le fichier dépasse :size Mo.",
+    "The file is larger than this server takes. Try a smaller one.": "Le fichier dépasse ce que ce serveur accepte. Essayez un fichier plus petit."
 }
