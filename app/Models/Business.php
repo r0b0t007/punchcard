@@ -299,6 +299,16 @@ class Business extends Model implements TenantModel
     }
 
     /**
+     * Its verification documents (CHW-145).
+     *
+     * @return HasMany<BusinessDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(BusinessDocument::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

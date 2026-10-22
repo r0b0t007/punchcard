@@ -193,10 +193,10 @@ it('lets only the business app\'s pages be read, and going back', function (): v
     expect($allowed)->toBe([
         'GET business', 'GET business/cards', 'GET business/cards/create', 'GET business/cards/{card}/edit', 'GET business/counter',
         'GET business/counter/scan', 'GET business/counter/scans/{scan}', 'GET business/onboarding', 'GET business/onboarding/{step}',
-        'GET business/qr-stand', 'GET business/staff', 'GET business/stampers', 'GET email/verify', 'GET start',
+        'GET business/qr-stand', 'GET business/staff', 'GET business/stampers', 'GET business/verification', 'GET email/verify', 'GET start',
         'HEAD business', 'HEAD business/cards', 'HEAD business/cards/create', 'HEAD business/cards/{card}/edit', 'HEAD business/counter',
         'HEAD business/counter/scan', 'HEAD business/counter/scans/{scan}', 'HEAD business/onboarding', 'HEAD business/onboarding/{step}',
-        'HEAD business/qr-stand', 'HEAD business/staff', 'HEAD business/stampers', 'HEAD email/verify', 'HEAD start',
+        'HEAD business/qr-stand', 'HEAD business/staff', 'HEAD business/stampers', 'HEAD business/verification', 'HEAD email/verify', 'HEAD start',
         'POST impersonation/stop',
     ]);
 });

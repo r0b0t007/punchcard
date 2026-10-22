@@ -64,6 +64,15 @@ return [
         'warnings_per_run' => (int) env('INACTIVITY_WARNINGS_PER_RUN', 500),
     ],
 
+    'documents' => [
+        // Business verification documents (CHW-145): their own key (DocumentCipher), never APP_KEY. "base64:" and 32
+        // random bytes; a rotated key stays in previous_keys (comma-separated) until its files are gone.
+        'key' => env('DOCUMENTS_KEY'),
+        'previous_keys' => env('DOCUMENTS_PREVIOUS_KEYS', ''),
+        // Kept this long after the platform decides (accepted or rejected), then deleted (docs/privacy/retention.md).
+        'retention_months' => 3,
+    ],
+
     'admin' => [
         // The platform admin signed in as a business owner (CHW-144): read-only, back to admin after this long.
         'impersonation_minutes' => 30,
