@@ -67,6 +67,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Signed in as an owner (CHW-144): refused before any route's own middleware (auth, a confirmation, bindings) answers.
         $middleware->prependToPriorityList(before: NeverCache::class, prepend: WhileImpersonating::class);
+        // ...in the language of whoever reads the refusal.
+        $middleware->prependToPriorityList(before: WhileImpersonating::class, prepend: SetLocale::class);
 
         // A stale confirmation goes back before the throttle counts it (Download my data, CHW-58).
         $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: RequireRecentConfirmation::class);

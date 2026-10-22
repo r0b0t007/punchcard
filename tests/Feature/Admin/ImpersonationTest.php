@@ -20,6 +20,8 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use Livewire\Features\SupportTesting\Testable;
@@ -254,7 +256,7 @@ it('goes back to admin instead of round in circles when the owner\'s app sends a
     // A refused page again before any page showed: back to admin.
     $this->get(route('profile.edit'))->assertRedirect(route('filament.admin.resources.businesses.view', $this->tenants->a2->id));
     expect(Auth::id())->toBe($this->admin->id)
-        ->and(collect(($this->audits)())->last())->toMatchArray(['action' => 'impersonation.ended', 'reason' => StopImpersonation::BACK]);
+        ->and(collect(($this->audits)())->last())->toMatchArray(['action' => 'impersonation.ended', 'reason' => StopImpersonation::REFUSED_TWICE]);
 });
 
 it('ends when either account goes, or the admin loses the panel, and says who it was', function (Closure $change, string $reason, ?bool $adminBack): void {
@@ -308,6 +310,63 @@ it('checks every route with a session', function (): void {
         ->values()->all();
 
     expect($unchecked)->toBe([]);
+});
+
+it('sends a refused change back to the page with a GET, never the same PUT, PATCH or DELETE again', function (): void {
+    ($this->start)();
+
+    $this->from(route('onboarding.step', 'location'))->put(route('onboarding.location'))
+        ->assertStatus(303)->assertRedirect(route('onboarding.step', 'location'));
+    $this->from(route('counter.show'))->delete(route('counter.disarm', $this->tenants->stamper($this->tenants->a2)->id))
+        ->assertStatus(303)->assertRedirect(route('counter.show'));
+});
+
+it('refuses in the language the page is read in', function (): void {
+    $this->owner->forceFill(['locale' => 'fr'])->save();
+    ($this->start)();
+
+    $this->get(route('app.cards'))->assertInertiaFlash('toast.message', 'Pas tant que vous êtes connecté en tant que propriétaire : rien n’a été modifié.');
+});
+
+it('records the end when the owner\'s password changes elsewhere and the session is signed out', function (): void {
+    ($this->start)();
+    $this->owner->forceFill(['password' => Hash::make('changed-on-their-phone')])->save();
+    Auth::forgetGuards();
+
+    $this->get(route('staff.index'))->assertRedirect();
+
+    expect(Auth::check())->toBeFalse()
+        ->and(Impersonation::of(($this->session)()))->toBeNull()
+        ->and(collect(($this->audits)())->last())->toMatchArray([
+            'actor_id' => $this->admin->id,
+            'action' => 'impersonation.ended',
+            'reason' => StopImpersonation::OWNER_GONE,
+        ]);
+});
+
+it('names the admin in the session row while they are signed in as the owner', function (): void {
+    $handler = app('session')->driver('database')->getHandler();
+    $sessionOf = fn (string $id): mixed => DB::table('sessions')->where('id', $id)->value('user_id');
+
+    $this->actingAs($this->owner);
+    $handler->write('owners-own', serialize([]));
+    ($this->start)();
+    // A new session id: a row of its own (the handler would update the first otherwise).
+    $handler->setExists(false)->write('impersonating', serialize([]));
+
+    expect($sessionOf('owners-own'))->toBe($this->owner->id)
+        ->and($sessionOf('impersonating'))->toBe($this->admin->id);
+});
+
+it('offers signing in as the owner only where it can work', function (): void {
+    $this->actingAs($this->admin);
+    Filament::setCurrentPanel('admin');
+    Filament::setServingStatus();
+    $page = fn (): Testable => $this->context->bypass(fn (): Testable => Livewire::test(ViewBusiness::class, ['record' => $this->tenants->a2->getRouteKey()]));
+
+    $page()->assertActionVisible('impersonate');
+    $this->context->bypass(fn () => $this->tenants->a2->forceFill(['status' => BusinessStatus::Suspended])->save());
+    $page()->assertActionHidden('impersonate');
 });
 
 it('never counts the admin\'s reading as the owner\'s use of their account', function (): void {

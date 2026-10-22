@@ -6,6 +6,7 @@ namespace App\Filament\Resources\Businesses\Actions;
 
 use App\Actions\Admin\ImpersonationRefused;
 use App\Actions\Admin\StartImpersonation;
+use App\Enums\BusinessStatus;
 use App\Enums\PlatformRole;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
@@ -19,6 +20,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use WeakMap;
 
 /**
  * "Sign in as the owner" on a business's page (CHW-144, A1): one of its
@@ -35,7 +37,9 @@ final class ImpersonateOwnerAction
             ->icon(Heroicon::OutlinedEye)
             ->color('gray')
             ->authorize(fn (Business $record): bool => Gate::allows('impersonate', $record))
-            ->visible(fn (Business $record): bool => ! BusinessesTable::archivedAt($record) instanceof CarbonInterface && self::owners($record)->isNotEmpty())
+            ->visible(fn (Business $record): bool => $record->status !== BusinessStatus::Suspended
+                && ! BusinessesTable::archivedAt($record) instanceof CarbonInterface
+                && self::owners($record)->isNotEmpty())
             ->modalDescription(__('You see the business app as the owner does, read-only, for :minutes minutes. Starting and ending are kept in the audit log.', [
                 'minutes' => (int) config('punchcard.admin.impersonation_minutes'),
             ]))
@@ -66,13 +70,17 @@ final class ImpersonateOwnerAction
     }
 
     /**
-     * Its owners one may sign in as: real people, not platform admins.
+     * Its owners one may sign in as: real people, not platform admins. Read
+     * once per record, roles with them: the page asks on every render.
      *
      * @return Collection<int, User>
      */
     private static function owners(Business $record): Collection
     {
-        return $record->owners()->notAnonymised()->get()
+        /** @var WeakMap<Business, Collection<int, User>> $read */
+        static $read = new WeakMap;
+
+        return $read[$record] ??= $record->owners()->notAnonymised()->with('roles')->get()
             ->reject(fn (User $owner): bool => $owner->hasRole(PlatformRole::Admin->value))
             ->values();
     }

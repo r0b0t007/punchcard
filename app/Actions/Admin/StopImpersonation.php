@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Admin;
 
 use App\Http\Middleware\SetTenant;
+use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\User;
 use App\Support\Auth\Impersonation;
@@ -15,11 +16,12 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Back to the admin's own session (CHW-144): asked for, signed out, the time
- * limit reached, or either account gone. The admin is signed in again (only
- * while their account still may be: ActiveUserProvider), the owner's
- * business and confirmations are dropped, and the end goes in the audit log
- * in the admin's name, even when their account went meanwhile. The owner's
- * own sessions and remember token are never touched.
+ * limit reached, refused pages in a row, or either account gone. The admin
+ * is signed in again first (only while their account still may be:
+ * ActiveUserProvider), so a failure after leaves them themselves; then the
+ * end goes in the audit log in the admin's name, even when their account
+ * went meanwhile. The owner's own sessions and remember token are never
+ * touched.
  */
 final readonly class StopImpersonation
 {
@@ -28,6 +30,8 @@ final readonly class StopImpersonation
     public const string EXPIRED = 'expired';
 
     public const string SIGNED_OUT = 'signed out';
+
+    public const string REFUSED_TWICE = 'refused twice';
 
     public const string OWNER_GONE = 'owner gone';
 
@@ -44,30 +48,50 @@ final readonly class StopImpersonation
         }
 
         $admin = Auth::guard('web')->getProvider()->retrieveById($impersonation->adminId);
-        $business = $this->context->bypass(fn (): ?Business => Business::query()->find($impersonation->businessId));
 
-        DB::transaction(function () use ($impersonation, $session, $admin, $business, $why): void {
-            Impersonation::forget($session);
-            $session->forget([SetTenant::SESSION_KEY, 'auth.password_confirmed_at', 'url.intended']);
+        // Forgotten first: the sign-out below ends no impersonation twice (lost()).
+        Impersonation::forget($session);
+        $session->forget([SetTenant::SESSION_KEY, 'auth.password_confirmed_at', 'url.intended']);
 
-            if ($admin instanceof User && $why !== self::ADMIN_GONE) {
-                Auth::guard('web')->login($admin);
-                $session->regenerate();
-            } else {
-                // Nobody to go back to. Never logout(), which would sign the owner out everywhere.
-                Auth::guard('web')->logoutCurrentDevice();
-                $session->invalidate();
-            }
+        if ($admin instanceof User && $why !== self::ADMIN_GONE) {
+            Auth::guard('web')->login($admin);
+            $session->regenerate();
+        } else {
+            // Nobody to go back to. Never logout(), which would sign the owner out everywhere.
+            Auth::guard('web')->logoutCurrentDevice();
+            $session->invalidate();
+        }
 
-            // Businesses are archived, never deleted: kept for a row that went another way.
-            if ($business instanceof Business) {
-                $this->recordAudit->handle('impersonation.ended', $business, $why, [
-                    'admin_id' => $impersonation->adminId,
-                    'owner_id' => $impersonation->ownerId,
-                ], actor: User::query()->find($impersonation->adminId));
-            }
-        });
+        $this->record($impersonation, $why, $admin instanceof User ? $admin : User::query()->find($impersonation->adminId));
 
         return $impersonation;
+    }
+
+    /**
+     * The owner's session ended under the admin (their password changed, so
+     * AuthenticateSession signed this device out, CurrentDeviceLogout): no
+     * way back, but the end is recorded all the same.
+     */
+    public function lost(Session $session): void
+    {
+        $impersonation = Impersonation::of($session);
+
+        if ($impersonation instanceof Impersonation) {
+            Impersonation::forget($session);
+            $this->record($impersonation, self::OWNER_GONE, User::query()->find($impersonation->adminId));
+        }
+    }
+
+    private function record(Impersonation $impersonation, string $why, ?User $admin): void
+    {
+        $business = $this->context->bypass(fn (): ?Business => Business::query()->find($impersonation->businessId));
+
+        // Businesses are archived, never deleted: kept for a row that went another way.
+        if ($business instanceof Business) {
+            DB::transaction(fn (): AuditLog => $this->recordAudit->handle('impersonation.ended', $business, $why, [
+                'admin_id' => $impersonation->adminId,
+                'owner_id' => $impersonation->ownerId,
+            ], actor: $admin));
+        }
     }
 }

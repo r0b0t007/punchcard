@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Actions\Account\RecordActivity;
+use App\Actions\Admin\StopImpersonation;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
@@ -11,12 +12,14 @@ use App\Models\NfcTag;
 use App\Models\User;
 use App\Policies\Invariants;
 use App\Support\Auth\ActiveUserProvider;
+use App\Support\Auth\ImpersonationSessionHandler;
 use App\Support\Http\ClientAddress;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
@@ -35,6 +38,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Livewire;
@@ -106,6 +110,7 @@ class AppServiceProvider extends ServiceProvider
         $this->letAdminsThroughInFilament();
         $this->runAdminPanelUpdatesAcrossTenants();
         $this->rekeyTapClaimTokenAtSignIn();
+        $this->keepImpersonationSessionsTheAdmins();
         $this->trustConfiguredProxies();
     }
 
@@ -164,6 +169,28 @@ class AppServiceProvider extends ServiceProvider
      * regenerated), so a session id planted before sign-in can't claim the
      * taps made later in that browser (TapSession, CHW-142).
      */
+    /**
+     * Signed in as an owner (CHW-144): the database session row names the
+     * admin (ImpersonationSessionHandler), and an owner's session signed out
+     * under the admin (their password changed elsewhere) still records the
+     * end (StopImpersonation::lost).
+     */
+    private function keepImpersonationSessionsTheAdmins(): void
+    {
+        Session::extend('database', fn (Application $app): ImpersonationSessionHandler => new ImpersonationSessionHandler(
+            $app->make('db')->connection(config('session.connection')),
+            (string) config('session.table'),
+            (int) config('session.lifetime'),
+            $app,
+        ));
+
+        Event::listen(CurrentDeviceLogout::class, function (): void {
+            if (request()->hasSession()) {
+                app(StopImpersonation::class)->lost(request()->session());
+            }
+        });
+    }
+
     private function rekeyTapClaimTokenAtSignIn(): void
     {
         Event::listen(Login::class, function (): void {

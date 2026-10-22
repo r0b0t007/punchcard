@@ -32,6 +32,7 @@ final readonly class Impersonation
         public int $adminId,
         public int $ownerId,
         public int $businessId,
+        public string $businessName,
         public CarbonImmutable $endsAt,
     ) {}
 
@@ -43,7 +44,13 @@ final readonly class Impersonation
             return null;
         }
 
-        return new self((int) $kept['admin_id'], (int) $kept['owner_id'], (int) $kept['business_id'], CarbonImmutable::createFromTimestamp((int) $kept['ends_at']));
+        return new self(
+            (int) $kept['admin_id'],
+            (int) $kept['owner_id'],
+            (int) $kept['business_id'],
+            (string) ($kept['business_name'] ?? ''),
+            CarbonImmutable::createFromTimestamp((int) $kept['ends_at']),
+        );
     }
 
     public function keep(Session $session): void
@@ -52,6 +59,7 @@ final readonly class Impersonation
             'admin_id' => $this->adminId,
             'owner_id' => $this->ownerId,
             'business_id' => $this->businessId,
+            'business_name' => $this->businessName,
             'ends_at' => $this->endsAt->getTimestamp(),
         ]);
     }

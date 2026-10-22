@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\DB;
  * The platform admin signs in as a business owner to support them (CHW-144):
  * an owner of that business, never an anonymised account, another platform
  * admin or themselves, at a business that operates (not suspended, nothing
- * archived). The entry in the audit log is written first, as the admin, in
- * the transaction the session switches in: no entry, no switch.
+ * archived). The entry in the audit log is committed first, as the admin,
+ * then the session switches: no entry, no switch.
  *
  * The session becomes the owner's, in their business, for a fixed time
  * (punchcard.admin.impersonation_minutes), read-only (WhileImpersonating).
@@ -36,27 +36,30 @@ final readonly class StartImpersonation
     {
         $this->assertAllowed($admin, $business, $owner, $session);
 
-        return DB::transaction(function () use ($admin, $business, $owner, $session): Impersonation {
+        $impersonation = DB::transaction(function () use ($admin, $business, $owner): Impersonation {
             // Their row under KEY SHARE: an account deletion either waits for this, or ran first and this refuses.
             if (! User::query()->whereKey($owner->id)->notAnonymised()->lock('for key share')->exists()) {
                 throw new ImpersonationRefused(__('That account was deleted.'));
             }
 
-            $impersonation = new Impersonation($admin->id, $owner->id, $business->id, now()->toImmutable()->addMinutes((int) config('punchcard.admin.impersonation_minutes')));
+            $impersonation = new Impersonation($admin->id, $owner->id, $business->id, $business->name, now()->toImmutable()->addMinutes((int) config('punchcard.admin.impersonation_minutes')));
             $this->recordAudit->handle('impersonation.started', $business, context: [
                 'admin_id' => $admin->id,
                 'owner_id' => $owner->id,
                 'ends_at' => $impersonation->endsAt->toIso8601String(),
             ], actor: $admin);
 
-            Auth::guard('web')->login($owner);
-            $session->regenerate();
-            $session->forget(['auth.password_confirmed_at', 'url.intended']);
-            $session->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
-            $impersonation->keep($session);
-
             return $impersonation;
         });
+
+        // Committed: the session switches. Should this fail, the admin is still themselves.
+        Auth::guard('web')->login($owner);
+        $session->regenerate();
+        $session->forget(['auth.password_confirmed_at', 'url.intended']);
+        $session->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
+        $impersonation->keep($session);
+
+        return $impersonation;
     }
 
     private function assertAllowed(User $admin, Business $business, User $owner, Session $session): void

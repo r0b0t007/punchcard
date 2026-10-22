@@ -82,11 +82,11 @@ final readonly class WhileImpersonating
         $this->stopImpersonation->handle($request->session(), $why);
         $request->session()->forget(self::REFUSED);
 
-        // Said on the admin's page; asking to go back, or signing out, needs no word.
+        // Said on the admin's page when it ended by itself; signing out needs no word.
         match ($why) {
             StopImpersonation::EXPIRED => $this->notify(__('Your time as the owner ran out: you are back in admin.')),
             StopImpersonation::OWNER_GONE => $this->notify(__('The owner\'s account is no longer available: you are back in admin.')),
-            StopImpersonation::BACK => $this->notify(__('The owner\'s app sent you to a page you can\'t read as them: you are back in admin.')),
+            StopImpersonation::REFUSED_TWICE => $this->notify(__('The owner\'s app sent you to a page you can\'t read as them: you are back in admin.')),
             default => null,
         };
 
@@ -109,7 +109,7 @@ final readonly class WhileImpersonating
     private function refuse(Request $request, Impersonation $impersonation): Response
     {
         if ($request->isMethodSafe() && $request->session()->get(self::REFUSED) === true) {
-            return $this->end($request, $impersonation, StopImpersonation::BACK);
+            return $this->end($request, $impersonation, StopImpersonation::REFUSED_TWICE);
         }
 
         // A link prefetched on hover is not something the admin did: no toast for it.
@@ -119,8 +119,9 @@ final readonly class WhileImpersonating
                 : __('Not while you are signed in as the owner: nothing was changed.')]);
         }
 
+        // 303: the page asking is loaded again, never the refused PUT, PATCH or DELETE sent once more.
         if (! $request->isMethodSafe()) {
-            return back();
+            return back(303);
         }
 
         $request->session()->put(self::REFUSED, true);

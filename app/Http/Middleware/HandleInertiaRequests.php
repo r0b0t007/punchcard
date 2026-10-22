@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Actions\Tenancy\HasMemberships;
-use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\Impersonation;
@@ -94,9 +93,7 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $business = app(TenantContext::class)->bypass(fn (): ?string => Business::query()->whereKey($impersonation->businessId)->value('name'));
-
-        return ['owner' => (string) $request->user()->name, 'business' => (string) $business, 'endsAt' => $impersonation->endsAt->toIso8601String()];
+        return ['owner' => (string) $request->user()->name, 'business' => $impersonation->businessName, 'endsAt' => $impersonation->endsAt->toIso8601String()];
     }
 
     /** Whether the user works in a business (owner, staff or HQ), so has a counter there; no business, no counter. */
