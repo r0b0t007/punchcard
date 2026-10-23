@@ -56,19 +56,21 @@ les tampons NFC, des QR scannés par le personnel et des tampons ajoutés par le
 - punchcard (personnel habilité, besoin d'en connaître).
 - L'organisation qui gère le programme (ses administrateurs) ; dans un réseau de franchise, chaque franchisé ne reçoit
   que les clients qui ont tamponné chez lui en personne.
-- Sous-traitants : hébergeur **[ADR 0008]**, Cloudflare (réseau), fournisseur d'e-mails **[À CHOISIR]**, suivi d'erreurs
-  (Sentry, prévu) ; plus tard Apple et Google (Wallet), services de notification des navigateurs.
+- Sous-traitants : hébergeur Oracle Cloud Infrastructure (région Maroc Ouest, Casablanca ; ADR 0008), Cloudflare
+  (réseau), fournisseur d'e-mails **[À CHOISIR]**, suivi d'erreurs (Sentry, prévu) ; plus tard Apple et Google (Wallet),
+  services de notification des navigateurs.
 
 ## 7. Transferts vers l'étranger
 
-**[À DÉCIDER : ADR 0008]**. Garder l'annexe qui correspond au choix.
+Hébergement au Maroc (ADR 0008) :
 
-- **Annexe A (hébergement dans l'Union européenne)** : transfert de l'ensemble des données vers **[pays, ex.
-  Allemagne]**, pays assurant un niveau de protection suffisant au sens de l'article 43 de la loi 09-08 **[à confirmer
-  avec la liste de la CNDP]** ; prestataire **[nom]** ; finalités 1 à 8.
-- **Annexe B (hébergement au Maroc)** : pas de transfert de la base de données ; prestataire **[nom, ville]**.
-- Dans les deux cas : transferts liés aux sous-traitants situés hors du Maroc (Cloudflare, fournisseur d'e-mails,
-  Sentry ; plus tard Apple, Google, services de notification), à déclarer ou à autoriser selon le pays.
+- **Base de données, fichiers et sauvegardes** : hébergés au Maroc, chez Oracle Cloud Infrastructure, région Maroc Ouest
+  (Casablanca), sur un serveur dédié à punchcard ; les sauvegardes chiffrées restent dans la même région. Pas de
+  transfert de la base de données hors du Maroc ; finalités 1 à 8.
+- **Prestataire de droit américain** : Oracle est une société américaine, bien que les données restent au Maroc.
+  **[À vérifier avec la CNDP : l'accès à distance de son support compte-t-il comme un transfert ?]**
+- **Transferts liés aux sous-traitants situés hors du Maroc** : Cloudflare (réseau), fournisseur d'e-mails, Sentry ;
+  plus tard Apple, Google et les services de notification. À déclarer ou à autoriser selon le pays.
 
 ## 8. Durées de conservation
 
@@ -93,11 +95,12 @@ d'une décision sans limite pour l'instant **[À DÉCIDER]** ; journal d'audit *
 Chiffrement des échanges (HTTPS) ; mots de passe chiffrés ; double authentification et clés d'accès ; cloisonnement des
 données entre organisations et entre franchisés, vérifié par des tests automatisés ; clés des tampons NFC et certificats
 hors du code et de la base ; aucune donnée personnelle dans les journaux techniques ; journal d'audit des actions des
-administrateurs ; sauvegardes chiffrées **[ADR 0008, CHW-59]**.
+administrateurs ; sauvegardes chiffrées chaque nuit, conservées au Maroc dans la même région **[CHW-59]**.
 
 ## 11. Liste de contrôle avant le dépôt
 
-- [ ] Hébergement décidé (ADR 0008) et annexe A ou B gardée.
+- [x] Hébergement décidé (ADR 0008) : au Maroc, Oracle Cloud, Casablanca.
+- [ ] Position de la CNDP sur un hébergeur de droit américain dont les données restent au Maroc.
 - [ ] Question des rôles tranchée (roles.md) : un dépôt pour punchcard, et un par organisation si elles sont
       responsables.
 - [ ] Sous-traitants choisis et listés (e-mails, suivi d'erreurs).
