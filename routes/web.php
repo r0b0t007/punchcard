@@ -5,6 +5,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterScanController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FinishSignUpController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\JoinController;
@@ -119,6 +120,11 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
     Route::get('t/result', [TapController::class, 'show'])->block(10, 10)->name('taps.result');
     Route::inertia('t/busy', 'tap/refused', ['reason' => 'busy'])->name('taps.busy');
 });
+
+// A verification document for the platform admin (CHW-145): the 5-minute signed link from its business's page in A1,
+// never cached; who may is BusinessDocumentPolicy::open.
+Route::get('admin-documents/{document}', [DocumentController::class, 'show'])->whereNumber('document')
+    ->middleware(['auth', 'signed', NeverCache::class])->name('documents.view');
 
 // The customer's cards (CHW-27), rewards and redeeming them (CHW-26). Not "verified": an unverified customer sees
 // their rewards and is asked to verify before redeeming (OpenRedeemWindow). Never cached. The redeem

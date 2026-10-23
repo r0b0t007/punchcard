@@ -90,7 +90,7 @@ Common to every entry:
   log (who did what, never key material), including each time the platform admin signs in as an owner to support
   them (start and end, read-only, 30 minutes at most, CHW-144); the verification documents (the owner's ID card or
   passport and a proof of the business's address, CHW-145), encrypted at rest with their own key, read by the
-  platform admin only, each view in the audit log (that view ships later in CHW-145).
+  platform admin only, each view in the audit log.
 - **Recipients**: punchcard; the business's owners for their own staff.
 - **Retention**: while the membership exists; verification documents 3 months after the platform's decision,
   deleted by a nightly job, and while waiting no limit yet (to decide); audit log to decide (retention.md).

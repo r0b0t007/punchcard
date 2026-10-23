@@ -41,7 +41,7 @@ et administrateurs des commerces et réseaux ; administrateurs de la plateforme.
 - Professionnels : rôle par commerce, invitations, actions de la plateforme (journal d'audit).
 - Vérification des commerces : copie de la pièce d'identité du propriétaire (carte nationale ou passeport) et
   justificatif d'adresse du commerce, chiffrés, consultés par l'administrateur de la plateforme seulement, chaque
-  consultation journalisée **[à mettre en place]**. **[À vérifier : la copie de la carte nationale peut relever de l'autorisation préalable
+  consultation journalisée. **[À vérifier : la copie de la carte nationale peut relever de l'autorisation préalable
   plutôt que de la simple déclaration.]**
 - Aucune donnée sensible au sens de l'article 1 de la loi 09-08. Pas de date de naissance pour l'instant
   **[à revoir si l'anniversaire est ajouté]**.
