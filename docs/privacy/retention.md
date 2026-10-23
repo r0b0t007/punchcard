@@ -15,10 +15,32 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
 | Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                | `users` columns, `follows` rows, `consent_events`     | CHW-58  |
 | Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules           | Membership removal; `MustHandOverBusiness`            | Built   |
 | Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                   | Append-only; no pruning yet                           | Open    |
-| Verification documents (ID, address)             | To decide with CHW-145 (proposal: 3 months after the decision)                     | Scheduled job in CHW-145                              | Planned |
+| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; while waiting, no limit yet   | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built   |
 | Wallet passes and push subscriptions             | While the pass or subscription exists                                              | Phase 2                                               | Planned |
 | Backups                                          | To decide with the hosting (proposal: 30 days rolling)                             | ADR 0008, CHW-59                                      | Open    |
 | Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                           | CHW-241                                               | Open    |
+
+## Verification documents
+
+- **What**: the owner's ID card or passport and a proof of the business's address, sent from "Verify your business"
+  (CHW-145). JPG, PNG or PDF, 10 MB at most.
+- **Stored** on the private `documents` disk, never served by Laravel, under a random name, encrypted with their own
+  key (`DOCUMENTS_KEY`, AES-256-GCM), never `APP_KEY`. Only the platform admin reads them, each view in the audit
+  log (the A1 view, still to build in CHW-145).
+- **Kept** 3 months after the platform decides (`punchcard.documents.retention_months`): verifying the business
+  accepts them, "Ask for new documents" (still to build) rejects them. A new document replaces the one waiting or
+  rejected, file and row.
+- **Built** (CHW-145): every night at 04:00 UTC `DeleteDecidedDocuments` deletes each due document's file, then its row.
+  A file that won't go keeps its row for the next night. It also deletes the files no row points at once they are a
+  day old: an upload that failed before its row, a replaced file that wouldn't go, a business deleted with its rows.
+  It logs counts, and a failure by document id or path only.
+- **Owner's account deleted**: the documents stay until their date; `uploaded_by` is cleared, or points at the
+  anonymised account when it had history (`DeleteAccount`).
+- **Key rotation**: a key moved to `DOCUMENTS_PREVIOUS_KEYS` can be dropped once the files written with it are gone:
+  3 months after the last decision on them, or sooner if they were replaced (`key_id` on each row says which).
+- **Open**: a document still waiting has no date, so a business that is never verified (closed, suspended, or its
+  owner gone) keeps it. Proposal: delete documents waiting longer than 12 months, or when the business is closed.
+  To decide before the CNDP filing.
 
 ## The inactivity rule
 
