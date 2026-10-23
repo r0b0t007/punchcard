@@ -39,6 +39,10 @@ et administrateurs des commerces et réseaux ; administrateurs de la plateforme.
 - Sécurité : journal des passages sur les tampons (date, tampon, résultat, adresse IP, navigateur).
 - Consentements : confirmation de l'âge, actualités de punchcard, programmes suivis, avec leurs dates.
 - Professionnels : rôle par commerce, invitations, actions de la plateforme (journal d'audit).
+- Vérification des commerces : copie de la pièce d'identité du propriétaire (carte nationale ou passeport) et
+  justificatif d'adresse du commerce, chiffrés, consultés par l'administrateur de la plateforme seulement, chaque
+  consultation journalisée **[à mettre en place]**. **[À vérifier : la copie de la carte nationale peut relever de l'autorisation préalable
+  plutôt que de la simple déclaration.]**
 - Aucune donnée sensible au sens de l'article 1 de la loi 09-08. Pas de date de naissance pour l'instant
   **[à revoir si l'anniversaire est ajouté]**.
 
@@ -70,7 +74,9 @@ les tampons NFC, des QR scannés par le personnel et des tampons ajoutés par le
 
 Voir retention.md. En résumé : compte client jusqu'à sa suppression, ou 24 mois sans activité (préavis par e-mail 30
 jours avant) puis suppression ou anonymisation ; tampons et récompenses conservés sans l'identité de la personne ;
-journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois ; journal d'audit **[À DÉCIDER]**.
+journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois ; documents de vérification des
+commerces 3 mois après la décision de la plateforme (acceptés ou refusés), supprimés chaque nuit, et en attente
+d'une décision sans limite pour l'instant **[À DÉCIDER]** ; journal d'audit **[À DÉCIDER]**.
 
 ## 9. Droits des personnes
 
@@ -98,6 +104,7 @@ administrateurs ; sauvegardes chiffrées **[ADR 0008, CHW-59]**.
 - [ ] Formulaire en vigueur téléchargé sur www.cndp.ma et rubriques reportées.
 - [ ] Chaque mesure marquée **[à mettre en place]** est en service dans l'application (droits, journal des
       consentements, désinscription, règle d'inactivité).
+- [ ] Régime des copies de pièces d'identité vérifié (déclaration ou autorisation préalable).
 - [ ] Dépôt **avant toute donnée réelle** (avant le pilote, CHW-37).
 - [ ] Numéro de récépissé noté et imprimé dans la notice de confidentialité.
 - [ ] Notice et conditions professionnelles publiées sur le site.

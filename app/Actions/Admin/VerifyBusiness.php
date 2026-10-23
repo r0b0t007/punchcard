@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Admin;
 
 use App\Actions\Admin\Concerns\ChangesBusinessStatus;
+use App\Actions\Verification\DeleteDecidedDocuments;
 use App\Enums\BusinessStatus;
 use App\Enums\DocumentStatus;
 use App\Models\Business;
@@ -43,7 +44,7 @@ final readonly class VerifyBusiness
                 BusinessDocument::query()->where('business_id', $locked->id)->where('status', DocumentStatus::Submitted)->update([
                     'status' => DocumentStatus::Accepted,
                     'decided_at' => now(),
-                    'deletes_at' => now()->addMonths((int) config('punchcard.documents.retention_months')),
+                    'deletes_at' => DeleteDecidedDocuments::deletesAt(now()),
                 ]);
             },
         );
