@@ -2,12 +2,13 @@
 
 One entry per purpose. "punchcard" means the company operating the platform; "the organization" is the business or
 franchise network that runs a loyalty program (ADR 0006). Roles are explained in [roles.md](roles.md); retention periods
-in [retention.md](retention.md). Hosting and transfers depend on ADR 0008: every entry below says "the hosting country"
-until it is decided.
+in [retention.md](retention.md). Hosting is in Morocco (ADR 0008: Oracle Cloud, Casablanca); the transfers listed are
+those to sub-processors abroad.
 
 Common to every entry:
 
-- **Hosting**: one database (PostgreSQL) and object storage in the hosting country; HTTPS only; Cloudflare in front.
+- **Hosting**: one database (PostgreSQL) and the files on a server of punchcard's own at Oracle Cloud, region Morocco
+  West (Casablanca); backups in the same region; HTTPS only; Cloudflare in front.
 - **Security**: passwords hashed (bcrypt), optional two-factor and passkeys; tenant isolation enforced in code and tested
   (an organization never reads another's data; a franchisee only its own customers); platform admin actions audited;
   secrets (tag keys, certificates) outside the code and the database; personal data never written to the logs.

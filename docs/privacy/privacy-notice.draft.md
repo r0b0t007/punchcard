@@ -1,7 +1,7 @@
 # Privacy notice (draft, customer-facing)
 
 > Draft for counsel. To publish in English, French and Arabic on the marketing site and link from the app, once the
-> hosting (ADR 0008) and the CNDP receipt number are known. Placeholders are in **[brackets]**.
+> CNDP receipt number is known. Placeholders are in **[brackets]**.
 
 ## Who we are
 
@@ -27,8 +27,10 @@ We don't sell your data, and we don't show ads.
 
 - **The café or network whose card it is** sees your first name, your progress and your visits there. In a franchise
   network, a shop only sees you if you stamped there in person.
-- **Our providers**: hosting **[ADR 0008]**, network (Cloudflare), email **[provider]**; later Apple or Google if you add a
-  card to your Wallet. **[Transfers abroad, per ADR 0008]**.
+- **Our providers**: hosting by Oracle Cloud, in Morocco (Casablanca), where your data and its backups are stored;
+  network (Cloudflare), email **[provider]**; later Apple or Google if you add a card to your Wallet. Those outside
+  Morocco receive only what they need for their task, as declared to the CNDP **[list the countries once the providers
+  are chosen]**.
 
 ## How long
 

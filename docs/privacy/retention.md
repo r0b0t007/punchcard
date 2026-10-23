@@ -3,22 +3,22 @@
 How long each kind of personal data is kept, and what enforces it. "Built" means the rule runs in the app today;
 "CHW-58" means it ships with this issue.
 
-| Data                                             | Kept                                                                               | Enforced by                                           | Status  |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------- | ------- |
-| Customer account                                 | Until the customer deletes it, or 24 months without activity (notice at 23 months) | `DeleteAccount`; the daily inactivity job             | CHW-58  |
-| Stamps and rewards of a deleted account          | Kept without the person's identity, so business counts stay true                   | `DeleteAccount` anonymises; the ledger is append-only | Built   |
-| Tap log (IP address, browser)                    | 180 days (`TAP_RETENTION_DAYS`)                                                    | `Tap` pruning, daily `model:prune`                    | Built   |
-| Sign-in links                                    | 1 day                                                                              | `LoginLink` pruning                                   | Built   |
-| Counter scans (member QR)                        | 1 day after they expire                                                            | `CounterScan` pruning                                 | Built   |
-| Staff invitations                                | 1 month after use or expiry                                                        | `StaffInvitation` pruning                             | Built   |
-| Sessions (IP address, browser)                   | The session lifetime (`SESSION_LIFETIME`, 120 minutes), then garbage-collected     | Laravel session garbage collection                    | Built   |
-| Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                | `users` columns, `follows` rows, `consent_events`     | CHW-58  |
-| Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules           | Membership removal; `MustHandOverBusiness`            | Built   |
-| Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                   | Append-only; no pruning yet                           | Open    |
-| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; while waiting, no limit yet   | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built   |
-| Wallet passes and push subscriptions             | While the pass or subscription exists                                              | Phase 2                                               | Planned |
-| Backups                                          | To decide with the hosting (proposal: 30 days rolling)                             | ADR 0008, CHW-59                                      | Open    |
-| Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                           | CHW-241                                               | Open    |
+| Data                                             | Kept                                                                                | Enforced by                                           | Status  |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------- | ------- |
+| Customer account                                 | Until the customer deletes it, or 24 months without activity (notice at 23 months)  | `DeleteAccount`; the daily inactivity job             | CHW-58  |
+| Stamps and rewards of a deleted account          | Kept without the person's identity, so business counts stay true                    | `DeleteAccount` anonymises; the ledger is append-only | Built   |
+| Tap log (IP address, browser)                    | 180 days (`TAP_RETENTION_DAYS`)                                                     | `Tap` pruning, daily `model:prune`                    | Built   |
+| Sign-in links                                    | 1 day                                                                               | `LoginLink` pruning                                   | Built   |
+| Counter scans (member QR)                        | 1 day after they expire                                                             | `CounterScan` pruning                                 | Built   |
+| Staff invitations                                | 1 month after use or expiry                                                         | `StaffInvitation` pruning                             | Built   |
+| Sessions (IP address, browser)                   | The session lifetime (`SESSION_LIFETIME`, 120 minutes), then garbage-collected      | Laravel session garbage collection                    | Built   |
+| Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                 | `users` columns, `follows` rows, `consent_events`     | CHW-58  |
+| Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules            | Membership removal; `MustHandOverBusiness`            | Built   |
+| Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                    | Append-only; no pruning yet                           | Open    |
+| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; while waiting, no limit yet    | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built   |
+| Wallet passes and push subscriptions             | While the pass or subscription exists                                               | Phase 2                                               | Planned |
+| Backups                                          | In Morocco, the hosting's region (ADR 0008); how long to decide (proposal: 30 days) | Nightly to Oracle Object Storage, Casablanca; CHW-59  | Open    |
+| Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                            | CHW-241                                               | Open    |
 
 ## Verification documents
 
