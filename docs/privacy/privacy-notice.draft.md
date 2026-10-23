@@ -27,16 +27,21 @@ We don't sell your data, and we don't show ads.
 
 - **The café or network whose card it is** sees your first name, your progress and your visits there. In a franchise
   network, a shop only sees you if you stamped there in person.
-- **Our providers**: hosting by Oracle Cloud, in Morocco (Casablanca), where your data and its backups are stored;
-  network (Cloudflare), email **[provider]**; later Apple or Google if you add a card to your Wallet. Those outside
-  Morocco receive only what they need for their task, as declared to the CNDP **[list the countries once the providers
-  are chosen]**.
+- **Our providers**: hosting by Oracle Cloud in Morocco (Casablanca), where our database, files and their backups are
+  stored. Some providers are outside Morocco, as declared to the CNDP:
+    - Cloudflare carries all traffic between your phone and us, through its servers abroad, without keeping it as a
+      database **[countries]**;
+    - our email provider keeps your address and the messages we send you, for its own period **[provider, country,
+      period]**;
+    - error monitoring keeps your account number and what the app was doing when an error happens **[provider, country,
+      period]**;
+    - later Apple or Google, if you add a card to your Wallet.
 
 ## How long
 
 Until you delete your account. If you don't use it for 23 months, we email you; if you still don't sign in, we delete
 it 30 days later. When an account is deleted, the cafés keep their stamp counts without your name or email. Tap records
-are deleted after 180 days.
+are deleted after 180 days. Anything deleted stays in our encrypted backups, in Morocco, until they expire **[30 days]**.
 
 ## Your rights
 

@@ -7,7 +7,7 @@ those to sub-processors abroad.
 
 Common to every entry:
 
-- **Hosting**: one database (PostgreSQL) and the files on a server of punchcard's own at Oracle Cloud, region Morocco
+- **Hosting**: one database (PostgreSQL) and the files on a virtual machine of punchcard's own at Oracle Cloud, region Morocco
   West (Casablanca); backups in the same region; HTTPS only; Cloudflare in front.
 - **Security**: passwords hashed (bcrypt), optional two-factor and passkeys; tenant isolation enforced in code and tested
   (an organization never reads another's data; a franchisee only its own customers); platform admin actions audited;

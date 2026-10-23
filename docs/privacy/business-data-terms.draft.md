@@ -23,8 +23,9 @@
 8. **Breaches.** punchcard tells the organization without undue delay of any breach affecting its program data.
 9. **End of the contract.** When an organization leaves, its program data is deleted or anonymised; customers keep their
    punchcard account.
-10. **Location and transfers.** Data and its backups are hosted in Morocco, at Oracle Cloud in Casablanca (ADR 0008);
-    the sub-processors abroad (network, email, error monitoring) receive only what their task needs, as declared to the
-    CNDP.
+10. **Location and transfers.** The database, files and backups are hosted in Morocco, at Oracle Cloud in Casablanca
+    (ADR 0008). Sub-processors abroad, as declared to the CNDP: Cloudflare carries all traffic, decrypted, without
+    storing it as a database; the email provider keeps addresses and messages; error monitoring keeps a user id and the
+    request's context when an error happens.
 11. **Declaration.** **[If organizations are controllers]** The organization declares its program to the CNDP; punchcard
     provides the content of the declaration (the program entries of the register).

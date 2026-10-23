@@ -65,12 +65,17 @@ les tampons NFC, des QR scannés par le personnel et des tampons ajoutés par le
 Hébergement au Maroc (ADR 0008) :
 
 - **Base de données, fichiers et sauvegardes** : hébergés au Maroc, chez Oracle Cloud Infrastructure, région Maroc Ouest
-  (Casablanca), sur un serveur dédié à punchcard ; les sauvegardes chiffrées restent dans la même région. Pas de
-  transfert de la base de données hors du Maroc ; finalités 1 à 8.
+  (Casablanca), sur une machine virtuelle réservée à punchcard (matériel partagé du prestataire), dans un compartiment et
+  un réseau qui lui sont propres ; les sauvegardes chiffrées restent dans la même région. Pas de transfert de la base de
+  données hors du Maroc ; finalités 1 à 8.
 - **Prestataire de droit américain** : Oracle est une société américaine, bien que les données restent au Maroc.
   **[À vérifier avec la CNDP : l'accès à distance de son support compte-t-il comme un transfert ?]**
-- **Transferts liés aux sous-traitants situés hors du Maroc** : Cloudflare (réseau), fournisseur d'e-mails, Sentry ;
-  plus tard Apple, Google et les services de notification. À déclarer ou à autoriser selon le pays.
+- **Transferts liés aux sous-traitants situés hors du Maroc** : à déclarer ou à autoriser selon le pays.
+    - Cloudflare (réseau) : tout le trafic transite par ses serveurs hors du Maroc, déchiffré (connexions, tampons,
+      exports, documents envoyés), sans y être conservé comme une base de données.
+    - Fournisseur d'e-mails : adresses et contenu des messages, conservés selon sa propre durée **[À CHOISIR]**.
+    - Suivi d'erreurs (Sentry, prévu) : identifiant de l'utilisateur et contexte de la requête en cas d'erreur.
+    - Plus tard Apple, Google et les services de notification.
 
 ## 8. Durées de conservation
 
@@ -78,7 +83,8 @@ Voir retention.md. En résumé : compte client jusqu'à sa suppression, ou 24 mo
 jours avant) puis suppression ou anonymisation ; tampons et récompenses conservés sans l'identité de la personne ;
 journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois ; documents de vérification des
 commerces 3 mois après la décision de la plateforme (acceptés ou refusés), supprimés chaque nuit, et en attente
-d'une décision sans limite pour l'instant **[À DÉCIDER]** ; journal d'audit **[À DÉCIDER]**.
+d'une décision sans limite pour l'instant **[À DÉCIDER]** ; journal d'audit **[À DÉCIDER]**. Les sauvegardes
+chiffrées gardent les données supprimées jusqu'à leur expiration (30 jours proposés **[À DÉCIDER]**), puis plus rien.
 
 ## 9. Droits des personnes
 
