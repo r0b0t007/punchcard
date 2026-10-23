@@ -25,10 +25,10 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
 - **What**: the owner's ID card or passport and a proof of the business's address, sent from "Verify your business"
   (CHW-145). JPG, PNG or PDF, 10 MB at most.
 - **Stored** on the private `documents` disk, never served by Laravel, under a random name, encrypted with their own
-  key (`DOCUMENTS_KEY`, AES-256-GCM), never `APP_KEY`. Only the platform admin reads them, each view in the audit
-  log (the A1 view, still to build in CHW-145).
+  key (`DOCUMENTS_KEY`, AES-256-GCM), never `APP_KEY`. Only the platform admin reads them, from the business's page
+  in A1 through a link that works 5 minutes, each view in the audit log (`document.viewed`).
 - **Kept** 3 months after the platform decides (`punchcard.documents.retention_months`): verifying the business
-  accepts them, "Ask for new documents" (still to build) rejects them. The date is the start of that day (UTC), so
+  accepts them, "Ask for new documents" in A1 rejects them, with a reason the owners get by email. The date is the start of that day (UTC), so
   the night's run deletes them on the day the owner's page names. A new document replaces the one waiting or
   rejected, file and row.
 - **Built** (CHW-145): every night at 04:00 UTC `DeleteDecidedDocuments` deletes each due document's file, then its row.

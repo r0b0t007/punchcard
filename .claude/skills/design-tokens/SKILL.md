@@ -80,7 +80,7 @@ above: keep the two in step.
 | B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                             | `Punchcard Business Onboarding.dc.html`  |
 | B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                                      | `Punchcard Business App.dc.html`         |
 | S1 counter mode v3 (Scan a QR), S2a scanner, S2 scan result and its refusals, S3 redeem, C10 My QR v3 (short code)      | `Punchcard Staff Scanning.dc.html`       |
-| The eight notification emails, the owner fraud alerts (CHW-36) included                                                 | `Punchcard Emails.dc.html`               |
+| The notification emails: the owner fraud alerts (CHW-36), the request for new verification documents (CHW-145)          | `Punchcard Emails.dc.html`               |
 | The impersonation bar: the platform admin signed in as an owner, on every page (8a, CHW-144)                            | `Punchcard Impersonation Review.dc.html` |
 | Verify your business: the documents page, its four states and the checklist item (9a, CHW-145); the new-documents email | `Punchcard Verification Review.dc.html`  |
 | The inactivity warning email (CHW-58, option B: date first), light, dark and Arabic                                     | Design canvas, see below                 |
