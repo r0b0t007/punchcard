@@ -48,17 +48,20 @@ either way.
   compartment, so a fault or breach in Postiz doesn't reach punchcard's VM, disks or backups. What both still share is
   the tenancy itself: the console and API credentials that administer it, so those get two-factor and no day-to-day use.
 - **Cost**: Oracle's Always Free allowance (4 OCPUs and 24 GB of A1 a month for the tenancy, of which Postiz uses 1 and 6)
-  applies only in the tenancy's home region. Postiz's A1 VM already runs in Casablanca and the console shows the free
-  allowance there, but the home region is to confirm in the tenancy details; outside it, the VM is billed at Oracle's
-  list price for A1. The account moves to Pay As You Go before real data, which keeps free resources free but stops
-  Oracle reclaiming an idle Always Free VM.
+  applies only in the tenancy's home region, which is Morocco West (Casablanca), so punchcard's VM is free as long as
+  the two VMs together stay within 4 OCPUs and 24 GB. The backups count against the separate Always Free storage
+  allowance (Object Storage, to check in the console): tiny at the pilot, but 30 nightly full copies grow with the
+  logos and documents, so watch the size and switch to incremental copies before they pass the allowance, or they
+  are billed. The account moves to Pay As You Go before real data, which keeps free resources free but stops Oracle
+  reclaiming an idle Always Free VM.
 - **Database**: PostgreSQL with PostGIS on the VM itself (no managed Postgres in the allowance), patched by us.
 - **Files** (logos, verification documents): on the VM's disk, or Object Storage in the same region; not Cloudflare R2,
   which would be a transfer.
 - **Backups**: nightly, encrypted, to Object Storage in the same region, so they stay in Morocco too: the database dump
   and both storage folders (`storage/app/public` and the already encrypted `storage/app/documents`). Losing the VM then
-  loses no logo or document. Backups keep deleted data (closed accounts, documents past their date) until they expire:
-  their length is retention.md's (retention and restore drill: CHW-59).
+  loses no logo or document. Backups are kept 30 days, so deleted data (closed accounts, documents past their date)
+  is gone from them 30 days after its deletion. A restore applies the deletions made since the backup again before
+  the app serves anyone (retention.md, "After a restore"; restore drill: CHW-59).
 
 Why: with the database in Morocco there is no transfer of it to declare to the CNDP, which unblocks the filing and so the
 pilot; "your data stays in Morocco" matters to Moroccan businesses and public bodies; taps are faster for customers in
@@ -76,7 +79,8 @@ Accepted with:
 ## Consequences
 
 - The declaration draft keeps the Morocco annex only (docs/privacy/cndp-declaration-draft.fr.md): no transfer of the
-  database; the sub-processors abroad (Cloudflare, email, Sentry; later Apple, Google, push services) are still declared.
+  database; the sub-processors abroad (Cloudflare; Resend for email, United States; Sentry, EU region in Germany;
+  later Apple, Google, push services) are still declared.
 - Backups stay in Morocco; the privacy notice and the business terms name Morocco and Oracle Cloud.
 - The spec's stack (Hetzner, R2 storage) is superseded for hosting and file storage. Ploi stays the deploy tool (the
   deploy workflow and the stamper-keys runbook use it) if it manages Arm servers; if not, those move to a deploy script.

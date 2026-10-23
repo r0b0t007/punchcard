@@ -11,7 +11,7 @@ customers in France or elsewhere in the EU are also covered by the GDPR. These d
 | [processing-register.md](processing-register.md)             | Register of processing activities (one entry per purpose)                    | Draft                    |
 | [cndp-declaration-draft.fr.md](cndp-declaration-draft.fr.md) | The declaration to the CNDP, in French, following its form, with a checklist | Draft, not filed         |
 | [retention.md](retention.md)                                 | How long each kind of data is kept, and what enforces it                     | Draft; parts built later |
-| [roles.md](roles.md)                                         | Who is controller and who is processor, franchises included (ADR 0006)       | Draft, open question     |
+| [roles.md](roles.md)                                         | Who is controller and who is processor, franchises included (ADR 0006)       | Draft, decided           |
 | [privacy-notice.draft.md](privacy-notice.draft.md)           | The customer-facing privacy notice                                           | Draft, not published     |
 | [business-data-terms.draft.md](business-data-terms.draft.md) | Data processing clauses for businesses and franchise networks                | Draft, not published     |
 | [ADR 0008](../adr/0008-hosting-location.md)                  | Where the data is hosted: Morocco, Oracle Cloud (Casablanca)                 | Accepted                 |
@@ -20,11 +20,15 @@ customers in France or elsewhere in the EU are also covered by the GDPR. These d
 
 - **Hosting provider's law** (ADR 0008, decided: Morocco, Oracle Cloud). To confirm with the CNDP whether a US provider
   whose data stays in Morocco needs any transfer formality.
-- **Who files** (roles.md): does each organization declare its loyalty program, with punchcard as its processor, or does
-  punchcard declare everything as the sole controller?
-- **Sub-processors** not chosen yet: the transactional email provider, error monitoring (Sentry planned), Apple and Google
-  Wallet (Phase 2), web push services (Phase 2). Each one abroad is a transfer to declare.
-- **Retention** of the audit log and of backups (retention.md).
+- **Resend's transfer to the United States**: it keeps addresses, names, the messages, and their logs and metadata
+  there, a country not recognised as adequate. To confirm with the CNDP: authorisation, or an exception of the law
+  (performing the service for service emails, explicit consent to the transfer for news and offers).
+- **Providers' retention**: how long Resend and Sentry keep their logs (placeholders in CNDP §7 and the privacy
+  notice).
+- **Sub-processors** still to choose: Apple and Google Wallet (Phase 2), web push services (Phase 2). Chosen: Resend
+  (email) and Sentry, EU region (error monitoring). Each one abroad is a transfer to declare.
+- **Retention** of the audit log (retention.md). Decided: backups 30 days, verification documents still waiting 12
+  months after upload (to build), deletions applied again after a restore (to build, CHW-59).
 - **Filing** the declaration (the founder's step) and printing its receipt number in the privacy notice.
 - **Publishing** the privacy notice and business terms on the marketing site.
 

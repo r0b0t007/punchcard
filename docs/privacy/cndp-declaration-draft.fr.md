@@ -11,8 +11,9 @@
   privacy@…)
 - Qualité : responsable du traitement pour les comptes clients, la sécurité des tampons, les actualités de punchcard, les
   utilisateurs professionnels et les e-mails de service ; sous-traitant des organisations pour leurs programmes de
-  fidélité. **[À DÉCIDER]** : voir la question des rôles (roles.md) ; si punchcard est seul responsable, regrouper tout
-  ici.
+  fidélité (roles.md). Chaque organisation, responsable de son programme, le déclare elle-même avec punchcard comme
+  sous-traitant ; punchcard lui fournit le contenu (les finalités 2 et 5 du registre, et la part des offres de la
+  finalité 7 une fois les cartes Wallet en service). punchcard déclare ici le service des cartes Wallet lui-même.
 
 ## 2. Finalités
 
@@ -57,7 +58,7 @@ les tampons NFC, des QR scannés par le personnel et des tampons ajoutés par le
 - L'organisation qui gère le programme (ses administrateurs) ; dans un réseau de franchise, chaque franchisé ne reçoit
   que les clients qui ont tamponné chez lui en personne.
 - Sous-traitants : hébergeur Oracle Cloud Infrastructure (région Maroc Ouest, Casablanca ; ADR 0008), Cloudflare
-  (réseau), fournisseur d'e-mails **[À CHOISIR]**, suivi d'erreurs (Sentry, prévu) ; plus tard Apple et Google (Wallet),
+  (réseau), Resend (e-mails de service), Sentry (suivi d'erreurs) ; plus tard Apple et Google (Wallet),
   services de notification des navigateurs.
 
 ## 7. Transferts vers l'étranger
@@ -73,8 +74,14 @@ Hébergement au Maroc (ADR 0008) :
 - **Transferts liés aux sous-traitants situés hors du Maroc** : à déclarer ou à autoriser selon le pays.
     - Cloudflare (réseau) : tout le trafic transite par ses serveurs hors du Maroc, déchiffré (connexions, tampons,
       exports, documents envoyés), sans y être conservé comme une base de données.
-    - Fournisseur d'e-mails : adresses et contenu des messages, conservés selon sa propre durée **[À CHOISIR]**.
-    - Suivi d'erreurs (Sentry, prévu) : identifiant de l'utilisateur et contexte de la requête en cas d'erreur.
+    - Resend (e-mails, société américaine ; finalités 4, 5 et 8) : adresse, nom, les messages, leurs journaux et leurs
+      métadonnées, conservés aux États-Unis (les e-mails partent d'Irlande, mais les données restent aux États-Unis),
+      pays non reconnu comme assurant une protection adéquate : transfert à autoriser par la CNDP, ou à fonder sur une
+      exception de la loi : l'exécution du service demandé pour les e-mails de service (finalité 8), le consentement
+      exprès de la personne au transfert pour les actualités et les offres (finalités 4 et 5) **[À vérifier]**. Durée
+      de conservation des journaux selon ses conditions **[À COMPLÉTER]**.
+    - Sentry (suivi d'erreurs, société américaine) : identifiant de l'utilisateur et contexte de la requête en cas
+      d'erreur, hébergés dans sa région européenne (Francfort, Allemagne) ; durée selon l'offre **[À COMPLÉTER]**.
     - Plus tard Apple, Google et les services de notification.
 
 ## 8. Durées de conservation
@@ -82,9 +89,11 @@ Hébergement au Maroc (ADR 0008) :
 Voir retention.md. En résumé : compte client jusqu'à sa suppression, ou 24 mois sans activité (préavis par e-mail 30
 jours avant) puis suppression ou anonymisation ; tampons et récompenses conservés sans l'identité de la personne ;
 journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois ; documents de vérification des
-commerces 3 mois après la décision de la plateforme (acceptés ou refusés), supprimés chaque nuit, et en attente
-d'une décision sans limite pour l'instant **[À DÉCIDER]** ; journal d'audit **[À DÉCIDER]**. Les sauvegardes
-chiffrées gardent les données supprimées jusqu'à leur expiration (30 jours proposés **[À DÉCIDER]**), puis plus rien.
+commerces 3 mois après la décision de la plateforme (acceptés ou refusés), supprimés chaque nuit, et 12 mois après
+leur envoi s'ils attendent encore une décision **[à mettre en place]** ; journal d'audit **[À DÉCIDER]**. Les sauvegardes chiffrées
+sont conservées 30 jours : une donnée supprimée en disparaît 30 jours plus tard. Après une restauration, les
+suppressions faites depuis la sauvegarde sont appliquées de nouveau avant la remise en service **[à mettre en place,
+CHW-59]**.
 
 ## 9. Droits des personnes
 
@@ -101,15 +110,16 @@ chiffrées gardent les données supprimées jusqu'à leur expiration (30 jours p
 Chiffrement des échanges (HTTPS) ; mots de passe chiffrés ; double authentification et clés d'accès ; cloisonnement des
 données entre organisations et entre franchisés, vérifié par des tests automatisés ; clés des tampons NFC et certificats
 hors du code et de la base ; aucune donnée personnelle dans les journaux techniques ; journal d'audit des actions des
-administrateurs ; sauvegardes chiffrées chaque nuit, conservées au Maroc dans la même région **[CHW-59]**.
+administrateurs ; sauvegardes chiffrées chaque nuit, conservées 30 jours au Maroc dans la même région **[CHW-59]**.
 
 ## 11. Liste de contrôle avant le dépôt
 
 - [x] Hébergement décidé (ADR 0008) : au Maroc, Oracle Cloud, Casablanca.
 - [ ] Position de la CNDP sur un hébergeur de droit américain dont les données restent au Maroc.
-- [ ] Question des rôles tranchée (roles.md) : un dépôt pour punchcard, et un par organisation si elles sont
-      responsables.
-- [ ] Sous-traitants choisis et listés (e-mails, suivi d'erreurs).
+- [x] Question des rôles tranchée (roles.md) : chaque organisation est responsable de son programme ; un dépôt pour
+      punchcard, et un par organisation, dont punchcard fournit le contenu.
+- [x] Sous-traitants choisis et listés : Resend (e-mails), Sentry, région européenne (suivi d'erreurs).
+- [ ] Transfert des données de Resend vers les États-Unis : autorisation de la CNDP ou exception applicable.
 - [ ] Formulaire en vigueur téléchargé sur www.cndp.ma et rubriques reportées.
 - [ ] Chaque mesure marquée **[à mettre en place]** est en service dans l'application (droits, journal des
       consentements, désinscription, règle d'inactivité).
