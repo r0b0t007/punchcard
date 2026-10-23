@@ -48,16 +48,20 @@ either way.
   compartment, so a fault or breach in Postiz doesn't reach punchcard's VM, disks or backups. What both still share is
   the tenancy itself: the console and API credentials that administer it, so those get two-factor and no day-to-day use.
 - **Cost**: Oracle's Always Free allowance (4 OCPUs and 24 GB of A1 a month for the tenancy, of which Postiz uses 1 and 6)
-  applies only in the tenancy's home region, which is Morocco West (Casablanca), so punchcard's VM is free while both
-  VMs stay within it. The account moves to Pay As You Go before real data, which keeps free resources free but stops
-  Oracle reclaiming an idle Always Free VM.
+  applies only in the tenancy's home region, which is Morocco West (Casablanca), so punchcard's VM is free as long as
+  the two VMs together stay within 4 OCPUs and 24 GB. The backups count against the separate Always Free storage
+  allowance (Object Storage, to check in the console): tiny at the pilot, but 30 nightly full copies grow with the
+  logos and documents, so watch the size and switch to incremental copies before they pass the allowance, or they
+  are billed. The account moves to Pay As You Go before real data, which keeps free resources free but stops Oracle
+  reclaiming an idle Always Free VM.
 - **Database**: PostgreSQL with PostGIS on the VM itself (no managed Postgres in the allowance), patched by us.
 - **Files** (logos, verification documents): on the VM's disk, or Object Storage in the same region; not Cloudflare R2,
   which would be a transfer.
 - **Backups**: nightly, encrypted, to Object Storage in the same region, so they stay in Morocco too: the database dump
   and both storage folders (`storage/app/public` and the already encrypted `storage/app/documents`). Losing the VM then
   loses no logo or document. Backups are kept 30 days, so deleted data (closed accounts, documents past their date)
-  is gone from them 30 days after its deletion (retention.md; restore drill: CHW-59).
+  is gone from them 30 days after its deletion. A restore applies the deletions made since the backup again before
+  the app serves anyone (retention.md, "After a restore"; restore drill: CHW-59).
 
 Why: with the database in Morocco there is no transfer of it to declare to the CNDP, which unblocks the filing and so the
 pilot; "your data stays in Morocco" matters to Moroccan businesses and public bodies; taps are faster for customers in

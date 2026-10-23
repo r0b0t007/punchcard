@@ -78,7 +78,8 @@ Common to every entry:
 - **People**: customers following a program.
 - **Data**: the follow (program, on or off, since when), email, language; later the Wallet pass or push subscription
   (T7).
-- **Recipients**: the organization (its admins; a franchisee only for its own customers); punchcard as processor.
+- **Recipients**: the organization (its admins; a franchisee only for its own customers); punchcard as processor;
+  Resend, which sends the offers by email (a transfer to the United States, as in T8).
 - **Retention**: until withdrawn or the account ends.
 
 ## T6. Business users and administration
@@ -94,8 +95,8 @@ Common to every entry:
   passport and a proof of the business's address, CHW-145), encrypted at rest with their own key, read by the
   platform admin only, each view in the audit log.
 - **Recipients**: punchcard; the business's owners for their own staff.
-- **Retention**: while the membership exists; verification documents 3 months after the platform's decision, or 12
-  months after upload while still waiting, deleted by a nightly job; audit log to decide (retention.md).
+- **Retention**: while the membership exists; verification documents 3 months after the platform's decision, deleted
+  by a nightly job, and 12 months after upload while still waiting (to build); audit log to decide (retention.md).
 
 ## T7. Wallet passes and notifications (planned, Phase 2)
 
@@ -113,7 +114,8 @@ Common to every entry:
 - **Purpose**: sign-in links, confirmations, staff invitations, fraud alerts to owners, the inactivity notice.
 - **Legal basis**: performance of the service; legitimate interest (fraud alerts).
 - **Data**: email, name, language, the message.
-- **Recipients and transfers**: Resend, the email provider: sends from Ireland, keeps account data, logs and message
-  metadata in the United States (a transfer to a country not recognised as adequate: CNDP authorisation or an
-  exception of the law, to confirm).
+- **Recipients and transfers**: Resend, the email provider, also for T4 and T5: it keeps the address, name, the
+  messages, and their logs and metadata in the United States, though the mail leaves from Ireland (a transfer to a
+  country not recognised as adequate: CNDP authorisation, or an exception of the law: performing the service here,
+  the person's explicit consent to the transfer for T4 and T5; to confirm).
 - **Retention**: not stored by punchcard beyond the queue; the provider's logs per its terms.

@@ -20,12 +20,15 @@ customers in France or elsewhere in the EU are also covered by the GDPR. These d
 
 - **Hosting provider's law** (ADR 0008, decided: Morocco, Oracle Cloud). To confirm with the CNDP whether a US provider
   whose data stays in Morocco needs any transfer formality.
-- **Resend's transfer to the United States**: it keeps email logs and metadata there, a country not recognised as
-  adequate. To confirm with the CNDP: authorisation, or an exception of the law (performing the service asked for).
+- **Resend's transfer to the United States**: it keeps addresses, names, the messages, and their logs and metadata
+  there, a country not recognised as adequate. To confirm with the CNDP: authorisation, or an exception of the law
+  (performing the service for service emails, explicit consent to the transfer for news and offers).
+- **Providers' retention**: how long Resend and Sentry keep their logs (placeholders in CNDP §7 and the privacy
+  notice).
 - **Sub-processors** still to choose: Apple and Google Wallet (Phase 2), web push services (Phase 2). Chosen: Resend
   (email) and Sentry, EU region (error monitoring). Each one abroad is a transfer to declare.
 - **Retention** of the audit log (retention.md). Decided: backups 30 days, verification documents still waiting 12
-  months after upload (to build).
+  months after upload (to build), deletions applied again after a restore (to build, CHW-59).
 - **Filing** the declaration (the founder's step) and printing its receipt number in the privacy notice.
 - **Publishing** the privacy notice and business terms on the marketing site.
 

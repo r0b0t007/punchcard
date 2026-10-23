@@ -3,22 +3,22 @@
 How long each kind of personal data is kept, and what enforces it. "Built" means the rule runs in the app today;
 "CHW-58" means it ships with this issue.
 
-| Data                                             | Kept                                                                                            | Enforced by                                           | Status                   |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
-| Customer account                                 | Until the customer deletes it, or 24 months without activity (notice at 23 months)              | `DeleteAccount`; the daily inactivity job             | CHW-58                   |
-| Stamps and rewards of a deleted account          | Kept without the person's identity, so business counts stay true                                | `DeleteAccount` anonymises; the ledger is append-only | Built                    |
-| Tap log (IP address, browser)                    | 180 days (`TAP_RETENTION_DAYS`)                                                                 | `Tap` pruning, daily `model:prune`                    | Built                    |
-| Sign-in links                                    | 1 day                                                                                           | `LoginLink` pruning                                   | Built                    |
-| Counter scans (member QR)                        | 1 day after they expire                                                                         | `CounterScan` pruning                                 | Built                    |
-| Staff invitations                                | 1 month after use or expiry                                                                     | `StaffInvitation` pruning                             | Built                    |
-| Sessions (IP address, browser)                   | The session lifetime (`SESSION_LIFETIME`, 120 minutes), then garbage-collected                  | Laravel session garbage collection                    | Built                    |
-| Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                             | `users` columns, `follows` rows, `consent_events`     | CHW-58                   |
-| Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules                        | Membership removal; `MustHandOverBusiness`            | Built                    |
-| Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                                | Append-only; no pruning yet                           | Open                     |
-| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; 12 months after upload while still waiting | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built; waiting: to build |
-| Wallet passes and push subscriptions             | While the pass or subscription exists                                                           | Phase 2                                               | Planned                  |
-| Backups (database and file folders)              | 30 days, in Morocco (ADR 0008); deleted data is gone from them 30 days after its deletion       | Nightly to Oracle Object Storage, Casablanca; CHW-59  | Planned                  |
-| Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                                        | CHW-241                                               | Open                     |
+| Data                                             | Kept                                                                                                                             | Enforced by                                           | Status                   |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
+| Customer account                                 | Until the customer deletes it, or 24 months without activity (notice at 23 months)                                               | `DeleteAccount`; the daily inactivity job             | CHW-58                   |
+| Stamps and rewards of a deleted account          | Kept without the person's identity, so business counts stay true                                                                 | `DeleteAccount` anonymises; the ledger is append-only | Built                    |
+| Tap log (IP address, browser)                    | 180 days (`TAP_RETENTION_DAYS`)                                                                                                  | `Tap` pruning, daily `model:prune`                    | Built                    |
+| Sign-in links                                    | 1 day                                                                                                                            | `LoginLink` pruning                                   | Built                    |
+| Counter scans (member QR)                        | 1 day after they expire                                                                                                          | `CounterScan` pruning                                 | Built                    |
+| Staff invitations                                | 1 month after use or expiry                                                                                                      | `StaffInvitation` pruning                             | Built                    |
+| Sessions (IP address, browser)                   | The session lifetime (`SESSION_LIFETIME`, 120 minutes), then garbage-collected                                                   | Laravel session garbage collection                    | Built                    |
+| Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                                                              | `users` columns, `follows` rows, `consent_events`     | CHW-58                   |
+| Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules                                                         | Membership removal; `MustHandOverBusiness`            | Built                    |
+| Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                                                                 | Append-only; no pruning yet                           | Open                     |
+| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; 12 months after upload while still waiting                                  | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built; waiting: to build |
+| Wallet passes and push subscriptions             | While the pass or subscription exists                                                                                            | Phase 2                                               | Planned                  |
+| Backups (database and file folders)              | 30 days, in Morocco (ADR 0008); deleted data is gone from them 30 days after its deletion; a restore applies the deletions again | Nightly to Oracle Object Storage, Casablanca; CHW-59  | Planned                  |
+| Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                                                                         | CHW-241                                               | Open                     |
 
 ## Verification documents
 
@@ -38,12 +38,23 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
 - **Owner's account deleted**: the documents stay until their date; `uploaded_by` is cleared, or points at the
   anonymised account when it had history (`DeleteAccount`).
 - **Key rotation**: a key moved to `DOCUMENTS_PREVIOUS_KEYS` can be dropped once no row has its `key_id` (the first 16
-  characters of its SHA-256). Count rows, never months: a document can wait up to 12 months before its decision.
+  characters of its SHA-256). Count rows, never months.
 - **One disk**: the `documents` disk is local, and the job runs on one server. With more than one app server it must
   move to shared storage first, or the job deletes rows whose files sit on another server.
 - **Never decided**: a document still waiting 12 months after its upload is deleted the same way, so a business
   that is never reviewed (closed, suspended, or its owner gone) doesn't keep ID copies on file. Decided; to build in
-  `DeleteDecidedDocuments` before the CNDP filing.
+  `DeleteDecidedDocuments` before the CNDP filing. The build also has to say what follows: the owners are emailed that
+  their documents were deleted unreviewed, their page goes back to "nothing sent", and a pending business with no
+  documents is visible as such in A1 (designed first, like the rest of the page).
+
+## After a restore
+
+A backup holds whatever existed the night it was taken, so restoring one brings back data deleted since. Before the
+restored app serves anyone, the deletions made since the backup are applied again: the date-based jobs (inactivity,
+tap pruning, verification documents) catch up on their own on their next run, which the restore runs at once;
+deletions customers asked for (`DeleteAccount`) have no record outside the database today, so the restore needs one
+kept elsewhere (a deletion log shipped off the VM, ids only) or the 30-day promise fails. To build with the restore
+drill (CHW-59).
 
 ## The inactivity rule
 

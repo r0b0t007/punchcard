@@ -31,8 +31,8 @@ We don't sell your data, and we don't show ads.
   stored. Some providers are outside Morocco, as declared to the CNDP:
     - Cloudflare carries all traffic between your phone and us, through its servers abroad, without keeping it as a
       database **[countries]**;
-    - Resend, our email provider, keeps your address and the messages we send you in the United States, for its own
-      period **[period]**;
+    - Resend, our email provider, keeps your address, your name, the messages we send you, and their logs and metadata
+      in the United States, for its own period **[period]**;
     - Sentry, our error monitoring, keeps your account number and what the app was doing when an error happens, in
       Germany **[period]**;
     - later Apple or Google, if you add a card to your Wallet.

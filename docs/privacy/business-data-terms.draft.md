@@ -25,8 +25,8 @@
    punchcard account.
 10. **Location and transfers.** The database, files and backups are hosted in Morocco, at Oracle Cloud in Casablanca
     (ADR 0008). Sub-processors abroad, as declared to the CNDP: Cloudflare carries all traffic, decrypted, without
-    storing it as a database; Resend (email, United States) keeps addresses, messages and their logs in the United
-    States; Sentry (error monitoring, EU region in Germany) keeps a user id and the request's context when an error
+    storing it as a database; Resend (email) keeps addresses, names, the messages, and their logs and metadata in
+    the United States; Sentry (error monitoring, EU region in Germany) keeps a user id and the request's context when an error
     happens. Backups are kept 30 days.
 11. **Declaration.** The organization declares its program to the CNDP; punchcard provides the content of the
     declaration (the program entries of the register).

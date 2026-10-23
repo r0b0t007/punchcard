@@ -37,8 +37,9 @@ does in a program (T2, T5) belongs to that program.
 ## Who files
 
 Decided: the split above. Under Law 09-08 each controller declares its own processing, so **every organization files
-its own declaration** for its loyalty program (T2, T5), with punchcard named as processor, and punchcard files for T1,
-T3, T4, T6 and T8. To keep that light for a small café, punchcard provides the content of the organization's
+its own declaration** for its loyalty program (T2, T5, and in Phase 2 the offers it sends through Wallet passes and
+notifications, T7), with punchcard named as processor, and punchcard files for T1, T3, T4, T6, T8 and the pass service
+itself (T7). To keep that light for a small café, punchcard provides the content of the organization's
 declaration (the program entries of the register) and the business terms say so.
 
 Not chosen: punchcard as the sole controller of everything (one declaration, but all the responsibility on punchcard)
