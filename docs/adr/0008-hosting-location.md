@@ -1,7 +1,7 @@
-# 0008. Where customer data is hosted (EU or Morocco)
+# 0008. Where customer data is hosted
 
-- Status: proposed, decision deferred (CHW-58)
-- Date: 2026-10-18
+- Status: accepted (CHW-58): option B, Oracle Cloud in Casablanca
+- Date: 2026-10-18; decided 2026-10-23
 
 ## Context
 
@@ -40,11 +40,48 @@ either way.
 
 ## Decision
 
-Deferred. Until it is made, the CHW-58 hosting criterion stays open and the declaration draft carries both annexes
-(docs/privacy/cndp-declaration-draft.fr.md).
+**B, Morocco: Oracle Cloud Infrastructure, region Morocco West (Casablanca, `af-casablanca-1`)**, on a VM of its own.
+
+- **Server**: an Ampere A1 VM (Arm, `VM.Standard.A1.Flex`), about 2 OCPUs and 12 GB of memory, Ubuntu 24.04 (arm64),
+  on Oracle's shared hardware. It runs nothing else. The tenancy's other VM (Postiz, 1 OCPU, 6 GB) stays apart: punchcard
+  gets its own compartment, its own network (VCN, security lists, no route to Postiz) and IAM policies scoped to that
+  compartment, so a fault or breach in Postiz doesn't reach punchcard's VM, disks or backups. What both still share is
+  the tenancy itself: the console and API credentials that administer it, so those get two-factor and no day-to-day use.
+- **Cost**: Oracle's Always Free allowance (4 OCPUs and 24 GB of A1 a month for the tenancy, of which Postiz uses 1 and 6)
+  applies only in the tenancy's home region. Postiz's A1 VM already runs in Casablanca and the console shows the free
+  allowance there, but the home region is to confirm in the tenancy details; outside it, the VM is billed at Oracle's
+  list price for A1. The account moves to Pay As You Go before real data, which keeps free resources free but stops
+  Oracle reclaiming an idle Always Free VM.
+- **Database**: PostgreSQL with PostGIS on the VM itself (no managed Postgres in the allowance), patched by us.
+- **Files** (logos, verification documents): on the VM's disk, or Object Storage in the same region; not Cloudflare R2,
+  which would be a transfer.
+- **Backups**: nightly, encrypted, to Object Storage in the same region, so they stay in Morocco too: the database dump
+  and both storage folders (`storage/app/public` and the already encrypted `storage/app/documents`). Losing the VM then
+  loses no logo or document. Backups keep deleted data (closed accounts, documents past their date) until they expire:
+  their length is retention.md's (retention and restore drill: CHW-59).
+
+Why: with the database in Morocco there is no transfer of it to declare to the CNDP, which unblocks the filing and so the
+pilot; "your data stays in Morocco" matters to Moroccan businesses and public bodies; taps are faster for customers in
+Morocco. The cost difference with Hetzner (a few euros a month) did not decide it.
+
+Accepted with:
+
+- **No SLA on Always Free**, and Arm capacity is sometimes short in a region. Pay As You Go and our own backups cover
+  the first; the exit path covers the rest.
+- **More of our own operations** than a host with one-click backups: Postgres, patching and backups are ours. Ploi's
+  support for Arm servers is to confirm; otherwise a deploy script.
+- **A US provider**: Oracle is subject to US law although the data sits in Morocco. The declaration says so; whether the
+  CNDP sees the provider's remote support access as a transfer is to confirm with it.
 
 ## Consequences
 
-- Filing waits for this decision; the pilot (CHW-37) waits for the filing.
-- Whichever option wins, backups stay in the same jurisdiction, the privacy notice names the country, and the business
-  terms state it.
+- The declaration draft keeps the Morocco annex only (docs/privacy/cndp-declaration-draft.fr.md): no transfer of the
+  database; the sub-processors abroad (Cloudflare, email, Sentry; later Apple, Google, push services) are still declared.
+- Backups stay in Morocco; the privacy notice and the business terms name Morocco and Oracle Cloud.
+- The spec's stack (Hetzner, R2 storage) is superseded for hosting and file storage. Ploi stays the deploy tool (the
+  deploy workflow and the stamper-keys runbook use it) if it manages Arm servers; if not, those move to a deploy script.
+- Cloudflare stays in front: all traffic passes through it abroad, decrypted, without being stored as a database. The
+  declaration, the privacy notice and the business terms say so.
+- Exit path: the app is host-agnostic (everything in `.env`, database drivers, no host-specific service), so moving to
+  another host, Hetzner included, is a database dump, the storage folders and a DNS change. Revisit if Oracle's
+  availability or support falls short once businesses pay.
