@@ -8,10 +8,12 @@ those to sub-processors abroad.
 Common to every entry:
 
 - **Hosting**: one database (PostgreSQL) and the files on a virtual machine of punchcard's own at Oracle Cloud, region Morocco
-  West (Casablanca); backups in the same region; HTTPS only; Cloudflare in front.
+  West (Casablanca); backups in the same region, kept 30 days; HTTPS only; Cloudflare in front.
 - **Security**: passwords hashed (bcrypt), optional two-factor and passkeys; tenant isolation enforced in code and tested
   (an organization never reads another's data; a franchisee only its own customers); platform admin actions audited;
   secrets (tag keys, certificates) outside the code and the database; personal data never written to the logs.
+- **Error monitoring**: Sentry, EU region (Frankfurt, Germany): a user id and the request's context when an error
+  happens, never passwords, keys or raw tap parameters.
 - **Rights**: access and portability (download as JSON in the settings, CHW-58), rectification (profile), erasure
   (delete the account), objection to marketing (consent switches on each card and in the settings, CHW-58; an
   unsubscribe link in news emails, to build). Contact: the privacy address in the notice.
@@ -33,8 +35,7 @@ Common to every entry:
 
 ## T2. Loyalty programs
 
-- **Controller**: the organization that runs the program; punchcard is its processor (see roles.md for the open
-  question).
+- **Controller**: the organization that runs the program; punchcard is its processor (roles.md).
 - **Purpose**: record stamps and rewards on a customer's card and hand rewards over.
 - **Legal basis**: performance of the program the customer joined.
 - **People**: customers who joined a program.
@@ -66,7 +67,7 @@ Common to every entry:
 - **Legal basis**: consent, opt-in, dated; can be withdrawn in the settings at any time.
 - **People**: customers who opted in.
 - **Data**: email, language, date of consent or withdrawal.
-- **Recipients**: punchcard; the email provider.
+- **Recipients**: punchcard; the email provider (Resend, T8).
 - **Retention**: until withdrawn or the account ends.
 
 ## T5. Offers from programs a customer follows
@@ -93,8 +94,8 @@ Common to every entry:
   passport and a proof of the business's address, CHW-145), encrypted at rest with their own key, read by the
   platform admin only, each view in the audit log.
 - **Recipients**: punchcard; the business's owners for their own staff.
-- **Retention**: while the membership exists; verification documents 3 months after the platform's decision,
-  deleted by a nightly job, and while waiting no limit yet (to decide); audit log to decide (retention.md).
+- **Retention**: while the membership exists; verification documents 3 months after the platform's decision, or 12
+  months after upload while still waiting, deleted by a nightly job; audit log to decide (retention.md).
 
 ## T7. Wallet passes and notifications (planned, Phase 2)
 
@@ -112,5 +113,7 @@ Common to every entry:
 - **Purpose**: sign-in links, confirmations, staff invitations, fraud alerts to owners, the inactivity notice.
 - **Legal basis**: performance of the service; legitimate interest (fraud alerts).
 - **Data**: email, name, language, the message.
-- **Recipients and transfers**: the email provider (to choose; a transfer if abroad).
+- **Recipients and transfers**: Resend, the email provider: sends from Ireland, keeps account data, logs and message
+  metadata in the United States (a transfer to a country not recognised as adequate: CNDP authorisation or an
+  exception of the law, to confirm).
 - **Retention**: not stored by punchcard beyond the queue; the provider's logs per its terms.

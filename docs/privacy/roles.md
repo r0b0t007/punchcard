@@ -5,7 +5,7 @@ processor), per [processing activity](processing-register.md). It follows the te
 organization (an independent café, a chain, or a franchise network) runs the loyalty program; its businesses are the
 sites that stamp.
 
-## Proposed split
+## Split (decided)
 
 | Activity                                 | Controller        | punchcard is          |
 | ---------------------------------------- | ----------------- | --------------------- |
@@ -34,15 +34,12 @@ does in a program (T2, T5) belongs to that program.
 - **punchcard** processes program data only on the organization's instructions, through the app; it uses it for its own
   purposes only for T3 (fraud and integrity).
 
-## Open question (for counsel or the CNDP)
+## Who files
 
-Under Law 09-08 each controller declares its own processing. With the split above, **every organization would file its
-own declaration** for its loyalty program, with punchcard named as processor, and punchcard would file for T1, T3, T4,
-T6 and T8. That is heavy for a small café.
+Decided: the split above. Under Law 09-08 each controller declares its own processing, so **every organization files
+its own declaration** for its loyalty program (T2, T5), with punchcard named as processor, and punchcard files for T1,
+T3, T4, T6 and T8. To keep that light for a small café, punchcard provides the content of the organization's
+declaration (the program entries of the register) and the business terms say so.
 
-The alternative is **punchcard as the sole controller** of everything, the businesses being recipients of their own
-customers' data. It is simpler to file (one declaration) but gives punchcard more responsibility, and the business
-terms would change accordingly.
-
-The declaration draft follows the split above and notes the alternative; the choice decides who files and what the
-business terms say.
+Not chosen: punchcard as the sole controller of everything (one declaration, but all the responsibility on punchcard)
+or joint controllers (a joint-controller agreement with every organization).

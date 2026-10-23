@@ -31,17 +31,17 @@ We don't sell your data, and we don't show ads.
   stored. Some providers are outside Morocco, as declared to the CNDP:
     - Cloudflare carries all traffic between your phone and us, through its servers abroad, without keeping it as a
       database **[countries]**;
-    - our email provider keeps your address and the messages we send you, for its own period **[provider, country,
-      period]**;
-    - error monitoring keeps your account number and what the app was doing when an error happens **[provider, country,
-      period]**;
+    - Resend, our email provider, keeps your address and the messages we send you in the United States, for its own
+      period **[period]**;
+    - Sentry, our error monitoring, keeps your account number and what the app was doing when an error happens, in
+      Germany **[period]**;
     - later Apple or Google, if you add a card to your Wallet.
 
 ## How long
 
 Until you delete your account. If you don't use it for 23 months, we email you; if you still don't sign in, we delete
 it 30 days later. When an account is deleted, the cafés keep their stamp counts without your name or email. Tap records
-are deleted after 180 days. Anything deleted stays in our encrypted backups, in Morocco, until they expire **[30 days]**.
+are deleted after 180 days. Anything deleted stays in our encrypted backups, in Morocco, until they expire, 30 days later.
 
 ## Your rights
 

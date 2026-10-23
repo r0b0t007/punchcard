@@ -1,7 +1,7 @@
 # Data processing terms for businesses (draft)
 
-> Draft for counsel, to attach to the business terms of service. It follows the split in roles.md (the organization is
-> the controller of its loyalty program, punchcard its processor); rewrite it if punchcard becomes the sole controller.
+> Draft for counsel, to attach to the business terms of service. It follows the split decided in roles.md: the
+> organization is the controller of its loyalty program, punchcard its processor.
 
 1. **Roles.** For its loyalty program (cards, stamps, rewards, offers to customers who follow it) the organization is the
    controller and punchcard its processor. punchcard is the controller of customer accounts, sign-in, fraud prevention
@@ -25,7 +25,8 @@
    punchcard account.
 10. **Location and transfers.** The database, files and backups are hosted in Morocco, at Oracle Cloud in Casablanca
     (ADR 0008). Sub-processors abroad, as declared to the CNDP: Cloudflare carries all traffic, decrypted, without
-    storing it as a database; the email provider keeps addresses and messages; error monitoring keeps a user id and the
-    request's context when an error happens.
-11. **Declaration.** **[If organizations are controllers]** The organization declares its program to the CNDP; punchcard
-    provides the content of the declaration (the program entries of the register).
+    storing it as a database; Resend (email, United States) keeps addresses, messages and their logs in the United
+    States; Sentry (error monitoring, EU region in Germany) keeps a user id and the request's context when an error
+    happens. Backups are kept 30 days.
+11. **Declaration.** The organization declares its program to the CNDP; punchcard provides the content of the
+    declaration (the program entries of the register).
