@@ -39,7 +39,7 @@
         "clsx": "^2.1.1",
         "input-otp": "^1.4.2",
         "laravel-vite-plugin": "^3.0.0",
-        "lucide-react": "^1.50.0",
+        "lucide-react": "^1.59.0",
         "qr-scanner": "^1.4.2",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
