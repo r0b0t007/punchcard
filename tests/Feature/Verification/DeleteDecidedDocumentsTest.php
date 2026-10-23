@@ -8,8 +8,10 @@ use App\Models\BusinessDocument;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Console\Scheduling\Event as ScheduledEvent;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Tests\Support\Tenants;
@@ -67,6 +69,15 @@ it('deletes accepted and rejected documents whose day has come, file and row', f
         ->and(($this->exists)($accepted))->toBeFalse()
         ->and(($this->exists)($rejected))->toBeFalse();
     $this->disk->assertMissing([$accepted->path, $rejected->path]);
+});
+
+it('deletes a document on the night of the day its page names, whatever the hour of the decision', function (): void {
+    $lateDecision = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-23 23:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-23 23:30:00'))]);
+    $nextDay = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-24 00:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-24 00:30:00'))]);
+
+    expect(($this->sweep)())->toBe(['documents' => 1, 'orphans' => 0])
+        ->and(($this->exists)($lateDecision))->toBeFalse()
+        ->and(($this->exists)($nextDay))->toBeTrue();
 });
 
 it('keeps documents still waiting, and decided ones before their day', function (): void {
@@ -130,6 +141,21 @@ it('goes on with the other folders and files when one fails, logging its path on
     $this->disk->assertMissing('9/01OLD.enc');
     Log::shouldHaveReceived('warning', ['The documents sweep skipped a folder.', ['directory' => '8', 'error' => RuntimeException::class]])->once();
     Log::shouldHaveReceived('warning', ['The documents sweep skipped a file.', ['path' => $stuck, 'error' => RuntimeException::class]])->once();
+});
+
+it('still deletes the files with no row when the documents query fails, and says so', function (): void {
+    Log::spy();
+    ($this->decided)('2026-10-22 04:00:00');
+    $orphan = ($this->orphan)('7/01OLD.enc', 25);
+    DB::listen(function (QueryExecuted $query): void {
+        if (str_contains($query->sql, 'deletes_at')) {
+            throw new RuntimeException('The database went away.');
+        }
+    });
+
+    expect(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 1]);
+    $this->disk->assertMissing($orphan);
+    Log::shouldHaveReceived('warning', ['The documents sweep stopped early.', ['step' => 'documents', 'error' => RuntimeException::class]])->once();
 });
 
 it('changes nothing when run again', function (): void {

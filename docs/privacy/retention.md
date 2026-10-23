@@ -28,7 +28,8 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
   key (`DOCUMENTS_KEY`, AES-256-GCM), never `APP_KEY`. Only the platform admin reads them, each view in the audit
   log (the A1 view, still to build in CHW-145).
 - **Kept** 3 months after the platform decides (`punchcard.documents.retention_months`): verifying the business
-  accepts them, "Ask for new documents" (still to build) rejects them. A new document replaces the one waiting or
+  accepts them, "Ask for new documents" (still to build) rejects them. The date is the start of that day (UTC), so
+  the night's run deletes them on the day the owner's page names. A new document replaces the one waiting or
   rejected, file and row.
 - **Built** (CHW-145): every night at 04:00 UTC `DeleteDecidedDocuments` deletes each due document's file, then its row.
   A file that won't go keeps its row for the next night. It also deletes the files no row points at once they are a
@@ -36,8 +37,10 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
   It logs counts, and a failure by document id or path only.
 - **Owner's account deleted**: the documents stay until their date; `uploaded_by` is cleared, or points at the
   anonymised account when it had history (`DeleteAccount`).
-- **Key rotation**: a key moved to `DOCUMENTS_PREVIOUS_KEYS` can be dropped once the files written with it are gone:
-  3 months after the last decision on them, or sooner if they were replaced (`key_id` on each row says which).
+- **Key rotation**: a key moved to `DOCUMENTS_PREVIOUS_KEYS` can be dropped once no row has its `key_id` (the first 16
+  characters of its SHA-256). Documents still waiting have no date, so count rows, never months.
+- **One disk**: the `documents` disk is local, and the job runs on one server. With more than one app server it must
+  move to shared storage first, or the job deletes rows whose files sit on another server.
 - **Open**: a document still waiting has no date, so a business that is never verified (closed, suspended, or its
   owner gone) keeps it. Proposal: delete documents waiting longer than 12 months, or when the business is closed.
   To decide before the CNDP filing.
