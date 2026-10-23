@@ -56,7 +56,7 @@ final readonly class RequestNewDocuments
 
         $deletesAt = DeleteDecidedDocuments::deletesAt(now());
 
-        [$rejected, $owners, $timezone] = $this->context->bypass(fn (): array => DB::transaction(function () use ($business, $documentIds, $reason, $deletesAt): array {
+        [$rejected, $owners, $timezone, $name] = $this->context->bypass(fn (): array => DB::transaction(function () use ($business, $documentIds, $reason, $deletesAt): array {
             $locked = Business::query()->whereKey($business->id)->operating()->lock('for no key update')->first();
 
             if (! $locked instanceof Business || $locked->status !== BusinessStatus::Pending) {
@@ -67,7 +67,8 @@ final readonly class RequestNewDocuments
                 ->whereKey($documentIds)->orderBy('id')->get();
 
             if ($documents->count() !== count(array_unique($documentIds))) {
-                throw new DocumentRefused(__('The business sent a new document since you opened this page. Look at it first.'));
+                // Replaced by the owner, or decided by someone else, since the admin's page was read.
+                throw new DocumentRefused(__('These documents changed since you opened this page. Reload it and look again.'));
             }
 
             $documents->each(fn (BusinessDocument $document): bool => $document->forceFill([
@@ -82,11 +83,11 @@ final readonly class RequestNewDocuments
                 'kinds' => $documents->map(fn (BusinessDocument $document): string => $document->kind->value)->all(),
             ]);
 
-            return [$documents, $locked->owners()->get(), LocalMoment::timezoneOf($locked->firstLocation()->first())];
+            return [$documents, $locked->owners()->get(), LocalMoment::timezoneOf($locked->firstLocation()->first()), $locked->name];
         }));
 
         Notification::send($owners, new NewDocumentsNeededMail(
-            businessName: $business->name,
+            businessName: $name,
             kinds: array_values($rejected->map(fn (BusinessDocument $document): DocumentKind => $document->kind)->all()),
             reason: $reason,
             deletesAt: $deletesAt,

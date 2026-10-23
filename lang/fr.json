@@ -938,7 +938,7 @@
     "The file is larger than :size MB.": "Le fichier dépasse :size Mo.",
     "The file is larger than this server takes. Try a smaller one.": "Le fichier dépasse ce que ce serveur accepte. Essayez un fichier plus petit.",
     "Say why: the owners read it.": "Dites pourquoi : les propriétaires le lisent.",
-    "The business sent a new document since you opened this page. Look at it first.": "Le commerce a envoyé un nouveau document depuis l’ouverture de cette page. Regardez-le d’abord.",
+    "These documents changed since you opened this page. Reload it and look again.": "Ces documents ont changé depuis l’ouverture de cette page. Rechargez-la et regardez à nouveau.",
     "Only a business waiting to be verified can be asked for new documents.": "Seul un commerce en attente de vérification peut se voir demander de nouveaux documents.",
     "None of these documents is waiting for review.": "Aucun de ces documents n’attend de vérification.",
     "We need new documents to verify :business": "Il nous faut de nouveaux documents pour vérifier :business",

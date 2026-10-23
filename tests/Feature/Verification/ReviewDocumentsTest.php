@@ -16,6 +16,7 @@ use App\Enums\PlatformRole;
 use App\Filament\Resources\Businesses\Pages\ViewBusiness;
 use App\Http\Middleware\SetTenant;
 use App\Models\AuditLog;
+use App\Models\Business;
 use App\Models\BusinessDocument;
 use App\Models\User;
 use App\Notifications\NewDocumentsNeededMail;
@@ -202,6 +203,7 @@ describe('asking for new documents', function (): void {
         $staff = $this->tenants->member(User::factory()->create(), $this->business, BusinessRole::Staff);
         $this->actingAs($this->admin);
 
+        $this->context->bypass(fn () => Business::query()->whereKey($this->business->id)->update(['name' => 'Café Hafa']));
         app(RequestNewDocuments::class)->handle($this->business, [$id->id, $address->id], "Both scans\nare too blurry [here](https://evil.test).");
 
         Notification::assertNotSentTo($staff, NewDocumentsNeededMail::class);
@@ -209,15 +211,15 @@ describe('asking for new documents', function (): void {
         Notification::assertSentTo($english, function (NewDocumentsNeededMail $mail) use ($english): bool {
             $message = $mail->toMail($english);
 
-            expect($message->subject)->toBe('We need new documents to verify '.$this->business->name)
+            expect($message->subject)->toBe('We need new documents to verify Café Hafa')
                 ->and($message->greeting)->toBe('Hello \[Omar\](https://evil.test),')
                 ->and($message->introLines)->toBe([
-                    'We couldn\'t verify '.$this->business->name.' with the ID and the proof of address you sent. Please send new ones.',
+                    'We couldn\'t verify Café Hafa with the ID and the proof of address you sent. Please send new ones.',
                     "Our reason: “\u{2068}Both scans are too blurry \\[here\\](https://evil.test).\u{2069}”",
                 ])
                 ->and($message->actionText)->toBe('Send new documents')
                 ->and($message->actionUrl)->toBe(route('verification.show'))
-                ->and($message->outroLines)->toBe([$this->business->name.' keeps working while we check. The documents we couldn\'t use are deleted as soon as you send new ones, or on 23 January at the latest.']);
+                ->and($message->outroLines)->toBe(['Café Hafa keeps working while we check. The documents we couldn\'t use are deleted as soon as you send new ones, or on 23 January at the latest.']);
 
             return true;
         });
@@ -242,7 +244,7 @@ describe('asking for new documents', function (): void {
 
         // Replaced since the admin's page was read: the new one is never rejected unseen.
         $newAddress = ($this->send)(DocumentKind::ProofOfAddress);
-        expect($request([$address->id]))->toThrow(DocumentRefused::class, 'The business sent a new document since you opened this page. Look at it first.')
+        expect($request([$address->id]))->toThrow(DocumentRefused::class, 'These documents changed since you opened this page. Reload it and look again.')
             ->and(($this->fresh)($newAddress)->status)->toBe(DocumentStatus::Submitted);
 
         app(RequestNewDocuments::class)->handle($this->business, [$newAddress->id], 'Too old.');
@@ -293,7 +295,7 @@ describe('the business\'s page in A1', function (): void {
 
     it('asks for new documents, offered only while some wait on a pending business', function (): void {
         ($this->panel)();
-        ($this->page)(fn (Testable $page): Testable => $page->assertActionHidden('requestNewDocuments'));
+        ($this->page)(fn (Testable $page): Testable => $page->assertActionHidden('requestNewDocuments')->assertSee('None sent'));
 
         $address = ($this->send)(DocumentKind::ProofOfAddress);
         ($this->page)(fn (Testable $page): Testable => $page->assertActionVisible('requestNewDocuments')

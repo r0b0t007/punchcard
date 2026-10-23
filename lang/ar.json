@@ -938,7 +938,7 @@
     "The file is larger than :size MB.": "الملف أكبر من :size ميغابايت.",
     "The file is larger than this server takes. Try a smaller one.": "الملف أكبر مما يقبله هذا الخادم. جرّب ملفًا أصغر.",
     "Say why: the owners read it.": "اذكر السبب: يقرؤه المالكون.",
-    "The business sent a new document since you opened this page. Look at it first.": "أرسل النشاط وثيقة جديدة منذ فتحت هذه الصفحة. اطّلع عليها أولًا.",
+    "These documents changed since you opened this page. Reload it and look again.": "تغيّرت هذه الوثائق منذ فتحت هذه الصفحة. أعد تحميلها وألقِ نظرة جديدة.",
     "Only a business waiting to be verified can be asked for new documents.": "لا يُطلب وثائق جديدة إلا من نشاط ينتظر التوثيق.",
     "None of these documents is waiting for review.": "لا تنتظر أي من هذه الوثائق المراجعة.",
     "We need new documents to verify :business": "نحتاج إلى وثائق جديدة للتحقق من :business",
