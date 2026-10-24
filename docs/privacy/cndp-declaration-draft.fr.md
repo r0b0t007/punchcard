@@ -90,7 +90,7 @@ Voir retention.md. En résumé : compte client jusqu'à sa suppression, ou 24 mo
 jours avant) puis suppression ou anonymisation ; tampons et récompenses conservés sans l'identité de la personne ;
 journal des passages 180 jours ; liens de connexion 1 jour ; invitations 1 mois ; documents de vérification des
 commerces 3 mois après la décision de la plateforme (acceptés ou refusés), supprimés chaque nuit, et 12 mois après
-leur envoi s'ils attendent encore une décision **[à mettre en place]** ; journal d'audit **[À DÉCIDER]**. Les sauvegardes chiffrées
+leur envoi s'ils attendent encore une décision, les propriétaires prévenus par e-mail ; journal d'audit **[À DÉCIDER]**. Les sauvegardes chiffrées
 sont conservées 30 jours : une donnée supprimée en disparaît 30 jours plus tard. Après une restauration, les
 suppressions faites depuis la sauvegarde sont appliquées de nouveau avant la remise en service **[à mettre en place,
 CHW-59]**.

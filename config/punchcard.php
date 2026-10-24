@@ -71,6 +71,8 @@ return [
         'previous_keys' => env('DOCUMENTS_PREVIOUS_KEYS', ''),
         // Kept this long after the platform decides (accepted or rejected), then deleted (docs/privacy/retention.md).
         'retention_months' => 3,
+        // One the platform never decided on goes this long after it was sent, and its owners are told.
+        'waiting_months' => 12,
     ],
 
     'admin' => [

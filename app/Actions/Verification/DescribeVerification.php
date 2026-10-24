@@ -21,7 +21,7 @@ final readonly class DescribeVerification
     public function __construct(private SubmitDocument $submitDocument) {}
 
     /**
-     * @return array{verified: bool, canSend: bool, maxMegabytes: int, retentionMonths: int, documents: list<array{kind: string, status: string|null, sentOn: string|null, reason: string|null, deletesOn: string|null}>}
+     * @return array{verified: bool, canSend: bool, maxMegabytes: int, retentionMonths: int, waitingMonths: int, documents: list<array{kind: string, status: string|null, sentOn: string|null, reason: string|null, deletesOn: string|null}>}
      */
     public function handle(Business $business): array
     {
@@ -34,6 +34,7 @@ final readonly class DescribeVerification
             'canSend' => $this->submitDocument->maySend($business),
             'maxMegabytes' => intdiv(DocumentRequest::MAX_KILOBYTES, 1024),
             'retentionMonths' => (int) config('punchcard.documents.retention_months'),
+            'waitingMonths' => (int) config('punchcard.documents.waiting_months'),
             'documents' => array_map(function (DocumentKind $kind) use ($latest, $timezone): array {
                 $document = $latest->get($kind->value);
 
