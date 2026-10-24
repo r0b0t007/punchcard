@@ -66,7 +66,8 @@ return [
 
     'documents' => [
         // Business verification documents (CHW-145): their own key (DocumentCipher), never APP_KEY. "base64:" and 32
-        // random bytes; a rotated key stays in previous_keys (comma-separated) until its files are gone.
+        // random bytes; a rotated key stays in previous_keys (comma-separated) until its files are gone. Setup, the deploy
+        // check (punchcard:documents:check) and rotation: docs/runbooks/verification-documents.md.
         'key' => env('DOCUMENTS_KEY'),
         'previous_keys' => env('DOCUMENTS_PREVIOUS_KEYS', ''),
         // Kept this long after the platform decides (accepted or rejected), then deleted (docs/privacy/retention.md).

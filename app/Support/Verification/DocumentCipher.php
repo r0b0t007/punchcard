@@ -61,7 +61,13 @@ final readonly class DocumentCipher
     /** The current key's id: the first 16 hex characters of its SHA-256, never the key. */
     public function keyId(): string
     {
-        return substr(hash('sha256', $this->key((string) config('punchcard.documents.key'))), 0, 16);
+        return self::idOf((string) config('punchcard.documents.key'));
+    }
+
+    /** A configured key's id, as keyId() gives it (punchcard:documents:check). */
+    public static function idOf(string $configured): string
+    {
+        return substr(hash('sha256', (new self)->key($configured)), 0, 16);
     }
 
     /** @return list<string> the current key first, then the previous ones that read as keys (a malformed one is reported, and skipped) */
