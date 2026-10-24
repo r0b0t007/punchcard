@@ -35,8 +35,12 @@ usable key already set is kept, so running it again never makes documents unread
 is replaced. Local setups get theirs from `scripts/bootstrap.sh` and `scripts/bootstrap.ps1`.
 
 Then copy the key from the server's `.env` into the password manager, under the environment's name. Without it every
-stored document is unreadable, and a restored backup is no help. Keep it out of the server backups themselves: a
-backup holding both the files and their key protects nothing.
+stored document is unreadable, and a restored backup is no help.
+
+The encryption protects copies made without `.env`: a database dump, a copy of `storage/app/private/documents`, a
+mistaken sync of the disk. A backup of the whole volume (Oracle boot or block volume backups) holds `.env` too, so it
+holds the key with the files: keep those in the same region (ADR 0008), encrypted, with access limited as for the
+server itself, and keep any separate data backup free of `.env`.
 
 ## The deploy check
 
@@ -44,12 +48,17 @@ Run `php artisan punchcard:documents:check` in the Ploi deploy script, after `mi
 release is activated, next to `punchcard:nfc:check` ([stamper-keys.md](stamper-keys.md)). It fails when:
 
 - `DOCUMENTS_KEY` is missing or isn't `base64:` and 32 bytes;
-- `DOCUMENTS_KEY` is `APP_KEY`;
-- a key in `DOCUMENTS_PREVIOUS_KEYS` isn't one (named by its place in the list, never printed);
-- stored documents were encrypted with a key that is in neither variable, so they can't be read.
+- a key in `DOCUMENTS_PREVIOUS_KEYS` isn't one (named by its place in the list as written, never printed);
+- `DOCUMENTS_KEY` or a previous key is `APP_KEY` or one of `APP_PREVIOUS_KEYS`;
+- stored documents were encrypted with a key that is in neither variable, so they can't be read. It says how many,
+  by key id.
 
 Otherwise the first sign of a bad key is an owner told sending isn't set up, or the platform admin unable to open a
-document. It prints no key material.
+document. It also prints how many documents each previous key still covers. It prints no key material: a key id is the
+first 16 hex characters of the SHA-256 of the key's 32 bytes, as stored on each document (`key_id`).
+
+After a lost key (below), run it as `punchcard:documents:check --allow-unreadable` until the unreadable documents are
+gone: they are then a warning, and every other failure still stops the deploy.
 
 ## Changing the key
 
@@ -62,8 +71,8 @@ Change it when it may have leaked, or when someone who had it leaves.
 
 New uploads use the new key; files are not encrypted again, so older ones are read with the previous key. Keep it
 until the last file under it is deleted: at most 12 months waiting for a decision, then 3 months after it, so about 15
-months. To see whether it can go, remove it and run the check: if documents still need it, the check fails and names
-how many, and the key goes back.
+months. The check prints how many documents each previous key still covers ("Previous key 2: 0 documents"): remove
+one only once it is at 0, then run `config:cache` and the check again.
 
 A key that leaked stays dangerous for the files it encrypted, wherever copies of them are. Changing it protects new
 uploads only.
@@ -71,11 +80,12 @@ uploads only.
 ## A lost key
 
 If `DOCUMENTS_KEY` is gone from the server and the password manager, the files under it can't be read again, and the
-check fails with their count. Set a new key as in the first setup, then in A1 use "Ask for new documents" on each
-pending business with documents waiting, saying why: the owners are emailed, send new ones, and the unreadable files go
-then or 3 months later. Documents already accepted can't be opened any more and are deleted on their date. The check
-keeps failing until the last of them is gone, up to 3 months: take it out of the deploy script meanwhile, and put it
-back once it passes.
+check fails with their count. Set a new key as in the first setup, and add `--allow-unreadable` to the check in the
+deploy script. Then in A1 use "Ask for new documents" on each pending business with documents waiting, saying why: the
+owners are emailed, send new ones, and the unreadable files go then or 3 months later. Documents already accepted, and
+those waiting at a suspended or closed business (which can't be asked), can't be opened any more and go on their own
+date: 3 months after the decision, or 12 months after they were sent. Once the check passes without
+`--allow-unreadable`, take the option out of the deploy script.
 
 ## Upload limits
 

@@ -34,7 +34,8 @@ it('passes when every stored document has its key, current or previous', functio
     ($this->stored)($this->old);
 
     $this->artisan('punchcard:documents:check')
-        ->expectsOutputToContain('Documents key OK: 1 previous')
+        ->expectsOutputToContain('Previous key 1: 1 document.')
+        ->expectsOutputToContain('Documents key OK: 1 previous, current key: 1 document.')
         ->doesntExpectOutputToContain($this->current)
         ->doesntExpectOutputToContain($this->old)
         ->assertSuccessful();
@@ -57,17 +58,21 @@ it('fails when DOCUMENTS_KEY is missing or not a key', function (?string $key): 
     '16 bytes' => ['base64:'.base64_encode(str_repeat('k', 16))],
 ]);
 
-it('fails when DOCUMENTS_KEY is APP_KEY', function (): void {
-    config(['app.key' => $this->current]);
+it('fails when a documents key is APP_KEY or one of its previous keys', function (string $where, Closure $setUp): void {
+    $setUp($this);
 
-    $this->artisan('punchcard:documents:check')->expectsOutputToContain('DOCUMENTS_KEY is APP_KEY')->assertFailed();
-});
+    $this->artisan('punchcard:documents:check')->expectsOutputToContain($where.' is APP_KEY or one of APP_PREVIOUS_KEYS')->assertFailed();
+})->with([
+    'the current key, APP_KEY' => ['DOCUMENTS_KEY', fn ($test) => config(['app.key' => $test->current])],
+    'the current key, a previous APP_KEY' => ['DOCUMENTS_KEY', fn ($test) => config(['app.previous_keys' => [$test->old, $test->current]])],
+    'a previous key, APP_KEY' => ['A key in DOCUMENTS_PREVIOUS_KEYS', fn ($test) => config(['app.key' => $test->old, 'punchcard.documents.previous_keys' => $test->old])],
+]);
 
-it('fails on a previous key that is not a key, naming its place only', function (): void {
-    config(['punchcard.documents.previous_keys' => $this->old.',base64:short']);
+it('fails on a previous key that is not a key, naming its place as written only', function (): void {
+    config(['punchcard.documents.previous_keys' => $this->old.', ,base64:short']);
 
     $this->artisan('punchcard:documents:check')
-        ->expectsOutputToContain('Key 2 in DOCUMENTS_PREVIOUS_KEYS is not "base64:" and 32 bytes')
+        ->expectsOutputToContain('Key 3 in DOCUMENTS_PREVIOUS_KEYS is not "base64:" and 32 bytes')
         ->doesntExpectOutputToContain('base64:short')
         ->assertFailed();
 });
@@ -77,7 +82,41 @@ it('fails when stored documents were encrypted with a key no longer configured',
     ($this->stored)($this->old);
     ($this->stored)($this->old);
 
+    $lost = ($this->key)();
+    ($this->stored)($lost);
+
     $this->artisan('punchcard:documents:check')
-        ->expectsOutputToContain('2 stored documents were encrypted with a key in neither DOCUMENTS_KEY nor DOCUMENTS_PREVIOUS_KEYS')
+        ->expectsOutputToContain('3 documents can\'t be read: the key is in neither DOCUMENTS_KEY nor DOCUMENTS_PREVIOUS_KEYS')
+        ->expectsOutputToContain('key id '.DocumentCipher::idOf($this->old).': 2 documents')
+        ->expectsOutputToContain('key id '.DocumentCipher::idOf($lost).': 1 document')
+        ->doesntExpectOutputToContain('Documents key OK')
         ->assertFailed();
+});
+
+it('says how many documents each previous key still covers, so one at 0 can go', function (): void {
+    $older = ($this->key)();
+    config(['punchcard.documents.previous_keys' => $this->old.','.$older]);
+    ($this->stored)($this->old);
+    ($this->stored)($this->old);
+
+    $this->artisan('punchcard:documents:check')
+        ->expectsOutputToContain('Previous key 1: 2 documents.')
+        ->expectsOutputToContain('Previous key 2: 0 documents.')
+        ->expectsOutputToContain('Documents key OK: 2 previous, current key: 0 documents.')
+        ->assertSuccessful();
+});
+
+it('only warns about documents nobody can read after a lost key, and still fails on the rest', function (): void {
+    ($this->stored)($this->old);
+
+    $this->artisan('punchcard:documents:check', ['--allow-unreadable' => true])
+        ->expectsOutputToContain('1 document can\'t be read')
+        ->expectsOutputToContain('Documents key OK')
+        ->assertSuccessful();
+
+    config(['app.key' => $this->current]);
+    $this->artisan('punchcard:documents:check', ['--allow-unreadable' => true])->expectsOutputToContain('is APP_KEY')->assertFailed();
+
+    config(['punchcard.documents.key' => '']);
+    $this->artisan('punchcard:documents:check', ['--allow-unreadable' => true])->expectsOutputToContain('DOCUMENTS_KEY is missing')->assertFailed();
 });

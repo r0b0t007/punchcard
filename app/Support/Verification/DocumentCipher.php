@@ -75,11 +75,30 @@ final readonly class DocumentCipher
     {
         $keys = [$this->key((string) config('punchcard.documents.key'))];
 
-        foreach (array_filter(array_map(trim(...), explode(',', (string) config('punchcard.documents.previous_keys')))) as $previous) {
+        foreach (self::previousKeys() as $previous) {
             try {
                 $keys[] = $this->key($previous);
             } catch (DocumentKeyMissing) {
                 once(fn () => report(new DocumentKeyMissing('A key in DOCUMENTS_PREVIOUS_KEYS is not "base64:" and 32 bytes: skipped.')));
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * DOCUMENTS_PREVIOUS_KEYS as written, comma-separated, each trimmed, by its place in the list (from 1); empty entries
+     * are left out but keep their place, so a check can name the entry an operator sees.
+     *
+     * @return array<int, string>
+     */
+    public static function previousKeys(): array
+    {
+        $keys = [];
+
+        foreach (explode(',', (string) config('punchcard.documents.previous_keys')) as $index => $key) {
+            if (trim($key) !== '') {
+                $keys[$index + 1] = trim($key);
             }
         }
 
