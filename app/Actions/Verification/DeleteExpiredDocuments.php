@@ -4,21 +4,35 @@ declare(strict_types=1);
 
 namespace App\Actions\Verification;
 
+use App\Enums\DocumentKind;
+use App\Enums\DocumentStatus;
+use App\Models\Business;
 use App\Models\BusinessDocument;
+use App\Notifications\DocumentsDeletedUnreviewedMail;
+use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
  * The verification documents' retention (CHW-145, docs/privacy/retention.md):
  * each document whose deletes_at has come (3 months after the platform
- * accepted or rejected it) loses its file, then its row; one still waiting
- * has no deletes_at and stays. A file that won't go keeps its row for the
- * next run, so no file is ever left without one by this job.
+ * accepted or rejected it) loses its file, then its row. A file that won't
+ * go keeps its row for the next run.
+ *
+ * Then the documents still waiting waiting_months (12) after they were
+ * sent (CHW-58): business by business, under its row lock as SubmitDocument
+ * and the decisions take it, so one replaced or decided meanwhile stays.
+ * Their rows go first, their files once that commits (one that won't go is
+ * logged and left to the next step). The owners of a business that can still send
+ * (SubmitDocument::maySend) get one email naming them; a suspended or
+ * closed one gets none.
  *
  * Then the files no row points at, once a day old (newer ones may be an
  * upload whose row isn't committed yet): an upload that died before its
@@ -29,9 +43,9 @@ use Throwable;
  * is logged by id or path (a business id and a random name), never the
  * message, and the rest go on. Returns the counts.
  */
-final readonly class DeleteDecidedDocuments
+final readonly class DeleteExpiredDocuments
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private SubmitDocument $submitDocument) {}
 
     /**
      * When a document decided at $decidedAt goes: retention_months later, at the start of that day (UTC), so the 04:00
@@ -43,7 +57,7 @@ final readonly class DeleteDecidedDocuments
     }
 
     /**
-     * @return array{documents: int, orphans: int}
+     * @return array{documents: int, waiting: int, orphans: int}
      */
     public function handle(CarbonInterface $now): array
     {
@@ -52,6 +66,7 @@ final readonly class DeleteDecidedDocuments
 
         return $this->context->bypass(fn (): array => [
             'documents' => $this->deleteDue($disk, $now),
+            'waiting' => $this->deleteWaiting($disk, $now->subMonthsNoOverflow((int) config('punchcard.documents.waiting_months'))),
             'orphans' => $this->deleteOrphans($disk, $now->subDay()),
         ]);
     }
@@ -77,6 +92,78 @@ final readonly class DeleteDecidedDocuments
         }
 
         return $gone;
+    }
+
+    private function deleteWaiting(Filesystem $disk, CarbonImmutable $sentBefore): int
+    {
+        $gone = 0;
+
+        try {
+            $businessIds = $this->waitingSince($sentBefore)->distinct()->orderBy('business_id')->pluck('business_id');
+        } catch (Throwable $failed) {
+            Log::warning('The documents sweep stopped early.', ['step' => 'waiting', 'error' => $failed::class]);
+
+            return 0;
+        }
+
+        foreach ($businessIds as $businessId) {
+            try {
+                $gone += $this->deleteWaitingOf((int) $businessId, $disk, $sentBefore);
+            } catch (Throwable $failed) {
+                Log::warning('The documents sweep skipped a business.', ['business_id' => $businessId, 'error' => $failed::class]);
+            }
+        }
+
+        return $gone;
+    }
+
+    /** One business's documents still waiting, sent at or before $sentBefore. */
+    private function deleteWaitingOf(int $businessId, Filesystem $disk, CarbonImmutable $sentBefore): int
+    {
+        [$documents, $owners, $name] = DB::transaction(function () use ($businessId, $sentBefore): array {
+            $business = Business::query()->whereKey($businessId)->lock('for no key update')->firstOrFail();
+            $documents = $this->waitingSince($sentBefore)->where('business_id', $business->id)->orderBy('id')->get();
+
+            if ($documents->isEmpty()) {
+                return [$documents, collect(), $business->name];
+            }
+
+            $documents->each(fn (BusinessDocument $document): ?bool => $document->delete());
+
+            return [$documents, $this->submitDocument->maySend($business) ? $business->owners()->get() : collect(), $business->name];
+        });
+
+        // Replaced or decided meanwhile: nothing went, nobody to tell.
+        if ($documents->isEmpty()) {
+            return 0;
+        }
+
+        try {
+            $disk->delete($documents->pluck('path')->all());
+        } catch (Throwable $failed) {
+            // A file with no row now: the orphans step after this one takes it.
+            Log::warning('The documents sweep left files to the next step.', ['business_id' => $businessId, 'error' => $failed::class]);
+        }
+
+        if ($owners->isNotEmpty()) {
+            try {
+                Notification::send($owners, new DocumentsDeletedUnreviewedMail(
+                    businessName: $name,
+                    kinds: array_values($documents->map(fn (BusinessDocument $document): DocumentKind => $document->kind)->unique()->all()),
+                ));
+            } catch (Throwable $failed) {
+                // The documents are gone either way: the next run won't find this business again.
+                Log::warning('The documents sweep could not email a business.', ['business_id' => $businessId, 'error' => $failed::class]);
+            }
+        }
+
+        return $documents->count();
+    }
+
+    /** @return TenantBuilder<BusinessDocument> */
+    private function waitingSince(CarbonImmutable $sentBefore): TenantBuilder
+    {
+        return BusinessDocument::query()->where('status', DocumentStatus::Submitted)->where('created_at', '<=', $sentBefore);
     }
 
     private function deleteOrphans(Filesystem $disk, CarbonImmutable $before): int

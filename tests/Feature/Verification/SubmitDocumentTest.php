@@ -302,6 +302,8 @@ it('shows where each document stands, never a file or where it is', function ():
         ->assertInertia(fn (Assert $page): Assert => $page->component('business/verification')
             ->where('verified', false)
             ->where('canSend', true)
+            ->where('retentionMonths', 3)
+            ->where('waitingMonths', 12)
             ->where('documents', [
                 ['kind' => 'id_document', 'status' => 'submitted', 'sentOn' => '2026-10-22', 'reason' => null, 'deletesOn' => null],
                 ['kind' => 'proof_of_address', 'status' => 'rejected', 'sentOn' => '2026-10-22', 'reason' => 'The bill is older than 3 months.', 'deletesOn' => '2027-01-22'],

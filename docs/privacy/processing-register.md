@@ -96,7 +96,8 @@ Common to every entry:
   platform admin only, each view in the audit log.
 - **Recipients**: punchcard; the business's owners for their own staff.
 - **Retention**: while the membership exists; verification documents 3 months after the platform's decision, deleted
-  by a nightly job, and 12 months after upload while still waiting (to build); audit log to decide (retention.md).
+  by a nightly job, and 12 months after upload while still waiting, the owners told by email; audit log to decide
+  (retention.md).
 
 ## T7. Wallet passes and notifications (planned, Phase 2)
 

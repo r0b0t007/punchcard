@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Notification;
  * The platform admin asks a business for new verification documents
  * (CHW-145, "Ask for new documents" in A1): the documents the admin looked
  * at, by id, become rejected with the reason, decided now and dated for
- * deletion (DeleteDecidedDocuments::deletesAt), in the audit log
+ * deletion (DeleteExpiredDocuments::deletesAt), in the audit log
  * ("documents.rejected", which ones: the reason stays on the documents,
  * deleted with them, never in the log kept for good). The business stays
  * pending; its owners are emailed once this commits, each in their
@@ -54,7 +54,7 @@ final readonly class RequestNewDocuments
             throw new DocumentRefused(__('None of these documents is waiting for review.'));
         }
 
-        $deletesAt = DeleteDecidedDocuments::deletesAt(now());
+        $deletesAt = DeleteExpiredDocuments::deletesAt(now());
 
         [$rejected, $owners, $timezone, $name] = $this->context->bypass(fn (): array => DB::transaction(function () use ($business, $documentIds, $reason, $deletesAt): array {
             $locked = Business::query()->whereKey($business->id)->operating()->lock('for no key update')->first();

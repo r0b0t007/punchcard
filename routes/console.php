@@ -3,7 +3,7 @@
 use App\Actions\Account\AnonymiseInactiveAccounts;
 use App\Actions\Account\WarnInactiveAccounts;
 use App\Actions\Taps\ExpirePendingTaps;
-use App\Actions\Verification\DeleteDecidedDocuments;
+use App\Actions\Verification\DeleteExpiredDocuments;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -27,7 +27,7 @@ Schedule::call(fn () => Log::info('Inactivity warnings sent.', ['warned' => app(
 Schedule::call(fn () => Log::info('Inactive accounts swept.', ['gone' => app(AnonymiseInactiveAccounts::class)->handle(now())]))
     ->name('punchcard:inactive-accounts-sweep')->dailyAt('03:45')->withoutOverlapping()->onOneServer();
 
-// Verification documents (CHW-145, docs/privacy/retention.md): deleted 3 months after the platform decides, and files
-// with no row once a day old. Logs counts only.
-Schedule::call(fn () => Log::info('Verification documents swept.', app(DeleteDecidedDocuments::class)->handle(now())))
+// Verification documents (CHW-145, docs/privacy/retention.md): deleted 3 months after the platform decides, or 12 months
+// after they were sent while still waiting (CHW-58), and files with no row once a day old. Logs counts only.
+Schedule::call(fn () => Log::info('Verification documents swept.', app(DeleteExpiredDocuments::class)->handle(now())))
     ->name('punchcard:documents-sweep')->dailyAt('04:00')->withoutOverlapping()->onOneServer();
