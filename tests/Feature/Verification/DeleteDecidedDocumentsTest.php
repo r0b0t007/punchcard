@@ -65,7 +65,7 @@ it('deletes accepted and rejected documents whose day has come, file and row', f
     $accepted = ($this->decided)('2026-10-23 03:59:59');
     $rejected = ($this->decided)('2026-10-23 04:00:00', DocumentStatus::Rejected);
 
-    expect(($this->sweep)())->toBe(['documents' => 2, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 2, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($accepted))->toBeFalse()
         ->and(($this->exists)($rejected))->toBeFalse();
     $this->disk->assertMissing([$accepted->path, $rejected->path]);
@@ -75,7 +75,7 @@ it('deletes a document on the night of the day its page names, whatever the hour
     $lateDecision = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-23 23:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-23 23:30:00'))]);
     $nextDay = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-24 00:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-24 00:30:00'))]);
 
-    expect(($this->sweep)())->toBe(['documents' => 1, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 1, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($lateDecision))->toBeFalse()
         ->and(($this->exists)($nextDay))->toBeTrue();
 });
@@ -84,7 +84,7 @@ it('keeps documents still waiting, and decided ones before their day', function 
     $waiting = ($this->document)();
     $notYet = ($this->decided)('2026-10-23 04:00:01');
 
-    expect(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 0, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($waiting))->toBeTrue()
         ->and(($this->exists)($notYet))->toBeTrue();
     $this->disk->assertExists([$waiting->path, $notYet->path]);
@@ -94,7 +94,7 @@ it('deletes the row of a document whose file is already gone', function (): void
     $document = ($this->decided)('2026-10-22 04:00:00');
     $this->disk->delete($document->path);
 
-    expect(($this->sweep)())->toBe(['documents' => 1, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 1, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($document))->toBeFalse();
 });
 
@@ -107,7 +107,7 @@ it('keeps the row while its file won\'t go, logs its id only, and goes on with t
     $disk->shouldReceive('delete')->passthru();
     Storage::set(BusinessDocument::DISK, $disk);
 
-    expect(($this->sweep)())->toBe(['documents' => 1, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 1, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($stuck))->toBeTrue()
         ->and(($this->exists)($next))->toBeFalse();
     Log::shouldHaveReceived('warning')->once()->with('The documents sweep skipped a document.', ['document_id' => $stuck->id, 'error' => RuntimeException::class]);
@@ -120,7 +120,7 @@ it('deletes files with no row once a day old, never one with a row, a newer one 
     $deleted = ($this->orphan)('999/01GONE.enc', 48);
     $uploading = ($this->orphan)($this->tenants->a1->id.'/01NEW.enc', 23);
 
-    expect(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 2]);
+    expect(($this->sweep)())->toBe(['documents' => 0, 'waiting' => 0, 'orphans' => 2]);
     $this->disk->assertMissing([$old, $deleted]);
     $this->disk->assertExists([$kept->path, $uploading, $notOurs]);
 });
@@ -137,7 +137,7 @@ it('goes on with the other folders and files when one fails, logging its path on
     $disk->shouldReceive('delete')->passthru();
     Storage::set(BusinessDocument::DISK, $disk);
 
-    expect(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 1]);
+    expect(($this->sweep)())->toBe(['documents' => 0, 'waiting' => 0, 'orphans' => 1]);
     $this->disk->assertMissing('9/01OLD.enc');
     Log::shouldHaveReceived('warning', ['The documents sweep skipped a folder.', ['directory' => '8', 'error' => RuntimeException::class]])->once();
     Log::shouldHaveReceived('warning', ['The documents sweep skipped a file.', ['path' => $stuck, 'error' => RuntimeException::class]])->once();
@@ -153,7 +153,7 @@ it('still deletes the files with no row when the documents query fails, and says
         }
     });
 
-    expect(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 1]);
+    expect(($this->sweep)())->toBe(['documents' => 0, 'waiting' => 0, 'orphans' => 1]);
     $this->disk->assertMissing($orphan);
     Log::shouldHaveReceived('warning', ['The documents sweep stopped early.', ['step' => 'documents', 'error' => RuntimeException::class]])->once();
 });
@@ -163,8 +163,8 @@ it('changes nothing when run again', function (): void {
     ($this->orphan)('7/01OLD.enc', 25);
     $waiting = ($this->document)();
 
-    expect(($this->sweep)())->toBe(['documents' => 1, 'orphans' => 1])
-        ->and(($this->sweep)())->toBe(['documents' => 0, 'orphans' => 0])
+    expect(($this->sweep)())->toBe(['documents' => 1, 'waiting' => 0, 'orphans' => 1])
+        ->and(($this->sweep)())->toBe(['documents' => 0, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($waiting))->toBeTrue();
     expect($this->disk->allFiles())->toBe([$waiting->path]);
 });

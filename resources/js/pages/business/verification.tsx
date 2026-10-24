@@ -44,6 +44,7 @@ export default function Verification({
     canSend,
     maxMegabytes,
     retentionMonths,
+    waitingMonths,
     documents,
 }: {
     verified: boolean;
@@ -52,6 +53,8 @@ export default function Verification({
     maxMegabytes: number;
     /** How long the files are kept after the decision (punchcard.documents.retention_months). */
     retentionMonths: number;
+    /** How long one never decided on is kept after it was sent (punchcard.documents.waiting_months). */
+    waitingMonths: number;
     documents: Document[];
 }) {
     const { t, locale } = useTranslation();
@@ -141,8 +144,8 @@ export default function Verification({
                 <p className="flex items-start gap-2 text-xs text-muted-foreground">
                     <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
                     {t(
-                        "Only punchcard's team sees these files, and every look is recorded. We delete them :months months after we decide.",
-                        { months: retentionMonths },
+                        "Only punchcard's team sees these files, and every look is recorded. We delete them :months months after we decide, or :waiting months after you send them if we haven't decided by then.",
+                        { months: retentionMonths, waiting: waitingMonths },
                     )}
                 </p>
             </div>
