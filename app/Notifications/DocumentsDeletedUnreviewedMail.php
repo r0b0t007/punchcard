@@ -14,7 +14,7 @@ use Illuminate\Notifications\Notification;
 /**
  * To a business's owners (CHW-58, Punchcard Emails): the nightly sweep
  * deleted the verification documents it sent more than 12 months ago and
- * the platform never decided on (DeleteDecidedDocuments). Which ones, and
+ * the platform never decided on (DeleteExpiredDocuments). Which ones, and
  * the verification page to send them again. Only to a business that can
  * still send; queued, in each owner's language.
  */
@@ -49,9 +49,9 @@ final class DocumentsDeletedUnreviewedMail extends Notification implements Shoul
                 : __('We deleted the document :business sent for verification', ['business' => $this->businessName]))
             ->greeting($name === null ? __('Hello!') : __('Hello :name,', ['name' => Plain::text($name)]))
             ->line(match (true) {
-                $several => __('You sent us the ID and the proof of address of :business more than :months months ago, and we never checked them. We don\'t keep verification documents longer than that, so we deleted them.', $sent),
-                $this->kinds === [DocumentKind::IdDocument] => __('You sent us the owner\'s ID for :business more than :months months ago, and we never checked it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
-                default => __('You sent us the proof of address of :business more than :months months ago, and we never checked it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
+                $several => __('You sent us the ID and the proof of address of :business more than :months months ago, and we never finished checking them. We don\'t keep verification documents longer than that, so we deleted them.', $sent),
+                $this->kinds === [DocumentKind::IdDocument] => __('You sent us the owner\'s ID for :business more than :months months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
+                default => __('You sent us the proof of address of :business more than :months months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
             })
             ->action($several ? __('Send them again') : __('Send it again'), route('verification.show'))
             ->line($several

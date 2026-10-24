@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\Verification\DeleteDecidedDocuments;
+use App\Actions\Verification\DeleteExpiredDocuments;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\DocumentKind;
@@ -57,7 +57,7 @@ beforeEach(function (): void {
 
         return $document;
     });
-    $this->sweep = fn (): array => app(DeleteDecidedDocuments::class)->handle(now());
+    $this->sweep = fn (): array => app(DeleteExpiredDocuments::class)->handle(now());
     $this->exists = fn (BusinessDocument $document): bool => $this->context->bypass(fn (): bool => BusinessDocument::query()->whereKey($document->id)->exists());
 });
 
@@ -124,7 +124,7 @@ it('emails each business\'s own owners only, never another site\'s, another orga
     Notification::assertSentTo($otherOwner, fn (DocumentsDeletedUnreviewedMail $mail): bool => $mail->businessName === 'B1' && $mail->kinds === [DocumentKind::IdDocument]);
 });
 
-it('leaves a file that won\'t go to the files with no row, in the same run', function (): void {
+it('leaves a file that won\'t go to the files with no row, in the same run, and says so by id', function (): void {
     Log::spy();
     $document = ($this->waiting)('2025-09-01 10:00:00');
     $disk = Mockery::mock(FilesystemAdapter::class, [$this->disk->getDriver(), $this->disk->getAdapter(), $this->disk->getConfig()])->makePartial();
@@ -136,7 +136,7 @@ it('leaves a file that won\'t go to the files with no row, in the same run', fun
         ->and(($this->exists)($document))->toBeFalse();
     $this->disk->assertMissing($document->path);
     Notification::assertSentToTimes($this->owner, DocumentsDeletedUnreviewedMail::class, 1);
-    Log::shouldNotHaveReceived('warning');
+    Log::shouldHaveReceived('warning')->once()->with('The documents sweep left files to the next step.', ['business_id' => $this->business->id, 'error' => RuntimeException::class]);
 });
 
 it('still counts the documents when the email can\'t be queued, and says so by id', function (): void {
@@ -220,11 +220,11 @@ it('tells the owner which documents went and how to send them again', function (
             : 'Café Hafa keeps working meanwhile. Send it again whenever you want the business verified.']);
 })->with([
     'the ID' => [[DocumentKind::IdDocument], 'We deleted the document Café Hafa sent for verification',
-        'You sent us the owner\'s ID for Café Hafa more than 12 months ago, and we never checked it. We don\'t keep verification documents longer than that, so we deleted it.', 'Send it again'],
+        'You sent us the owner\'s ID for Café Hafa more than 12 months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', 'Send it again'],
     'the proof of address' => [[DocumentKind::ProofOfAddress], 'We deleted the document Café Hafa sent for verification',
-        'You sent us the proof of address of Café Hafa more than 12 months ago, and we never checked it. We don\'t keep verification documents longer than that, so we deleted it.', 'Send it again'],
+        'You sent us the proof of address of Café Hafa more than 12 months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', 'Send it again'],
     'both' => [[DocumentKind::IdDocument, DocumentKind::ProofOfAddress], 'We deleted the documents Café Hafa sent for verification',
-        'You sent us the ID and the proof of address of Café Hafa more than 12 months ago, and we never checked them. We don\'t keep verification documents longer than that, so we deleted them.', 'Send them again'],
+        'You sent us the ID and the proof of address of Café Hafa more than 12 months ago, and we never finished checking them. We don\'t keep verification documents longer than that, so we deleted them.', 'Send them again'],
 ]);
 
 it('writes the email in the owner\'s language', function (): void {
@@ -232,5 +232,7 @@ it('writes the email in the owner\'s language', function (): void {
     $mail = (new DocumentsDeletedUnreviewedMail('مقهى الحافة', [DocumentKind::ProofOfAddress]))->toMail($this->owner);
 
     expect($mail->subject)->toBe('حذفنا الوثيقة التي أرسلها مقهى الحافة للتوثيق')
-        ->and($mail->actionText)->toBe('إعادة الإرسال');
+        ->and($mail->actionText)->toBe('إعادة الإرسال')
+        ->and((new DocumentsDeletedUnreviewedMail('مقهى الحافة', [DocumentKind::IdDocument, DocumentKind::ProofOfAddress]))->toMail($this->owner)->subject)
+        ->toBe('حذفنا الوثيقتين اللتين أرسلهما مقهى الحافة للتوثيق');
 });

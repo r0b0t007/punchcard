@@ -15,7 +15,7 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
 | Consent dates and their log (16+, news, follows) | While the account exists; every change logged, withdrawals included                                                              | `users` columns, `follows` rows, `consent_events`     | CHW-58  |
 | Business users (owners, staff, org admins)       | While the membership exists; then the account follows the customer rules                                                         | Membership removal; `MustHandOverBusiness`            | Built   |
 | Platform audit log                               | To decide (proposal: 5 years, no personal data beyond who acted)                                                                 | Append-only; no pruning yet                           | Open    |
-| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; 12 months after upload while still waiting                                  | `DeleteDecidedDocuments`, nightly at 04:00 UTC        | Built   |
+| Verification documents (ID, address)             | 3 months after the platform accepts or rejects them; 12 months after upload while still waiting                                  | `DeleteExpiredDocuments`, nightly at 04:00 UTC        | Built   |
 | Wallet passes and push subscriptions             | While the pass or subscription exists                                                                                            | Phase 2                                               | Planned |
 | Backups (database and file folders)              | 30 days, in Morocco (ADR 0008); deleted data is gone from them 30 days after its deletion; a restore applies the deletions again | Nightly to Oracle Object Storage, Casablanca; CHW-59  | Planned |
 | Cache entries (dedupe and day marks)             | Up to 7 days, but expired rows stay until read or pruned                                                                         | CHW-241                                               | Open    |
@@ -31,7 +31,7 @@ How long each kind of personal data is kept, and what enforces it. "Built" means
   accepts them, "Ask for new documents" in A1 rejects them, with a reason the owners get by email. The date is the start of that day (UTC), so
   the night's run deletes them on the day the owner's page names. A new document replaces the one waiting or
   rejected, file and row.
-- **Built** (CHW-145): every night at 04:00 UTC `DeleteDecidedDocuments` deletes each due document's file, then its row.
+- **Built** (CHW-145): every night at 04:00 UTC `DeleteExpiredDocuments` deletes each due document's file, then its row.
   A file that won't go keeps its row for the next night. It also deletes the files no row points at once they are a
   day old: an upload that failed before its row, a replaced file that wouldn't go, a business deleted with its rows.
   It logs counts, and a failure by document id or path only.

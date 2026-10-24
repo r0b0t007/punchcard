@@ -30,7 +30,7 @@ use Throwable;
  * sent (CHW-58): business by business, under its row lock as SubmitDocument
  * and the decisions take it, so one replaced or decided meanwhile stays.
  * Their rows go first, their files once that commits (one that won't go is
- * left to the next step). The owners of a business that can still send
+ * logged and left to the next step). The owners of a business that can still send
  * (SubmitDocument::maySend) get one email naming them; a suspended or
  * closed one gets none.
  *
@@ -43,7 +43,7 @@ use Throwable;
  * is logged by id or path (a business id and a random name), never the
  * message, and the rest go on. Returns the counts.
  */
-final readonly class DeleteDecidedDocuments
+final readonly class DeleteExpiredDocuments
 {
     public function __construct(private TenantContext $context, private SubmitDocument $submitDocument) {}
 
@@ -123,15 +123,29 @@ final readonly class DeleteDecidedDocuments
         [$documents, $owners, $name] = DB::transaction(function () use ($businessId, $sentBefore): array {
             $business = Business::query()->whereKey($businessId)->lock('for no key update')->firstOrFail();
             $documents = $this->waitingSince($sentBefore)->where('business_id', $business->id)->orderBy('id')->get();
+
+            if ($documents->isEmpty()) {
+                return [$documents, collect(), $business->name];
+            }
+
             $documents->each(fn (BusinessDocument $document): ?bool => $document->delete());
 
             return [$documents, $this->submitDocument->maySend($business) ? $business->owners()->get() : collect(), $business->name];
         });
 
-        // A file that won't go is a file with no row: the orphans step after this one takes it.
-        rescue(fn (): bool => $disk->delete($documents->pluck('path')->all()), report: false);
+        // Replaced or decided meanwhile: nothing went, nobody to tell.
+        if ($documents->isEmpty()) {
+            return 0;
+        }
 
-        if ($documents->isNotEmpty() && $owners->isNotEmpty()) {
+        try {
+            $disk->delete($documents->pluck('path')->all());
+        } catch (Throwable $failed) {
+            // A file with no row now: the orphans step after this one takes it.
+            Log::warning('The documents sweep left files to the next step.', ['business_id' => $businessId, 'error' => $failed::class]);
+        }
+
+        if ($owners->isNotEmpty()) {
             try {
                 Notification::send($owners, new DocumentsDeletedUnreviewedMail(
                     businessName: $name,

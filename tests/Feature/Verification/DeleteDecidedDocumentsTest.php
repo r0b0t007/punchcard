@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\Verification\DeleteDecidedDocuments;
+use App\Actions\Verification\DeleteExpiredDocuments;
 use App\Enums\DocumentStatus;
 use App\Models\BusinessDocument;
 use App\Support\Tenancy\TenantContext;
@@ -57,7 +57,7 @@ beforeEach(function (): void {
 
         return $path;
     };
-    $this->sweep = fn (): array => app(DeleteDecidedDocuments::class)->handle(now());
+    $this->sweep = fn (): array => app(DeleteExpiredDocuments::class)->handle(now());
     $this->exists = fn (BusinessDocument $document): bool => $this->context->bypass(fn (): bool => BusinessDocument::query()->whereKey($document->id)->exists());
 });
 
@@ -72,8 +72,8 @@ it('deletes accepted and rejected documents whose day has come, file and row', f
 });
 
 it('deletes a document on the night of the day its page names, whatever the hour of the decision', function (): void {
-    $lateDecision = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-23 23:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-23 23:30:00'))]);
-    $nextDay = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-24 00:30:00', 'deletes_at' => DeleteDecidedDocuments::deletesAt(Carbon::parse('2026-07-24 00:30:00'))]);
+    $lateDecision = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-23 23:30:00', 'deletes_at' => DeleteExpiredDocuments::deletesAt(Carbon::parse('2026-07-23 23:30:00'))]);
+    $nextDay = ($this->document)(['status' => DocumentStatus::Accepted, 'decided_at' => '2026-07-24 00:30:00', 'deletes_at' => DeleteExpiredDocuments::deletesAt(Carbon::parse('2026-07-24 00:30:00'))]);
 
     expect(($this->sweep)())->toBe(['documents' => 1, 'waiting' => 0, 'orphans' => 0])
         ->and(($this->exists)($lateDecision))->toBeFalse()
