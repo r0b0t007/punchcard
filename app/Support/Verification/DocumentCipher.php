@@ -61,7 +61,13 @@ final readonly class DocumentCipher
     /** The current key's id: the first 16 hex characters of its SHA-256, never the key. */
     public function keyId(): string
     {
-        return substr(hash('sha256', $this->key((string) config('punchcard.documents.key'))), 0, 16);
+        return self::idOf((string) config('punchcard.documents.key'));
+    }
+
+    /** A configured key's id, as keyId() gives it (punchcard:documents:check). */
+    public static function idOf(string $configured): string
+    {
+        return substr(hash('sha256', (new self)->key($configured)), 0, 16);
     }
 
     /** @return list<string> the current key first, then the previous ones that read as keys (a malformed one is reported, and skipped) */
@@ -69,11 +75,30 @@ final readonly class DocumentCipher
     {
         $keys = [$this->key((string) config('punchcard.documents.key'))];
 
-        foreach (array_filter(array_map(trim(...), explode(',', (string) config('punchcard.documents.previous_keys')))) as $previous) {
+        foreach (self::previousKeys() as $previous) {
             try {
                 $keys[] = $this->key($previous);
             } catch (DocumentKeyMissing) {
                 once(fn () => report(new DocumentKeyMissing('A key in DOCUMENTS_PREVIOUS_KEYS is not "base64:" and 32 bytes: skipped.')));
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * DOCUMENTS_PREVIOUS_KEYS as written, comma-separated, each trimmed, by its place in the list (from 1); empty entries
+     * are left out but keep their place, so a check can name the entry an operator sees.
+     *
+     * @return array<int, string>
+     */
+    public static function previousKeys(): array
+    {
+        $keys = [];
+
+        foreach (explode(',', (string) config('punchcard.documents.previous_keys')) as $index => $key) {
+            if (trim($key) !== '') {
+                $keys[$index + 1] = trim($key);
             }
         }
 
