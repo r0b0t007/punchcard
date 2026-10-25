@@ -39,6 +39,9 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 
 - `LoyaltyCard` (`resources/js/components/loyalty-card/`) is the signature component: logo, business name, stamp grid (5–50, balanced rows), stamp style (`dot`, `ring`, `check`, `heart`, `star`, `logo`), ink-stamp look with slight rotation for filled stamps, reward line, progress text. Props: `businessName`, `cardName?`, `logoUrl?`, `stampsRequired`, `stampsCollected`, `stampStyle?`, `brandColor?`, `brandForeground?` (stored by the server; used only while it still reaches 4.5:1 on the brand colour, otherwise `cardInks()` in `@/lib/color` computes one), `rewardText`. Reuse it in C2, C5, C6, the B6 preview and marketing screenshots.
 - Brand colours reach the card only as `--card-brand`, `--card-brand-foreground` and `--card-stamp` set on the card element; their Tailwind colours live in `@theme inline`, because a plain `@theme` entry resolves once on `:root` and ignores per-element overrides. Stamps are saffron when that reaches 3:1 on the brand colour (`stampColor()`), otherwise the foreground.
+- The punchcard mark (`resources/js/components/wordmark.tsx`): `Wordmark` (saffron `StampDot` + "punchcard" in Baloo
+  Bhaijaan 2, 800, always LTR) heads the sign-in pages; the dot alone heads onboarding; `AppLogo` puts it on an
+  espresso tile in the sidebar.
 - Preview components at `/dev/components` (registered only when `APP_ENV=local`).
 - Use existing shadcn/ui components in `resources/js/components/ui/` before creating new ones.
 

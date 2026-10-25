@@ -11,7 +11,7 @@ import I18nLayout from '@/layouts/i18n-layout';
 import OnboardingLayout from '@/layouts/onboarding-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'punchcard';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

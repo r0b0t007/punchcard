@@ -1,5 +1,4 @@
 import { Form, Link, usePage } from '@inertiajs/react';
-import AppLogoIcon from '@/components/app-logo-icon';
 import LanguageSwitcher from '@/components/language-switcher';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +10,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { StampDot } from '@/components/wordmark';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
@@ -51,8 +51,12 @@ export default function OnboardingLayout({
         <div className="flex min-h-svh flex-col items-center bg-background p-6 md:p-10">
             <div className="flex w-full max-w-lg flex-col gap-8">
                 <div className="flex items-center justify-between gap-4">
-                    <Link href={home()} aria-label={t('Home')}>
-                        <AppLogoIcon className="size-8 fill-current text-foreground" />
+                    <Link
+                        href={home()}
+                        aria-label={t('Home')}
+                        className="flex size-8 items-center justify-center"
+                    >
+                        <StampDot className="size-6" />
                     </Link>
                     <div className="flex items-center gap-2">
                         <LanguageSwitcher />
