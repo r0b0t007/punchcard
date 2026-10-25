@@ -78,7 +78,7 @@ on localhost only: nothing in the security list opens 5432, and it must stay tha
 
 1. Sites › Create: domain `staging.<domain>`, web directory `/public`, project type Laravel.
 2. Repository: GitHub, `r0b0t007/punchcard`, branch `main`. Turn **"Deploy on push" off**: only the GitHub workflow
-   deploys, after CI passes (step 9).
+   deploys, after CI passes (step 10).
 3. Turn **zero-downtime deployment on**. Check that `storage` and `.env` are shared between releases (Ploi's default):
    the logos and the verification documents live in `storage/app`, and must survive every deploy.
 4. **nginx**: in the site's Nginx configuration, inside `server { … }`, add `client_max_body_size 13M;` (verification
@@ -105,42 +105,43 @@ In the site's Environment tab (Ploi writes it to the site's `.env`, never to the
 | `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`               | an address on the verified domain, `punchcard`                      |
 | `TRUSTED_PROXIES`                                   | `*` (only because step 2 lets Cloudflare alone reach the origin)    |
 | `LOG_CHANNEL`, `LOG_LEVEL`                          | `daily`, `info`                                                     |
-| `NFC_SUN_MASTER_KEY`                                | its own, see below                                                  |
+| `APP_KEY`, `DOCUMENTS_KEY`                          | each its own, generated below                                       |
+| `NFC_SUN_MASTER_KEY`                                | its own, generated below                                            |
 | `NFC_SUN_KEY_VERSION`                               | `1`                                                                 |
-| `PASSKEYS_USER_HANDLE_SECRET`                       | its own, see below                                                  |
-| `APP_KEY`, `DOCUMENTS_KEY`                          | set by the commands below                                           |
+| `PASSKEYS_USER_HANDLE_SECRET`                       | its own, generated below                                            |
 
-Then on the server, in the site's folder (Ploi shows it; with zero-downtime, the shared `.env` is the one edited):
-
-```bash
-php artisan key:generate --force
-php artisan punchcard:documents-key
-```
-
-and for the two others, generate a value each and paste it into the Environment tab:
+Every value goes in through this tab, before the first deploy: there is no release yet to run `artisan` in, and the
+first deploy's checks need the keys. Generate the four keys on the server with plain PHP (installed by Ploi in step 3),
+one at a time:
 
 ```bash
-php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"   # NFC_SUN_MASTER_KEY: 32 hex characters
-php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"   # PASSKEYS_USER_HANDLE_SECRET
+php -r "echo 'base64:'.base64_encode(random_bytes(32)), PHP_EOL;"   # APP_KEY, then again for DOCUMENTS_KEY
+php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"                   # NFC_SUN_MASTER_KEY: 32 hex characters
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"                   # PASSKEYS_USER_HANDLE_SECRET
 ```
 
-Run these on the server, not through a chat or a shared terminal, and copy each value straight into the environment
-and the password manager. Staging and production never share a key. `PASSKEYS_USER_HANDLE_SECRET` is set on its own so
-that changing `APP_KEY` later doesn't break every passkey. `APP_ENV=staging` keeps the fake tap commands off (they run
-in `local` and `testing` only).
+`APP_KEY` and `DOCUMENTS_KEY` are two different runs, never the same value (`punchcard:documents:check` refuses that).
+Run these on the server, not through a chat or a shared terminal, and copy each value straight into the tab and the
+password manager. Reload the tab before editing it, and edit it only there: saving a copy loaded before another change
+to `.env` writes the old text back.
+
+Staging and production never share a key. `PASSKEYS_USER_HANDLE_SECRET` is set on its own so that changing `APP_KEY`
+later doesn't break every passkey. `APP_ENV=staging` keeps the fake tap commands off (they run in `local` and
+`testing` only).
 
 ## 7. The deploy script
 
-Ploi's zero-downtime script has its own lines at the top and bottom (creating and activating the release): keep them,
-and put these between them:
+Ploi's zero-downtime script has its own lines at the top and bottom (creating the release, then activating it): keep
+them, and put these between them:
 
 ```bash
 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+php artisan punchcard:nfc:check
+
 npm ci
 npm run build
 
 php artisan migrate --force
-php artisan punchcard:nfc:check
 php artisan punchcard:documents:check
 
 php artisan config:cache
@@ -148,21 +149,31 @@ php artisan route:cache
 php artisan view:cache
 php artisan event:cache
 php artisan storage:link
+```
+
+and this one last, after Ploi's line that activates the release:
+
+```bash
 php artisan queue:restart
 ```
 
 The two checks fail the deploy, before the new release is activated, on a missing, malformed or shared key
-([stamper-keys.md](stamper-keys.md), [verification-documents.md](verification-documents.md)). `npm run build` needs
-PHP and the `.env` (Wayfinder generates the typed routes during the build), so it comes after `composer install`.
+([stamper-keys.md](stamper-keys.md), [verification-documents.md](verification-documents.md)). `nfc:check` needs no
+database, so it runs before `migrate`: a deploy it rejects leaves the schema as the live release expects it.
+`documents:check` reads the documents table, so it runs after. `npm run build` needs PHP and the `.env` (Wayfinder
+generates the typed routes during the build), so it comes after `composer install`. `queue:restart` comes after the
+switch, so the worker Supervisor starts again runs the new release's code, not the old one's.
 
-Run it once by hand with "Deploy now" in Ploi and watch the log.
+Run it once by hand with "Deploy now" in Ploi and watch the log. Turn on Ploi's notifications for failed deploys (the
+site's Notifications, by email): the GitHub workflow only proves the deploy was triggered and the site still answers.
 
 ## 8. Queue worker and scheduler
 
 - **Queue**: the site's Queue tab, a worker on connection `database`, queue `default`, 1 process, `--tries=3`. Ploi
-  runs it under Supervisor and `queue:restart` in the deploy script reloads it with the new code.
-- **Scheduler**: the server's Cron jobs, every minute: `php /home/ploi/staging.<domain>/artisan schedule:run` (the path
-  Ploi shows for the site; with zero-downtime, the `current` folder). It runs the tap log prune, the expired pending
+  runs it under Supervisor and `queue:restart` at the end of the deploy script reloads it with the new code.
+- **Scheduler**: the server's Cron jobs, every minute: `php /home/ploi/staging.<domain>/current/artisan schedule:run`
+  (the site's path as Ploi shows it, always with `current/`: with zero-downtime, `artisan` lives only in the active
+  release). Check its log after a few minutes: a wrong path fails silently, and the retention jobs never run. It runs the tap log prune, the expired pending
   taps, the inactivity warnings and sweep, and the documents sweep (`routes/console.php`).
 
 ## 9. Cloudflare and HTTPS
@@ -190,13 +201,18 @@ Set the secret in the GitHub page itself, not with `gh secret set` in a shared t
 `main` whose CI passes calls the webhook, then waits for `/up` (`.github/workflows/deploy.yml`). A deploy can also be
 started by hand: Actions › deploy › Run workflow › staging.
 
+A green workflow doesn't mean the new code is live. Ploi answers the webhook at once and deploys after; with
+zero-downtime, the old release keeps answering `/up` while the new one builds, and goes on answering if a check stops
+the deploy. Ploi's deploy log and its failure notification (step 7) are what tell you a deploy failed.
+
 ## 11. First admin and smoke test
 
 1. Create your platform admin account: register on `https://staging.<domain>`, turn on two-factor in its settings, then
    on the server `php artisan punchcard:admin <your email>` (the `admin` role, ADR 0006; Filament at `/admin`).
 2. Smoke test, all with test data:
-    - sign up as a business owner, finish onboarding, create a card;
-    - add a stamp from the counter (a manual stamp) to a test customer, until a reward unlocks;
+    - sign up as a business owner, finish onboarding, and set the card to 5 stamps, a cooldown of 0 minutes and a
+      daily cap of 5 or more (the defaults, 20 minutes and 5 a day, apply to manual stamps too);
+    - add stamps from the counter (manual stamps) to a test customer, until a reward unlocks;
     - send an ID and a proof of address of about 9 MB each from the verification page (a 413 means nginx still refuses
       it), and open them in A1 as the admin;
     - check a sign-in email arrives (Resend).
@@ -207,8 +223,10 @@ started by hand: Actions › deploy › Run workflow › staging.
 
 The same steps with:
 
-- its own compartment, VCN, security list and VM (`punchcard-production`), within the tenancy's Always Free total, or
-  on Pay As You Go (ADR 0008: move the account before real data);
+- its own compartment, VCN, security list and VM (`punchcard-production`). The Always Free A1 total is 4 OCPUs and
+  24 GB for the whole tenancy: with Postiz (1, 6) and staging (2, 12), 1 OCPU and 6 GB are left. Either production
+  takes those (1 OCPU, 6 GB), or staging shrinks to 1 OCPU and 6 GB first and production gets 2 and 12, or the
+  difference is billed. The account moves to Pay As You Go before real data either way (ADR 0008);
 - its own database password, keys (`APP_KEY`, `DOCUMENTS_KEY`, `NFC_SUN_MASTER_KEY`, `PASSKEYS_USER_HANDLE_SECRET`),
   Resend key and origin certificate, each in the password manager under production;
 - `APP_ENV=production` (destructive database commands are refused, and passwords need 12 characters and more);
