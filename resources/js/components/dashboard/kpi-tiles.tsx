@@ -68,7 +68,7 @@ export default function KpiTiles({ kpis }: { kpis: DashboardStats['kpis'] }) {
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col gap-1">
-                                <p className="font-display text-3xl font-bold tabular-nums">
+                                <p className="font-display text-title font-bold tabular-nums">
                                     <bdi>
                                         {tile.key === 'returnRate'
                                             ? formats.percent.format(

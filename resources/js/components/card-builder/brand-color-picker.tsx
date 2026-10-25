@@ -76,7 +76,7 @@ export default function BrandColorPicker({
                             setCustom(hex);
                             onChange(hex);
                         }}
-                        className="h-11 w-12 shrink-0 cursor-pointer rounded-button border bg-transparent p-1"
+                        className="h-12 w-12 shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
                     />
                     <Input
                         id="brand_color_custom"

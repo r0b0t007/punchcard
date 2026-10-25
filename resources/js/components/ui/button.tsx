@@ -14,7 +14,7 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-white dark:text-background shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
-          "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-card shadow-xs hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
@@ -28,12 +28,13 @@ const buttonVariants = cva(
         stamp: "bg-stamp text-stamp-foreground shadow-xs hover:bg-stamp/90",
       },
       size: {
-        default: "h-11 px-5 py-2 has-[>svg]:px-4",
-        sm: "h-9 px-3 has-[>svg]:px-2.5",
-        lg: "h-14 px-7 text-base has-[>svg]:px-5",
-        icon: "size-11",
+        // 44 px controls take radius 12; the 56 px lg keeps the button radius, 14 (punchcard-ui.css .btns, .btn).
+        default: "h-11 rounded-md px-5 py-2 has-[>svg]:px-4",
+        sm: "h-9 rounded-md px-3 has-[>svg]:px-2.5",
+        lg: "h-14 px-7 text-lg has-[>svg]:px-5",
+        icon: "size-11 rounded-md",
         // Counter mode (CHW-29, S1): 72 px targets, read at arm's length in a morning rush.
-        counter: "min-h-18 px-6 text-2xl font-bold tabular-nums",
+        counter: "min-h-18 rounded-2xl px-6 font-display text-2xl font-bold tabular-nums",
       },
     },
     defaultVariants: {

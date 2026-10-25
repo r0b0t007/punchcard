@@ -1,7 +1,21 @@
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { clsx } from 'clsx';
 import type { ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+/**
+ * tailwind-merge, told about the theme's own radii and text sizes
+ * (resources/css/app.css), so `rounded-md` replaces `rounded-button` and
+ * `text-title` isn't mistaken for a colour.
+ */
+const twMerge = extendTailwindMerge({
+    extend: {
+        theme: {
+            radius: ['card', 'button', 'nav'],
+            text: ['title', 'heading'],
+        },
+    },
+});
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
