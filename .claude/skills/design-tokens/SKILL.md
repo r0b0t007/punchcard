@@ -41,7 +41,7 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - Brand colours reach the card only as `--card-brand`, `--card-brand-foreground` and `--card-stamp` set on the card element; their Tailwind colours live in `@theme inline`, because a plain `@theme` entry resolves once on `:root` and ignores per-element overrides. Stamps are saffron when that reaches 3:1 on the brand colour (`stampColor()`), otherwise the foreground.
 - The punchcard mark (`resources/js/components/wordmark.tsx`): `Wordmark` (saffron `StampDot` + "punchcard" in Baloo
   Bhaijaan 2, 800, always LTR) heads the sign-in pages; the dot alone heads onboarding; `AppLogo` puts it on an
-  espresso tile in the sidebar.
+  espresso tile in the sidebar (cream in dark mode, as in the design).
 - Preview components at `/dev/components` (registered only when `APP_ENV=local`).
 - Use existing shadcn/ui components in `resources/js/components/ui/` before creating new ones.
 
@@ -73,22 +73,23 @@ Every built screen has a design in the Claude Design project "Punchcard loyalty 
 built later gets its design first, in the same project, and a row here. `punchcard-ui.css` there mirrors the tokens
 above: keep the two in step.
 
-| Screens                                                                                                                 | Design file                                                         |
-| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| C1 first tap, C2 stamp success, C3 reward unlocked, C4 redeem, cooldown (with states)                                   | `Punchcard Tap Flow.dc.html`                                        |
-| Redeemed (staff glance), C9 My rewards, C4 time's up and verify email                                                   | `Punchcard Redemption.dc.html`                                      |
-| The loyalty card                                                                                                        | `LoyaltyCard.dc.html`                                               |
-| C5 My cards, C6 card detail, C10 My QR, C12 settings and privacy, C13 install sheet, tap refused, offline pages         | `Punchcard Customer Home.dc.html`                                   |
-| Every page in `pages/auth/*` (sign in, sign up, two-factor, email links, confirm it's you, staff invitation)            | `Punchcard Sign In.dc.html`                                         |
-| B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                             | `Punchcard Business Onboarding.dc.html`                             |
-| B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                                      | `Punchcard Business App.dc.html`                                    |
-| S1 counter mode v3 (Scan a QR), S2a scanner, S2 scan result and its refusals, S3 redeem, C10 My QR v3 (short code)      | `Punchcard Staff Scanning.dc.html`                                  |
-| The notification emails: the owner fraud alerts (CHW-36), the request for new verification documents (CHW-145)          | `Punchcard Emails.dc.html`                                          |
-| The documents deleted unreviewed email (one, both, Arabic) and the page's privacy line with both periods (CHW-58)       | `Punchcard Emails.dc.html`, `Punchcard Verification Review.dc.html` |
-| The impersonation bar: the platform admin signed in as an owner, on every page (8a, CHW-144)                            | `Punchcard Impersonation Review.dc.html`                            |
-| Verify your business: the documents page, its four states and the checklist item (9a, CHW-145); the new-documents email | `Punchcard Verification Review.dc.html`                             |
-| The inactivity warning email (CHW-58, option B: date first), light, dark and Arabic                                     | Design canvas, see below                                            |
-| B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                | `BA Stampers.dc.html`                                               |
+| Screens                                                                                                                 | Design file                                                           |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| C1 first tap, C2 stamp success, C3 reward unlocked, C4 redeem, cooldown (with states)                                   | `Punchcard Tap Flow.dc.html`                                          |
+| Redeemed (staff glance), C9 My rewards, C4 time's up and verify email                                                   | `Punchcard Redemption.dc.html`                                        |
+| The loyalty card                                                                                                        | `LoyaltyCard.dc.html`                                                 |
+| C5 My cards, C6 card detail, C10 My QR, C12 settings and privacy, C13 install sheet, tap refused, offline pages         | `Punchcard Customer Home.dc.html`                                     |
+| Every page in `pages/auth/*` (sign in, sign up, two-factor, email links, confirm it's you, staff invitation)            | `Punchcard Sign In.dc.html`                                           |
+| B1 business sign-up, B2 setup steps, QR stand (screen and print), join page                                             | `Punchcard Business Onboarding.dc.html`                               |
+| B3 dashboard, B6 card builder, B7 cards, B13 team, S1 counter mode                                                      | `Punchcard Business App.dc.html`                                      |
+| S1 counter mode v3 (Scan a QR), S2a scanner, S2 scan result and its refusals, S3 redeem, C10 My QR v3 (short code)      | `Punchcard Staff Scanning.dc.html`                                    |
+| The punchcard mark: the sign-in wordmark, the onboarding dot, the sidebar tile (CHW-216)                                | `Punchcard Sign In.dc.html`, `BO Screen.dc.html`, `BA Screen.dc.html` |
+| The notification emails: the owner fraud alerts (CHW-36), the request for new verification documents (CHW-145)          | `Punchcard Emails.dc.html`                                            |
+| The documents deleted unreviewed email (one, both, Arabic) and the page's privacy line with both periods (CHW-58)       | `Punchcard Emails.dc.html`, `Punchcard Verification Review.dc.html`   |
+| The impersonation bar: the platform admin signed in as an owner, on every page (8a, CHW-144)                            | `Punchcard Impersonation Review.dc.html`                              |
+| Verify your business: the documents page, its four states and the checklist item (9a, CHW-145); the new-documents email | `Punchcard Verification Review.dc.html`                               |
+| The inactivity warning email (CHW-58, option B: date first), light, dark and Arabic                                     | Design canvas, see below                                              |
+| B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                | `BA Stampers.dc.html`                                                 |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.

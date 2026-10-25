@@ -2,14 +2,22 @@ import { cn } from '@/lib/utils';
 
 /**
  * The saffron stamp dot of the punchcard mark, with its soft halo
- * (`Punchcard Sign In.dc.html`). Alone, it is the onboarding header's mark.
+ * (`Punchcard Sign In.dc.html`). Alone, it is the onboarding header's mark;
+ * on the sidebar's tile it goes without the halo.
  */
-export function StampDot({ className }: { className?: string }) {
+export function StampDot({
+    halo = true,
+    className,
+}: {
+    halo?: boolean;
+    className?: string;
+}) {
     return (
         <span
             aria-hidden
             className={cn(
-                'inline-block shrink-0 rounded-full bg-stamp ring-3 ring-stamp/30',
+                'inline-block shrink-0 rounded-full bg-stamp',
+                halo && 'ring-3 ring-stamp/30',
                 className,
             )}
         />

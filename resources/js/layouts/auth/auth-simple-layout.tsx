@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
+import { Wordmark } from '@/components/wordmark';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
-import { Wordmark } from '@/components/wordmark';
 
 export default function AuthSimpleLayout({
     children,
@@ -18,7 +18,6 @@ export default function AuthSimpleLayout({
                             className="flex flex-col items-center gap-2"
                         >
                             <Wordmark />
-                            <span className="sr-only">{title}</span>
                         </Link>
 
                         <div className="space-y-2 text-center">
