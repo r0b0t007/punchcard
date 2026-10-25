@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\BusinessDocument;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Verification\DocumentCipher;
+use Illuminate\Support\Facades\Schema;
 use Tests\Support\Tenants;
 
 /*
@@ -43,6 +44,15 @@ it('passes when every stored document has its key, current or previous', functio
 
 it('passes with no documents stored yet', function (): void {
     $this->artisan('punchcard:documents:check')->expectsOutputToContain('Documents key OK: 0 previous')->assertSuccessful();
+});
+
+it('runs before the migrations, on a first deploy with no documents table yet', function (): void {
+    Schema::drop('business_documents');
+
+    $this->artisan('punchcard:documents:check')->expectsOutputToContain('Documents key OK: 0 previous, current key: 0 documents.')->assertSuccessful();
+
+    config(['punchcard.documents.key' => '']);
+    $this->artisan('punchcard:documents:check')->expectsOutputToContain('DOCUMENTS_KEY is missing')->assertFailed();
 });
 
 it('fails when DOCUMENTS_KEY is missing or not a key', function (?string $key): void {

@@ -44,8 +44,9 @@ server itself, and keep any separate data backup free of `.env`.
 
 ## The deploy check
 
-Run `php artisan punchcard:documents:check` in the Ploi deploy script, after `migrate --force` and before the new
-release is activated, next to `punchcard:nfc:check` ([stamper-keys.md](stamper-keys.md)). It fails when:
+Run `php artisan punchcard:documents:check` in the Ploi deploy script ([deploy.md](deploy.md)), before `migrate --force`
+and the new release's activation, next to `punchcard:nfc:check` ([stamper-keys.md](stamper-keys.md)). On a first
+deploy, with no documents table yet, it checks the keys only. It fails when:
 
 - `DOCUMENTS_KEY` is missing or isn't `base64:` and 32 bytes;
 - a key in `DOCUMENTS_PREVIOUS_KEYS` isn't one (named by its place in the list as written, never printed);

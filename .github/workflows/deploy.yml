@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.event_name == 'release' && 'production' || 'staging' }}
+  group: deploy-${{ (github.event_name == 'release' || inputs.environment == 'production') && 'production' || 'staging' }}
   cancel-in-progress: false
 
 jobs:

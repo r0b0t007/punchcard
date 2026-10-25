@@ -10,6 +10,7 @@ use App\Support\Verification\DocumentCipher;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -20,7 +21,9 @@ use Illuminate\Support\Str;
  * key_id). Says how many documents each previous key still covers, so one
  * at 0 can go. After a lost key, --allow-unreadable warns about the
  * documents nobody can read instead of failing, and the rest still fails.
- * Run after the migrations. Never prints key material.
+ * Run before the migrations (a first deploy has no documents table yet), so
+ * a bad key stops the deploy before the schema changes. Never prints key
+ * material.
  */
 #[Signature('punchcard:documents:check {--allow-unreadable : After a lost key (see the runbook): warn about documents nobody can read instead of failing}')]
 #[Description('Check the verification documents\' key, and that every stored document has its key configured')]
@@ -59,9 +62,11 @@ class DocumentsCheck extends Command
             }
         }
 
-        /** @var array<string, int> $counts documents by the id of the key that encrypted them */
-        $counts = $context->bypass(fn (): array => BusinessDocument::query()->selectRaw('key_id, count(*) as total')->groupBy('key_id')
-            ->pluck('total', 'key_id')->map(fn (mixed $total): int => (int) $total)->all());
+        /** @var array<string, int> $counts documents by the id of the key that encrypted them; none before the first migration */
+        $counts = Schema::hasTable((new BusinessDocument)->getTable())
+            ? $context->bypass(fn (): array => BusinessDocument::query()->selectRaw('key_id, count(*) as total')->groupBy('key_id')
+                ->pluck('total', 'key_id')->map(fn (mixed $total): int => (int) $total)->all())
+            : [];
 
         foreach ($previous as $place => $key) {
             $this->line('Previous key '.$place.': '.$this->documents($counts[DocumentCipher::idOf($key)] ?? 0).'.');
