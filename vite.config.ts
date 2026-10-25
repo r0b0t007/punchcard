@@ -93,7 +93,7 @@ export default defineConfig({
                     preload: [{ weight: 400 }],
                 }),
                 bunny('Baloo Bhaijaan 2', {
-                    weights: [600, 700],
+                    weights: [600, 700, 800],
                     subsets: ['latin', 'latin-ext', 'arabic'],
                     preload: false,
                 }),
