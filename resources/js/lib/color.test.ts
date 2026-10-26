@@ -1,11 +1,15 @@
+// @ts-expect-error -- Node's fs: the browser code loads no Node types, and a test shouldn't add them for every file.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vite-plus/test';
 import {
     BRAND_SWATCHES,
+    brandMarkOn,
     cardInks,
     contrastRatio,
     isWeakBrand,
     readableForeground,
     stampColor,
+    SURFACE,
 } from '@/lib/color';
 
 describe('contrastRatio', () => {
@@ -45,6 +49,36 @@ describe('readableForeground', () => {
 
     it('falls back to the default espresso card for invalid input', () => {
         expect(readableForeground('not-a-colour')).toBe('#FBF6EE');
+    });
+});
+
+describe('SURFACE', () => {
+    it("is app.css's --card, light and dark", () => {
+        const appCss = readFileSync(
+            new URL('../../css/app.css', import.meta.url),
+            'utf8',
+        );
+        const cards = [
+            ...appCss.matchAll(/^\s*--card:\s*(#[0-9a-f]{6});/gim),
+        ].map((match) => match[1].toUpperCase());
+
+        expect(cards).toEqual([SURFACE.light, SURFACE.dark]);
+    });
+});
+
+describe('brandMarkOn', () => {
+    it('keeps the brand colour where it stands out from the surface (3:1)', () => {
+        expect(brandMarkOn(SURFACE.light, '#3B2A20', '#FBF6EE')).toBe(
+            '#3B2A20',
+        );
+        expect(brandMarkOn(SURFACE.dark, '#CFE8D8', '#241A13')).toBe('#CFE8D8');
+    });
+
+    it("turns to the card's text colour where it would blend in", () => {
+        expect(brandMarkOn(SURFACE.dark, '#3B2A20', '#FBF6EE')).toBe('#FBF6EE');
+        expect(brandMarkOn(SURFACE.light, '#F2A541', '#241A13')).toBe(
+            '#241A13',
+        );
     });
 });
 

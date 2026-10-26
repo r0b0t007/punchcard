@@ -11,6 +11,9 @@ export const INK = '#241A13';
 export const ESPRESSO = '#3B2A20';
 export const SAFFRON = '#F2A541';
 
+/** The raised surface (`--card` in app.css), light and dark: where a brand mark sits outside the card. */
+export const SURFACE = { light: '#FFFDF9', dark: '#211A15' } as const;
+
 /**
  * The card builder's swatches (B6): each reads with punchcard's cream or ink
  * (never isWeakBrand). Labels are English translation keys.
@@ -51,6 +54,20 @@ export function readableForeground(brand: string): string {
     return contrastRatio(preferred, background) >= 4.5
         ? preferred
         : best(['#FFFFFF', '#000000']);
+}
+
+/**
+ * A brand-coloured mark on punchcard's own surface, such as a card's progress
+ * bar on My cards: the brand colour while it stands out from the surface
+ * (3:1, the non-text contrast rule), otherwise the card's text colour, the
+ * brand's opposite (an espresso bar turns cream on the dark surface).
+ */
+export function brandMarkOn(
+    surface: string,
+    brand: string,
+    foreground: string,
+): string {
+    return contrastRatio(brand, surface) >= 3 ? brand : foreground;
 }
 
 /**

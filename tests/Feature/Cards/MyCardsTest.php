@@ -89,6 +89,32 @@ it('shows a progressive card\'s lifetime stamps and marks a paused card', functi
             ->where('cards.0.paused', true));
 });
 
+it('says how many stamps are left to a cyclic card\'s next reward', function (): void {
+    $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['stamps_required' => 10])->save());
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
+    $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 3, 'lifetime_stamps' => 23])->save());
+
+    $this->actingAs($this->customer)->get(route('app.cards'))
+        ->assertInertia(fn ($page) => $page->where('cards.0.stampsToReward', 7));
+});
+
+it('counts a progressive card to its next tier, and to nothing once every tier is earned (CHW-217)', function (int $lifetime, ?int $left): void {
+    $this->context->bypass(fn () => $this->tenants->cardB->forceFill([
+        'mode' => 'progressive', 'tiers' => [['stamps' => 10, 'reward' => 'Cake'], ['stamps' => 5, 'reward' => 'Tea']], 'stamps_required' => 10,
+    ])->save());
+    $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardB);
+    $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 0, 'lifetime_stamps' => $lifetime])->save());
+
+    $this->actingAs($this->customer)->get(route('app.cards'))
+        ->assertInertia(fn ($page) => $page->where('cards.0.stampsToReward', $left));
+})->with([
+    'before the first tier' => [3, 2],
+    'on the first tier' => [5, 5],
+    'between the tiers' => [7, 3],
+    'every tier earned' => [10, null],
+    'past the last tier' => [14, null],
+]);
+
 it('says how many local days ago the customer last stamped in person', function (): void {
     $enrollment = $this->tenants->enroll($this->customer, $this->tenants->cardA);
     // 10 Oct 00:30 local (UTC+1), still 9 Oct in UTC: one local day before 11 Oct.

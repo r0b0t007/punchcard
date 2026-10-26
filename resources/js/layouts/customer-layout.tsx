@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Gift, UserRound, WalletCards } from 'lucide-react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import PasskeyOffer from '@/components/passkey-offer';
 import { useTranslation } from '@/hooks/use-translation';
@@ -22,20 +23,24 @@ const TABS = [
 
 /**
  * The customer's screens (CHW-27): full screen, with a tab bar pinned to the
- * bottom, and the passkey offered after an email-link sign-in (CHW-23).
+ * bottom, and the passkey offered after an email-link sign-in (CHW-23). The
+ * bar is 64px of tabs over the home indicator's safe area, 88px in all on
+ * an iPhone (Claude Design `CH MyCards v2`, CHW-217).
  */
 export default function CustomerLayout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
     const { url } = usePage();
     const path = url.split('?')[0];
 
+    useReachUnderHomeIndicator();
+
     return (
-        <div className="min-h-dvh bg-background pb-20">
+        <div className="min-h-dvh bg-background pb-28">
             <PasskeyOffer />
             {children}
             <nav
                 aria-label={t('Main')}
-                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background"
+                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background pb-safe"
             >
                 <ul className="mx-auto grid max-w-md grid-cols-3">
                     {TABS.map((tab) => {
@@ -49,9 +54,9 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
                                     href={tab.href}
                                     aria-current={current ? 'page' : undefined}
                                     className={cn(
-                                        'flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium',
+                                        'flex h-16 flex-col items-center justify-center gap-1 text-xs',
                                         current
-                                            ? 'text-foreground'
+                                            ? 'font-semibold text-foreground'
                                             : 'text-muted-foreground',
                                     )}
                                 >
@@ -68,4 +73,29 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
             </nav>
         </div>
     );
+}
+
+/**
+ * While the tab bar shows, the page reaches under the home indicator
+ * (viewport-fit=cover), so env(safe-area-inset-bottom) can pad the bar
+ * (`pb-safe`). Set on every visit, not only a full load, and undone when
+ * the layout goes: no other page pads for the notch or the indicator.
+ */
+function useReachUnderHomeIndicator(): void {
+    useEffect(() => {
+        const viewport = document.querySelector<HTMLMetaElement>(
+            'meta[name="viewport"]',
+        );
+
+        if (viewport === null) {
+            return;
+        }
+
+        const plain = viewport.content;
+        viewport.content = `${plain}, viewport-fit=cover`;
+
+        return () => {
+            viewport.content = plain;
+        };
+    }, []);
 }

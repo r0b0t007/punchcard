@@ -10,9 +10,9 @@ import {
 import type { MyCard } from '@/types/my-cards';
 
 /**
- * C5 My cards (CHW-27): the customer's home. A banner for the rewards ready,
- * then every card they hold, the most recently used first, each in its
- * program's colours.
+ * C5 My cards (CHW-27): the customer's home. The rewards ready, the card
+ * closest to a reward in full, then every other card they hold, the most
+ * recently used first, each in its program's colours (MyCardsView).
  */
 export default function MyCards({
     firstName,

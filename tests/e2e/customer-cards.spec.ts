@@ -213,6 +213,34 @@ test.describe('in English, light', () => {
             });
     });
 
+    test('reaches under the home indicator only while the tab bar shows (CHW-217)', async ({
+        page,
+    }) => {
+        const viewport = page.locator('meta[name="viewport"]');
+
+        await page.goto('/app');
+        await expect(viewport).toHaveAttribute(
+            'content',
+            /, viewport-fit=cover$/,
+        );
+
+        // My QR has no tab bar, and nothing padded for the home indicator.
+        await page.locator('[data-test="my-qr-link"]').click();
+        await expect(page).toHaveURL(/\/app\/qr$/);
+        await expect(viewport).toHaveAttribute(
+            'content',
+            'width=device-width, initial-scale=1',
+        );
+
+        // Back is an Inertia visit, not a full load: the layout sets it again.
+        await page.goBack();
+        await expect(page).toHaveURL(/\/app$/);
+        await expect(viewport).toHaveAttribute(
+            'content',
+            'width=device-width, initial-scale=1, viewport-fit=cover',
+        );
+    });
+
     test('shows a card in full', async ({ page }, testInfo) => {
         await openCafeHafa(page);
 
