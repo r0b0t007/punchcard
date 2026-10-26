@@ -13,6 +13,7 @@ import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { Badge } from '@/components/ui/badge';
+import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -324,16 +325,17 @@ export default function MyCard({
 
                 {venues.length > 0 ? (
                     <Section title={t('Where to use it')}>
-                        <ul className="flex flex-col gap-2.5 pb-6">
+                        <ul className="flex flex-col gap-2.5">
                             {venues.map((venue) => (
                                 <li
                                     key={venue.id}
                                     className="flex flex-col gap-1.5 rounded-card border bg-card p-4"
                                 >
-                                    <p className="flex items-center gap-2 font-medium">
+                                    <p className="flex items-start gap-2 font-medium">
+                                        {/* Beside the first line of a name that wraps. */}
                                         <MapPin
                                             aria-hidden="true"
-                                            className="size-4 shrink-0"
+                                            className="mt-1 size-4 shrink-0"
                                         />
                                         {venue.businessName === venue.name
                                             ? venue.name
@@ -380,7 +382,7 @@ function Section({
 }) {
     return (
         <section className="flex flex-col gap-2.5">
-            <h2 className="font-display text-heading font-bold">{title}</h2>
+            <Heading variant="small" title={title} />
             {children}
         </section>
     );

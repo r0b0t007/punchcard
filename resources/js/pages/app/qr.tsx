@@ -12,9 +12,10 @@ import { cards } from '@/routes/app';
  * which staff scan at the counter. Full screen, the code on its own white
  * card (scanners need the contrast, dark mode or not), the phone's clock
  * ticking under it so staff can tell it from a screenshot (Claude Design
- * `CH MyQr v3`, CHW-217), a bar for the time it has left, then the next one. A code past its time is dimmed until the
- * next arrives, so nobody scans one that no longer counts. The screen stays
- * on while it shows (Screen Wake Lock, where the browser has it).
+ * `CH MyQr v3`, CHW-217), a bar for the time it has left, then the next
+ * one. A code past its time is dimmed until the next arrives, so nobody
+ * scans one that no longer counts. The screen stays on while it shows
+ * (Screen Wake Lock, where the browser has it).
  */
 export default function MemberQr({
     qrCode,

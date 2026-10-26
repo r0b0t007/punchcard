@@ -75,12 +75,10 @@ export default function RedeemedReward({
                 {live ? (
                     <>
                         <div className="w-full border-t border-dashed border-border" />
-                        <div className="flex flex-col items-center gap-1">
-                            <LiveClock className="text-4xl" />
-                            <p className="text-muted-foreground">
-                                {t('Show this screen to staff')}
-                            </p>
-                        </div>
+                        <LiveClock
+                            className="text-4xl"
+                            caption={t('Show this screen to staff')}
+                        />
                     </>
                 ) : null}
             </div>
