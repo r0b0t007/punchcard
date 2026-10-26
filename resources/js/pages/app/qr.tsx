@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import LiveClock from '@/components/live-clock';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { cards } from '@/routes/app';
@@ -9,8 +10,9 @@ import { cards } from '@/routes/app';
 /**
  * C10, "My QR" (CHW-28): for a phone without NFC, the customer's member QR,
  * which staff scan at the counter. Full screen, the code on its own white
- * card (scanners need the contrast, dark mode or not), a bar for the time
- * it has left, then the next one. A code past its time is dimmed until the
+ * card (scanners need the contrast, dark mode or not), the phone's clock
+ * ticking under it so staff can tell it from a screenshot (Claude Design
+ * `CH MyQr v3`, CHW-217), a bar for the time it has left, then the next one. A code past its time is dimmed until the
  * next arrives, so nobody scans one that no longer counts. The screen stays
  * on while it shows (Screen Wake Lock, where the browser has it).
  */
@@ -41,7 +43,7 @@ export default function MemberQr({
     return (
         <>
             <Head title={t('My QR')} />
-            <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center gap-6 px-4 py-6 text-center">
+            <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center gap-4 px-6 pt-5 pb-6 text-center">
                 <Link
                     href={cards()}
                     className="flex items-center gap-1 self-start text-sm text-muted-foreground"
@@ -54,7 +56,7 @@ export default function MemberQr({
                 </Link>
 
                 <div className="flex flex-col gap-1">
-                    <h1 className="font-display text-2xl font-bold">
+                    <h1 className="font-display text-3xl leading-tight font-bold">
                         {firstName
                             ? t(':name, show this to staff', {
                                   name: firstName,
@@ -66,7 +68,7 @@ export default function MemberQr({
                     </p>
                 </div>
 
-                <div className="rounded-2xl bg-white p-3 shadow-sm">
+                <div className="rounded-card bg-white p-3 shadow-sm">
                     <img
                         src={qrCode}
                         alt={t('Your member QR code')}
@@ -94,7 +96,10 @@ export default function MemberQr({
                     </p>
                 </div>
 
-                <div className="flex w-full max-w-72 flex-col gap-2">
+                {/* Ticks on while the next code is on its way: the screen is live either way. */}
+                <LiveClock className="text-3xl" />
+
+                <div className="flex w-full max-w-64 flex-col gap-2">
                     <div
                         role="progressbar"
                         aria-label={t('New code in')}

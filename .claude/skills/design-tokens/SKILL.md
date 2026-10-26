@@ -34,7 +34,7 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - Radius: `--radius-card: 20px` (customer surfaces, the loyalty card), `--radius-button: 14px` (56px buttons) and `--radius-nav: 8px` (sidebar items) in `@theme`, used as `rounded-card` / `rounded-button` / `rounded-nav`; 44px buttons and 48px fields take `rounded-md` (12px), business cards (`Card`) `rounded-2xl` (16px), chips and badges `rounded-full`. No arbitrary values like `rounded-[20px]` (they will fail `@shadcn/lint`).
 - Lines: `--default-border-width: 1.5px`, so every `border` (cards, boxes, fields, separators) draws the design's 1.5px line.
 - Type: **Readex Pro** for UI (`font-sans`), **Baloo Bhaijaan 2** for card titles, the wordmark and reward moments (`font-display`); both cover Latin and Arabic and load through `bunny()` in `vite.config.ts`. Scale 12–40px.
-- Display scale (`font-display font-bold`): `text-title` (34px) for page titles and big numbers, `text-heading` (22px) for section headings; `Heading` uses them (default and `small`). `cn()` knows these sizes and the custom radii (`extendTailwindMerge` in `lib/utils.ts`): add any new `--text-*` or `--radius-*` token there too, or `cn()` will mis-merge it.
+- Display scale (`font-display font-bold`): `text-title` (34px) for page titles and big numbers, `text-heading` (22px) for section headings; `Heading` uses them (default and `small`). `text-md` (15px) is the design's body size between `sm` and `base` (`.t15`). `cn()` knows these sizes and the custom radii (`extendTailwindMerge` in `lib/utils.ts`): add any new `--text-*` or `--radius-*` token there too, or `cn()` will mis-merge it.
 - Touch targets ≥ 44px (`Button` default is 44px, `Input`, `Select` and `Textarea` 48px, `size="lg"` 56px); counter-mode buttons ≥ 72px.
 
 ## Components
@@ -44,6 +44,7 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - The punchcard mark (`resources/js/components/wordmark.tsx`): `Wordmark` (saffron `StampDot` + "punchcard" in Baloo
   Bhaijaan 2, 800, always LTR) heads the sign-in pages; the dot alone heads onboarding; `AppLogo` puts it on an
   espresso tile in the sidebar (cream in dark mode, as in the design).
+- `LiveClock` (`resources/js/components/live-clock.tsx`): the phone's time to the second after a pulsing green dot, always left to right, so staff can tell a live screen from a screenshot (the redeemed reward, My QR).
 - Preview components at `/dev/components` (registered only when `APP_ENV=local`).
 - Use existing shadcn/ui components in `resources/js/components/ui/` before creating new ones.
 

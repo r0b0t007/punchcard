@@ -40,6 +40,9 @@
     --text-title--line-height: 1.1;
     --text-heading: 1.375rem;
     --text-heading--line-height: 1.2;
+    /* The design's body text between sm and base (punchcard-ui.css .t15). */
+    --text-md: 0.9375rem;
+    --text-md--line-height: 1.45;
 
     /* A stamp landing on the card (C2): pressed down askew, then settled, with an ink ring
        spreading out. Components pair them with motion-reduce:animate-none. */
