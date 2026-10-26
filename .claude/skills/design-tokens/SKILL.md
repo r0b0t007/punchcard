@@ -31,9 +31,11 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 ## Where tokens live
 
 - Tailwind 4 `@theme` + shadcn CSS variables in `resources/css/app.css` (`:root` and `.dark`). Do not hardcode hex values in components; use `bg-primary`, `text-accent`, etc.
-- Radius: define `--radius-card: 20px` and `--radius-button: 14px` in `@theme` and use `rounded-card` / `rounded-button`; chips `rounded-full`. No arbitrary values like `rounded-[20px]` (they will fail `@shadcn/lint`).
+- Radius: `--radius-card: 20px` (customer surfaces, the loyalty card), `--radius-button: 14px` (56px buttons) and `--radius-nav: 8px` (sidebar items) in `@theme`, used as `rounded-card` / `rounded-button` / `rounded-nav`; 44px buttons and 48px fields take `rounded-md` (12px), business cards (`Card`) `rounded-2xl` (16px), chips and badges `rounded-full`. No arbitrary values like `rounded-[20px]` (they will fail `@shadcn/lint`).
+- Lines: `--default-border-width: 1.5px`, so every `border` (cards, boxes, fields, separators) draws the design's 1.5px line.
 - Type: **Readex Pro** for UI (`font-sans`), **Baloo Bhaijaan 2** for card titles, the wordmark and reward moments (`font-display`); both cover Latin and Arabic and load through `bunny()` in `vite.config.ts`. Scale 12–40px.
-- Touch targets ≥ 44px (`Button` default and `Input` are 44px, `size="lg"` 56px); counter-mode buttons ≥ 72px.
+- Display scale (`font-display font-bold`): `text-title` (34px) for page titles and big numbers, `text-heading` (22px) for section headings; `Heading` uses them (default and `small`). `cn()` knows these sizes and the custom radii (`extendTailwindMerge` in `lib/utils.ts`): add any new `--text-*` or `--radius-*` token there too, or `cn()` will mis-merge it.
+- Touch targets ≥ 44px (`Button` default is 44px, `Input`, `Select` and `Textarea` 48px, `size="lg"` 56px); counter-mode buttons ≥ 72px.
 
 ## Components
 

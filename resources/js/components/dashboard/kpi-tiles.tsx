@@ -60,22 +60,27 @@ export default function KpiTiles({ kpis }: { kpis: DashboardStats['kpis'] }) {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {TILES.map((tile) => {
                 const kpi = kpis[tile.key];
+                const shown =
+                    tile.key === 'returnRate'
+                        ? formats.percent.format(kpi.value / 100)
+                        : String(kpi.value);
 
                 return (
-                    <Card key={tile.key}>
+                    <Card key={tile.key} className="min-w-0">
                         <CardHeader>
                             <CardDescription>{t(tile.label)}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col gap-1">
-                                <p className="font-display text-3xl font-bold tabular-nums">
-                                    <bdi>
-                                        {tile.key === 'returnRate'
-                                            ? formats.percent.format(
-                                                  kpi.value / 100,
-                                              )
-                                            : kpi.value}
-                                    </bdi>
+                                {/* Past 4 characters the 34 px figure wraps in a phone's half-width tile. */}
+                                <p
+                                    className={cn(
+                                        'font-display text-title font-bold wrap-anywhere tabular-nums',
+                                        shown.length > 4 &&
+                                            'max-sm:text-heading',
+                                    )}
+                                >
+                                    <bdi>{shown}</bdi>
                                 </p>
                                 <Change
                                     kpi={kpi}

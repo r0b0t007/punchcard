@@ -28,6 +28,18 @@
     --radius-sm: calc(var(--radius) - 4px);
     --radius-card: 20px;
     --radius-button: 14px;
+    /* Sidebar menu items (BA Screen.dc.html, .nav). */
+    --radius-nav: 8px;
+
+    /* Cards, boxes, fields and separators draw 1.5px lines, as in Claude Design (CHW-216). */
+    --default-border-width: 1.5px;
+
+    /* The display type scale (font-display, bold): page titles and big numbers,
+       then section headings (punchcard-ui.css .h1 and .h2). */
+    --text-title: 2.125rem;
+    --text-title--line-height: 1.1;
+    --text-heading: 1.375rem;
+    --text-heading--line-height: 1.2;
 
     /* A stamp landing on the card (C2): pressed down askew, then settled, with an ink ring
        spreading out. Components pair them with motion-reduce:animate-none. */
