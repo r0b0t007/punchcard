@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react';
 import PasskeyRegistration from '@/components/passkey-register';
 import { buttonVariants } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
+import { cn } from '@/lib/utils';
 import { dismiss } from '@/routes/passkey-offer';
 
 const subscribeToNothing = () => () => {};
@@ -64,7 +65,7 @@ export default function PasskeyOffer() {
                         href={dismiss()}
                         as="button"
                         preserveScroll
-                        className={buttonVariants({ variant: 'ghost' })}
+                        className={cn(buttonVariants({ variant: 'ghost' }))}
                         data-test="passkey-offer-dismiss"
                     >
                         {t('Not now')}
