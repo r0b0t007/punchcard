@@ -17,6 +17,9 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        // Saffron, for a reward ready (CHW-217, C5); stamps and rewards only.
+        stamp:
+          "border-transparent bg-stamp font-semibold text-stamp-foreground",
       },
     },
     defaultVariants: {

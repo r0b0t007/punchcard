@@ -56,6 +56,18 @@ it('forgets the app on the next request', function (): void {
         ->assertInertia(fn ($page) => $page->where('pwa', null));
 });
 
+it('lets only the customer app reach under the home indicator, for its tab bar', function (): void {
+    $customerViewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
+    $owner = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
+
+    $this->actingAs(User::factory()->create())->get(route('app.cards'))->assertSee($customerViewport, escape: false);
+
+    $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])->get(route('dashboard'))
+        ->assertSee('<meta name="viewport" content="width=device-width, initial-scale=1">', escape: false)
+        ->assertDontSee('viewport-fit', escape: false);
+    $this->get('/login')->assertDontSee('viewport-fit', escape: false);
+});
+
 it('describes both apps in valid manifests whose icons exist', function (string $app, string $id, string $startUrl, string $scope): void {
     $manifest = json_decode((string) file_get_contents(public_path("manifest-{$app}.webmanifest")), true, flags: JSON_THROW_ON_ERROR);
 

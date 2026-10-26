@@ -22,7 +22,9 @@ const TABS = [
 
 /**
  * The customer's screens (CHW-27): full screen, with a tab bar pinned to the
- * bottom, and the passkey offered after an email-link sign-in (CHW-23).
+ * bottom, and the passkey offered after an email-link sign-in (CHW-23). The
+ * bar is 64px of tabs over the home indicator's safe area, 88px in all on
+ * an iPhone (Claude Design `CH MyCards v2`, CHW-217).
  */
 export default function CustomerLayout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
@@ -30,12 +32,12 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
     const path = url.split('?')[0];
 
     return (
-        <div className="min-h-dvh bg-background pb-20">
+        <div className="min-h-dvh bg-background pb-28">
             <PasskeyOffer />
             {children}
             <nav
                 aria-label={t('Main')}
-                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background"
+                className="fixed inset-x-0 bottom-0 z-10 border-t bg-background pb-safe"
             >
                 <ul className="mx-auto grid max-w-md grid-cols-3">
                     {TABS.map((tab) => {
@@ -49,9 +51,9 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
                                     href={tab.href}
                                     aria-current={current ? 'page' : undefined}
                                     className={cn(
-                                        'flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium',
+                                        'flex h-16 flex-col items-center justify-center gap-1 text-xs',
                                         current
-                                            ? 'text-foreground'
+                                            ? 'font-semibold text-foreground'
                                             : 'text-muted-foreground',
                                     )}
                                 >

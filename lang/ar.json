@@ -587,6 +587,8 @@
     "My cards": "بطاقاتي",
     "No cards yet": "لا بطاقات بعد",
     "No visit yet": "لا زيارة بعد",
+    "Closest to a reward": "الأقرب إلى مكافأة",
+    ":count card|:count cards": "لا بطاقات|بطاقة واحدة|بطاقتان|:count بطاقات|:count بطاقة|:count بطاقة",
     "Paused by the café": "أوقفها المقهى مؤقتًا",
     "Rewards": "المكافآت",
     "See all my cards": "عرض كل بطاقاتي",

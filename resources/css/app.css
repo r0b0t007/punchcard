@@ -148,6 +148,11 @@
     transition-duration: var(--default-transition-duration);
 }
 
+/* The phone's bottom safe area (the home indicator); 0 where the page doesn't reach under it (viewport-fit). */
+@utility pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
 @theme inline {
     --color-card-brand: var(--card-brand);
     --color-card-brand-foreground: var(--card-brand-foreground);

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
     BRAND_SWATCHES,
+    brandMarkOn,
     cardInks,
     contrastRatio,
     isWeakBrand,
     readableForeground,
     stampColor,
+    SURFACE,
 } from '@/lib/color';
 
 describe('contrastRatio', () => {
@@ -45,6 +47,22 @@ describe('readableForeground', () => {
 
     it('falls back to the default espresso card for invalid input', () => {
         expect(readableForeground('not-a-colour')).toBe('#FBF6EE');
+    });
+});
+
+describe('brandMarkOn', () => {
+    it('keeps the brand colour where it stands out from the surface (3:1)', () => {
+        expect(brandMarkOn(SURFACE.light, '#3B2A20', '#FBF6EE')).toBe(
+            '#3B2A20',
+        );
+        expect(brandMarkOn(SURFACE.dark, '#CFE8D8', '#241A13')).toBe('#CFE8D8');
+    });
+
+    it("turns to the card's text colour where it would blend in", () => {
+        expect(brandMarkOn(SURFACE.dark, '#3B2A20', '#FBF6EE')).toBe('#FBF6EE');
+        expect(brandMarkOn(SURFACE.light, '#F2A541', '#241A13')).toBe(
+            '#241A13',
+        );
     });
 });
 
