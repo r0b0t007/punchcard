@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Gift, UserRound, WalletCards } from 'lucide-react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import PasskeyOffer from '@/components/passkey-offer';
 import { useTranslation } from '@/hooks/use-translation';
@@ -30,6 +31,8 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
     const { url } = usePage();
     const path = url.split('?')[0];
+
+    useReachUnderHomeIndicator();
 
     return (
         <div className="min-h-dvh bg-background pb-28">
@@ -70,4 +73,29 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
             </nav>
         </div>
     );
+}
+
+/**
+ * While the tab bar shows, the page reaches under the home indicator
+ * (viewport-fit=cover), so env(safe-area-inset-bottom) can pad the bar
+ * (`pb-safe`). Set on every visit, not only a full load, and undone when
+ * the layout goes: no other page pads for the notch or the indicator.
+ */
+function useReachUnderHomeIndicator(): void {
+    useEffect(() => {
+        const viewport = document.querySelector<HTMLMetaElement>(
+            'meta[name="viewport"]',
+        );
+
+        if (viewport === null) {
+            return;
+        }
+
+        const plain = viewport.content;
+        viewport.content = `${plain}, viewport-fit=cover`;
+
+        return () => {
+            viewport.content = plain;
+        };
+    }, []);
 }

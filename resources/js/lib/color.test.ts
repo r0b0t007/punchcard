@@ -1,3 +1,5 @@
+// @ts-expect-error -- Node's fs: the browser code loads no Node types, and a test shouldn't add them for every file.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vite-plus/test';
 import {
     BRAND_SWATCHES,
@@ -47,6 +49,20 @@ describe('readableForeground', () => {
 
     it('falls back to the default espresso card for invalid input', () => {
         expect(readableForeground('not-a-colour')).toBe('#FBF6EE');
+    });
+});
+
+describe('SURFACE', () => {
+    it("is app.css's --card, light and dark", () => {
+        const appCss = readFileSync(
+            new URL('../../css/app.css', import.meta.url),
+            'utf8',
+        );
+        const cards = [
+            ...appCss.matchAll(/^\s*--card:\s*(#[0-9a-f]{6});/gim),
+        ].map((match) => match[1].toUpperCase());
+
+        expect(cards).toEqual([SURFACE.light, SURFACE.dark]);
     });
 });
 

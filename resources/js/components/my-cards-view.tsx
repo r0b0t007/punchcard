@@ -152,7 +152,12 @@ export default function MyCardsView({
                 <ul className="flex flex-col gap-2.5">
                     {others.map((myCard) => (
                         <li key={myCard.id}>
-                            <OpenCard myCard={myCard} offline={!!offline}>
+                            {/* Named by its content, so the count and the chips are read out too. */}
+                            <OpenCard
+                                myCard={myCard}
+                                offline={!!offline}
+                                named={false}
+                            >
                                 <CardRow myCard={myCard} />
                             </OpenCard>
                         </li>
@@ -167,10 +172,13 @@ export default function MyCardsView({
 function OpenCard({
     myCard,
     offline,
+    named = true,
     children,
 }: {
     myCard: MyCard;
     offline: boolean;
+    /** Labelled "Open :card"; a link without the label is named by its content. */
+    named?: boolean;
     children: ReactNode;
 }) {
     const { t } = useTranslation();
@@ -182,9 +190,13 @@ function OpenCard({
     return (
         <Link
             href={show(myCard.id)}
-            aria-label={t('Open :card', {
-                card: `${myCard.card.businessName}, ${myCard.card.cardName}`,
-            })}
+            aria-label={
+                named
+                    ? t('Open :card', {
+                          card: `${myCard.card.businessName}, ${myCard.card.cardName}`,
+                      })
+                    : undefined
+            }
             className="block rounded-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
             {children}
@@ -195,8 +207,10 @@ function OpenCard({
 /**
  * Any card but the closest: its monogram, the count, and a bar in its brand
  * colour (ADR 0007), or its text colour where the brand would blend into the
- * light or dark surface. A card whose reward is ready has started again, so
- * the count is the new one, never a full bar.
+ * light or dark surface. A cyclic card whose reward is ready has started
+ * again, so the count is the new one; only a progressive card with every
+ * tier earned shows a full bar. The card's name follows the café's, so two
+ * cards of one café tell apart.
  */
 function CardRow({ myCard }: { myCard: MyCard }) {
     const { card } = myCard;
@@ -225,8 +239,16 @@ function CardRow({ myCard }: { myCard: MyCard }) {
             />
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-semibold">
-                        {card.businessName}
+                    <span className="truncate">
+                        <span className="font-semibold">
+                            {card.businessName}
+                        </span>
+                        {card.cardName ? (
+                            <span className="text-muted-foreground">
+                                {' · '}
+                                {card.cardName}
+                            </span>
+                        ) : null}
                     </span>
                     <bdi
                         dir="ltr"

@@ -10,6 +10,7 @@ use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use LogicException;
 
 /**
  * A business's card as a customer screen shows it (the TapCard type in
@@ -38,6 +39,33 @@ final class CustomerCard
     public static function stampsOf(LoyaltyCard $card, CardEnrollment $enrollment): int
     {
         return $card->mode === CardMode::Progressive ? $enrollment->lifetime_stamps : $enrollment->current_stamps;
+    }
+
+    /**
+     * The stamps still to collect for the card's next reward (My cards'
+     * "closest to a reward", CHW-217): a cyclic card's to its reward, a
+     * progressive card's to its next tier, null once every tier is earned
+     * (or its tiers can't be read: nothing to show then, not a broken page).
+     */
+    public static function stampsToReward(LoyaltyCard $card, CardEnrollment $enrollment): ?int
+    {
+        if ($card->mode !== CardMode::Progressive) {
+            return max(0, $card->stamps_required - $enrollment->current_stamps);
+        }
+
+        try {
+            $tiers = ProgressiveTiers::parse($card->tiers);
+        } catch (LogicException) {
+            return null;
+        }
+
+        foreach ($tiers as $tier) {
+            if ($tier['stamps'] > $enrollment->lifetime_stamps) {
+                return $tier['stamps'] - $enrollment->lifetime_stamps;
+            }
+        }
+
+        return null;
     }
 
     /**

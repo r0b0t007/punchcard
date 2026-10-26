@@ -2,8 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\Locales::direction(app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
     <head>
         <meta charset="utf-8">
-        {{-- The customer app's tab bar reaches under the home indicator, padded by the safe area (CHW-217); every other page lets Safari keep it clear of the notch. --}}
-        <meta name="viewport" content="width=device-width, initial-scale=1{{ ($page['props']['pwa']['app'] ?? null) === 'customer' ? ', viewport-fit=cover' : '' }}">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>

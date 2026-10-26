@@ -25,7 +25,8 @@ use Carbon\CarbonImmutable;
  * with the organization's logo, the rewards ready on it, how many local
  * days ago they last stamped in person (a tap, a scan or by hand, in that
  * location's timezone) and whether the card is paused. A progressive card
- * shows its lifetime stamps, a cyclic one the stamps since its last reward.
+ * shows its lifetime stamps, a cyclic one the stamps since its last reward;
+ * both say how many stamps are left to the next reward (CHW-217).
  *
  * In bypass(): a customer has no tenant, so every read is kept to their own
  * enrollments. A fixed number of queries, however many cards.
@@ -38,7 +39,7 @@ final readonly class ListMyCards
      * @return array{
      *     firstName: string,
      *     rewardsReady: int,
-     *     cards: list<array{id: int, card: array<string, mixed>, logoUrl: ?string, rewardsReady: int, lastVisitDaysAgo: ?int, paused: bool}>,
+     *     cards: list<array{id: int, card: array<string, mixed>, logoUrl: ?string, rewardsReady: int, stampsToReward: ?int, lastVisitDaysAgo: ?int, paused: bool}>,
      * }
      */
     public function handle(User $user, CarbonImmutable $now): array
@@ -88,6 +89,7 @@ final readonly class ListMyCards
                     'card' => CustomerCard::ofProgram($organization, $card, CustomerCard::stampsOf($card, $enrollment)),
                     'logoUrl' => $organization->logoUrl(),
                     'rewardsReady' => (int) $ready->get($enrollment->id, 0),
+                    'stampsToReward' => CustomerCard::stampsToReward($card, $enrollment),
                     'lastVisitDaysAgo' => $lastVisit === null ? null : (int) round(abs($lastVisit->created_at->toImmutable()->setTimezone($timezone)->startOfDay()
                         ->diffInDays($now->setTimezone($timezone)->startOfDay()))),
                     'paused' => ! $card->active,

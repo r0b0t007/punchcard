@@ -6,7 +6,9 @@ function myCard(
     id: number,
     collected: number,
     required: number,
-    facts: Partial<Pick<MyCard, 'lastVisitDaysAgo' | 'paused'>> = {},
+    facts: Partial<
+        Pick<MyCard, 'lastVisitDaysAgo' | 'paused' | 'stampsToReward'>
+    > = {},
 ): MyCard {
     return {
         id,
@@ -56,6 +58,30 @@ describe('closestToReward', () => {
                 myCard(2, 3, 5, { lastVisitDaysAgo: 2 }),
             ]).closest?.id,
         ).toBe(1);
+    });
+
+    it("ranks by the server's stamps to the next reward, a progressive card's next tier", () => {
+        // A progressive card at 4 of 10, one stamp from its first tier (5).
+        expect(
+            closestToReward([
+                myCard(1, 7, 10, { stampsToReward: 3 }),
+                myCard(2, 4, 10, { stampsToReward: 1 }),
+            ]).closest?.id,
+        ).toBe(2);
+    });
+
+    it('never puts a progressive card with every tier earned first', () => {
+        const { closest, others } = closestToReward([
+            myCard(1, 10, 10, { stampsToReward: null }),
+            myCard(2, 1, 10, { stampsToReward: 9 }),
+        ]);
+
+        expect(closest?.id).toBe(2);
+        expect(ids(others)).toEqual([1]);
+        expect(
+            closestToReward([myCard(1, 10, 10, { stampsToReward: null })])
+                .closest,
+        ).toBeNull();
     });
 
     it('never puts a paused card first', () => {

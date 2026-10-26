@@ -7,6 +7,12 @@ export type MyCard = {
     card: TapCard;
     logoUrl: string | null;
     rewardsReady: number;
+    /**
+     * Stamps left to the next reward: a progressive card's next tier, null
+     * once every tier is earned (CHW-217). Missing from a copy kept offline
+     * before it was added.
+     */
+    stampsToReward?: number | null;
     /** Local days since the last stamp in person; null before any. */
     lastVisitDaysAgo: number | null;
     paused: boolean;
