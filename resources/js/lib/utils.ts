@@ -11,7 +11,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 const twMerge = extendTailwindMerge({
     extend: {
         theme: {
-            radius: ['card', 'button', 'nav'],
+            radius: ['card', 'button', 'nav', 'sheet'],
             text: ['title', 'heading', 'md'],
         },
     },

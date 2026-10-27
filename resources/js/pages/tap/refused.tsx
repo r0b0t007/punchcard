@@ -48,12 +48,15 @@ export default function TapRefused({ reason }: { reason: Reason }) {
                     </Button>
                 }
             >
-                <h1 className="font-display text-4xl leading-tight font-bold text-balance">
-                    {t('No stamp this time')}
-                </h1>
-                <p className="text-lg text-muted-foreground">
-                    {messages[reason]}
-                </p>
+                {/* The reason sits under the title, closer than the frame's blocks (Claude Design `CH Refused`). */}
+                <div className="flex flex-col gap-3.5">
+                    <h1 className="font-display text-4xl leading-tight font-bold text-balance">
+                        {t('No stamp this time')}
+                    </h1>
+                    <p className="text-lg text-pretty text-muted-foreground">
+                        {messages[reason]}
+                    </p>
+                </div>
             </TapScreen>
         </>
     );

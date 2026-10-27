@@ -30,6 +30,8 @@
     --radius-button: 14px;
     /* Sidebar menu items (BA Screen.dc.html, .nav). */
     --radius-nav: 8px;
+    /* A bottom sheet's top corners: the install sheet (CH InstallSheet.dc.html, .sheet). */
+    --radius-sheet: 28px;
 
     /* Cards, boxes, fields and separators draw 1.5px lines, as in Claude Design (CHW-216). */
     --default-border-width: 1.5px;
