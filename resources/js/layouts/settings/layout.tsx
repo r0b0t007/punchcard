@@ -62,7 +62,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                     href={item.href}
                                     aria-current={current ? 'page' : undefined}
                                     className={cn(
-                                        'flex h-10 items-center gap-2 rounded-sm px-3 text-md transition-colors focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
+                                        'flex min-h-10 items-center gap-2 rounded-sm px-3 py-2 text-md transition-colors focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
                                         // The hover is lighter than the current page's surface, which is the same colour.
                                         current
                                             ? 'bg-secondary font-semibold text-secondary-foreground'

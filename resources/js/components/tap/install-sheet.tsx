@@ -85,7 +85,8 @@ export default function InstallSheet({
                         </span>
                     </SheetTitle>
                     <SheetDescription>
-                        <span className="text-base">
+                        {/* A block, so it takes its own 16px line height, not the paragraph's 14px one. */}
+                        <span className="block text-base">
                             {t('Your cards in one tap, even offline.')}
                         </span>
                     </SheetDescription>
