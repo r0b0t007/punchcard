@@ -5,14 +5,19 @@ import { useSyncExternalStore } from 'react';
  * however many things read it (a live clock, every "last tap" line). A tick
  * is scheduled to the next second boundary each time, so a late timer never
  * shows a second twice or skips one, and the time is read again the moment
- * the page comes back from the background.
+ * the page comes back from the background. The time is kept to the whole
+ * second, so reading it twice within one gives the same value.
  */
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | undefined;
-let now = Date.now();
+let now = currentSecond();
+
+function currentSecond(): number {
+    return Math.floor(Date.now() / 1000) * 1000;
+}
 
 function tick(): void {
-    now = Date.now();
+    now = currentSecond();
     listeners.forEach((notify) => notify());
 }
 
@@ -21,7 +26,11 @@ function schedule(): void {
     timer = setTimeout(
         () => {
             tick();
-            schedule();
+
+            // The last reader may have left during the tick: no orphan timer then.
+            if (listeners.size > 0) {
+                schedule();
+            }
         },
         1000 - (Date.now() % 1000) + 5,
     );
@@ -38,7 +47,7 @@ export function subscribeToSeconds(listener: () => void): () => void {
 
     if (listeners.size === 1) {
         // The first reader in a while: the time kept may be from long ago.
-        now = Date.now();
+        now = currentSecond();
         schedule();
         document.addEventListener('visibilitychange', onVisible);
     }
@@ -54,7 +63,12 @@ export function subscribeToSeconds(listener: () => void): () => void {
     };
 }
 
-function readSecond(): number {
+/** The time kept; with nobody subscribed it is read afresh, so a reader's first render is never stale. */
+export function readSecond(): number {
+    if (listeners.size === 0) {
+        now = currentSecond();
+    }
+
     return now;
 }
 

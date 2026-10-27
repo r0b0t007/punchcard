@@ -6,7 +6,7 @@ import {
     it,
     vi,
 } from 'vite-plus/test';
-import { subscribeToSeconds } from '@/lib/seconds';
+import { readSecond, subscribeToSeconds } from '@/lib/seconds';
 
 describe('subscribeToSeconds', () => {
     beforeEach(() => {
@@ -57,5 +57,19 @@ describe('subscribeToSeconds', () => {
         stop();
         document.dispatchEvent(new Event('visibilitychange'));
         expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops for good when the last reader leaves during a tick', () => {
+        const stop = subscribeToSeconds(() => stop());
+
+        vi.advanceTimersByTime(1000);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('keeps the whole second, read afresh while nobody is subscribed', () => {
+        expect(readSecond()).toBe(Date.parse('2026-10-26T10:00:05.000Z'));
+
+        vi.setSystemTime(new Date('2026-10-26T10:10:00.700Z'));
+        expect(readSecond()).toBe(Date.parse('2026-10-26T10:10:00.000Z'));
     });
 });
