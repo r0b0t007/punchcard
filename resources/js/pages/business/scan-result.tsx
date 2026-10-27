@@ -811,17 +811,21 @@ function RedeemedView({
  * The scan's seconds left, counted down to a deadline set when the page
  * arrives, read on the page's one ticker (lib/seconds), so a phone that was
  * locked comes back to the right count. What the server sent while the page
- * is rendered there; never more than it sent (the ticker keeps whole
- * seconds, a little behind the deadline's own clock reading).
+ * is rendered there. The deadline starts from the same whole second the
+ * ticker keeps, so the count reaches 0 at most a second early, never after
+ * the server has stopped taking stamps.
  */
 function useSecondsLeft(secondsLeft: number): number {
-    const [deadline] = useState(() => Date.now() + secondsLeft * 1000);
+    const [deadline] = useState(
+        () => Math.floor(Date.now() / 1000) * 1000 + secondsLeft * 1000,
+    );
     const now = useSecond();
 
     if (now === null) {
         return secondsLeft;
     }
 
+    // Capped: just past a second boundary, the ticker may still hold the second before.
     return Math.min(
         secondsLeft,
         Math.max(0, Math.ceil((deadline - now) / 1000)),
