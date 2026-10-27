@@ -1,7 +1,9 @@
 import { Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import LiveClock from '@/components/live-clock';
 import { useTranslation } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
+import { useSecond } from '@/lib/seconds';
 import type { LocalMoment } from '@/lib/local-moment';
 
 /**
@@ -9,7 +11,9 @@ import type { LocalMoment } from '@/lib/local-moment';
  * "Punchcard Redemption" 06). Live for liveSeconds (the server's count, from
  * the redemption): a big check and the phone's clock ticking, so staff can
  * tell it from a screenshot. Then, even on a screen left open, it only says it
- * was already redeemed, with no check to hand anything over on.
+ * was already redeemed, with no check to hand anything over on. The window
+ * ends at a deadline on the phone's clock, never a count of timers: a phone
+ * locked or in the background freezes those, and would come back "live".
  */
 export default function RedeemedReward({
     rewardText,
@@ -23,18 +27,10 @@ export default function RedeemedReward({
     liveSeconds: number;
 }) {
     const { t, locale } = useTranslation();
-    const [liveLeft, setLiveLeft] = useState(liveSeconds);
-    const live = liveLeft > 0;
-
-    useEffect(() => {
-        if (liveLeft <= 0) {
-            return;
-        }
-
-        const timer = window.setTimeout(() => setLiveLeft(liveLeft - 1), 1000);
-
-        return () => window.clearTimeout(timer);
-    }, [liveLeft]);
+    const [liveUntil] = useState(() => Date.now() + liveSeconds * 1000);
+    const now = useSecond();
+    // Rendered on the server: as the server sent it, until the phone's clock is read.
+    const live = now === null ? liveSeconds > 0 : now < liveUntil;
 
     return (
         <>
@@ -74,50 +70,13 @@ export default function RedeemedReward({
                 {live ? (
                     <>
                         <div className="w-full border-t border-dashed border-border" />
-                        <LiveClock />
+                        <LiveClock
+                            className="text-4xl"
+                            caption={t('Show this screen to staff')}
+                        />
                     </>
                 ) : null}
             </div>
         </>
-    );
-}
-
-/** The phone's own time, to the second: a screenshot stops, this doesn't. */
-function LiveClock() {
-    const { t } = useTranslation();
-    const [now, setNow] = useState(() => new Date());
-
-    useEffect(() => {
-        const timer = window.setInterval(() => setNow(new Date()), 1000);
-
-        return () => window.clearInterval(timer);
-    }, []);
-
-    const time = new Intl.DateTimeFormat('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hourCycle: 'h23',
-    }).format(now);
-
-    return (
-        <div className="flex flex-col items-center gap-1">
-            <p className="flex items-center gap-2.5">
-                <span
-                    aria-hidden="true"
-                    className="size-2.5 rounded-full bg-success motion-safe:animate-pulse"
-                />
-                <time
-                    dir="ltr"
-                    dateTime={now.toISOString()}
-                    className="font-display text-4xl leading-tight font-bold tabular-nums"
-                >
-                    {time}
-                </time>
-            </p>
-            <p className="text-muted-foreground">
-                {t('Show this screen to staff')}
-            </p>
-        </div>
     );
 }

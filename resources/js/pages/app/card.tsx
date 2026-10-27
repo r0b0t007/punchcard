@@ -13,6 +13,7 @@ import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { Badge } from '@/components/ui/badge';
+import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -65,7 +66,7 @@ type Props = {
  * C6 Card detail (CHW-27): one of the customer's cards in full. The card and
  * its banner, a progressive card's tiers, its reward and terms, what the
  * café tells its customers, "Follow for offers", the latest stamps and the
- * places that honour it.
+ * places that honour it (Claude Design `CH CardDetail`, CHW-217).
  */
 export default function MyCard({
     id,
@@ -92,7 +93,7 @@ export default function MyCard({
     return (
         <>
             <Head title={card.cardName ?? card.businessName} />
-            <main className="mx-auto flex max-w-md flex-col gap-6 px-4 pt-6">
+            <main className="mx-auto flex max-w-md flex-col gap-6 px-6 pt-5">
                 <Link
                     href={cards()}
                     className="flex items-center gap-1 self-start text-sm text-muted-foreground"
@@ -116,10 +117,10 @@ export default function MyCard({
                 {/* "My QR" (CHW-28, C10): staff scan it when the phone can't tap the stamper. */}
                 <Link
                     href={memberQr()}
-                    className="flex items-center justify-center gap-2 rounded-card border p-3 text-sm font-medium"
+                    className="flex items-center gap-2.5 rounded-button border bg-card px-4 py-3.5 font-medium"
                     data-test="card-my-qr-link"
                 >
-                    <QrCode aria-hidden="true" className="size-4" />
+                    <QrCode aria-hidden="true" className="size-5 shrink-0" />
                     {t('No NFC? Show my QR')}
                 </Link>
 
@@ -232,7 +233,7 @@ export default function MyCard({
                 ) : null}
 
                 {canFollow || following ? (
-                    <section className="flex items-start gap-3 rounded-card border p-4">
+                    <section className="flex items-start gap-3 rounded-card border bg-card p-4">
                         <Checkbox
                             id="follow"
                             checked={following}
@@ -283,13 +284,13 @@ export default function MyCard({
                             {history.map((stamp) => (
                                 <li
                                     key={stamp.id}
-                                    className="flex items-center justify-between gap-3 py-2"
+                                    className="flex items-center justify-between gap-3 py-3"
                                 >
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">
+                                    <div className="flex min-w-0 flex-col gap-0.5">
+                                        <p className="truncate text-md font-medium">
                                             {stamp.place}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className="truncate text-sm text-muted-foreground">
                                             {stamp.sourceLabel} ·{' '}
                                             {momentLabel(locale, stamp.at, {
                                                 today: (time) =>
@@ -308,7 +309,7 @@ export default function MyCard({
                                         // A signed count reads "+1" in Arabic too.
                                         dir="ltr"
                                         className={cn(
-                                            'shrink-0 font-display font-bold tabular-nums',
+                                            'shrink-0 font-display text-heading font-bold tabular-nums',
                                             stamp.qty < 0 && 'text-destructive',
                                         )}
                                     >
@@ -324,42 +325,44 @@ export default function MyCard({
 
                 {venues.length > 0 ? (
                     <Section title={t('Where to use it')}>
-                        <ul className="flex flex-col gap-4">
+                        <ul className="flex flex-col gap-2.5">
                             {venues.map((venue) => (
-                                <li key={venue.id} className="flex gap-3">
-                                    <MapPin
-                                        aria-hidden="true"
-                                        className="mt-0.5 size-4 shrink-0"
-                                    />
-                                    <div className="flex min-w-0 flex-col gap-1">
-                                        <p className="font-medium">
-                                            {venue.businessName === venue.name
-                                                ? venue.name
-                                                : `${venue.businessName} · ${venue.name}`}
+                                <li
+                                    key={venue.id}
+                                    className="flex flex-col gap-1.5 rounded-card border bg-card p-4"
+                                >
+                                    <p className="flex items-start gap-2 font-medium">
+                                        {/* Beside the first line of a name that wraps. */}
+                                        <MapPin
+                                            aria-hidden="true"
+                                            className="mt-1 size-4 shrink-0"
+                                        />
+                                        {venue.businessName === venue.name
+                                            ? venue.name
+                                            : `${venue.businessName} · ${venue.name}`}
+                                    </p>
+                                    {venue.address ? (
+                                        <p
+                                            dir="auto"
+                                            className="text-sm text-muted-foreground"
+                                        >
+                                            {venue.address}
                                         </p>
-                                        {venue.address ? (
-                                            <p
-                                                dir="auto"
-                                                className="text-sm text-muted-foreground"
-                                            >
-                                                {venue.address}
-                                            </p>
-                                        ) : null}
-                                        {venue.mapsUrl ? (
-                                            <a
-                                                href={venue.mapsUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1 text-sm font-medium underline underline-offset-4"
-                                            >
-                                                {t('Open in Maps')}
-                                                <ExternalLink
-                                                    aria-hidden="true"
-                                                    className="size-3.5"
-                                                />
-                                            </a>
-                                        ) : null}
-                                    </div>
+                                    ) : null}
+                                    {venue.mapsUrl ? (
+                                        <a
+                                            href={venue.mapsUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 self-start text-sm font-medium underline underline-offset-4"
+                                        >
+                                            {t('Open in Maps')}
+                                            <ExternalLink
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
+                                        </a>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>
@@ -378,8 +381,8 @@ function Section({
     children: React.ReactNode;
 }) {
     return (
-        <section className="flex flex-col gap-3">
-            <h2 className="font-semibold">{title}</h2>
+        <section className="flex flex-col gap-2.5">
+            <Heading variant="small" title={title} />
             {children}
         </section>
     );
