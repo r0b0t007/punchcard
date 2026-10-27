@@ -30,6 +30,7 @@
     --radius-button: 14px;
     /* Sidebar menu items (BA Screen.dc.html, .nav). */
     --radius-nav: 8px;
+    --radius-sheet: 28px;
 
     /* Cards, boxes, fields and separators draw 1.5px lines, as in Claude Design (CHW-216). */
     --default-border-width: 1.5px;

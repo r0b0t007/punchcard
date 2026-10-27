@@ -80,12 +80,14 @@ export default function InstallSheet({
                 <SheetHeader>
                     <SheetTitle>
                         {/* Clear of the close button. */}
-                        <span className="block pe-8">
+                        <span className="block pe-8 font-display text-2xl leading-tight font-bold">
                             {t('Keep punchcard on your home screen')}
                         </span>
                     </SheetTitle>
                     <SheetDescription>
-                        {t('Your cards in one tap, even offline.')}
+                        <span className="text-base">
+                            {t('Your cards in one tap, even offline.')}
+                        </span>
                     </SheetDescription>
                 </SheetHeader>
 
@@ -139,10 +141,10 @@ function Step({
     children: ReactNode;
 }) {
     return (
-        <li className="flex items-center gap-3">
+        <li className="flex items-center gap-3 text-base">
             <span
                 aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stamp font-semibold text-stamp-foreground tabular-nums"
+                className="flex size-7.5 shrink-0 items-center justify-center rounded-full bg-stamp font-bold text-stamp-foreground tabular-nums"
             >
                 {number}
             </span>

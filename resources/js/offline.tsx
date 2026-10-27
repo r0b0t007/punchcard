@@ -108,18 +108,20 @@ function NothingKept({ onRetry }: { onRetry: () => void }) {
     const { t } = useTranslation();
 
     return (
-        <main className="mx-auto flex min-h-svh max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
+        <main className="mx-auto flex min-h-svh max-w-md flex-col items-center justify-center gap-3.5 px-8 pb-20 text-center">
             <CloudOff
                 aria-hidden="true"
                 className="size-10 text-muted-foreground"
             />
-            <h1 className="font-display text-2xl font-bold">
+            <h1 className="font-display text-3xl leading-tight font-bold">
                 {t("You're offline")}
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-pretty text-muted-foreground">
                 {t('Your cards show here once you are back online.')}
             </p>
-            <Button onClick={onRetry}>{t('Try again')}</Button>
+            <Button onClick={onRetry} className="mt-1.5">
+                {t('Try again')}
+            </Button>
         </main>
     );
 }

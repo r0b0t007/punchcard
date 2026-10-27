@@ -45,7 +45,7 @@ export default function DeleteUser({
                     'Your account and your sign-in go. The places keep your stamps, without your name or email.',
                 )}
             />
-            <div className="space-y-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+            <div className="space-y-4 rounded-2xl border border-destructive/35 bg-destructive/7 p-4">
                 <div className="relative space-y-0.5 text-destructive">
                     <p className="font-medium">{t('Warning')}</p>
                     <p className="text-sm">

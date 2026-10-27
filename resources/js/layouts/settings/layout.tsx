@@ -1,11 +1,10 @@
 import { Link } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useTranslation } from '@/hooks/use-translation';
-import { toUrl } from '@/lib/utils';
+import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editPrivacy } from '@/routes/privacy';
 import { edit } from '@/routes/profile';
@@ -40,38 +39,42 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const { t } = useTranslation();
 
     return (
-        <div className="px-4 py-6">
+        <div className="px-6 pt-5 pb-6">
             <Heading
+                as="h1"
                 title={t('Settings')}
                 description={t('Manage your profile and account settings')}
             />
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
+                    {/* C12 (Claude Design `CH Settings`, CHW-217): 40px items at radius 10, the current one on the secondary surface. */}
                     <nav
-                        className="flex flex-col space-y-1 space-x-0"
+                        className="flex flex-col gap-1"
                         aria-label={t('Settings')}
                     >
-                        {sidebarNavItems.map((item, index) => (
-                            <Button
-                                key={`${toUrl(item.href)}-${index}`}
-                                size="sm"
-                                variant={
-                                    isCurrentOrParentUrl(item.href)
-                                        ? 'secondary'
-                                        : 'ghost'
-                                }
-                                asChild
-                                className="w-full justify-start"
-                            >
-                                <Link href={item.href}>
+                        {sidebarNavItems.map((item, index) => {
+                            const current = isCurrentOrParentUrl(item.href);
+
+                            return (
+                                <Link
+                                    key={`${toUrl(item.href)}-${index}`}
+                                    href={item.href}
+                                    aria-current={current ? 'page' : undefined}
+                                    className={cn(
+                                        'flex h-10 items-center gap-2 rounded-sm px-3 text-md transition-colors focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none',
+                                        current
+                                            ? 'bg-secondary font-semibold'
+                                            : 'hover:bg-accent',
+                                    )}
+                                >
                                     {item.icon && (
                                         <item.icon className="h-4 w-4" />
                                     )}
                                     {t(item.title)}
                                 </Link>
-                            </Button>
-                        ))}
+                            );
+                        })}
                     </nav>
                 </aside>
 

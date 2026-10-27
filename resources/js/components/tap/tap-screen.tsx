@@ -41,7 +41,7 @@ export default function TapScreen({
                 className,
             )}
         >
-            <div className="flex flex-col gap-7 px-6 pt-8">{children}</div>
+            <div className="flex flex-col gap-7 px-6 pt-5">{children}</div>
             {actions ? (
                 <div className="mt-auto flex flex-col gap-3 px-6 pt-8 pb-8">
                     {actions}
