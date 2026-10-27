@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
 import { calendarDate } from '@/lib/local-moment';
+import { useSecond } from '@/lib/seconds';
 import { cn } from '@/lib/utils';
 import { scan as scanner } from '@/routes/counter';
 import { redeem, stamp } from '@/routes/counter/scans';
@@ -806,18 +807,25 @@ function RedeemedView({
     );
 }
 
-/** The scan's seconds left, counted down to a deadline set when the page arrives (never ticks). */
+/**
+ * The scan's seconds left, counted down to a deadline set when the page
+ * arrives, read on the page's one ticker (lib/seconds), so a phone that was
+ * locked comes back to the right count. What the server sent while the page
+ * is rendered there; never more than it sent (the ticker keeps whole
+ * seconds, a little behind the deadline's own clock reading).
+ */
 function useSecondsLeft(secondsLeft: number): number {
     const [deadline] = useState(() => Date.now() + secondsLeft * 1000);
-    const [now, setNow] = useState(() => Date.now());
+    const now = useSecond();
 
-    useEffect(() => {
-        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    if (now === null) {
+        return secondsLeft;
+    }
 
-        return () => window.clearInterval(timer);
-    }, []);
-
-    return Math.max(0, Math.ceil((deadline - now) / 1000));
+    return Math.min(
+        secondsLeft,
+        Math.max(0, Math.ceil((deadline - now) / 1000)),
+    );
 }
 
 function newKey(): string {
