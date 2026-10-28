@@ -46,7 +46,8 @@ export default function LanguageSwitcher({
                     onClick={() => switchTo(code)}
                     className={cn(
                         size === 'sm'
-                            ? 'h-7 rounded-nav px-2 text-xs transition-colors'
+                            ? // 28px as drawn, an invisible 8px more above and below to tap.
+                              'relative h-7 rounded-nav px-2 text-xs transition-colors after:absolute after:inset-x-0 after:-inset-y-2'
                             : 'rounded-md px-3.5 py-1.5 text-sm transition-colors',
                         locale === code
                             ? 'bg-card text-foreground shadow-xs'

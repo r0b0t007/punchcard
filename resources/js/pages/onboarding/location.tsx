@@ -91,12 +91,16 @@ export default function OnboardingLocation({ location, timezones }: Props) {
                             <InputError message={errors.timezone} />
                         </div>
 
-                        {/* Wraps where a long label (French) won't fit beside Back: the primary goes full width below. */}
-                        <div className="flex flex-wrap gap-3">
+                        {/* Stacked on a phone, the primary on top at full width; side by side from sm. */}
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row">
                             <Button variant="secondary" size="lg" asChild>
                                 <Link href={step('business')}>{t('Back')}</Link>
                             </Button>
-                            <Button type="submit" size="lg" className="flex-1">
+                            <Button
+                                type="submit"
+                                size="lg"
+                                className="sm:flex-1"
+                            >
                                 {processing && <Spinner />}
                                 {t('Continue')}
                             </Button>
