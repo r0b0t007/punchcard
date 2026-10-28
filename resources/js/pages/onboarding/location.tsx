@@ -91,7 +91,8 @@ export default function OnboardingLocation({ location, timezones }: Props) {
                             <InputError message={errors.timezone} />
                         </div>
 
-                        <div className="flex gap-3">
+                        {/* Wraps where a long label (French) won't fit beside Back: the primary goes full width below. */}
+                        <div className="flex flex-wrap gap-3">
                             <Button variant="secondary" size="lg" asChild>
                                 <Link href={step('business')}>{t('Back')}</Link>
                             </Button>

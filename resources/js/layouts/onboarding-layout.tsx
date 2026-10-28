@@ -50,7 +50,7 @@ export default function OnboardingLayout({
     return (
         <div className="flex min-h-svh flex-col items-center bg-background p-6 md:p-10">
             <div className="flex w-full max-w-lg flex-col gap-8">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                     <Link
                         href={home()}
                         aria-label={t('Home')}
@@ -86,7 +86,7 @@ export default function OnboardingLayout({
                                     {open ? (
                                         <Link
                                             href={stepRoute(name)}
-                                            className="block text-2xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                            className="-my-2 block py-2 text-2xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                                         >
                                             {label}
                                         </Link>
