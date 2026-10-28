@@ -31,7 +31,8 @@ const buttonVariants = cva(
         // 44 px controls take radius 12; the 56 px lg keeps the button radius, 14 (punchcard-ui.css .btns, .btn).
         default: "h-11 rounded-md px-5 py-2 has-[>svg]:px-4",
         sm: "h-9 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-14 px-7 text-lg has-[>svg]:px-5",
+        // At least 56px, wrapping a long label (French) instead of spilling past the button.
+        lg: "h-auto min-h-14 px-7 py-3 text-lg whitespace-normal text-balance has-[>svg]:px-5",
         icon: "size-11 rounded-md",
         // Counter mode (CHW-29, S1): 72 px targets, read at arm's length in a morning rush.
         counter: "min-h-18 rounded-2xl px-6 font-display text-2xl font-bold tabular-nums",

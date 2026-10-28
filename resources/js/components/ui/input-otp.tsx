@@ -11,7 +11,7 @@ const InputOTP = React.forwardRef<
   <OTPInput
     ref={ref}
     containerClassName={cn(
-      "flex items-center gap-2 has-[:disabled]:opacity-50 [direction:ltr]", // codes read left to right in every locale
+      "flex w-full items-center justify-center gap-2 has-[:disabled]:opacity-50 [direction:ltr]", // codes read left to right in every locale
       containerClassName
     )}
     className={cn("disabled:cursor-not-allowed", className)}
@@ -24,7 +24,7 @@ const InputOTPGroup = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div">
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex min-w-0 items-center gap-2", className)} {...props} />
+  <div ref={ref} className={cn("flex w-full min-w-0 items-center justify-center gap-2", className)} {...props} />
 ))
 InputOTPGroup.displayName = "InputOTPGroup"
 
@@ -40,8 +40,8 @@ const InputOTPSlot = React.forwardRef<
       ref={ref}
       className={cn(
         // Separate boxes, as in Claude Design (Punchcard Sign In, .otp): 46 x 56 at radius 12, display digits.
-        // They narrow (min-w-0) where six of them don't fit: a 360px phone, the 2FA setup dialog.
-        "relative flex h-14 w-11.5 min-w-0 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
+        // Fluid: they share the row up to 46px each, narrower where six don't fit (a 320px phone, the 2FA setup dialog).
+        "relative flex h-14 min-w-0 max-w-11.5 flex-1 basis-0 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
         // The fields' focus ring (input.tsx).
         isActive && "z-10 border-ring ring-[3px] ring-ring",
         className
