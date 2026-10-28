@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 /**
  * One ticker for the whole page, on each whole second of the phone's clock,
@@ -86,12 +86,17 @@ export function useSecond(): number | null {
 }
 
 /**
- * Where a countdown's deadline goes when a new count arrives (a poll): the
- * earlier of the two, so the count never steps back up a second; a later
- * one only when it moved by more than a tick, which is a new arming.
+ * Where a countdown's deadline goes when a new count arrives (a poll): for
+ * the same arming, the earlier of the two, so the count never steps back up
+ * and a slow answer never carries it past the server's end; for a new
+ * arming (the server's count went up), the new one.
  */
-export function nextDeadline(current: number, arrived: number): number {
-    return arrived < current || arrived - current > 2000 ? arrived : current;
+export function nextDeadline(
+    current: number,
+    arrived: number,
+    rearmed: boolean,
+): number {
+    return rearmed ? arrived : Math.min(current, arrived);
 }
 
 /**
@@ -100,19 +105,23 @@ export function nextDeadline(current: number, arrived: number): number {
  * count up and the answer takes a moment to come, so the deadline starts a
  * second short, from a whole second: 0 comes a little early, never after the
  * server has stopped. A new count (refreshedBy changes, as each poll's data
- * does) moves the deadline through nextDeadline. What the server sent while
- * the page is rendered there.
+ * does) moves the deadline through nextDeadline: a new arming only when the
+ * server's own count went up, never judged by when the answer came. What
+ * the server sent while the page is rendered there.
  */
 export function useSecondsLeft(
     secondsLeft: number,
     refreshedBy?: unknown,
 ): number {
     const [deadline, setDeadline] = useState(() => deadlineFor(secondsLeft));
+    const sent = useRef(secondsLeft);
     const now = useSecond();
 
     useEffect(() => {
+        const rearmed = secondsLeft > sent.current;
+        sent.current = secondsLeft;
         const arrived = deadlineFor(secondsLeft);
-        setDeadline((current) => nextDeadline(current, arrived));
+        setDeadline((current) => nextDeadline(current, arrived, rearmed));
     }, [secondsLeft, refreshedBy]);
 
     if (now === null) {

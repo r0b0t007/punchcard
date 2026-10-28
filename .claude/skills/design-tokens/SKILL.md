@@ -35,7 +35,7 @@ Rules (ADR 0007): the organization's brand colour may only change the **loyalty 
 - Lines: `--default-border-width: 1.5px`, so every `border` (cards, boxes, fields, separators) draws the design's 1.5px line.
 - Type: **Readex Pro** for UI (`font-sans`), **Baloo Bhaijaan 2** for card titles, the wordmark and reward moments (`font-display`); both cover Latin and Arabic and load through `bunny()` in `vite.config.ts`. Scale 12–40px.
 - Display scale (`font-display font-bold`): `text-title` (34px) for page titles and big numbers, `text-heading` (22px) for section headings; `Heading` uses them (default and `small`). `text-md` (15px) is the design's body size between `sm` and `base` (`.t15`). `text-giant` (88px) is an armed stamper's quantity in counter mode; `--radius-panel` (22px, `rounded-panel`) its panels. `cn()` knows these sizes and the custom radii (`extendTailwindMerge` in `lib/utils.ts`): add any new `--text-*` or `--radius-*` token there too, or `cn()` will mis-merge it.
-- Touch targets ≥ 44px (`Button` default is 44px, `Input`, `Select` and `Textarea` 48px, `size="lg"` 56px); counter-mode buttons ≥ 72px.
+- Touch targets ≥ 44px (`Button` default is 44px, `Input`, `Select` and `Textarea` 48px, `size="lg"` 56px); counter-mode quantity buttons ≥ 72px (an armed panel's Cancel is 52px, as drawn, in its corner).
 
 ## Components
 

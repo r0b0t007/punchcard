@@ -75,13 +75,15 @@ describe('subscribeToSeconds', () => {
 });
 
 describe('nextDeadline', () => {
-    it('keeps the earlier deadline, so a poll never adds a second back', () => {
-        expect(nextDeadline(10_000, 11_000)).toBe(10_000);
-        expect(nextDeadline(10_000, 9_000)).toBe(9_000);
+    it('keeps the earlier deadline within one arming, however late a poll answers', () => {
+        expect(nextDeadline(10_000, 11_000, false)).toBe(10_000);
+        // A slow poll lands its deadline well after the current one: still the same arming.
+        expect(nextDeadline(10_000, 13_500, false)).toBe(10_000);
+        expect(nextDeadline(10_000, 9_000, false)).toBe(9_000);
     });
 
-    it('takes a deadline more than a tick later: a new arming', () => {
-        expect(nextDeadline(10_000, 12_001)).toBe(12_001);
-        expect(nextDeadline(10_000, 12_000)).toBe(10_000);
+    it('takes the new deadline when the server count went up: a new arming', () => {
+        expect(nextDeadline(10_000, 60_000, true)).toBe(60_000);
+        expect(nextDeadline(10_000, 9_000, true)).toBe(9_000);
     });
 });

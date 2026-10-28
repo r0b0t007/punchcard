@@ -211,7 +211,7 @@ function StamperPanel({
                         href={disarm(stamper.id)}
                         as="button"
                         preserveScroll
-                        className="flex h-13 shrink-0 items-center justify-center rounded-button border border-stamp-foreground/35 px-5.5 text-lg font-semibold focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
+                        className="flex h-13 shrink-0 items-center justify-center rounded-button border border-stamp-foreground/35 px-5.5 text-lg font-semibold focus-visible:ring-3 focus-visible:ring-stamp-foreground focus-visible:outline-none"
                         data-test="counter-disarm"
                     >
                         {t('Cancel')}
@@ -284,24 +284,40 @@ function ArmedCountdown({
         '--left': `${(left / Math.max(total, 1)) * 100}%`,
     } as CSSProperties;
 
+    // At 0 the server stops the arming up to a second later: ask then, and again with each poll still armed.
     useEffect(() => {
-        if (left === 0) {
-            onDone();
+        if (left !== 0) {
+            return;
         }
-    }, [left, onDone]);
+
+        const timer = window.setTimeout(onDone, 1000);
+
+        return () => window.clearTimeout(timer);
+    }, [left, polled, onDone]);
 
     return (
         <>
+            {/* Read as one sentence; the big "+3" and its label are for the eyes. */}
+            <p className="sr-only">
+                {t('Next tap gives :count', { count: `+${qty}` })}
+            </p>
             <div className="flex items-end gap-4.5">
                 <bdi
                     dir="ltr"
+                    aria-hidden="true"
                     className="font-display text-giant font-extrabold tabular-nums"
                 >
                     +{qty}
                 </bdi>
                 <div className="flex flex-col gap-0.5 pb-1.5">
-                    <p className="text-lg font-bold">{t('Next tap gives')}</p>
-                    <p className="text-md tabular-nums">
+                    <p aria-hidden="true" className="text-lg font-bold">
+                        {t('Next tap gives')}
+                    </p>
+                    <p
+                        role="timer"
+                        aria-live="off"
+                        className="text-md tabular-nums"
+                    >
                         {t(':count second left|:count seconds left', {
                             count: left,
                         })}
