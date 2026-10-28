@@ -125,23 +125,11 @@ img {
 }
 
 .wordmark-dot {
-    background-color: #f2a541;
-    border-radius: 50%;
-    display: inline-block;
-    height: 13px;
-    margin-right: 8px;
-    vertical-align: middle;
-    width: 13px;
-}
-
-/* Logo */
-
-.logo {
-    height: 75px;
-    margin-top: 15px;
-    margin-bottom: 10px;
-    max-height: 75px;
-    width: 75px;
+    color: #f2a541;
+    font-size: 24px;
+    line-height: 1;
+    margin-right: 6px;
+    vertical-align: -1px;
 }
 
 /* Body */
@@ -256,7 +244,9 @@ img {
     -webkit-text-size-adjust: none;
     border-radius: 12px;
     color: #fbf6ee;
+    font-size: 16px;
     font-weight: 500;
+    line-height: 20px;
     display: inline-block;
     overflow: hidden;
     text-decoration: none;

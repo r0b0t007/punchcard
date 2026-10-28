@@ -28,9 +28,7 @@ beforeEach(function (): void {
 it('heads every email with the punchcard wordmark, never Laravel\'s logo', function (): void {
     $html = ($this->html)('en');
 
-    expect($html)->toContain('class="wordmark-dot"')
-        ->toContain('background-color: #f2a541')
-        ->toMatch('/<span class="wordmark-dot"[^>]*><\/span>punchcard\s*<\/a>/')
+    expect($html)->toMatch('/<span class="wordmark-dot" style="[^"]*color: #f2a541;[^"]*">●<\/span>punchcard\s*<\/a>/u')
         ->not->toContain('notification-logo')
         ->not->toContain('Laravel');
 });
@@ -46,8 +44,17 @@ it('draws the design\'s page, card, button and footer, with its fonts', function
         ->toMatch('/class="button button-primary"[^>]*style="[^"]*border-radius: 12px;[^"]*color: #fbf6ee;[^"]*background-color: #3b2a20/')
         // The greeting in the display font, at 22px.
         ->toMatch("/<h1 style=\"[^\"]*font-family: 'Baloo Bhaijaan 2'[^\"]*font-size: 22px/")
-        ->toContain('fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2')
+        ->toContain('fonts.bunny.net/css?family=baloo-bhaijaan-2')
+        ->not->toContain('googleapis')
         ->toContain('© '.date('Y').' punchcard. All rights reserved.');
+});
+
+it('prints the app name once escaped in the header', function (): void {
+    config(['app.name' => "L'Atelier & Co"]);
+
+    expect(($this->html)('en'))->toMatch("/●<\/span>L(&#039;|')Atelier &amp; Co\s*<\/a>/u")
+        ->not->toContain('&amp;amp;')
+        ->not->toContain('&amp;#039;');
 });
 
 it('keeps an Arabic email right to left, the wordmark left to right', function (): void {

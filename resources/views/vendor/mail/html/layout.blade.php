@@ -9,8 +9,9 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-{{-- punchcard's fonts where the mail client loads web fonts; the theme falls back to system fonts (CHW-221). --}}
-<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700;800&family=Readex+Pro:wght@400;500&display=swap" rel="stylesheet">
+{{-- punchcard's fonts where the mail client loads web fonts, from Bunny Fonts as in the app (no visitor logs, unlike
+     Google's); the theme falls back to system fonts (CHW-221). Readex Pro's 700 is there for bold lines. --}}
+<link href="https://fonts.bunny.net/css?family=baloo-bhaijaan-2:700,800|readex-pro:400,500,700&display=swap" rel="stylesheet">
 <style>
 @media only screen and (max-width: 600px) {
 .inner-body {
