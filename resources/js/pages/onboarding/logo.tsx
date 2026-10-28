@@ -42,7 +42,7 @@ export default function OnboardingLogo({ logoUrl }: Props) {
                 {({ processing, errors }) => (
                     <>
                         <div className="flex items-center gap-4">
-                            <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
+                            <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-button border bg-muted">
                                 {preview ? (
                                     <img
                                         src={preview}
@@ -82,10 +82,10 @@ export default function OnboardingLogo({ logoUrl }: Props) {
                         </div>
 
                         <div className="flex gap-3">
-                            <Button variant="secondary" asChild>
+                            <Button variant="secondary" size="lg" asChild>
                                 <Link href={step('location')}>{t('Back')}</Link>
                             </Button>
-                            <Button type="submit" className="flex-1">
+                            <Button type="submit" size="lg" className="flex-1">
                                 {processing && <Spinner />}
                                 {t('Continue')}
                             </Button>

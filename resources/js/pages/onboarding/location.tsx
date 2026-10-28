@@ -92,10 +92,10 @@ export default function OnboardingLocation({ location, timezones }: Props) {
                         </div>
 
                         <div className="flex gap-3">
-                            <Button variant="secondary" asChild>
+                            <Button variant="secondary" size="lg" asChild>
                                 <Link href={step('business')}>{t('Back')}</Link>
                             </Button>
-                            <Button type="submit" className="flex-1">
+                            <Button type="submit" size="lg" className="flex-1">
                                 {processing && <Spinner />}
                                 {t('Continue')}
                             </Button>
