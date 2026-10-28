@@ -44,6 +44,12 @@
     --text-title--line-height: 1.1;
     --text-heading: 1.375rem;
     --text-heading--line-height: 1.2;
+    /* A centred form page's title: sign-in and setup (Punchcard Sign In.dc.html). */
+    --text-form-title: 1.75rem;
+    --text-form-title--line-height: 1.15;
+    /* The smallest label: the setup steps (BO Screen.dc.html, .stl). */
+    --text-2xs: 0.6875rem;
+    --text-2xs--line-height: 1.3;
     /* The design's body text between sm and base (punchcard-ui.css .t15). */
     --text-md: 0.9375rem;
     --text-md--line-height: 1.45;

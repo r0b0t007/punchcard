@@ -11,7 +11,7 @@ const InputOTP = React.forwardRef<
   <OTPInput
     ref={ref}
     containerClassName={cn(
-      "flex items-center gap-2 has-[:disabled]:opacity-50 [direction:ltr]", // codes read left to right in every locale
+      "flex w-full items-center justify-center gap-2 has-[:disabled]:opacity-50 [direction:ltr]", // codes read left to right in every locale
       containerClassName
     )}
     className={cn("disabled:cursor-not-allowed", className)}
@@ -24,7 +24,7 @@ const InputOTPGroup = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div">
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center", className)} {...props} />
+  <div ref={ref} className={cn("flex w-full min-w-0 items-center justify-center gap-2", className)} {...props} />
 ))
 InputOTPGroup.displayName = "InputOTPGroup"
 
@@ -39,8 +39,11 @@ const InputOTPSlot = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "relative flex h-9 w-9 items-center justify-center border-y border-e border-input text-sm shadow-sm transition-all first:rounded-s-md first:border-s last:rounded-e-md",
-        isActive && "z-10 ring-1 ring-ring",
+        // Separate boxes, as in Claude Design (Punchcard Sign In, .otp): 46 x 56 at radius 12, display digits.
+        // Fluid: they share the row up to 46px each, narrower where six don't fit (a 320px phone, the 2FA setup dialog).
+        "relative flex h-14 min-w-0 max-w-11.5 flex-1 basis-0 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
+        // The fields' focus ring (input.tsx).
+        isActive && "z-10 border-ring ring-[3px] ring-ring",
         className
       )}
       {...props}
@@ -48,7 +51,7 @@ const InputOTPSlot = React.forwardRef<
       {char}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
+          <div className="h-7 w-px animate-caret-blink bg-foreground duration-1000" />
         </div>
       )}
     </div>

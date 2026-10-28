@@ -69,11 +69,14 @@ export default function QrStand({
                     <h1 className="font-display text-3xl font-bold text-balance">
                         {businessName}
                     </h1>
-                    <img
-                        src={qrCode}
-                        alt={t('QR code to join the loyalty card')}
-                        className="size-64"
-                    />
+                    {/* A white frame on screen, as on My QR (the design's tile, also on the dark theme); the full 256px on paper. */}
+                    <div className="rounded-card bg-white p-3 print:p-0">
+                        <img
+                            src={qrCode}
+                            alt={t('QR code to join the loyalty card')}
+                            className="size-59 print:size-64"
+                        />
+                    </div>
                     <p className="text-xl font-semibold text-balance">
                         {t('Scan to get your loyalty card')}
                     </p>

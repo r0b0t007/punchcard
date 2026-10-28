@@ -91,6 +91,7 @@ export default function Login({ status, canResetPassword }: Props) {
                             </div>
 
                             <Button
+                                size="lg"
                                 type="submit"
                                 className="mt-4 w-full"
                                 tabIndex={4}

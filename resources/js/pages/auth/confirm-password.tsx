@@ -70,6 +70,7 @@ export default function ConfirmPassword({
                         ) : (
                             <>
                                 <Button
+                                    size="lg"
                                     className="w-full"
                                     disabled={processing}
                                     data-test="confirm-by-email-button"
@@ -105,6 +106,7 @@ export default function ConfirmPassword({
 
                             <div className="flex items-center">
                                 <Button
+                                    size="lg"
                                     className="w-full"
                                     disabled={processing}
                                     data-test="confirm-password-button"
