@@ -5,7 +5,7 @@
 <tr>
 <td class="header">
 <a href="{{ $url }}" dir="ltr" style="display: inline-block;">
-<span class="wordmark-dot">&#9679;</span>{!! trim($slot) !!}
+<span class="wordmark-dot" aria-hidden="true">&#9679;</span>{!! trim($slot) !!}
 </a>
 </td>
 </tr>

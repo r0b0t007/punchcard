@@ -28,7 +28,7 @@ beforeEach(function (): void {
 it('heads every email with the punchcard wordmark, never Laravel\'s logo', function (): void {
     $html = ($this->html)('en');
 
-    expect($html)->toMatch('/<span class="wordmark-dot" style="[^"]*color: #f2a541;[^"]*">●<\/span>punchcard\s*<\/a>/u')
+    expect($html)->toMatch('/<span class="wordmark-dot" aria-hidden="true" style="[^"]*color: #f2a541;[^"]*">●<\/span>punchcard\s*<\/a>/u')
         ->not->toContain('notification-logo')
         ->not->toContain('Laravel');
 });
@@ -44,17 +44,21 @@ it('draws the design\'s page, card, button and footer, with its fonts', function
         ->toMatch('/class="button button-primary"[^>]*style="[^"]*border-radius: 12px;[^"]*color: #fbf6ee;[^"]*background-color: #3b2a20/')
         // The greeting in the display font, at 22px.
         ->toMatch("/<h1 style=\"[^\"]*font-family: 'Baloo Bhaijaan 2'[^\"]*font-size: 22px/")
-        ->toContain('fonts.bunny.net/css?family=baloo-bhaijaan-2')
+        // No web fonts: opening an email requests nothing from a third party.
+        ->not->toContain('fonts.bunny.net')
         ->not->toContain('googleapis')
+        ->toContain('<!--[if mso]>')
         ->toContain('© '.date('Y').' punchcard. All rights reserved.');
 });
 
-it('prints the app name once escaped in the header', function (): void {
-    config(['app.name' => "L'Atelier & Co"]);
+it('prints the app name escaped once in the header: markup never reaches the email', function (): void {
+    // A bare "&" comes out as &amp; either way (the CSS inliner re-serialises the HTML); markup tells.
+    config(['app.name' => 'A <b>B</b> & Co']);
 
-    expect(($this->html)('en'))->toMatch("/●<\/span>L(&#039;|')Atelier &amp; Co\s*<\/a>/u")
-        ->not->toContain('&amp;amp;')
-        ->not->toContain('&amp;#039;');
+    expect(($this->html)('en'))->toMatch('/●<\/span>A &lt;b&gt;B&lt;\/b&gt; &amp; Co\s*<\/a>/u')
+        ->not->toContain('<b>B</b>')
+        ->not->toContain('&amp;lt;')
+        ->not->toContain('&amp;amp;');
 });
 
 it('keeps an Arabic email right to left, the wordmark left to right', function (): void {
