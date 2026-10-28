@@ -56,7 +56,7 @@ final readonly class DescribeDashboard
      * @return array{
      *     kpis: array{activeCustomers: array{value: int, change: ?int}, visits: array{value: int, change: ?int}, returnRate: array{value: int, change: ?int}, rewardsRedeemed: array{value: int, change: ?int}},
      *     visitsPerDay: list<array{date: string, visits: int}>,
-     *     recentStamps: list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>,
+     *     recentStamps: list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}, secondsAgo: int}>,
      *     topCustomers: list<array{id: int, name: string, visits: int, lastVisit: string}>,
      *     locations: list<array{id: int, name: string}>,
      *     location: ?int,

@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils';
 /**
  * The latest stamps here, newest first, with the customer and their card; a
  * correction shows as a minus. The owner's dashboard (B3), and counter mode's
- * live feed (S1, CHW-29), larger to read at arm's length.
+ * live feed (S1, CHW-29), larger to read at arm's length: there without the
+ * card (one card per café today) and the newest marked "Just now" while it
+ * is under a minute old (BA Counter v2, CHW-220; the counter polls).
  */
 export function RecentStamps({
     stamps,
@@ -27,7 +29,7 @@ export function RecentStamps({
 
     return (
         <ul className="flex flex-col divide-y">
-            {stamps.map((stamp) => (
+            {stamps.map((stamp, index) => (
                 <li
                     key={stamp.id}
                     className={cn(
@@ -38,12 +40,12 @@ export function RecentStamps({
                     <div className="min-w-0">
                         <p
                             className={cn(
-                                'truncate font-medium',
-                                large && 'text-lg',
+                                'truncate',
+                                large ? 'text-lg font-semibold' : 'font-medium',
                             )}
                         >
                             {stamp.customer ?? t('A customer')}
-                            {stamp.card ? ` · ${stamp.card}` : null}
+                            {stamp.card && !large ? ` · ${stamp.card}` : null}
                         </p>
                         <p
                             className={cn(
@@ -51,18 +53,22 @@ export function RecentStamps({
                                 large ? 'text-sm' : 'text-xs',
                             )}
                         >
-                            {[
-                                stamp.sourceLabel,
-                                stamp.location,
+                            {[stamp.sourceLabel, stamp.location]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            {' · '}
+                            {large && index === 0 && stamp.secondsAgo < 60 ? (
+                                <span className="font-semibold text-success">
+                                    {t('Just now')}
+                                </span>
+                            ) : (
                                 momentLabel(locale, stamp.at, {
                                     today: (time) =>
                                         t('Today at :time', { time }),
                                     other: (date, time) =>
                                         t(':date at :time', { date, time }),
-                                }),
-                            ]
-                                .filter(Boolean)
-                                .join(' · ')}
+                                })
+                            )}
                         </p>
                     </div>
                     <span
@@ -70,7 +76,7 @@ export function RecentStamps({
                         dir="ltr"
                         className={cn(
                             'shrink-0 font-display font-bold tabular-nums',
-                            large && 'text-2xl',
+                            large && 'text-3xl',
                             stamp.qty < 0 && 'text-destructive',
                         )}
                     >

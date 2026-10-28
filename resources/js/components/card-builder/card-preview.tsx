@@ -47,7 +47,7 @@ export default function CardPreview({
         links.length > 0;
 
     return (
-        <figure className="mx-auto flex w-full max-w-sm flex-col gap-4 rounded-3xl border-8 bg-background p-3 shadow-sm">
+        <figure className="mx-auto flex w-full max-w-sm flex-col gap-4 rounded-sheet border-8 bg-background p-3 shadow-sm">
             <figcaption className="sr-only">
                 {t('Preview of the card')}
             </figcaption>

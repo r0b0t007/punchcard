@@ -251,9 +251,9 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                             <Label id="mode-label">{t('How it rewards')}</Label>
                             <ToggleGroup
                                 type="single"
-                                variant="outline"
+                                variant="segmented"
                                 aria-labelledby="mode-label"
-                                className="self-start"
+                                className="self-start justify-self-start"
                                 disabled={held}
                                 value={data.mode}
                                 onValueChange={(mode) =>
@@ -366,9 +366,9 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                                     </Label>
                                     <ToggleGroup
                                         type="single"
-                                        variant="outline"
+                                        variant="segmented"
                                         aria-labelledby="reward-type-label"
-                                        className="self-start"
+                                        className="self-start justify-self-start"
                                         value={data.reward_type}
                                         onValueChange={(type) =>
                                             type &&
@@ -481,9 +481,9 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                             <Label id="stamp-style-label">{t('Stamp')}</Label>
                             <ToggleGroup
                                 type="single"
-                                variant="outline"
+                                variant="segmented"
                                 aria-labelledby="stamp-style-label"
-                                className="flex-wrap self-start"
+                                className="flex-wrap self-start justify-self-start"
                                 value={data.stamp_style}
                                 onValueChange={(style) =>
                                     style &&

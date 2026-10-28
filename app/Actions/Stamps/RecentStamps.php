@@ -18,6 +18,8 @@ use Carbon\CarbonImmutable;
  * (CardEnrollment's scope) shows without a name; the counter shows first
  * names only (S1: "first name and card"). Staff limited to one location see
  * that location's, whatever the caller asks (TenantContext::locationId()).
+ * Each also says how many seconds ago it landed, so the counter can mark the
+ * newest "Just now" (CHW-220): the local moment stops at the minute.
  */
 final readonly class RecentStamps
 {
@@ -27,7 +29,7 @@ final readonly class RecentStamps
     public const int LISTED = 10;
 
     /**
-     * @return list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}}>
+     * @return list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}, secondsAgo: int}>
      */
     public function handle(Business $business, ?int $locationId, CarbonImmutable $now, bool $firstNames = false): array
     {
@@ -53,6 +55,7 @@ final readonly class RecentStamps
                     'sourceLabel' => $event->source->getLabel(),
                     'qty' => $event->qty,
                     'at' => LocalMoment::of($event->created_at, LocalMoment::timezoneOf($event->location), $now),
+                    'secondsAgo' => max(0, $now->getTimestamp() - $event->created_at->getTimestamp()),
                 ];
             })
             ->all());

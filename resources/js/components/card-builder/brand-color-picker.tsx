@@ -42,7 +42,8 @@ export default function BrandColorPicker({
 
     return (
         <div className="flex flex-col gap-3">
-            <div className="grid max-w-sm grid-cols-9 gap-1.5">
+            {/* 30px swatches (BA Screen.dc.html, .sw), however wide the form. */}
+            <div className="flex max-w-sm flex-wrap gap-2.5">
                 {options.map((option) => (
                     <button
                         key={option.label}
@@ -57,7 +58,7 @@ export default function BrandColorPicker({
                         // Runtime colours enter the UI only as CSS variables (design-tokens skill).
                         style={{ '--card-brand': option.hex } as CSSProperties}
                         className={cn(
-                            'aspect-square w-full rounded-full border bg-card-brand ring-offset-2 ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            'size-7.5 shrink-0 rounded-full border bg-card-brand ring-offset-2 ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             selected === option.value &&
                                 'ring-2 ring-foreground',
                         )}

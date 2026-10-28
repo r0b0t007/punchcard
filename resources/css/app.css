@@ -32,6 +32,8 @@
     --radius-nav: 8px;
     /* A bottom sheet's top corners: the install sheet (CH InstallSheet.dc.html, .sheet). */
     --radius-sheet: 28px;
+    /* Counter mode's stamper panels (BA Counter v2.dc.html, .pan). */
+    --radius-panel: 22px;
 
     /* Cards, boxes, fields and separators draw 1.5px lines, as in Claude Design (CHW-216). */
     --default-border-width: 1.5px;
@@ -45,6 +47,9 @@
     /* The design's body text between sm and base (punchcard-ui.css .t15). */
     --text-md: 0.9375rem;
     --text-md--line-height: 1.45;
+    /* An armed stamper's quantity, read across the counter (BA Counter v2.dc.html, .bigq). */
+    --text-giant: 5.5rem;
+    --text-giant--line-height: 0.9;
 
     /* A stamp landing on the card (C2): pressed down askew, then settled, with an ink ring
        spreading out. Components pair them with motion-reduce:animate-none. */

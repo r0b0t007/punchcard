@@ -26,7 +26,9 @@ export default function OwnerDashboard({ stats }: { stats: DashboardStats }) {
     return (
         <section className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">{t('Last 30 days')}</h2>
+                <h2 className="font-display text-xl font-bold">
+                    {t('Last 30 days')}
+                </h2>
                 {stats.locations.length > 1 ? (
                     <Select
                         value={
