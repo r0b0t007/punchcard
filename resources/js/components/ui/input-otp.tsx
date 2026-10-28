@@ -24,7 +24,7 @@ const InputOTPGroup = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div">
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center", className)} {...props} />
+  <div ref={ref} className={cn("flex items-center gap-2", className)} {...props} />
 ))
 InputOTPGroup.displayName = "InputOTPGroup"
 
@@ -39,8 +39,9 @@ const InputOTPSlot = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "relative flex h-9 w-9 items-center justify-center border-y border-e border-input text-sm shadow-sm transition-all first:rounded-s-md first:border-s last:rounded-e-md",
-        isActive && "z-10 ring-1 ring-ring",
+        // Separate boxes, as in Claude Design (Punchcard Sign In, .otp): 46 x 56 at radius 12, display digits.
+        "relative flex h-14 w-11.5 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
+        isActive && "z-10 border-ring ring-[3px] ring-ring/50",
         className
       )}
       {...props}

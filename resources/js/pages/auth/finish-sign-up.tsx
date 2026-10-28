@@ -49,6 +49,7 @@ export default function FinishSignUp({ email }: { email: string }) {
                         <ConsentFields error={errors.adult} />
 
                         <Button
+                            size="lg"
                             type="submit"
                             className="w-full"
                             disabled={processing}

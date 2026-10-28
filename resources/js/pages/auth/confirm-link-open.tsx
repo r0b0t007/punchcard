@@ -32,7 +32,7 @@ export default function ConfirmLinkOpen({
                               )
                             : t('This link has expired or was used already.')}
                     </p>
-                    <Button asChild className="w-full">
+                    <Button size="lg" asChild className="w-full">
                         <Link href={confirm()}>{t('Get a new link')}</Link>
                     </Button>
                 </div>
@@ -40,6 +40,7 @@ export default function ConfirmLinkOpen({
                 <Form action={action} method="post">
                     {({ processing }) => (
                         <Button
+                            size="lg"
                             type="submit"
                             className="w-full"
                             disabled={processing}

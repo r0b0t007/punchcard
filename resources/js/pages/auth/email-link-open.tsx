@@ -32,7 +32,7 @@ export default function EmailLinkOpen({
                     <p className="text-sm text-muted-foreground">
                         {t('This link has expired or was used already.')}
                     </p>
-                    <Button asChild className="w-full">
+                    <Button size="lg" asChild className="w-full">
                         <Link href={create()}>{t('Get a new link')}</Link>
                     </Button>
                 </div>
@@ -52,6 +52,7 @@ export default function EmailLinkOpen({
                                 </p>
                             ) : null}
                             <Button
+                                size="lg"
                                 type="submit"
                                 className="w-full"
                                 disabled={processing}
