@@ -24,7 +24,7 @@ const InputOTPGroup = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div">
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center gap-2", className)} {...props} />
+  <div ref={ref} className={cn("flex min-w-0 items-center gap-2", className)} {...props} />
 ))
 InputOTPGroup.displayName = "InputOTPGroup"
 
@@ -40,8 +40,10 @@ const InputOTPSlot = React.forwardRef<
       ref={ref}
       className={cn(
         // Separate boxes, as in Claude Design (Punchcard Sign In, .otp): 46 x 56 at radius 12, display digits.
-        "relative flex h-14 w-11.5 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
-        isActive && "z-10 border-ring ring-[3px] ring-ring/50",
+        // They narrow (min-w-0) where six of them don't fit: a 360px phone, the 2FA setup dialog.
+        "relative flex h-14 w-11.5 min-w-0 items-center justify-center rounded-md border border-input bg-card font-display text-[1.625rem] font-bold transition-all",
+        // The fields' focus ring (input.tsx).
+        isActive && "z-10 border-ring ring-[3px] ring-ring",
         className
       )}
       {...props}
@@ -49,7 +51,7 @@ const InputOTPSlot = React.forwardRef<
       {char}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
+          <div className="h-7 w-px animate-caret-blink bg-foreground duration-1000" />
         </div>
       )}
     </div>
