@@ -286,6 +286,28 @@ it('gives one stamp for an arming whose armer no longer works there', function (
     expect(($this->tap)($this->stamper, 1))->toBe(1);
 })->with(['account deleted', 'limited to another location']);
 
+it('gives one stamp for an arming that committed after its armer\'s account was deleted', function (bool $hasHistory): void {
+    $counter = 1;
+    if ($hasHistory) {
+        // Stamps they gave keep the account, anonymised, for the ledger.
+        ($this->arm)($this->staff, $this->stamper, 2);
+        expect(($this->tap)($this->stamper, $counter++))->toBe(2);
+    }
+
+    app(DeleteAccount::class)->handle($this->staff);
+    expect($hasHistory ? $this->staff->fresh()?->isAnonymised() : $this->staff->fresh() === null)->toBeTrue();
+
+    // CHW-265: an arming that read their membership before the deletion committed, and committed after it, so the
+    // deletion's disarm missed it. The row is left as that race leaves it (Postgres's foreign key refuses it outright
+    // when the account was deleted, not kept).
+    $this->context->bypass(fn (): bool => Stamper::query()->whereKey($this->stamper->id)->firstOrFail()
+        ->forceFill(['armed_qty' => 5, 'armed_until' => now()->addSeconds(ArmStamper::SECONDS), 'armed_by' => $this->staff->id])->save());
+
+    expect(($this->tap)($this->stamper, $counter))->toBe(1);
+    $stamp = $this->context->bypass(fn (): StampEvent => StampEvent::query()->where('stamper_id', $this->stamper->id)->latest('id')->firstOrFail());
+    expect($stamp->staff_id)->toBeNull();
+})->with(['anonymised, kept for the ledger' => true, 'deleted' => false]);
+
 it('names nobody on a tap whose armer\'s account went before it was claimed', function (): void {
     ($this->arm)($this->staff, $this->stamper, 5);
     $tag = $this->context->bypass(fn (): NfcTag => NfcTag::query()->findOrFail($this->stamper->nfc_tag_id));
