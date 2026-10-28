@@ -6,7 +6,7 @@ import {
     it,
     vi,
 } from 'vite-plus/test';
-import { readSecond, subscribeToSeconds } from '@/lib/seconds';
+import { nextDeadline, readSecond, subscribeToSeconds } from '@/lib/seconds';
 
 describe('subscribeToSeconds', () => {
     beforeEach(() => {
@@ -71,5 +71,19 @@ describe('subscribeToSeconds', () => {
 
         vi.setSystemTime(new Date('2026-10-26T10:10:00.700Z'));
         expect(readSecond()).toBe(Date.parse('2026-10-26T10:10:00.000Z'));
+    });
+});
+
+describe('nextDeadline', () => {
+    it('keeps the earlier deadline within one arming, however late a poll answers', () => {
+        expect(nextDeadline(10_000, 11_000, false)).toBe(10_000);
+        // A slow poll lands its deadline well after the current one: still the same arming.
+        expect(nextDeadline(10_000, 13_500, false)).toBe(10_000);
+        expect(nextDeadline(10_000, 9_000, false)).toBe(9_000);
+    });
+
+    it('takes the new deadline when the server count went up: a new arming', () => {
+        expect(nextDeadline(10_000, 60_000, true)).toBe(60_000);
+        expect(nextDeadline(10_000, 9_000, true)).toBe(9_000);
     });
 });

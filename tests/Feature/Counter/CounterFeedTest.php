@@ -62,6 +62,16 @@ it('shows staff the last ten stamps here, newest first, by first name and card',
         ->where('feed.9.customer', 'Customer2'));
 });
 
+it('says how many seconds ago each stamp landed, for "Just now" (CHW-220)', function (): void {
+    ($this->stampFor)('Earlier Guest', $this->tenants->a1, ['created_at' => now()->subMinutes(5)]);
+    ($this->stampFor)('Fresh Guest', $this->tenants->a1, ['created_at' => now()->subSeconds(12)]);
+
+    ($this->feed)($this->staff)->assertInertia(fn (Assert $page): Assert => $page
+        ->where('feed.0.customer', 'Fresh')
+        ->where('feed.0.secondsAgo', 12)
+        ->where('feed.1.secondsAgo', 300));
+});
+
 it('shows staff limited to one location only that location\'s stamps', function (): void {
     $terrace = $this->context->bypass(fn (): Location => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace']));
     $this->context->bypass(fn () => BusinessMember::query()->where('user_id', $this->staff->id)->update(['location_id' => $terrace->id]));

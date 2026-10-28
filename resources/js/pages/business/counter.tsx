@@ -1,13 +1,13 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { ScanLine } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { RecentStamps } from '@/components/dashboard/stamp-lists';
 import type { DashboardStats } from '@/components/dashboard/types';
 import InputError from '@/components/input-error';
-import CountdownRing from '@/components/rewards/countdown-ring';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { useSecond } from '@/lib/seconds';
+import { useSecond, useSecondsLeft } from '@/lib/seconds';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { arm, disarm, scan } from '@/routes/counter';
@@ -28,7 +28,8 @@ type CounterStamper = {
 /**
  * S1, counter mode (CHW-29): built for a morning rush, at arm's length on a
  * phone or a tablet. Each stamper the user may arm, its last tap, and "Next
- * tap gives" +1 +2 +3 +5 for armSeconds, with a countdown and "Cancel";
+ * tap gives" +1 +2 +3 +5 for armSeconds; armed, its panel turns saffron with
+ * the quantity, the seconds left and "Cancel" (`BA Counter v2`, CHW-220);
  * then the last stamps given here, as they land. Stampers and feed refresh
  * every POLL_MS: an arming a tap took, or one made on another phone, and each
  * new stamp show within seconds.
@@ -108,7 +109,7 @@ export default function Counter({
                 >
                     <h2
                         id="counter-feed"
-                        className="mb-3 text-lg font-semibold"
+                        className="mb-3 font-display text-heading font-bold"
                     >
                         {t('Last stamps')}
                     </h2>
@@ -146,38 +147,58 @@ function StamperPanel({
     armSeconds: number;
     quantities: number[];
 }) {
-    const { t, tn } = useTranslation();
-    // Stable, so the ring's timer is not reset by each render (as on the redeem screen).
+    const { t } = useTranslation();
+    // Stable, so the countdown's effect is not re-run by each render.
     const reloadStampers = useCallback(
         () => router.reload({ only: ['stampers'] }),
         [],
     );
     const armed =
-        stamper.armedQty !== null && stamper.armedSecondsLeft !== null;
+        stamper.enabled &&
+        stamper.armedQty !== null &&
+        stamper.armedSecondsLeft !== null;
 
     return (
         <section
             aria-labelledby={`stamper-${stamper.id}`}
-            className="flex flex-col gap-5 rounded-2xl border bg-card p-5 text-card-foreground"
+            // Armed is saffron (BA Counter v2, review 1g): the whole panel, seen across the counter.
+            className={cn(
+                // min-w-0: a grid item that shrinks to the phone, its name truncated beside Cancel.
+                'flex min-w-0 flex-col gap-3.5 rounded-panel border p-5.5',
+                armed
+                    ? 'border-stamp bg-stamp text-stamp-foreground'
+                    : 'bg-card text-card-foreground',
+            )}
             data-test="counter-stamper"
         >
-            <div className="flex items-start gap-3">
-                <span
-                    aria-hidden="true"
-                    className={cn(
-                        'mt-2 size-3 shrink-0 rounded-full',
-                        stamper.enabled ? 'bg-success' : 'bg-muted-foreground',
-                    )}
-                />
-                <div className="min-w-0">
-                    <h2
-                        id={`stamper-${stamper.id}`}
-                        className="truncate text-xl font-semibold"
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex items-center gap-2.5">
+                        {armed ? null : (
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    'size-2.5 shrink-0 rounded-full',
+                                    stamper.enabled
+                                        ? 'bg-success'
+                                        : 'bg-muted-foreground',
+                                )}
+                            />
+                        )}
+                        <h2
+                            id={`stamper-${stamper.id}`}
+                            className="truncate font-display text-xl font-bold"
+                        >
+                            {stamper.label ?? t('Stamper')}
+                            {stamper.location ? ` · ${stamper.location}` : null}
+                        </h2>
+                    </div>
+                    <p
+                        className={cn(
+                            'text-sm',
+                            armed ? 'opacity-80' : 'text-muted-foreground',
+                        )}
                     >
-                        {stamper.label ?? t('Stamper')}
-                        {stamper.location ? ` · ${stamper.location}` : null}
-                    </h2>
-                    <p className="text-muted-foreground">
                         {stamper.enabled ? (
                             <LastTap at={stamper.lastTapAt} />
                         ) : (
@@ -185,39 +206,31 @@ function StamperPanel({
                         )}
                     </p>
                 </div>
+                {armed ? (
+                    <Link
+                        href={disarm(stamper.id)}
+                        as="button"
+                        preserveScroll
+                        className="flex h-13 shrink-0 items-center justify-center rounded-button border border-stamp-foreground/35 px-5.5 text-lg font-semibold focus-visible:ring-3 focus-visible:ring-stamp-foreground focus-visible:outline-none"
+                        data-test="counter-disarm"
+                    >
+                        {t('Cancel')}
+                    </Link>
+                ) : null}
             </div>
 
-            {stamper.enabled && armed ? (
-                <div className="flex items-center gap-5">
-                    <CountdownRing
-                        compact
-                        seconds={stamper.armedSecondsLeft ?? 0}
-                        total={armSeconds}
-                        onDone={reloadStampers}
-                    />
-                    <div className="flex flex-1 flex-col gap-3">
-                        <p className="text-2xl font-bold">
-                            {/* "+5" reads left to right, also in an Arabic sentence. */}
-                            {tn('Next tap gives :count', {
-                                count: <bdi dir="ltr">+{stamper.armedQty}</bdi>,
-                            })}
-                        </p>
-                        <Button asChild variant="outline" size="counter">
-                            <Link
-                                href={disarm(stamper.id)}
-                                as="button"
-                                preserveScroll
-                                data-test="counter-disarm"
-                            >
-                                {t('Cancel')}
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
+            {armed ? (
+                <ArmedCountdown
+                    qty={stamper.armedQty ?? 0}
+                    secondsLeft={stamper.armedSecondsLeft ?? 0}
+                    total={armSeconds}
+                    polled={stamper}
+                    onDone={reloadStampers}
+                />
             ) : stamper.enabled ? (
                 <div className="flex flex-col gap-3">
-                    <p className="font-medium">{t('Next tap gives')}</p>
-                    <div className="grid grid-cols-4 gap-3">
+                    <p className="text-md font-medium">{t('Next tap gives')}</p>
+                    <div className="grid grid-cols-4 gap-2.5">
                         {quantities.map((qty) => (
                             <Link
                                 key={qty}
@@ -225,9 +238,10 @@ function StamperPanel({
                                 data={{ qty }}
                                 as="button"
                                 preserveScroll
-                                // cn() merges the base text-sm away, so the counter size's text-2xl shows.
+                                // cn() merges the base text-sm away; the quantities read at 30px (BA Counter v2, .qb).
                                 className={cn(
                                     buttonVariants({ size: 'counter' }),
+                                    'text-3xl',
                                 )}
                                 aria-label={t('Next tap gives :count', {
                                     count: `+${qty}`,
@@ -241,6 +255,85 @@ function StamperPanel({
                 </div>
             ) : null}
         </section>
+    );
+}
+
+/**
+ * An armed stamper: the quantity big enough to read across the counter
+ * ("+2" always left to right), the seconds left and a bar emptying over the
+ * arming time; then the stampers again, the arming gone.
+ */
+function ArmedCountdown({
+    qty,
+    secondsLeft,
+    total,
+    polled,
+    onDone,
+}: {
+    qty: number;
+    secondsLeft: number;
+    total: number;
+    /** The stamper as the last poll brought it: each poll may carry a new arming. */
+    polled: CounterStamper;
+    onDone: () => void;
+}) {
+    const { t } = useTranslation();
+    const left = useSecondsLeft(secondsLeft, polled);
+    // Runtime values enter the UI only as CSS variables (design-tokens skill).
+    const bar = {
+        '--left': `${(left / Math.max(total, 1)) * 100}%`,
+    } as CSSProperties;
+
+    // At 0 the server stops the arming up to a second later: ask then, and again with each poll still armed.
+    useEffect(() => {
+        if (left !== 0) {
+            return;
+        }
+
+        const timer = window.setTimeout(onDone, 1000);
+
+        return () => window.clearTimeout(timer);
+    }, [left, polled, onDone]);
+
+    return (
+        <>
+            {/* Read as one sentence; the big "+3" and its label are for the eyes. */}
+            <p className="sr-only">
+                {t('Next tap gives :count', { count: `+${qty}` })}
+            </p>
+            <div className="flex items-end gap-4.5">
+                <bdi
+                    dir="ltr"
+                    aria-hidden="true"
+                    className="font-display text-giant font-extrabold tabular-nums"
+                >
+                    +{qty}
+                </bdi>
+                <div className="flex flex-col gap-0.5 pb-1.5">
+                    <p aria-hidden="true" className="text-lg font-bold">
+                        {t('Next tap gives')}
+                    </p>
+                    <p
+                        role="timer"
+                        aria-live="off"
+                        className="text-md tabular-nums"
+                    >
+                        {t(':count second left|:count seconds left', {
+                            count: left,
+                        })}
+                    </p>
+                </div>
+            </div>
+            <div
+                aria-hidden="true"
+                className="h-2 overflow-hidden rounded-full bg-stamp-foreground/15"
+            >
+                <div
+                    style={bar}
+                    className="h-full w-(--left) rounded-full bg-stamp-foreground transition-all duration-1000 ease-linear motion-reduce:transition-none"
+                />
+            </div>
+        </>
     );
 }
 

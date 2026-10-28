@@ -25,6 +25,8 @@ export type DashboardStats = {
         sourceLabel: string;
         qty: number;
         at: LocalMoment;
+        /** Seconds since it landed: the counter's "Just now" (CHW-220). */
+        secondsAgo: number;
     }[];
     topCustomers: {
         id: number;

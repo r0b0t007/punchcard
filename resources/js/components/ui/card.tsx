@@ -29,7 +29,8 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      // Card titles in the display font (Punchcard Business App, CHW-220).
+      className={cn("font-display text-lg leading-tight font-bold", className)}
       {...props}
     />
   )

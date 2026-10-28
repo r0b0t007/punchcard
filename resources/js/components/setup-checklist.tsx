@@ -35,8 +35,8 @@ export default function SetupChecklist({
     }
 
     return (
-        <section className="rounded-xl border p-6">
-            <h2 className="text-lg font-semibold">
+        <section className="rounded-2xl border bg-card p-6">
+            <h2 className="font-display text-lg font-bold">
                 {t('Before your first customers')}
             </h2>
             <ul className="mt-4 flex flex-col gap-4">
