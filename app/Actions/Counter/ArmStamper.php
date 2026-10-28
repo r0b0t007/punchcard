@@ -21,6 +21,11 @@ use Illuminate\Support\Facades\Gate;
  * it goes with it, to the tap and the stamp it gives (stamp_events.staff_id):
  * an armed tap gives stamps on their word. Whether it was armed. The caller
  * has checked StamperPolicy::arm.
+ *
+ * Their account is held first, key share, as DeleteAccount locks it before
+ * it disarms their stampers (CHW-265): a deletion under way finishes first
+ * and the account reads as gone here, or waits for this arming and then
+ * disarms it. An arming never outlives its armer's account.
  */
 final readonly class ArmStamper
 {
@@ -33,6 +38,12 @@ final readonly class ArmStamper
     public function handle(Stamper $stamper, int $qty, User $armedBy): bool
     {
         return DB::transaction(function () use ($stamper, $qty, $armedBy): bool {
+            $armer = User::query()->whereKey($armedBy->id)->lock('for key share')->first(['id', 'anonymised_at']);
+
+            if (! $armer instanceof User || $armer->isAnonymised()) {
+                return false;
+            }
+
             $locked = Stamper::query()->current()->whereKey($stamper->id)->lockForUpdate()->first();
 
             // Checked again on the locked row: a stamper moved meanwhile may be beyond a staff member's location.

@@ -147,9 +147,8 @@ final readonly class ReceiveTap
         }
 
         // An arming counts while whoever armed it still works at this stamper's site (CHW-29): taken off the staff,
-        // limited to another location, or their account deleted, it gives one stamp like any tap. That includes an arming
-        // that committed after the deletion, which DeleteAccount's disarm can't see: the deletion took their business
-        // memberships with it, and owners and org admins of an open site hand over before they can delete (CHW-265).
+        // limited to another location, or their account deleted, it gives one stamp like any tap. An arming never
+        // outlives its armer's account (ArmStamper locks it first, CHW-265); this covers the rest.
         $armed = $stamper->isArmed()
             && ($stamper->armed_by === null || $this->worksAt->handle($stamper->armed_by, $stamper->business_id, $stamper->location_id));
         $qty = $armed ? $stamper->armed_qty : 1;

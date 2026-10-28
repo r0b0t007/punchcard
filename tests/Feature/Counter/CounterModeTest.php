@@ -286,27 +286,48 @@ it('gives one stamp for an arming whose armer no longer works there', function (
     expect(($this->tap)($this->stamper, 1))->toBe(1);
 })->with(['account deleted', 'limited to another location']);
 
-it('gives one stamp for an arming that committed after its armer\'s account was deleted', function (bool $hasHistory): void {
-    $counter = 1;
-    if ($hasHistory) {
-        // Stamps they gave keep the account, anonymised, for the ledger.
-        ($this->arm)($this->staff, $this->stamper, 2);
-        expect(($this->tap)($this->stamper, $counter++))->toBe(2);
-    }
+it('refuses an arming by an account deleted meanwhile, whatever role it still holds', function (string $role): void {
+    // CHW-265: the request read their membership before the deletion committed; the arming waits on the account,
+    // then finds it anonymised. An org admin can still hold their role then (an archived organization, CHW-308).
+    $orgAdmin = $role === 'org admin';
+    $armer = $orgAdmin ? $this->tenants->admin(User::factory()->create(), $this->tenants->orgA) : $this->staff;
+    // The tenant as their request resolved it, before the deletion: the arm check passes on it.
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: $orgAdmin, businessRole: $orgAdmin ? null : BusinessRole::Staff);
+    $this->context->bypass(fn (): bool => $armer->forceFill(['anonymised_at' => now()])->save());
 
+    expect(app(ArmStamper::class)->handle($this->stamper, 5, $armer))->toBeFalse()
+        ->and(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
+    // The same arming by a live account goes through.
+    $this->context->bypass(fn (): bool => $armer->forceFill(['anonymised_at' => null])->save());
+    expect(app(ArmStamper::class)->handle($this->stamper, 5, $armer))->toBeTrue();
+})->with(['staff', 'org admin']);
+
+it('refuses an arming by an account deleted outright meanwhile', function (): void {
+    // No history, so the deletion took the row: the request still holds the user it signed in as.
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
     app(DeleteAccount::class)->handle($this->staff);
-    expect($hasHistory ? $this->staff->fresh()?->isAnonymised() : $this->staff->fresh() === null)->toBeTrue();
+    expect($this->staff->fresh())->toBeNull();
 
-    // CHW-265: an arming that read their membership before the deletion committed, and committed after it, so the
-    // deletion's disarm missed it. The row is left as that race leaves it (Postgres's foreign key refuses it outright
-    // when the account was deleted, not kept).
-    $this->context->bypass(fn (): bool => Stamper::query()->whereKey($this->stamper->id)->firstOrFail()
+    expect(app(ArmStamper::class)->handle($this->stamper, 5, $this->staff))->toBeFalse()
+        ->and(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
+});
+
+it('gives one stamp for an arming left on the stamper after its armer\'s account was deleted', function (): void {
+    // Stamps they gave keep the account, anonymised, for the ledger.
+    ($this->arm)($this->staff, $this->stamper, 2);
+    expect(($this->tap)($this->stamper, 1))->toBe(2);
+    app(DeleteAccount::class)->handle($this->staff);
+    expect($this->staff->fresh()?->isAnonymised())->toBeTrue();
+
+    // Should an arming still get past ArmStamper's lock, the tap gives one stamp naming nobody: the deletion took
+    // their business memberships with it.
+    $this->context->bypass(fn (): bool => ($this->fresh)($this->stamper)
         ->forceFill(['armed_qty' => 5, 'armed_until' => now()->addSeconds(ArmStamper::SECONDS), 'armed_by' => $this->staff->id])->save());
 
-    expect(($this->tap)($this->stamper, $counter))->toBe(1);
+    expect(($this->tap)($this->stamper, 2))->toBe(1);
     $stamp = $this->context->bypass(fn (): StampEvent => StampEvent::query()->where('stamper_id', $this->stamper->id)->latest('id')->firstOrFail());
     expect($stamp->staff_id)->toBeNull();
-})->with(['anonymised, kept for the ledger' => true, 'deleted' => false]);
+});
 
 it('names nobody on a tap whose armer\'s account went before it was claimed', function (): void {
     ($this->arm)($this->staff, $this->stamper, 5);
