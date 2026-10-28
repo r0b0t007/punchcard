@@ -1,13 +1,13 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { ScanLine } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { RecentStamps } from '@/components/dashboard/stamp-lists';
 import type { DashboardStats } from '@/components/dashboard/types';
 import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
-import { useSecond } from '@/lib/seconds';
+import { useSecond, useSecondsLeft } from '@/lib/seconds';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { arm, disarm, scan } from '@/routes/counter';
@@ -224,6 +224,7 @@ function StamperPanel({
                     qty={stamper.armedQty ?? 0}
                     secondsLeft={stamper.armedSecondsLeft ?? 0}
                     total={armSeconds}
+                    polled={stamper}
                     onDone={reloadStampers}
                 />
             ) : stamper.enabled ? (
@@ -237,9 +238,10 @@ function StamperPanel({
                                 data={{ qty }}
                                 as="button"
                                 preserveScroll
-                                // cn() merges the base text-sm away, so the counter size's text-3xl shows.
+                                // cn() merges the base text-sm away; the quantities read at 30px (BA Counter v2, .qb).
                                 className={cn(
                                     buttonVariants({ size: 'counter' }),
+                                    'text-3xl',
                                 )}
                                 aria-label={t('Next tap gives :count', {
                                     count: `+${qty}`,
@@ -265,15 +267,18 @@ function ArmedCountdown({
     qty,
     secondsLeft,
     total,
+    polled,
     onDone,
 }: {
     qty: number;
     secondsLeft: number;
     total: number;
+    /** The stamper as the last poll brought it: each poll may carry a new arming. */
+    polled: CounterStamper;
     onDone: () => void;
 }) {
     const { t } = useTranslation();
-    const left = useSecondsLeft(secondsLeft);
+    const left = useSecondsLeft(secondsLeft, polled);
     // Runtime values enter the UI only as CSS variables (design-tokens skill).
     const bar = {
         '--left': `${(left / Math.max(total, 1)) * 100}%`,
@@ -313,38 +318,6 @@ function ArmedCountdown({
                 />
             </div>
         </>
-    );
-}
-
-/**
- * The arming's seconds left, counted down on the page's one ticker
- * (lib/seconds) to a deadline taken from the server's count, again at each
- * poll that brings a new one. The deadline starts on the ticker's whole
- * second, so 0 comes at most a second early, never after the stamper has
- * stopped taking the armed quantity. What the server sent while the page is
- * rendered there.
- */
-function useSecondsLeft(secondsLeft: number): number {
-    const start = () =>
-        Math.floor(Date.now() / 1000) * 1000 + secondsLeft * 1000;
-    const [deadline, setDeadline] = useState(start);
-    const [from, setFrom] = useState(secondsLeft);
-    const now = useSecond();
-
-    // A poll brought a new count: count down from it (React's "adjust state on a prop change").
-    if (from !== secondsLeft) {
-        setFrom(secondsLeft);
-        setDeadline(start());
-    }
-
-    if (now === null) {
-        return secondsLeft;
-    }
-
-    // Capped: just past a second boundary, the ticker may still hold the second before.
-    return Math.min(
-        secondsLeft,
-        Math.max(0, Math.ceil((deadline - now) / 1000)),
     );
 }
 

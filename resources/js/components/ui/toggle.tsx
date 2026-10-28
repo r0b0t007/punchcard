@@ -14,7 +14,7 @@ const toggleVariants = cva(
           "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
         // A segment of a muted track, the chosen one raised (as language-switcher.tsx): the card builder (CHW-220).
         segmented:
-          "bg-transparent px-3.5 text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs",
+          "bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-xs",
       },
       size: {
         default: "h-9 px-2 min-w-9",

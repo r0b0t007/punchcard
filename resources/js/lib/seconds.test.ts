@@ -6,7 +6,7 @@ import {
     it,
     vi,
 } from 'vite-plus/test';
-import { readSecond, subscribeToSeconds } from '@/lib/seconds';
+import { nextDeadline, readSecond, subscribeToSeconds } from '@/lib/seconds';
 
 describe('subscribeToSeconds', () => {
     beforeEach(() => {
@@ -71,5 +71,17 @@ describe('subscribeToSeconds', () => {
 
         vi.setSystemTime(new Date('2026-10-26T10:10:00.700Z'));
         expect(readSecond()).toBe(Date.parse('2026-10-26T10:10:00.000Z'));
+    });
+});
+
+describe('nextDeadline', () => {
+    it('keeps the earlier deadline, so a poll never adds a second back', () => {
+        expect(nextDeadline(10_000, 11_000)).toBe(10_000);
+        expect(nextDeadline(10_000, 9_000)).toBe(9_000);
+    });
+
+    it('takes a deadline more than a tick later: a new arming', () => {
+        expect(nextDeadline(10_000, 12_001)).toBe(12_001);
+        expect(nextDeadline(10_000, 12_000)).toBe(10_000);
     });
 });

@@ -34,7 +34,7 @@ const buttonVariants = cva(
         lg: "h-14 px-7 text-lg has-[>svg]:px-5",
         icon: "size-11 rounded-md",
         // Counter mode (CHW-29, S1): 72 px targets, read at arm's length in a morning rush.
-        counter: "min-h-18 rounded-2xl px-6 font-display text-3xl font-bold tabular-nums",
+        counter: "min-h-18 rounded-2xl px-6 font-display text-2xl font-bold tabular-nums",
       },
     },
     defaultVariants: {
