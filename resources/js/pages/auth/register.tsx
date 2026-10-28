@@ -102,6 +102,7 @@ export default function Register({ passwordRules }: Props) {
                             <ConsentFields error={errors.adult} tabIndex={5} />
 
                             <Button
+                                size="lg"
                                 type="submit"
                                 className="mt-2 w-full"
                                 tabIndex={7}

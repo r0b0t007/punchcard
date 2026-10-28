@@ -34,7 +34,7 @@ export default function EmailLink({
                         aria-hidden="true"
                         className="size-10 text-success"
                     />
-                    <h2 className="text-lg font-semibold">
+                    <h2 className="font-display text-xl font-bold">
                         {t('Check your inbox')}
                     </h2>
                     <p className="text-sm text-muted-foreground">
@@ -79,6 +79,7 @@ export default function EmailLink({
                         </div>
 
                         <Button
+                            size="lg"
                             type="submit"
                             className="w-full"
                             disabled={processing}

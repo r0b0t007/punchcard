@@ -52,7 +52,7 @@ export default function StaffInvitation({
                             "This invitation can't be used any more: ask for a new one.",
                         )}
                     </p>
-                    <Button asChild className="w-full">
+                    <Button size="lg" asChild className="w-full">
                         <Link href={home()}>{t('Go to punchcard')}</Link>
                     </Button>
                 </div>
@@ -86,7 +86,12 @@ export default function StaffInvitation({
                                 { email: address },
                             )}
                         </p>
-                        <Button asChild variant="outline" className="w-full">
+                        <Button
+                            size="lg"
+                            asChild
+                            variant="outline"
+                            className="w-full"
+                        >
                             <Link href={logout()} as="button">
                                 {t('Log out')}
                             </Link>
@@ -104,6 +109,7 @@ export default function StaffInvitation({
                         <Form action={action} method="post">
                             {({ processing }) => (
                                 <Button
+                                    size="lg"
                                     type="submit"
                                     className="w-full"
                                     disabled={processing}
@@ -199,6 +205,7 @@ export default function StaffInvitation({
                                 ) : null}
 
                                 <Button
+                                    size="lg"
                                     type="submit"
                                     className="w-full"
                                     disabled={processing}

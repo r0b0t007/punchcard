@@ -37,7 +37,7 @@ export default function EmailChangeOpen({
             {message !== null || action === null ? (
                 <div className="flex flex-col gap-4 text-center">
                     <p className="text-sm text-muted-foreground">{message}</p>
-                    <Button asChild className="w-full">
+                    <Button size="lg" asChild className="w-full">
                         <Link href={start()}>{t('Go to punchcard')}</Link>
                     </Button>
                 </div>
@@ -45,6 +45,7 @@ export default function EmailChangeOpen({
                 <Form action={action} method="post">
                     {({ processing }) => (
                         <Button
+                            size="lg"
                             type="submit"
                             className="w-full"
                             disabled={processing}

@@ -21,8 +21,10 @@ export default function AuthSimpleLayout({
                         </Link>
 
                         <div className="space-y-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
+                            <h1 className="font-display text-form-title font-bold text-balance">
+                                {title}
+                            </h1>
+                            <p className="text-center text-md text-pretty text-muted-foreground">
                                 {description}
                             </p>
                         </div>
