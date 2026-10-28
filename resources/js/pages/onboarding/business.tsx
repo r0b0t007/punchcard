@@ -77,7 +77,7 @@ export default function OnboardingBusiness({ business, categories }: Props) {
                             <InputError message={errors.category} />
                         </div>
 
-                        <Button type="submit" className="w-full">
+                        <Button type="submit" size="lg" className="w-full">
                             {processing && <Spinner />}
                             {t('Continue')}
                         </Button>

@@ -50,7 +50,7 @@ export default function OnboardingLayout({
     return (
         <div className="flex min-h-svh flex-col items-center bg-background p-6 md:p-10">
             <div className="flex w-full max-w-lg flex-col gap-8">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-2">
                     <Link
                         href={home()}
                         aria-label={t('Home')}
@@ -58,8 +58,9 @@ export default function OnboardingLayout({
                     >
                         <StampDot className="size-6" />
                     </Link>
-                    <div className="flex items-center gap-2">
-                        <LanguageSwitcher />
+                    {/* Wraps on a narrow phone: Cancel setup under the languages, never off the screen. */}
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                        <LanguageSwitcher size="sm" />
                         <CancelSetup />
                     </div>
                 </div>
@@ -85,12 +86,12 @@ export default function OnboardingLayout({
                                     {open ? (
                                         <Link
                                             href={stepRoute(name)}
-                                            className="text-xs text-muted-foreground hover:text-foreground"
+                                            className="-my-2 block py-2 text-2xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                                         >
                                             {label}
                                         </Link>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground/60">
+                                        <span className="block text-2xs text-muted-foreground/60">
                                             {label}
                                         </span>
                                     )}
@@ -100,10 +101,12 @@ export default function OnboardingLayout({
                     </ol>
                 </nav>
 
-                <div className="space-y-2">
-                    <h1 className="text-xl font-medium">{title && t(title)}</h1>
+                <div className="space-y-1">
+                    <h1 className="font-display text-form-title font-bold text-balance">
+                        {title && t(title)}
+                    </h1>
                     {description && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-md text-pretty text-muted-foreground">
                             {t(description)}
                         </p>
                     )}

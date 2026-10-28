@@ -92,11 +92,16 @@ export default function OnboardingCard({
                             <InputError message={errors.stamps_required} />
                         </div>
 
-                        <div className="flex gap-3">
-                            <Button variant="secondary" asChild>
+                        {/* Stacked on a phone, the primary on top at full width; side by side from sm. */}
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                            <Button variant="secondary" size="lg" asChild>
                                 <Link href={step('logo')}>{t('Back')}</Link>
                             </Button>
-                            <Button type="submit" className="flex-1">
+                            <Button
+                                type="submit"
+                                size="lg"
+                                className="sm:flex-1"
+                            >
                                 {processing && <Spinner />}
                                 {t('Continue')}
                             </Button>

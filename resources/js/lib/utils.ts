@@ -12,7 +12,7 @@ const twMerge = extendTailwindMerge({
     extend: {
         theme: {
             radius: ['card', 'button', 'nav', 'sheet'],
-            text: ['title', 'heading', 'md', 'form-title'],
+            text: ['title', 'heading', 'md', 'form-title', '2xs'],
         },
     },
 });
