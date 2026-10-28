@@ -1,18 +1,23 @@
+/* punchcard's emails (Claude Design `Punchcard Emails.dc.html`, CHW-221): cream page, a card with a
+   brown hairline, espresso text and button. Readex Pro and Baloo Bhaijaan 2 where the client loads them
+   (the layout links them), system fonts everywhere else. Light only: the layout declares color-scheme. */
+
 /* Base */
 
 body,
 body *:not(html):not(style):not(br):not(tr):not(code) {
     box-sizing: border-box;
     font-family:
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-        sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+        'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol';
     position: relative;
 }
 
 body {
     -webkit-text-size-adjust: none;
-    background-color: #ffffff;
-    color: #52525b;
+    background-color: #f6eee3;
+    color: #3b2a20;
     height: 100%;
     line-height: 1.4;
     margin: 0;
@@ -29,7 +34,7 @@ blockquote {
 }
 
 a {
-    color: #18181b;
+    color: #3b2a20;
 }
 
 a img {
@@ -38,9 +43,13 @@ a img {
 
 /* Typography */
 
+/* The greeting, in the display font. */
 h1 {
-    color: #18181b;
-    font-size: 18px;
+    color: #241a13;
+    font-family:
+        'Baloo Bhaijaan 2', 'Readex Pro', -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    font-size: 22px;
     font-weight: bold;
     margin-top: 0;
     text-align: start;
@@ -62,7 +71,7 @@ h3 {
 
 p {
     font-size: 16px;
-    line-height: 1.5em;
+    line-height: 1.55em;
     margin-top: 0;
     text-align: start;
 }
@@ -81,7 +90,7 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #fafafa;
+    background-color: #f6eee3;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -99,15 +108,30 @@ img {
 /* Header */
 
 .header {
-    padding: 25px 0;
+    padding: 32px 0 22px;
     text-align: center;
 }
 
+/* The wordmark: the saffron dot, then "punchcard" in the display font (header.blade.php). */
 .header a {
-    color: #18181b;
-    font-size: 19px;
-    font-weight: bold;
+    color: #241a13;
+    font-family:
+        'Baloo Bhaijaan 2', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+        Roboto, Helvetica, Arial, sans-serif !important;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
     text-decoration: none;
+}
+
+.wordmark-dot {
+    background-color: #f2a541;
+    border-radius: 50%;
+    display: inline-block;
+    height: 13px;
+    margin-right: 8px;
+    vertical-align: middle;
+    width: 13px;
 }
 
 /* Logo */
@@ -126,9 +150,9 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #fafafa;
-    border-bottom: 1px solid #fafafa;
-    border-top: 1px solid #fafafa;
+    background-color: #f6eee3;
+    border-bottom: 1px solid #f6eee3;
+    border-top: 1px solid #f6eee3;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -138,13 +162,9 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 570px;
-    background-color: #ffffff;
-    border-color: #e4e4e7;
-    border-radius: 4px;
-    border-width: 1px;
-    box-shadow:
-        0 1px 3px 0 rgba(0, 0, 0, 0.1),
-        0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    background-color: #fffdf9;
+    border: 1px solid #e6d9c8;
+    border-radius: 16px;
     margin: 0 auto;
     padding: 0;
     width: 570px;
@@ -157,13 +177,14 @@ img {
 /* Subcopy */
 
 .subcopy {
-    border-top: 1px solid #e4e4e7;
+    border-top: 1px solid #e6d9c8;
     margin-top: 25px;
     padding-top: 25px;
 }
 
 .subcopy p {
-    font-size: 14px;
+    color: #6b5a4c;
+    font-size: 13px;
 }
 
 /* Footer */
@@ -179,13 +200,13 @@ img {
 }
 
 .footer p {
-    color: #a1a1aa;
+    color: #6b5a4c;
     font-size: 12px;
     text-align: center;
 }
 
 .footer a {
-    color: #a1a1aa;
+    color: #6b5a4c;
     text-decoration: underline;
 }
 
@@ -200,13 +221,13 @@ img {
 }
 
 .table th {
-    border-bottom: 1px solid #e4e4e7;
+    border-bottom: 1px solid #e6d9c8;
     margin: 0;
     padding-bottom: 8px;
 }
 
 .table td {
-    color: #52525b;
+    color: #3b2a20;
     font-size: 15px;
     line-height: 18px;
     margin: 0;
@@ -233,20 +254,22 @@ img {
 
 .button {
     -webkit-text-size-adjust: none;
-    border-radius: 4px;
-    color: #fff;
+    border-radius: 12px;
+    color: #fbf6ee;
+    font-weight: 500;
     display: inline-block;
     overflow: hidden;
     text-decoration: none;
 }
 
+/* 48px tall: 14px of border round a 20px line. */
 .button-blue,
 .button-primary {
-    background-color: #18181b;
-    border-bottom: 8px solid #18181b;
-    border-left: 18px solid #18181b;
-    border-right: 18px solid #18181b;
-    border-top: 8px solid #18181b;
+    background-color: #3b2a20;
+    border-bottom: 14px solid #3b2a20;
+    border-left: 28px solid #3b2a20;
+    border-right: 28px solid #3b2a20;
+    border-top: 14px solid #3b2a20;
 }
 
 .button-green,
@@ -270,18 +293,18 @@ img {
 /* Panels */
 
 .panel {
-    border-left: #18181b solid 4px;
+    border-left: #3b2a20 solid 4px;
     margin: 21px 0;
 }
 
 .panel-content {
-    background-color: #fafafa;
-    color: #52525b;
+    background-color: #f6eee3;
+    color: #3b2a20;
     padding: 16px;
 }
 
 .panel-content p {
-    color: #52525b;
+    color: #3b2a20;
 }
 
 .panel-item {

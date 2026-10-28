@@ -9,6 +9,8 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
+{{-- punchcard's fonts where the mail client loads web fonts; the theme falls back to system fonts (CHW-221). --}}
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700;800&family=Readex+Pro:wght@400;500&display=swap" rel="stylesheet">
 <style>
 @media only screen and (max-width: 600px) {
 .inner-body {
