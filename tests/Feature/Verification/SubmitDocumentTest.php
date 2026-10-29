@@ -115,7 +115,8 @@ it('stores nothing without the documents\' key, and reads a file after the key i
     config(['punchcard.documents.key' => 'base64:'.base64_encode(str_repeat('n', 32)), 'punchcard.documents.previous_keys' => $old]);
 
     expect(app(DocumentCipher::class)->decrypt($stored))->toBe('the scan')
-        ->and(fn () => app(DocumentCipher::class)->decrypt(substr($stored, 0, -1).'x'))->toThrow(DecryptException::class);
+        // One bit of the last byte flipped: always a change (replacing it with "x" left it as it was once in 256 runs).
+        ->and(fn () => app(DocumentCipher::class)->decrypt(substr($stored, 0, -1).chr(ord($stored[-1]) ^ 1)))->toThrow(DecryptException::class);
 });
 
 it('tells the owner sending is not set up yet when the key is missing, and reports it', function (): void {
