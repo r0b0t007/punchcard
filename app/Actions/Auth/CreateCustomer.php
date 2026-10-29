@@ -14,7 +14,9 @@ use Illuminate\Database\UniqueConstraintViolationException;
  * said they are 16 or older, and whether they want news by email, each
  * dated (CNDP). Signed up meanwhile by another route: that account, if it
  * may sign in by link (MaySignInByLink), with the consent just given where
- * it has none (its name stays its own); else null.
+ * it has none (its name and language stay its own); else null. A new one
+ * keeps the language the page was in (SetLocale), so the emails it gets
+ * later are too (CHW-132).
  */
 final readonly class CreateCustomer
 {
@@ -50,6 +52,7 @@ final readonly class CreateCustomer
             'email' => $email,
             'password' => null,
             'email_verified_at' => now(),
+            'locale' => app()->getLocale(),
         ]);
 
         return $this->recordConsent->handle($user, $wantsNews);
