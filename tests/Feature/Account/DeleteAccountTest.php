@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Actions\Account\DeleteAccount;
+use App\Actions\Stamps\WorksAt;
+use App\Actions\Tenancy\ArchiveOrganization;
+use App\Actions\Tenancy\RestoreArchived;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
 use App\Enums\TapRejection;
@@ -10,6 +13,7 @@ use App\Enums\TapStatus;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
+use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\Tap;
@@ -165,6 +169,35 @@ it('refuses deleting the account of an owner or org admin until they hand over',
     $this->assertAuthenticatedAs($user);
     expect($user->fresh()?->isAnonymised())->toBeFalse();
 })->with(['owner', 'org admin']);
+
+it('takes an org admin of an archived organization off it, so a restore never brings the deleted account back', function (bool $hasHistory): void {
+    $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    // A second admin keeps the organization run after the restore.
+    $other = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    if ($hasHistory) {
+        $customer = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
+        $this->tenants->stamp($customer, $this->tenants->a1, ['staff_id' => $admin->id]);
+    }
+    $this->context->bypass(fn () => app(ArchiveOrganization::class)->handle($this->tenants->orgA));
+
+    ($this->deleteAccount)($admin)->assertSessionHasNoErrors();
+    $this->context->bypass(fn () => app(RestoreArchived::class)->handle($this->tenants->orgA));
+
+    expect($hasHistory ? $admin->fresh()?->isAnonymised() : $admin->fresh() === null)->toBeTrue()
+        ->and($this->context->bypass(fn (): array => OrganizationMember::query()->where('organization_id', $this->tenants->orgA->id)->pluck('user_id')->all()))->toBe([$other->id])
+        ->and(app(WorksAt::class)->handle($admin->id, $this->tenants->a1->id, $this->tenants->locationOf($this->tenants->a1)->id))->toBeFalse();
+})->with(['anonymised, kept for the ledger' => true, 'deleted' => false]);
+
+it('removes the organization roles anonymised accounts kept before, and nobody else\'s', function (): void {
+    $kept = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $live = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    DB::table('users')->where('id', $kept->id)->update(['anonymised_at' => now()]);
+
+    $migration = require database_path('migrations/2026_10_29_125847_remove_anonymised_accounts_from_organizations.php');
+    $migration->up();
+
+    expect(DB::table('organization_user')->where('organization_id', $this->tenants->orgA->id)->pluck('user_id')->all())->toBe([$live->id]);
+});
 
 it('refuses an owner in the Action too, whoever calls it', function (): void {
     $owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
