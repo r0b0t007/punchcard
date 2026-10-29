@@ -10,6 +10,7 @@ use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\Follow;
+use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\Stamper;
@@ -79,6 +80,11 @@ final readonly class DeleteAccount
             if ($stillDue instanceof Closure && ! $stillDue()) {
                 return false;
             }
+
+            // The organizations they run, share-locked before the hand-over check reads them archived: a restore waits,
+            // then finds who is left to run it (RestoreArchived, CHW-308).
+            Organization::query()->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->select('organization_id'))
+                ->sharedLock()->pluck('id');
 
             if ($this->mustHandOverBusiness->handle($user)) {
                 throw new LogicException('An owner or org admin hands over or closes the business before deleting their account.');

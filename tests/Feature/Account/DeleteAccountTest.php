@@ -170,33 +170,48 @@ it('refuses deleting the account of an owner or org admin until they hand over',
     expect($user->fresh()?->isAnonymised())->toBeFalse();
 })->with(['owner', 'org admin']);
 
-it('takes an org admin of an archived organization off it, so a restore never brings the deleted account back', function (bool $hasHistory): void {
+it('takes an org admin of an archived organization off it, so a restore never brings the deleted account back', function (): void {
     $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
     // A second admin keeps the organization run after the restore.
     $other = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
-    if ($hasHistory) {
-        $customer = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
-        $this->tenants->stamp($customer, $this->tenants->a1, ['staff_id' => $admin->id]);
-    }
+    // Stamps they gave keep the account, anonymised, for the ledger (one deleted outright loses its roles by foreign key).
+    $customer = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
+    $this->tenants->stamp($customer, $this->tenants->a1, ['staff_id' => $admin->id]);
     $this->context->bypass(fn () => app(ArchiveOrganization::class)->handle($this->tenants->orgA));
 
     ($this->deleteAccount)($admin)->assertSessionHasNoErrors();
     $this->context->bypass(fn () => app(RestoreArchived::class)->handle($this->tenants->orgA));
 
-    expect($hasHistory ? $admin->fresh()?->isAnonymised() : $admin->fresh() === null)->toBeTrue()
+    expect($admin->fresh()?->isAnonymised())->toBeTrue()
         ->and($this->context->bypass(fn (): array => OrganizationMember::query()->where('organization_id', $this->tenants->orgA->id)->pluck('user_id')->all()))->toBe([$other->id])
         ->and(app(WorksAt::class)->handle($admin->id, $this->tenants->a1->id, $this->tenants->locationOf($this->tenants->a1)->id))->toBeFalse();
-})->with(['anonymised, kept for the ledger' => true, 'deleted' => false]);
+});
 
-it('removes the organization roles anonymised accounts kept before, and nobody else\'s', function (): void {
-    $kept = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
-    $live = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
-    DB::table('users')->where('id', $kept->id)->update(['anonymised_at' => now()]);
+it('keeps an archived organization closed once its only org admin deleted their account', function (): void {
+    $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $customer = $this->tenants->enroll(User::factory()->create(), $this->tenants->cardA);
+    $this->tenants->stamp($customer, $this->tenants->a1, ['staff_id' => $admin->id]);
+    $this->context->bypass(fn () => app(ArchiveOrganization::class)->handle($this->tenants->orgA));
+
+    ($this->deleteAccount)($admin)->assertSessionHasNoErrors();
+
+    expect(fn () => $this->context->bypass(fn () => app(RestoreArchived::class)->handle($this->tenants->orgA)))
+        ->toThrow(LogicException::class, 'Nobody is left to run this organization');
+    expect($this->tenants->orgA->fresh()?->archived_at)->not->toBeNull();
+});
+
+it('removes the organization roles anonymised accounts kept before, in every organization, and nobody else\'s', function (): void {
+    $keptA = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $liveA = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $keptB = $this->tenants->admin(User::factory()->create(), $this->tenants->orgB);
+    $liveB = $this->tenants->admin(User::factory()->create(), $this->tenants->orgB);
+    DB::table('users')->whereIn('id', [$keptA->id, $keptB->id])->update(['anonymised_at' => now()]);
 
     $migration = require database_path('migrations/2026_10_29_125847_remove_anonymised_accounts_from_organizations.php');
     $migration->up();
 
-    expect(DB::table('organization_user')->where('organization_id', $this->tenants->orgA->id)->pluck('user_id')->all())->toBe([$live->id]);
+    expect(DB::table('organization_user')->whereIn('user_id', [$keptA->id, $liveA->id, $keptB->id, $liveB->id])->orderBy('user_id')->pluck('user_id')->all())
+        ->toBe([$liveA->id, $liveB->id]);
 });
 
 it('refuses an owner in the Action too, whoever calls it', function (): void {
