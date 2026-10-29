@@ -54,11 +54,19 @@ use LogicException;
  * An anonymised account takes no more stamps, cards or redemptions (CHW-253):
  * AddStamps and EnrollCustomer read anonymised_at after the locks taken
  * here, and its rewards not yet redeemed expire with it.
+ *
+ * Run again when the database breaks a deadlock by aborting it (CHW-310): a
+ * tap holding a stamper the account armed (ReceiveTap: stamper, then the
+ * armer's key) can cross the disarm below (the user, then the stamper).
+ * Rolled back whole, so it starts over from the locks.
  */
 final readonly class DeleteAccount
 {
     /** Anonymised accounts get an address here; signup and profile changes refuse the domain. */
     public const string RESERVED_EMAIL_DOMAIN = 'deleted.invalid';
+
+    /** Runs of the deletion, when the database picks it to break a deadlock. */
+    public const int ATTEMPTS = 3;
 
     public function __construct(
         private TenantContext $context,
@@ -68,36 +76,45 @@ final readonly class DeleteAccount
     /** @param  (Closure(): bool)|null  $stillDue */
     public function handle(User $user, ?Closure $stillDue = null): bool
     {
-        return DB::transaction(fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
-            // Their taps first, then the user, then their cards (and rewards, in anonymise()): ApplyTap's order, tap then the
-            // user's key, so the two never deadlock. A signed-out tap being claimed has no user yet: it waits on the user.
-            Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
-            User::query()->whereKey($user->id)->lockForUpdate()->value('id');
-            CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
+        return DB::transaction(
+            callback: fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
+                // Their taps first, then the user, then their cards (and rewards, in anonymise()): ApplyTap's order, tap then the
+                // user's key, so the two never deadlock. A signed-out tap being claimed has no user yet: it waits on the user.
+                Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
+                // Read again under the lock, not the caller's copy: a run after a deadlock starts from the row as it is.
+                $user = User::query()->whereKey($user->id)->lockForUpdate()->first();
 
-            if ($stillDue instanceof Closure && ! $stillDue()) {
-                return false;
-            }
+                if (! $user instanceof User) {
+                    return false;
+                }
 
-            if ($this->mustHandOverBusiness->handle($user)) {
-                throw new LogicException('An owner or org admin hands over or closes the business before deleting their account.');
-            }
+                CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
 
-            DB::table('sessions')->where('user_id', $user->id)->delete();
-            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
-            Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
-            // An arming they made gives nothing more (CHW-29). Named by nobody once the account goes (Postgres empties
-            // armed_by), it would otherwise read as an arming from before armers were named, and still pay out.
-            Stamper::query()->where('armed_by', $user->id)->update(Stamper::DISARMED);
+                if ($stillDue instanceof Closure && ! $stillDue()) {
+                    return false;
+                }
 
-            if (! $this->hasHistory($user) && $this->deleted($user)) {
+                if ($this->mustHandOverBusiness->handle($user)) {
+                    throw new LogicException('An owner or org admin hands over or closes the business before deleting their account.');
+                }
+
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+                DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+                Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
+                // An arming they made gives nothing more (CHW-29). Named by nobody once the account goes (Postgres empties
+                // armed_by), it would otherwise read as an arming from before armers were named, and still pay out.
+                Stamper::query()->where('armed_by', $user->id)->update(Stamper::DISARMED);
+
+                if (! $this->hasHistory($user) && $this->deleted($user)) {
+                    return true;
+                }
+
+                $this->anonymise($user);
+
                 return true;
-            }
-
-            $this->anonymise($user);
-
-            return true;
-        }));
+            }),
+            attempts: self::ATTEMPTS,
+        );
     }
 
     /** Rows kept forever point at this user: stamps or rewards on their cards, stamps they gave or rewards they redeemed as staff, or what they did as platform admin (the audit log). */

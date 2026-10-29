@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
+use App\Actions\Account\DeleteAccount;
 use App\Actions\Cards\EnrollCustomer;
 use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
@@ -82,7 +83,17 @@ final readonly class ApplyTap
         $previous = $this->context->snapshot();
 
         try {
-            return DB::transaction(fn (): Tap => $this->apply($tap->id, $user));
+            // Run again when the database breaks a deadlock by aborting it (CHW-310): a deletion of the armer's account
+            // (the user, then this tap or stamper) can cross the stamp's key on them. Rolled back whole; each run starts
+            // from the caller's tenant, as apply() sets the tap's.
+            return DB::transaction(
+                callback: function () use ($tap, $user, $previous): Tap {
+                    $this->context->restore($previous);
+
+                    return $this->apply($tap->id, $user);
+                },
+                attempts: DeleteAccount::ATTEMPTS,
+            );
         } finally {
             $this->context->restore($previous);
         }
