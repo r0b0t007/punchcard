@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Actions\Account\DeleteAccount;
 use App\Actions\Cards\EnrollCustomer;
 use App\Actions\Rewards\RedeemPresence;
 use App\Actions\Rewards\RedeemRefused;
@@ -40,8 +39,10 @@ use Illuminate\Support\Facades\DB;
  *   waiting past its expiry becomes expired; one received by a signed-in
  *   customer, or already claimed, is theirs alone;
  * - the customer's key is locked next (CHW-253), so an account deletion
- *   waits for this tap or this tap for it, never both; an account gone
- *   meanwhile refuses the tap, its IP and user agent scrubbed;
+ *   waits for this tap or this tap for it; an account gone meanwhile
+ *   refuses the tap, its IP and user agent scrubbed. The armer's key, taken
+ *   by the stamp after the stamper, can still cross the armer's deletion:
+ *   the database aborts one, and this runs again (Outermost, CHW-310);
  * - then the stamper, as ReceiveTap does (tag, stamper, then the
  *   enrollment in AddStamps): an archive ends stampers before closing
  *   anything (CloseSites), so a stamper still current under the lock keeps
@@ -78,22 +79,16 @@ final readonly class ApplyTap
 
     public function handle(Tap $tap, User $user): Tap
     {
-        Outermost::assert('ApplyTap');
-
         $previous = $this->context->snapshot();
 
         try {
-            // Run again when the database breaks a deadlock by aborting it (CHW-310): a deletion of the armer's account
-            // (the user, then this tap or stamper) can cross the stamp's key on them. Rolled back whole; each run starts
+            // Run again if the database aborts it to break a deadlock (Outermost, CHW-310): rolled back whole, each run
             // from the caller's tenant, as apply() sets the tap's.
-            return DB::transaction(
-                callback: function () use ($tap, $user, $previous): Tap {
-                    $this->context->restore($previous);
+            return Outermost::transaction('ApplyTap', function () use ($tap, $user, $previous): Tap {
+                $this->context->restore($previous);
 
-                    return $this->apply($tap->id, $user);
-                },
-                attempts: DeleteAccount::ATTEMPTS,
-            );
+                return $this->apply($tap->id, $user);
+            });
         } finally {
             $this->context->restore($previous);
         }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Actions\Account\DeleteAccount;
 use App\Actions\Stamps\WorksAt;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
@@ -21,7 +20,6 @@ use App\Support\Nfc\SunVerificationFailed;
 use App\Support\Nfc\SunVerifier;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -80,13 +78,9 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
-        // Run again when the database breaks a deadlock by aborting it (CHW-310): the tap holds the stamper, then its
-        // insert takes the key of the armer or customer, which an account deletion (the user, then the stamper) may
-        // hold. Rolled back whole, counter included, so the tap is spent once; events go after commit.
-        return DB::transaction(
-            callback: fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request, $claimTokenHash)),
-            attempts: DeleteAccount::ATTEMPTS,
-        );
+        // Run again if the database aborts it to break a deadlock (Outermost, CHW-310): rolled back whole, counter
+        // included, so the tap is spent once, or found a replay if a copy of its URL landed meanwhile.
+        return Outermost::transaction('ReceiveTap', fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request, $claimTokenHash)));
     }
 
     /**
