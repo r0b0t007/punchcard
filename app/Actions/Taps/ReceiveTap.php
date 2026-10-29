@@ -20,7 +20,6 @@ use App\Support\Nfc\SunVerificationFailed;
 use App\Support\Nfc\SunVerifier;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -79,7 +78,9 @@ final readonly class ReceiveTap
             return $this->record([...$request, 'status' => TapStatus::Rejected, 'rejection' => $failed->reason]);
         }
 
-        return DB::transaction(fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request, $claimTokenHash)));
+        // Run again if the database aborts it to break a deadlock (Outermost, CHW-310): rolled back whole, counter
+        // included, so the tap is spent once, or found a replay if a copy of its URL landed meanwhile.
+        return Outermost::transaction('ReceiveTap', fn (): Tap => $this->context->bypass(fn (): Tap => $this->spend($message, $c, $request, $claimTokenHash)));
     }
 
     /**

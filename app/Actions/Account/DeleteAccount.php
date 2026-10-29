@@ -17,6 +17,7 @@ use App\Models\Stamper;
 use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Database\Outermost;
 use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Database\QueryException;
@@ -56,6 +57,12 @@ use LogicException;
  * An anonymised account takes no more stamps, cards or redemptions (CHW-253):
  * AddStamps and EnrollCustomer read anonymised_at after the locks taken
  * here, and its rewards not yet redeemed expire with it.
+ *
+ * Run again when the database aborts it to break a deadlock (Outermost,
+ * CHW-310): a tap holding a stamper the account armed (stamper, then the
+ * armer's key) can cross the disarm below (the user, then the stamper).
+ * Rolled back whole, so each run starts over from the locks, and the
+ * caller's model is read again under them.
  */
 final readonly class DeleteAccount
 {
@@ -70,11 +77,21 @@ final readonly class DeleteAccount
     /** @param  (Closure(): bool)|null  $stillDue */
     public function handle(User $user, ?Closure $stillDue = null): bool
     {
-        return DB::transaction(fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
+        return Outermost::transaction('DeleteAccount', fn (): bool => $this->context->bypass(function () use ($user, $stillDue): bool {
             // Their taps first, then the user, then their cards (and rewards, in anonymise()): ApplyTap's order, tap then the
-            // user's key, so the two never deadlock. A signed-out tap being claimed has no user yet: it waits on the user.
+            // user's key, so a deletion and the customer's own tap wait for each other. A signed-out tap being claimed has
+            // no user yet: it waits on the user.
             Tap::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
-            User::query()->whereKey($user->id)->lockForUpdate()->value('id');
+
+            // Gone meanwhile: nothing left to delete. Otherwise the caller's model is read again under the lock, so a run
+            // after a deadlock starts from the row as it is, and the caller sees what became of it.
+            if (User::query()->whereKey($user->id)->lockForUpdate()->value('id') === null) {
+                return true;
+            }
+
+            $user->exists = true;
+            $user->refresh();
+
             CardEnrollment::query()->where('user_id', $user->id)->lockForUpdate()->pluck('id');
 
             if ($stillDue instanceof Closure && ! $stillDue()) {

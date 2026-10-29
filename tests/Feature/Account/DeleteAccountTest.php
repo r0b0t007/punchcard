@@ -19,6 +19,7 @@ use App\Models\StampEvent;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -169,6 +170,42 @@ it('refuses deleting the account of an owner or org admin until they hand over',
     $this->assertAuthenticatedAs($user);
     expect($user->fresh()?->isAnonymised())->toBeFalse();
 })->with(['owner', 'org admin']);
+
+it('runs a deletion again when the database picked it as a deadlock victim', function (string $where): void {
+    // CHW-310: a tap holding a stamper this account armed can cross the deletion, at the disarm or at the delete (its
+    // savepoint). Laravel retries only an outermost transaction, so this leaves the test's own for the run (an account
+    // with no history: nothing is left behind).
+    DB::rollBack();
+    $user = User::factory()->create();
+    try {
+        $deadlock = new stdClass;
+        $deadlock->thrown = false;
+        DB::listen(function (QueryExecuted $query) use ($deadlock, $where): void {
+            if (! $deadlock->thrown && str_starts_with($query->sql, $where)) {
+                $deadlock->thrown = true;
+
+                throw new RuntimeException('SQLSTATE[40P01]: Deadlock detected: 7 ERROR:  deadlock detected');
+            }
+        });
+
+        expect(app(DeleteAccount::class)->handle($user))->toBeTrue()
+            ->and($deadlock->thrown)->toBeTrue()
+            ->and(User::query()->whereKey($user->id)->exists())->toBeFalse()
+            ->and($user->exists)->toBeFalse();
+    } finally {
+        // Committed outside the test's transaction: nothing may stay for the next test, even if this one fails (and
+        // never in place of its failure).
+        rescue(fn (): int => DB::table('users')->where('id', $user->id)->delete(), report: false);
+        DB::beginTransaction();
+    }
+})->with(['the disarm' => 'update "stampers"', 'the delete, in its savepoint' => 'delete from "users"']);
+
+it('counts an account deleted meanwhile as gone', function (): void {
+    $user = User::factory()->create();
+    $this->context->bypass(fn () => DB::table('users')->where('id', $user->id)->delete());
+
+    expect(app(DeleteAccount::class)->handle($user))->toBeTrue();
+});
 
 it('takes an org admin of an archived organization off it, so a restore never brings the deleted account back', function (): void {
     $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
