@@ -198,6 +198,8 @@ it('never writes the URL or key material to the log, a failed tap\'s report incl
     // here: a php.ini that drops arguments from traces (production's) would let a leak through unseen.
     $ignoreArgs = ini_set('zend.exception_ignore_args', '0');
     $argLength = ini_set('zend.exception_string_param_max_len', '15');
+    // A pin that didn't take would leave this test reading traces it cannot trust.
+    expect($ignoreArgs)->not->toBeFalse()->and($argLength)->not->toBeFalse();
     try {
         $logged = new ArrayObject;
         Event::listen(MessageLogged::class, function (MessageLogged $message) use ($logged): void {
@@ -230,12 +232,16 @@ it('never writes the URL or key material to the log, a failed tap\'s report incl
         }
         $secrets = [$url['e'], $url['c'], $failing['e'], $failing['c'], SunVectors::AN10922_MASTER_KEY];
         foreach ($secrets as $secret) {
-            // Whole, or as much as a trace keeps of an argument.
-            expect($lines->filter(fn (string $line): bool => str_contains($line, substr($secret, 0, 15))))->toBeEmpty();
+            // Whole, as much as a trace keeps of an argument (its start), or its end.
+            expect($lines->filter(fn (string $line): bool => str_contains($line, substr($secret, 0, 15)) || str_contains($line, substr($secret, -15))))->toBeEmpty();
         }
     } finally {
-        ini_set('zend.exception_ignore_args', (string) $ignoreArgs);
-        ini_set('zend.exception_string_param_max_len', (string) $argLength);
+        if ($ignoreArgs !== false) {
+            ini_set('zend.exception_ignore_args', $ignoreArgs);
+        }
+        if ($argLength !== false) {
+            ini_set('zend.exception_string_param_max_len', $argLength);
+        }
     }
 })->with(['a missing key', 'a bad key version', 'a failed write']);
 
@@ -246,11 +252,14 @@ it('never keeps the tap URL in the session as the page to go back to', function 
         config(['punchcard.nfc.key_version' => 'two']);
     }
 
+    $this->get(route('home'))->assertOk();
+
     $response = $this->get(route('taps.receive', $url));
 
     $outcome === 'a server error' ? $response->assertServerError() : $response->assertRedirect();
-    expect((string) session()->previousUrl())->not->toContain($url['e'])->not->toContain($url['c'])
-        ->and(session()->all())->not->toContain($url['e']);
+    // The page before stays the one to go back to, and nothing in the session, however deep, holds e or c.
+    expect(session()->previousUrl())->toBe(route('home'))
+        ->and(json_encode(session()->all()))->not->toContain($url['e'])->not->toContain($url['c']);
 })->with(['a tap', 'a server error']);
 
 it('treats a missing key as a server error, never as a tap', function (): void {
