@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Counter;
 
+use App\Actions\Stamps\ArmingCounts;
 use App\Enums\StamperStatus;
 use App\Models\Business;
 use App\Models\Stamper;
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  */
 final readonly class DescribeCounter
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ArmingCounts $armingCounts) {}
 
     /**
      * @return array{
@@ -56,10 +57,17 @@ final readonly class DescribeCounter
                 ->value('created_at'),
         ]));
 
+        // As the tap will take it: an arming by someone no longer working here shows idle (CHW-309). Asked once per
+        // armer and location, not per stamper, on every poll.
+        $armerKey = fn (Stamper $stamper): string => $stamper->armed_by.':'.$stamper->location_id;
+        $armingCounts = $stampers->filter(fn (Stamper $stamper): bool => $stamper->isArmed())
+            ->unique($armerKey)
+            ->mapWithKeys(fn (Stamper $stamper): array => [$armerKey($stamper) => $this->armingCounts->handle($stamper)]);
+
         return [
             'businessName' => $business->name,
-            'stampers' => $stampers->map(function (Stamper $stamper) use ($lastTaps): array {
-                $armed = $stamper->isArmed();
+            'stampers' => $stampers->map(function (Stamper $stamper) use ($lastTaps, $armingCounts, $armerKey): array {
+                $armed = $stamper->isArmed() && $armingCounts->get($armerKey($stamper)) === true;
                 $lastTap = $lastTaps->get($stamper->id);
 
                 return [
