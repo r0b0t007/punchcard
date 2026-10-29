@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils"
 const leftToRightTypes = new Set(["email", "password", "tel", "url"])
 const rightToLeftScript = /[\u0590-\u08FF]/
 
-function Input({ className, type, placeholder, ...props }: React.ComponentProps<"input">) {
-  const leftToRight = type !== undefined && leftToRightTypes.has(type)
+function Input({ className, type, dir, placeholder, ...props }: React.ComponentProps<"input">) {
+  // Or set so by the caller: a password shown as text still reads left to right.
+  const leftToRight = dir === "ltr" || (dir === undefined && type !== undefined && leftToRightTypes.has(type))
   return (
     <input
       type={type}
-      dir={leftToRight ? "ltr" : undefined}
+      dir={leftToRight ? "ltr" : dir}
       placeholder={placeholder}
       data-slot="input"
       className={cn(
