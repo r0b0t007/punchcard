@@ -11,6 +11,7 @@ use App\Http\Middleware\RequireRecentConfirmation;
 use App\Http\Middleware\ResolveOnboardingBusiness;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SetTenant;
+use App\Http\Middleware\StartSessionWithoutTapUrls;
 use App\Http\Middleware\UsePwa;
 use App\Http\Middleware\WhileImpersonating;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -21,6 +22,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Session\Middleware\StartSession;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -34,6 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // The offline page stays up, so a new service worker (which precaches it) installs during maintenance too.
         $middleware->preventRequestsDuringMaintenance(except: ['offline']);
+
+        // A tap's URL carries the raw SUN parameters: never kept as the page to go back to (CHW-149).
+        $middleware->web(replace: [StartSession::class => StartSessionWithoutTapUrls::class]);
 
         $middleware->web(append: [
             HandleAppearance::class,

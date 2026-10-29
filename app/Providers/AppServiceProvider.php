@@ -7,6 +7,7 @@ use App\Actions\Admin\StopImpersonation;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
+use App\Http\Middleware\StartSessionWithoutTapUrls;
 use App\Models\Business;
 use App\Models\NfcTag;
 use App\Models\User;
@@ -22,6 +23,7 @@ use Filament\Facades\Filament;
 use Illuminate\Auth\Events\CurrentDeviceLogout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -31,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Queue;
+use Illuminate\Session\SessionManager;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +58,11 @@ class AppServiceProvider extends ServiceProvider
         $this->registerTenantContext();
         // One per request or job: RecordLastActive holds the request's activity writes in it until the response is sent (CHW-58).
         $this->app->scoped(RecordActivity::class);
+        // As Laravel builds the StartSession it replaces (SessionServiceProvider): session blocking needs the cache (CHW-149).
+        $this->app->singleton(StartSessionWithoutTapUrls::class, fn ($app): StartSessionWithoutTapUrls => new StartSessionWithoutTapUrls(
+            $app->make(SessionManager::class),
+            fn (): CacheFactory => $app->make(CacheFactory::class),
+        ));
     }
 
     /**
