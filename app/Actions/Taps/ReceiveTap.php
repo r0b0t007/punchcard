@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Actions\Stamps\WorksAt;
+use App\Actions\Stamps\ArmingCounts;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
@@ -54,7 +54,7 @@ final readonly class ReceiveTap
         private TenantContext $context,
         private SunVerifier $verifier,
         private KeyDiversifier $keys,
-        private WorksAt $worksAt,
+        private ArmingCounts $armingCounts,
     ) {}
 
     public function handle(
@@ -146,11 +146,9 @@ final readonly class ReceiveTap
             return $this->record([...$trusted, 'status' => TapStatus::Rejected, 'rejection' => TapRejection::SiteClosed]);
         }
 
-        // An arming counts while whoever armed it still works at this stamper's site (CHW-29): taken off the staff,
-        // limited to another location, or their account deleted, it gives one stamp like any tap. An arming never
-        // outlives its armer's account (ArmStamper locks it first, CHW-265); this covers the rest.
-        $armed = $stamper->isArmed()
-            && ($stamper->armed_by === null || $this->worksAt->handle($stamper->armed_by, $stamper->business_id, $stamper->location_id));
+        // An arming counts while whoever armed it still works at this stamper's site (CHW-29); otherwise it gives one
+        // stamp like any tap. An arming never outlives its armer's account (ArmStamper locks it first, CHW-265).
+        $armed = $this->armingCounts->handle($stamper);
         $qty = $armed ? $stamper->armed_qty : 1;
 
         $armedBy = $armed ? $stamper->armed_by : null;

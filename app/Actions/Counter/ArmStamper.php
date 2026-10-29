@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Counter;
 
+use App\Actions\Stamps\WorksAt;
 use App\Enums\StamperStatus;
 use App\Models\Stamper;
 use App\Models\User;
@@ -26,6 +27,11 @@ use Illuminate\Support\Facades\Gate;
  * it disarms their stampers (CHW-265): a deletion under way finishes first
  * and the account reads as gone here, or waits for this arming and then
  * disarms it. An arming never outlives its armer's account.
+ *
+ * Whether they still work there is asked again on the locked stamper, not
+ * from the request's tenant, their membership share-locked (CHW-309):
+ * taking them off the staff waits for this arming and then ends it, or
+ * comes first and they are found gone.
  */
 final readonly class ArmStamper
 {
@@ -34,6 +40,8 @@ final readonly class ArmStamper
 
     /** What counter mode offers ("Next tap gives"). The stamper allows up to 10 (StampRequest::MAX_TAP). */
     public const array QUANTITIES = [1, 2, 3, 5];
+
+    public function __construct(private WorksAt $worksAt) {}
 
     public function handle(Stamper $stamper, int $qty, User $armedBy): bool
     {
@@ -49,6 +57,7 @@ final readonly class ArmStamper
             // Checked again on the locked row: a stamper moved meanwhile may be beyond a staff member's location.
             if (! $locked instanceof Stamper
                 || Gate::forUser($armedBy)->denies('arm', $locked)
+                || ! $this->worksAt->handle($armedBy->id, $locked->business_id, $locked->location_id, lock: true)
                 || $locked->status !== StamperStatus::Active
                 || ! ArchivedSites::isOpen($locked->business_id, $locked->location_id, counter: true)) {
                 return false;

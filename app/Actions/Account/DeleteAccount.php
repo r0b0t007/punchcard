@@ -88,6 +88,8 @@ final readonly class DeleteAccount
             Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
             // An arming they made gives nothing more (CHW-29). Named by nobody once the account goes (Postgres empties
             // armed_by), it would otherwise read as an arming from before armers were named, and still pay out.
+            // Locked in id order first, as staff removal and a suspension lock stampers, so the two never cross.
+            Stamper::query()->where('armed_by', $user->id)->inLockOrder()->pluck('id');
             Stamper::query()->where('armed_by', $user->id)->update(Stamper::DISARMED);
 
             if (! $this->hasHistory($user) && $this->deleted($user)) {
