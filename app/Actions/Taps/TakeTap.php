@@ -29,8 +29,15 @@ final readonly class TakeTap
 {
     public function __construct(private ReceiveTap $receiveTap, private ClaimPendingTaps $claimPendingTaps) {}
 
-    public function handle(string $e, string $c, ?User $user, ?string $ip, ?string $userAgent, TapSession $session): Tap
-    {
+    public function handle(
+        // Kept out of a reported exception's trace, as everywhere the raw SUN parameters pass (CHW-149).
+        #[\SensitiveParameter] string $e,
+        #[\SensitiveParameter] string $c,
+        ?User $user,
+        ?string $ip,
+        ?string $userAgent,
+        TapSession $session,
+    ): Tap {
         $tap = $this->receiveTap->handle($e, $c, $user, $ip, $userAgent, $session->claimTokenHash());
         $session->show($tap);
 

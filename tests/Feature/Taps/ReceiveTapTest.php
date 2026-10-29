@@ -15,6 +15,7 @@ use App\Support\Nfc\FakeTap;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -191,21 +192,75 @@ it('keeps the tag\'s counter across a reassignment', function (): void {
         ->and(($this->receive)(($this->url)(6))->business_id)->toBe($this->tenants->a2->id);
 });
 
-it('never writes the URL or key material to the log', function (): void {
-    $logged = [];
-    Event::listen(MessageLogged::class, function (MessageLogged $message) use (&$logged): void {
-        $logged[] = $message->message.json_encode($message->context);
-    });
-    $url = ($this->url)(5);
+it('never writes the URL or key material to the log, a failed tap\'s report included', function (string $failure): void {
+    // Each line as a log handler writes it: the message, the context, and a reported exception with its stack trace,
+    // where a function's arguments show (the first 15 characters of each) unless marked #[\SensitiveParameter]. Pinned
+    // here: a php.ini that drops arguments from traces (production's) would let a leak through unseen.
+    $ignoreArgs = ini_set('zend.exception_ignore_args', '0');
+    $argLength = ini_set('zend.exception_string_param_max_len', '15');
+    // A pin that didn't take would leave this test reading traces it cannot trust.
+    expect($ignoreArgs)->not->toBeFalse()->and($argLength)->not->toBeFalse();
+    try {
+        $logged = new ArrayObject;
+        Event::listen(MessageLogged::class, function (MessageLogged $message) use ($logged): void {
+            $exception = $message->context['exception'] ?? null;
+            $logged[] = $message->message.json_encode(Arr::except($message->context, 'exception')).($exception instanceof Throwable ? (string) $exception : '');
+        });
+        $url = ($this->url)(5);
 
-    ($this->receive)($url);
-    ($this->receive)($url);
-    ($this->receive)(['e' => $url['e'], 'c' => strrev($url['c'])]);
+        ($this->receive)($url);
+        ($this->receive)($url);
+        ($this->receive)(['e' => $url['e'], 'c' => strrev($url['c'])]);
+        // A tap that fails on the server (CHW-149): the handler reports it, with its trace, through /t itself. A missing
+        // key fails as the Action is built; a bad key version once the URL is in hand; a failed write once the tap is
+        // verified, in spend().
+        $failing = ($this->url)(6);
+        match ($failure) {
+            'a missing key' => config(['punchcard.nfc.sun_master_key' => null]),
+            'a bad key version' => config(['punchcard.nfc.key_version' => 'two']),
+            'a failed write' => Tap::creating(fn () => throw new RuntimeException('The tap could not be written.')),
+        };
+        app()->forgetInstance(KeyDiversifier::class);
+        $this->get(route('taps.receive', $failing))->assertServerError();
 
-    foreach ($logged as $line) {
-        expect($line)->not->toContain($url['e'])->not->toContain($url['c'])->not->toContain(SunVectors::AN10922_MASTER_KEY);
+        $lines = collect($logged->getArrayCopy());
+        $reported = ['a missing key' => 'NFC_SUN_MASTER_KEY', 'a bad key version' => 'NFC_SUN_KEY_VERSION', 'a failed write' => 'could not be written'][$failure];
+        expect($lines->filter(fn (string $line): bool => str_contains($line, $reported)))->not->toBeEmpty();
+        if ($failure !== 'a missing key') {
+            // The trace rendered the tap's arguments, hidden: the check below reads a real trace.
+            expect($lines->filter(fn (string $line): bool => str_contains($line, 'ReceiveTap->handle(Object(SensitiveParameterValue)')))->not->toBeEmpty();
+        }
+        $secrets = [$url['e'], $url['c'], $failing['e'], $failing['c'], SunVectors::AN10922_MASTER_KEY];
+        foreach ($secrets as $secret) {
+            // Whole, as much as a trace keeps of an argument (its start), or its end.
+            expect($lines->filter(fn (string $line): bool => str_contains($line, substr($secret, 0, 15)) || str_contains($line, substr($secret, -15))))->toBeEmpty();
+        }
+    } finally {
+        if ($ignoreArgs !== false) {
+            ini_set('zend.exception_ignore_args', $ignoreArgs);
+        }
+        if ($argLength !== false) {
+            ini_set('zend.exception_string_param_max_len', $argLength);
+        }
     }
-});
+})->with(['a missing key', 'a bad key version', 'a failed write']);
+
+it('never keeps the tap URL in the session as the page to go back to', function (string $outcome): void {
+    // The session keeps each page's full URL; this one carries e and c (CHW-149, sun-nfc-verification).
+    $url = ($this->url)(5);
+    if ($outcome === 'a server error') {
+        config(['punchcard.nfc.key_version' => 'two']);
+    }
+
+    $this->get(route('home'))->assertOk();
+
+    $response = $this->get(route('taps.receive', $url));
+
+    $outcome === 'a server error' ? $response->assertServerError() : $response->assertRedirect();
+    // The page before stays the one to go back to, and nothing in the session, however deep, holds e or c.
+    expect(session()->previousUrl())->toBe(route('home'))
+        ->and(json_encode(session()->all()))->not->toContain($url['e'])->not->toContain($url['c']);
+})->with(['a tap', 'a server error']);
 
 it('treats a missing key as a server error, never as a tap', function (): void {
     config(['punchcard.nfc.sun_master_key' => null]);
