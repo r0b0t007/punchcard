@@ -10,6 +10,8 @@ use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\Follow;
+use App\Models\Organization;
+use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\Stamper;
 use App\Models\StampEvent;
@@ -79,6 +81,11 @@ final readonly class DeleteAccount
                 return false;
             }
 
+            // The organizations they run, share-locked before the hand-over check reads them archived: a restore waits,
+            // then finds who is left to run it (RestoreArchived, CHW-308).
+            Organization::query()->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->select('organization_id'))
+                ->sharedLock()->pluck('id');
+
             if ($this->mustHandOverBusiness->handle($user)) {
                 throw new LogicException('An owner or org admin hands over or closes the business before deleting their account.');
             }
@@ -129,6 +136,9 @@ final readonly class DeleteAccount
     private function anonymise(User $user): void
     {
         BusinessMember::query()->where('user_id', $user->id)->delete();
+        // An org admin's role too (CHW-308): only one of an archived organization gets here (MustHandOverBusiness), and
+        // a restore would make "Deleted user" its admin again, counted as one and working at every site.
+        OrganizationMember::query()->where('user_id', $user->id)->delete();
         // A deleted row loses its roles with it (HasRoles); a kept one gives them up here.
         $user->syncRoles([]);
         CardEnrollment::query()->where('user_id', $user->id)->whereDoesntHave('stampEvents')->whereDoesntHave('rewards')->delete();

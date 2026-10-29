@@ -333,6 +333,8 @@ describe('restoring', function (): void {
     })->throws(LogicException::class);
 
     it('lets the platform admin restore a business, a location or an organization', function (string $what): void {
+        // An organization comes back with someone to run it (CHW-308).
+        $this->tenants->admin(User::factory()->create(), $this->tenants->orgB);
         $this->context->bypass(function () use ($what): void {
             match ($what) {
                 'a business' => [app(ArchiveBusiness::class)->handle($this->tenants->a2), app(RestoreArchived::class)->handle($this->tenants->a2)],
@@ -347,6 +349,18 @@ describe('restoring', function (): void {
             })->toBeTrue();
         });
     })->with(['a business', 'a location', 'an organization']);
+
+    it('refuses to restore an organization nobody is left to run', function (string $admins): void {
+        if ($admins === 'one, whose account was deleted') {
+            $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgB);
+            DB::table('users')->where('id', $admin->id)->update(['anonymised_at' => now()]);
+        }
+        $this->context->bypass(fn () => app(ArchiveOrganization::class)->handle($this->tenants->orgB));
+
+        expect(fn () => $this->context->bypass(fn () => app(RestoreArchived::class)->handle($this->tenants->orgB)))
+            ->toThrow(LogicException::class, 'Nobody is left to run this organization');
+        expect($this->tenants->orgB->fresh()?->archived_at)->not->toBeNull();
+    })->with(['none', 'one, whose account was deleted']);
 
     it('restores only what is archived', function (string $what): void {
         $this->context->bypass(fn () => app(RestoreArchived::class)->handle(match ($what) {
