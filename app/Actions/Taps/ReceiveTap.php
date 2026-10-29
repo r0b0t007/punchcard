@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Taps;
 
-use App\Actions\Counter\ArmingCounts;
+use App\Actions\Stamps\ArmingCounts;
 use App\Enums\StamperStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;

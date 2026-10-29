@@ -17,22 +17,28 @@ use App\Support\Tenancy\TenantContext;
  * ResolveTenant reads the limit), or an org admin of its organization. Who
  * may give stamps there (AddStamps), and whose arming a tap may still use
  * (ReceiveTap, CHW-29). Read in bypass(): a tap comes from no tenant.
+ *
+ * Locked (share) for one who is about to act on their word (ArmStamper,
+ * CHW-309): taking them off waits for the act, or the act waits and finds
+ * them gone.
  */
 final readonly class WorksAt
 {
     public function __construct(private TenantContext $context) {}
 
-    public function handle(int $userId, int $businessId, int $locationId): bool
+    public function handle(int $userId, int $businessId, int $locationId, bool $lock = false): bool
     {
         return $this->context->bypass(fn (): bool => BusinessMember::query()
             ->where('business_id', $businessId)
             ->where('user_id', $userId)
             ->where(fn ($membership) => $membership->where('role', BusinessRole::Owner)->orWhereNull('location_id')->orWhere('location_id', $locationId))
-            ->exists()
+            ->when($lock, fn ($membership) => $membership->sharedLock())
+            ->value('id') !== null
             || OrganizationMember::query()
                 ->where('user_id', $userId)
                 ->where('role', OrganizationRole::OrgAdmin)
                 ->whereIn('organization_id', Business::query()->whereKey($businessId)->select('organization_id'))
-                ->exists());
+                ->when($lock, fn ($admin) => $admin->sharedLock())
+                ->value('id') !== null);
     }
 }

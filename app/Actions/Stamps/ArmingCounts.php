@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Counter;
+namespace App\Actions\Stamps;
 
-use App\Actions\Stamps\WorksAt;
 use App\Models\Stamper;
 
 /**

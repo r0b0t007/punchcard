@@ -254,24 +254,61 @@ it('ends the armings of a staff member taken off the staff', function (): void {
     expect(($this->tap)($this->stamper, 1))->toBe(1);
 });
 
-it('shows an arming idle once its armer no longer works there, as the tap takes it', function (string $how): void {
+it('ends the armings of a staff member taken off the staff, so the counter and a re-invite never bring them back', function (): void {
     ($this->arm)($this->staff, $this->stamper, 5);
     ($this->as)($this->owner)->get(route('counter.show'))
         ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', 5));
+    $membership = $this->context->bypass(fn (): BusinessMember => BusinessMember::query()->where('user_id', $this->staff->id)->sole());
 
-    $this->context->bypass(function () use ($how): void {
-        $membership = BusinessMember::query()->where('user_id', $this->staff->id);
-        match ($how) {
-            'limited to another location' => $membership->update(['location_id' => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace'])->id]),
-            // Their account deleted: the deletion takes the membership (an arming that outlived it, CHW-265).
-            'membership gone' => $membership->delete(),
-        };
+    ($this->as)($this->owner)->delete(route('staff.destroy', $membership->id))->assertRedirect(route('staff.index'));
+
+    expect(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
+    ($this->as)($this->owner)->get(route('counter.show'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', null)->where('stampers.0.armedSecondsLeft', null));
+    // Back on the staff within the minute: nothing armed comes back with them.
+    $this->tenants->member($this->staff, $this->tenants->a1);
+    expect(($this->tap)($this->stamper, 1))->toBe(1);
+});
+
+it('refuses an arming by someone taken off the staff while their request was under way', function (): void {
+    // The tenant as their request resolved it, before the removal committed.
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Staff);
+    $this->context->bypass(fn () => BusinessMember::query()->where('user_id', $this->staff->id)->delete());
+
+    expect(app(ArmStamper::class)->handle($this->stamper, 5, $this->staff))->toBeFalse()
+        ->and(($this->fresh)($this->stamper)->armed_qty)->toBeNull();
+});
+
+it('keeps the armings of a staff member taken off the staff who still works there as an org admin', function (): void {
+    $this->tenants->admin($this->staff, $this->tenants->orgA);
+    ($this->arm)($this->staff, $this->stamper, 5);
+    $membership = $this->context->bypass(fn (): BusinessMember => BusinessMember::query()->where('user_id', $this->staff->id)->sole());
+
+    ($this->as)($this->owner)->delete(route('staff.destroy', $membership->id))->assertRedirect(route('staff.index'));
+
+    expect(($this->fresh)($this->stamper)->armed_qty)->toBe(5)
+        ->and(($this->tap)($this->stamper, 1))->toBe(5);
+});
+
+it('shows an arming idle when its armer no longer works there, as the tap takes it', function (string $where): void {
+    // An arming left by someone who no longer works at this site, on two stampers: asked once, idle on both.
+    $elsewhere = User::factory()->create();
+    $this->tenants->member($elsewhere, $where === 'another business' ? $this->tenants->a2 : $this->tenants->a1);
+    if ($where === 'another location of this one') {
+        $this->context->bypass(fn (): int => BusinessMember::query()->where('user_id', $elsewhere->id)
+            ->update(['location_id' => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace'])->id]));
+    }
+    $second = $this->tenants->stamper($this->tenants->a1);
+    $this->context->bypass(function () use ($elsewhere, $second): void {
+        foreach ([$this->stamper, $second] as $stamper) {
+            ($this->fresh)($stamper)->forceFill(['armed_qty' => 5, 'armed_until' => now()->addSeconds(ArmStamper::SECONDS), 'armed_by' => $elsewhere->id])->save();
+        }
     });
 
     ($this->as)($this->owner)->get(route('counter.show'))
-        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', null)->where('stampers.0.armedSecondsLeft', null));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', null)->where('stampers.1.armedQty', null));
     expect(($this->tap)($this->stamper, 1))->toBe(1);
-})->with(['limited to another location', 'membership gone']);
+})->with(['another business', 'another location of this one']);
 
 it('keeps the dashboard for an org admin who is also staff there', function (): void {
     $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
