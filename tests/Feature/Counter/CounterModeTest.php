@@ -254,6 +254,25 @@ it('ends the armings of a staff member taken off the staff', function (): void {
     expect(($this->tap)($this->stamper, 1))->toBe(1);
 });
 
+it('shows an arming idle once its armer no longer works there, as the tap takes it', function (string $how): void {
+    ($this->arm)($this->staff, $this->stamper, 5);
+    ($this->as)($this->owner)->get(route('counter.show'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', 5));
+
+    $this->context->bypass(function () use ($how): void {
+        $membership = BusinessMember::query()->where('user_id', $this->staff->id);
+        match ($how) {
+            'limited to another location' => $membership->update(['location_id' => Location::factory()->for($this->tenants->a1)->create(['name' => 'A1 terrace'])->id]),
+            // Their account deleted: the deletion takes the membership (an arming that outlived it, CHW-265).
+            'membership gone' => $membership->delete(),
+        };
+    });
+
+    ($this->as)($this->owner)->get(route('counter.show'))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('stampers.0.armedQty', null)->where('stampers.0.armedSecondsLeft', null));
+    expect(($this->tap)($this->stamper, 1))->toBe(1);
+})->with(['limited to another location', 'membership gone']);
+
 it('keeps the dashboard for an org admin who is also staff there', function (): void {
     $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
     $this->tenants->member($hq, $this->tenants->a1);

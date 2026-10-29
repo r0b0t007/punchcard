@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  */
 final readonly class DescribeCounter
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ArmingCounts $armingCounts) {}
 
     /**
      * @return array{
@@ -59,7 +59,8 @@ final readonly class DescribeCounter
         return [
             'businessName' => $business->name,
             'stampers' => $stampers->map(function (Stamper $stamper) use ($lastTaps): array {
-                $armed = $stamper->isArmed();
+                // As the tap will take it: an arming by someone no longer working here shows idle (CHW-309).
+                $armed = $this->armingCounts->handle($stamper);
                 $lastTap = $lastTaps->get($stamper->id);
 
                 return [
