@@ -69,7 +69,6 @@ export default function EmailLink({
                                 id="email"
                                 type="email"
                                 name="email"
-                                dir="ltr"
                                 required
                                 autoFocus
                                 autoComplete="email"

@@ -543,7 +543,6 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                             <Input
                                 id="info_phone"
                                 type="tel"
-                                dir="ltr"
                                 maxLength={30}
                                 value={data.info.phone}
                                 onChange={(event) =>
@@ -581,7 +580,6 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                                             />
                                             <Input
                                                 type="url"
-                                                dir="ltr"
                                                 maxLength={255}
                                                 placeholder="https://"
                                                 aria-label={t(

@@ -47,6 +47,27 @@ describe('locale resolution', function (): void {
             ->get('/')
             ->assertInertia(fn (Assert $page): Assert => $page->where('locale', 'ar')->where('dir', 'rtl'));
     });
+
+    it('keeps a language chosen before signing in, over the account\'s own', function (): void {
+        // CHW-132: the account kept the language it signed up in; the switcher, signed out, is a choice made since.
+        $user = User::factory()->create(['locale' => 'fr']);
+
+        $this->withCookie('locale', 'ar')
+            ->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+            ->assertSessionHasNoErrors();
+
+        expect($user->fresh()?->locale)->toBe('ar');
+    });
+
+    it('leaves the account\'s language as it is when nothing was chosen before signing in', function (): void {
+        $user = User::factory()->create(['locale' => 'fr']);
+
+        $this->withHeader('Accept-Language', 'ar')
+            ->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+            ->assertSessionHasNoErrors();
+
+        expect($user->fresh()?->locale)->toBe('fr');
+    });
 });
 
 describe('rendering', function (): void {

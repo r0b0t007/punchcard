@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Account\RecordActivity;
 use App\Actions\Admin\StopImpersonation;
+use App\Actions\Locale\UpdateLocale;
 use App\Actions\Taps\RekeyTapClaimToken;
 use App\Enums\PlatformRole;
 use App\Http\Middleware\PlatformAdminWorksAcrossTenants;
@@ -15,6 +16,7 @@ use App\Policies\Invariants;
 use App\Support\Auth\ActiveUserProvider;
 use App\Support\Auth\ImpersonationSessionHandler;
 use App\Support\Http\ClientAddress;
+use App\Support\Locales;
 use App\Support\Nfc\KeyDiversifier;
 use App\Support\Tenancy\QueuedTenant;
 use App\Support\Tenancy\TenantContext;
@@ -120,6 +122,7 @@ class AppServiceProvider extends ServiceProvider
         $this->letAdminsThroughInFilament();
         $this->runAdminPanelUpdatesAcrossTenants();
         $this->rekeyTapClaimTokenAtSignIn();
+        $this->keepLanguageChosenBeforeSignIn();
         $this->keepImpersonationSessionsTheAdmins();
         $this->trustConfiguredProxies();
     }
@@ -206,6 +209,23 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function (): void {
             if (request()->hasSession()) {
                 app(RekeyTapClaimToken::class)->handle(request()->session());
+            }
+        });
+    }
+
+    /**
+     * A language picked in the switcher while signed out (its cookie, set by
+     * nothing else) is a choice made since the account's: the account takes
+     * it at sign-in, so the language it signed up in never overrides it
+     * (CHW-132). No cookie, or the same language: nothing changes.
+     */
+    private function keepLanguageChosenBeforeSignIn(): void
+    {
+        Event::listen(Login::class, function (Login $login): void {
+            $chosen = request()->cookie('locale');
+
+            if ($login->user instanceof User && is_string($chosen) && Locales::isSupported($chosen) && $login->user->locale !== $chosen) {
+                app(UpdateLocale::class)->handle($login->user, $chosen);
             }
         });
     }

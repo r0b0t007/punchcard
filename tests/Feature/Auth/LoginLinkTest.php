@@ -259,10 +259,9 @@ it('keeps the language a new account was made in, for the emails it gets later',
 });
 
 it('leaves the language of an account that already existed as it was', function (): void {
-    Notification::fake();
     User::factory()->create(['email' => 'nadia@example.test', 'password' => null, 'locale' => 'fr']);
-    ($this->requestLink)('nadia@example.test');
-    $this->post(($this->linkFor)('nadia@example.test'));
+    // The page in another language than the account's.
+    app()->setLocale('ar');
 
     app(CreateCustomer::class)->handle('nadia@example.test', 'Nadia Tazi', false);
 

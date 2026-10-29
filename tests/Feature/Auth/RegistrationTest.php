@@ -41,8 +41,8 @@ class RegistrationTest extends TestCase
 
     public function test_new_users_keep_the_language_they_registered_in(): void
     {
-        // CHW-132: the page was in French, so later emails are too.
-        $this->withHeader('Accept-Language', 'fr')->post(route('register.store'), [
+        // CHW-132: the page was in Arabic (not the default), so later emails are too.
+        $this->withHeader('Accept-Language', 'ar')->post(route('register.store'), [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password',
@@ -50,6 +50,6 @@ class RegistrationTest extends TestCase
             'adult' => '1',
         ])->assertRedirect(route('start', absolute: false));
 
-        $this->assertSame('fr', User::query()->where('email', 'test@example.com')->sole()->locale);
+        $this->assertSame('ar', User::query()->where('email', 'test@example.com')->sole()->locale);
     }
 }
