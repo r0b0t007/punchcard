@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Features;
 use Tests\TestCase;
@@ -36,5 +37,19 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('start', absolute: false));
+    }
+
+    public function test_new_users_keep_the_language_they_registered_in(): void
+    {
+        // CHW-132: the page was in Arabic (not the default), so later emails are too.
+        $this->withHeader('Accept-Language', 'ar')->post(route('register.store'), [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'adult' => '1',
+        ])->assertRedirect(route('start', absolute: false));
+
+        $this->assertSame('ar', User::query()->where('email', 'test@example.com')->sole()->locale);
     }
 }

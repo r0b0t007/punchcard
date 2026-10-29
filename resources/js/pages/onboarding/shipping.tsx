@@ -57,7 +57,6 @@ export default function OnboardingShipping({ kit }: Props) {
                                 required
                                 maxLength={32}
                                 autoComplete="tel"
-                                dir="ltr"
                                 defaultValue={kit.phone ?? ''}
                                 placeholder="+212 6 12 34 56 78"
                             />

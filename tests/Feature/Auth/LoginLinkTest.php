@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\CreateCustomer;
 use App\Enums\BusinessRole;
 use App\Enums\PlatformRole;
 use App\Enums\TapStatus;
@@ -243,6 +244,28 @@ it('asks a new address who they are, then makes an account without a password', 
     Auth::logout();
     $this->post(route('login.store'), ['email' => 'nadia@example.test', 'password' => ''])->assertSessionHasErrors();
     $this->assertGuest();
+});
+
+it('keeps the language a new account was made in, for the emails it gets later', function (): void {
+    // CHW-132: the page was in Arabic (the browser asked for it), so later emails are too.
+    Notification::fake();
+    ($this->requestLink)('nadia@example.test');
+    $this->post(($this->linkFor)('nadia@example.test'));
+
+    $this->withHeader('Accept-Language', 'ar')
+        ->post(route('sign-up.finish.store'), ['name' => 'Nadia Tazi', 'adult' => '1'])->assertRedirect(route('start'));
+
+    expect(User::query()->where('email', 'nadia@example.test')->sole()->locale)->toBe('ar');
+});
+
+it('leaves the language of an account that already existed as it was', function (): void {
+    User::factory()->create(['email' => 'nadia@example.test', 'password' => null, 'locale' => 'fr']);
+    // The page in another language than the account's.
+    app()->setLocale('ar');
+
+    app(CreateCustomer::class)->handle('nadia@example.test', 'Nadia Tazi', false);
+
+    expect(User::query()->where('email', 'nadia@example.test')->sole()->locale)->toBe('fr');
 });
 
 it('records news by email only when ticked, with when', function (): void {

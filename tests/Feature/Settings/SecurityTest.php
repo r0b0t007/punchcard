@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SecurityTest extends TestCase
@@ -115,5 +116,37 @@ class SecurityTest extends TestCase
         $response
             ->assertSessionHasErrors('current_password')
             ->assertRedirect(route('security.edit'));
+    }
+
+    /**
+     * Passkey dates read in the account's language (CHW-132): "Added :time"
+     * and "Last used :time" get a time the server formats.
+     *
+     * @return array<string, array{string, string, string}>
+     */
+    public static function passkeyDateLocales(): array
+    {
+        return [
+            'French' => ['fr', 'il y a 3 jours', 'il y a 2 heures'],
+            'Arabic' => ['ar', 'منذ 3 أيام', 'منذ ساعتين'],
+        ];
+    }
+
+    #[DataProvider('passkeyDateLocales')]
+    public function test_passkey_dates_read_in_the_accounts_language(string $locale, string $added, string $lastUsed): void
+    {
+        $this->skipUnlessFortifyHas(Features::passkeys());
+
+        $user = User::factory()->create(['locale' => $locale]);
+        $passkey = $user->passkeys()->create(['name' => 'Phone', 'credential_id' => 'cred-1', 'credential' => []]);
+        $passkey->forceFill(['created_at' => now()->subDays(3), 'last_used_at' => now()->subHours(2)])->save();
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('security.edit'))
+            ->assertInertia(fn (Assert $page): AssertableInertia => $page
+                ->where('passkeys.0.created_at_diff', $added)
+                ->where('passkeys.0.last_used_at_diff', $lastUsed),
+            );
     }
 }

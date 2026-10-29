@@ -19,7 +19,8 @@ class CreateNewUser implements CreatesNewUsers
     public function __construct(private readonly RecordConsent $recordConsent) {}
 
     /**
-     * Validate and create a newly registered user, with their consent dated (CHW-23).
+     * Validate and create a newly registered user, with their consent dated (CHW-23), in the language the page was in
+     * (SetLocale), so the emails they get later are too (CHW-132).
      *
      * @param  array<string, string>  $input
      */
@@ -35,6 +36,7 @@ class CreateNewUser implements CreatesNewUsers
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
+            'locale' => app()->getLocale(),
         ]);
 
         return $this->recordConsent->handle($user, filter_var($input['marketing'] ?? false, FILTER_VALIDATE_BOOLEAN));

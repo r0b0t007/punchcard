@@ -15,9 +15,12 @@ export default function PasswordInput({
 
     return (
         <div className="relative">
+            {/* Left to right shown or hidden (CHW-132). The eye sits at the page's inline end, the field reads left to
+                right, so in Arabic its room is on the field's start. */}
             <Input
                 type={showPassword ? 'text' : 'password'}
-                className={cn('pe-10', className)}
+                dir="ltr"
+                className={cn('pe-10 rtl:ps-10 rtl:pe-3', className)}
                 ref={ref}
                 {...props}
             />
