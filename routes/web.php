@@ -25,6 +25,7 @@ use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Middleware\EnsureTenantUnchanged;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
 use App\Support\Auth\MailedLink;
@@ -59,8 +60,8 @@ Route::middleware(['guest', NeverCache::class])->group(function (): void {
 });
 
 // punchcard Pro, the business app (CHW-151): every page under /business, its manifest's scope, so a tap (/t) or a
-// join link (/j) never opens in it.
-Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('business')->group(function (): void {
+// join link (/j) never opens in it. A tab left on another business saves nothing (EnsureTenantUnchanged, CHW-147).
+Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, 'pwa:business'])->prefix('business')->group(function (): void {
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
     Route::get('/', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
     // A business's page from its emails (CHW-295): selects the business the signed link names, then opens the page.

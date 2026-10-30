@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ImpersonationBanner from '@/components/impersonation-banner';
 import PwaHead from '@/components/pwa-head';
 import ServiceWorker from '@/components/service-worker';
+import StaleTenantNotice from '@/components/stale-tenant-notice';
 import { createI18n, I18nContext } from '@/hooks/use-translation';
 import { keepOnlyCardsOf } from '@/lib/offline-cards';
 import type { User } from '@/types/auth';
@@ -16,7 +17,8 @@ import type { User } from '@/types/auth';
  * them to useTranslation(). Also keeps <html lang dir> in sync and feeds
  * Radix's DirectionProvider, which does not read <html dir>, registers the
  * service worker on the pages of an installable app (CHW-35), and shows the
- * impersonation banner on every page (CHW-144).
+ * impersonation banner on every page (CHW-144) and, on a business page left
+ * on another business since, the stale-tab notice (CHW-147).
  *
  * Outside it (component tests, previews) useTranslation() falls back to the
  * English keys.
@@ -70,6 +72,8 @@ export default function I18nLayout({ children }: { children: ReactNode }) {
                 {/* Above every page while the platform admin is signed in as an owner (CHW-144). */}
                 <ImpersonationBanner />
                 {children}
+                {/* A tab left on another business (CHW-147, 10f-2). */}
+                <StaleTenantNotice />
             </DirectionProvider>
             {/* The first page of an installable app registers the service worker (CHW-35). */}
             <PwaHead pwa={pwa ?? null} />

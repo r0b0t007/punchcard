@@ -987,5 +987,12 @@
     "This link is for another account": "هذا الرابط لحساب آخر",
     "We sent it to :sentTo. You're signed in as :signedInAs. Sign out, then sign in with the account it was sent to.": "أرسلناه إلى :sentTo. أنت متصل باسم :signedInAs. سجّل الخروج، ثم سجّل الدخول بالحساب الذي أُرسل إليه.",
     "Sign out and use that account": "تسجيل الخروج واستعمال ذلك الحساب",
-    "Stay signed in as :name": "البقاء متصلًا باسم :name"
+    "Stay signed in as :name": "البقاء متصلًا باسم :name",
+    "Not saved. You switched to :business in another tab, so this page now shows :business.": "لم يُحفظ شيء. انتقلت إلى :business في علامة تبويب أخرى، لذا تعرض هذه الصفحة الآن :business.",
+    "Not saved. You switched business in another tab.": "لم يُحفظ شيء. غيّرت النشاط التجاري في علامة تبويب أخرى.",
+    "You switched to :business in another tab.": "انتقلت إلى :business في علامة تبويب أخرى.",
+    "You switched business in another tab.": "غيّرت النشاط التجاري في علامة تبويب أخرى.",
+    "This page is still :business's: nothing here can be saved.": "هذه الصفحة ما زالت لـ :business: لن يُحفظ فيها شيء.",
+    "Nothing here can be saved.": "لن يُحفظ هنا شيء.",
+    "Show :business": "عرض :business"
 }

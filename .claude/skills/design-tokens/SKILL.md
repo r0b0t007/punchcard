@@ -94,6 +94,7 @@ above: keep the two in step.
 | Verify your business: the documents page, its four states and the checklist item (9a, CHW-145); the new-documents email                      | `Punchcard Verification Review.dc.html`                               |
 | The inactivity warning email (CHW-58, option B: date first), light, dark and Arabic                                                          | Design canvas, see below                                              |
 | Switch business: the business in the sidebar header and its menu (10a), no business chosen (10d), a link for another account (10e) (CHW-147) | `Punchcard Tenant Switcher Review.dc.html`                            |
+| A tab left on another business: the notice as soon as another tab switches, and the toast when a save is refused (10f-2, CHW-147)            | `Punchcard Stale Tab Review.dc.html`                                  |
 | B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                                     | `BA Stampers.dc.html`                                                 |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system

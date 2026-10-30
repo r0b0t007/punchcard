@@ -75,6 +75,13 @@ class HandleInertiaRequests extends Middleware
             ],
             // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
             'tenants' => fn (): ?array => $this->tenants($request),
+            // The tenant a business page is rendered for (CHW-147, 10f): its visits name it (EnsureTenantUnchanged), and the
+            // app's other tabs compare it with theirs. On every page the guard covers, full-screen ones too (not onboarding,
+            // which has its own business); one query at most.
+            'tenant' => fn (): ?array => $request->user() instanceof User && in_array(EnsureTenantUnchanged::class, $request->route()?->gatherMiddleware() ?? [], true) ? [
+                'choice' => EnsureTenantUnchanged::choiceOf(app(TenantContext::class)),
+                'name' => app(TenantContext::class)->business()->name ?? app(TenantContext::class)->organization()?->name,
+            ] : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
             'dir' => Locales::direction($locale),

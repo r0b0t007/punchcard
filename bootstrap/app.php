@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsureTenantUnchanged;
 use App\Http\Middleware\GiveSessionTapToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -61,6 +62,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // The tenant must be set before route model bindings resolve, so another
         // tenant's {location} or {business} is a 404 instead of an unscoped lookup.
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: SetTenant::class);
+        // A tab left on another business is refused after the tenant is set, before a binding could 404 (CHW-147).
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: EnsureTenantUnchanged::class);
 
         // NeverCache wraps the tap routes' auth and throttle, so a login redirect or a 429 is no-store too.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: NeverCache::class);

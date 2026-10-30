@@ -987,5 +987,12 @@
     "This link is for another account": "Ce lien est pour un autre compte",
     "We sent it to :sentTo. You're signed in as :signedInAs. Sign out, then sign in with the account it was sent to.": "Nous l’avons envoyé à :sentTo. Vous êtes connecté en tant que :signedInAs. Déconnectez-vous, puis connectez-vous avec le compte auquel il a été envoyé.",
     "Sign out and use that account": "Me déconnecter et utiliser ce compte",
-    "Stay signed in as :name": "Rester connecté en tant que :name"
+    "Stay signed in as :name": "Rester connecté en tant que :name",
+    "Not saved. You switched to :business in another tab, so this page now shows :business.": "Rien n’a été enregistré. Vous êtes passé à :business dans un autre onglet : cette page affiche maintenant :business.",
+    "Not saved. You switched business in another tab.": "Rien n’a été enregistré. Vous avez changé de commerce dans un autre onglet.",
+    "You switched to :business in another tab.": "Vous êtes passé à :business dans un autre onglet.",
+    "You switched business in another tab.": "Vous avez changé de commerce dans un autre onglet.",
+    "This page is still :business's: nothing here can be saved.": "Cette page est encore celle de :business : rien n’y sera enregistré.",
+    "Nothing here can be saved.": "Rien n’y sera enregistré.",
+    "Show :business": "Afficher :business"
 }

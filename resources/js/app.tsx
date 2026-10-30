@@ -10,6 +10,7 @@ import CustomerLayout from '@/layouts/customer-layout';
 import I18nLayout from '@/layouts/i18n-layout';
 import OnboardingLayout from '@/layouts/onboarding-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { withTenantHeader } from '@/lib/tenant-guard';
 
 const appName = import.meta.env.VITE_APP_NAME || 'punchcard';
 
@@ -53,6 +54,8 @@ void createInertiaApp({
         }
     },
     strictMode: true,
+    // Every visit from a business page names the tenant it shows (CHW-147, 10f).
+    defaults: { visitOptions: withTenantHeader },
     withApp(app) {
         return (
             <TooltipProvider delayDuration={0}>
