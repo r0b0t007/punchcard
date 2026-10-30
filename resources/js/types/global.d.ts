@@ -1,6 +1,7 @@
 import type { Auth } from '@/types/auth';
 import type { LocaleOption, TextDirection } from '@/types/i18n';
 import type { Pwa } from '@/types/pwa';
+import type { ShownTenant } from '@/lib/tenant-guard';
 import type { Tenants } from '@/types/tenants';
 
 declare module 'react' {
@@ -29,6 +30,8 @@ declare module '@inertiajs/core' {
             } | null;
             /** Where the user may work and where they work now (DescribeTenants, CHW-147); null outside the business app and settings, or for someone who works nowhere. */
             tenants: Tenants;
+            /** The tenant a business page is rendered for (CHW-147, 10f): its visits name it; null elsewhere. */
+            tenant: ShownTenant | null;
             /** The installable app the page belongs to (UsePwa, CHW-35). */
             pwa: Pwa;
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */

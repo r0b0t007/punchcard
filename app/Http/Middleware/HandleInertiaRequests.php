@@ -12,6 +12,7 @@ use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Inertia\Inertia;
 use Inertia\Middleware;
 
@@ -75,6 +76,14 @@ class HandleInertiaRequests extends Middleware
             ],
             // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
             'tenants' => fn (): ?array => $this->tenants($request),
+            // The tenant a business page is rendered for (CHW-147, 10f): its visits name it (EnsureTenantUnchanged), and the
+            // app's other tabs compare it with theirs, the latest render (`at`, the server's clock) being where the session
+            // works. On every page the guard covers, full-screen ones too (not onboarding: its own business); one query.
+            'tenant' => fn (): ?array => $request->user() instanceof User && $request->route() instanceof Route && EnsureTenantUnchanged::covers($request->route()) ? [
+                'choice' => EnsureTenantUnchanged::choiceOf(app(TenantContext::class)),
+                'name' => EnsureTenantUnchanged::nameOf(app(TenantContext::class)),
+                'at' => now()->getTimestampMs(),
+            ] : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
             'dir' => Locales::direction($locale),
