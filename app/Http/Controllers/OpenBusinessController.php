@@ -10,6 +10,8 @@ use App\Http\Requests\OpenBusinessRequest;
 use App\Models\User;
 use App\Support\Auth\MailedLink;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * A business's page from its emails (CHW-295): the verification emails'
@@ -22,7 +24,7 @@ use Illuminate\Http\RedirectResponse;
  */
 final class OpenBusinessController extends Controller
 {
-    public function __invoke(OpenBusinessRequest $request, int $business, string $page, SelectTenant $selectTenant): RedirectResponse
+    public function show(OpenBusinessRequest $request, int $business, string $page, SelectTenant $selectTenant): RedirectResponse
     {
         $user = $request->user();
         assert($user instanceof User);
@@ -34,5 +36,19 @@ final class OpenBusinessController extends Controller
         $request->session()->put(SetTenant::SESSION_KEY, SetTenant::businessChoice($business));
 
         return to_route(MailedLink::BUSINESS_PAGES[$page]);
+    }
+
+    /**
+     * "Sign out and use that account" (CHW-147, design 10e), posted to the same signed link: signs out whoever is
+     * signed in, then the sign-in page, which comes back to the link (Fortify's intended URL).
+     */
+    public function switchAccount(Request $request): RedirectResponse
+    {
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        $request->session()->put('url.intended', MailedLink::onTheApp($request->getRequestUri()));
+
+        return to_route('business.login');
     }
 }

@@ -983,5 +983,9 @@
     "Runs the network": "Gère le réseau",
     "Switch business": "Changer de commerce",
     "Where do you work today?": "Où travaillez-vous aujourd’hui ?",
-    "Choose a business. You can change it any time from the menu.": "Choisissez un commerce. Vous pouvez en changer à tout moment depuis le menu."
+    "Choose a business. You can change it any time from the menu.": "Choisissez un commerce. Vous pouvez en changer à tout moment depuis le menu.",
+    "This link is for another account": "Ce lien est pour un autre compte",
+    "We sent it to :sentTo. You're signed in as :signedInAs. Sign out, then sign in with the account it was sent to.": "Nous l’avons envoyé à :sentTo. Vous êtes connecté en tant que :signedInAs. Déconnectez-vous, puis connectez-vous avec le compte auquel il a été envoyé.",
+    "Sign out and use that account": "Me déconnecter et utiliser ce compte",
+    "Stay signed in as :name": "Rester connecté en tant que :name"
 }

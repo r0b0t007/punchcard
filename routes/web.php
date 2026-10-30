@@ -64,8 +64,11 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
     Route::get('/', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
     // A business's page from its emails (CHW-295): selects the business the signed link names, then opens the page.
-    Route::get('open/{business}/{page}', OpenBusinessController::class)->whereNumber('business')
+    Route::get('open/{business}/{page}', [OpenBusinessController::class, 'show'])->whereNumber('business')
         ->whereIn('page', array_keys(MailedLink::BUSINESS_PAGES))->middleware(ValidateSignature::relative())->name('business.open');
+    // Opened by another account (CHW-147, design 10e): sign out, then sign in as the one it was mailed to.
+    Route::post('open/{business}/{page}', [OpenBusinessController::class, 'switchAccount'])->whereNumber('business')
+        ->whereIn('page', array_keys(MailedLink::BUSINESS_PAGES))->middleware(ValidateSignature::relative())->name('business.open.switch-account');
     // The tenant switcher (CHW-147): work in another business or network, then its dashboard.
     Route::put('tenant', [TenantController::class, 'update'])->name('tenant.update');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.

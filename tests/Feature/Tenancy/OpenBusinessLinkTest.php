@@ -29,7 +29,9 @@ use Tests\Support\Tenants;
 | The verification emails and the fraud alerts go to one business's owners.
 | Their button opens that business, whichever one the session had selected:
 | a signed link selects it, when the user still works there, then shows its
-| page. Anyone else gets nothing, and nothing is switched.
+| page. Anyone else gets nothing, and nothing is switched. Opened while
+| another account is signed in, it says so (CHW-147, design 10e) and offers
+| to sign out, then back to the link once the right account signs in.
 |
 */
 
@@ -123,7 +125,7 @@ it('opens only for the user it was mailed to, switching nothing for anyone else'
     $this->tenants->member($coOwner, $this->tenants->a2, BusinessRole::Owner);
 
     ($this->onA2)($coOwner)->get(($this->link)('stampers'))
-        ->assertNotFound()
+        ->assertForbidden()
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a2->id);
     ($this->onA2)($coOwner)->get(str_replace('for='.$this->owner->id, 'for='.$coOwner->id, ($this->link)('stampers')))->assertForbidden();
     ($this->onA2)($coOwner)->get(($this->link)('stampers', $coOwner))->assertRedirect(route('stampers.index'));
@@ -146,4 +148,50 @@ it('opens it after signing in', function (): void {
 
     $this->get($link)->assertRedirect(route('verification.show'))
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a1->id);
+});
+
+it('tells another account signed in whom the link is for, half hidden, and opens nothing', function (): void {
+    $omar = User::factory()->create(['name' => 'Omar', 'email' => 'omar@example.com']);
+    $this->owner->forceFill(['email' => 'salma@cafehafa.ma'])->save();
+    $link = ($this->link)('verification');
+
+    ($this->onA2)($omar)->get($link)
+        ->assertForbidden()
+        ->assertDontSee('salma@cafehafa.ma')
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('auth/other-account')
+            ->where('sentTo', 's***@cafehafa.ma')
+            ->where('signedInAs', 'omar@example.com')
+            ->where('name', 'Omar')
+            ->where('action', parse_url($link, PHP_URL_PATH).'?'.parse_url($link, PHP_URL_QUERY)))
+        ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a2->id);
+});
+
+it('gives a 404 for a link whose account is gone', function (): void {
+    $gone = User::factory()->create();
+    $link = ($this->link)('verification', $gone);
+    $gone->delete();
+
+    ($this->onA2)()->get($link)->assertNotFound();
+});
+
+it('signs out the other account, then opens the link once the account it was mailed to signs in', function (): void {
+    $omar = User::factory()->create();
+    $link = ($this->link)('verification');
+
+    ($this->onA2)($omar)->post($link)->assertRedirect(route('business.login'));
+    $this->assertGuest();
+
+    $this->post(route('login.store'), ['email' => $this->owner->email, 'password' => 'password'])->assertRedirect($link);
+    $this->get($link)->assertRedirect(route('verification.show'))
+        ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a1->id);
+});
+
+it('signs nobody out for a link it did not sign', function (): void {
+    $omar = User::factory()->create();
+
+    ($this->onA2)($omar)->post(str_replace('for='.$this->owner->id, 'for='.$omar->id, ($this->link)('verification')))->assertForbidden();
+    ($this->onA2)($omar)->post(route('business.open.switch-account', ['business' => $this->tenants->a1->id, 'page' => 'verification', 'for' => $this->owner->id]))->assertForbidden();
+
+    $this->assertAuthenticatedAs($omar);
 });

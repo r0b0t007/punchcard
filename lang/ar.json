@@ -983,5 +983,9 @@
     "Runs the network": "يدير الشبكة",
     "Switch business": "تغيير النشاط التجاري",
     "Where do you work today?": "أين تعمل اليوم؟",
-    "Choose a business. You can change it any time from the menu.": "اختر نشاطًا تجاريًا. يمكنك تغييره في أي وقت من القائمة."
+    "Choose a business. You can change it any time from the menu.": "اختر نشاطًا تجاريًا. يمكنك تغييره في أي وقت من القائمة.",
+    "This link is for another account": "هذا الرابط لحساب آخر",
+    "We sent it to :sentTo. You're signed in as :signedInAs. Sign out, then sign in with the account it was sent to.": "أرسلناه إلى :sentTo. أنت متصل باسم :signedInAs. سجّل الخروج، ثم سجّل الدخول بالحساب الذي أُرسل إليه.",
+    "Sign out and use that account": "تسجيل الخروج واستعمال ذلك الحساب",
+    "Stay signed in as :name": "البقاء متصلًا باسم :name"
 }
