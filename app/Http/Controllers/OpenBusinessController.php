@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\Tenancy\SelectBusiness;
+use App\Actions\Tenancy\SelectTenant;
 use App\Http\Middleware\SetTenant;
 use App\Http\Requests\OpenBusinessRequest;
 use App\Models\User;
@@ -22,12 +22,12 @@ use Illuminate\Http\RedirectResponse;
  */
 final class OpenBusinessController extends Controller
 {
-    public function __invoke(OpenBusinessRequest $request, int $business, string $page, SelectBusiness $selectBusiness): RedirectResponse
+    public function __invoke(OpenBusinessRequest $request, int $business, string $page, SelectTenant $selectTenant): RedirectResponse
     {
         $user = $request->user();
         assert($user instanceof User);
 
-        if (! $selectBusiness->handle($user, $business)) {
+        if (! $selectTenant->handle($user, SetTenant::businessChoice($business))) {
             abort(404);
         }
 

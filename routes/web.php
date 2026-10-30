@@ -23,6 +23,7 @@ use App\Http\Controllers\StaffInvitationController;
 use App\Http\Controllers\StamperController;
 use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
+use App\Http\Controllers\TenantController;
 use App\Http\Controllers\VerificationController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
@@ -65,6 +66,8 @@ Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('busin
     // A business's page from its emails (CHW-295): selects the business the signed link names, then opens the page.
     Route::get('open/{business}/{page}', OpenBusinessController::class)->whereNumber('business')
         ->whereIn('page', array_keys(MailedLink::BUSINESS_PAGES))->middleware(ValidateSignature::relative())->name('business.open');
+    // The tenant switcher (CHW-147): work in another business or network, then its dashboard.
+    Route::put('tenant', [TenantController::class, 'update'])->name('tenant.update');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
     Route::middleware(RedirectToOnboarding::class)->group(function (): void {
         Route::get('qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');

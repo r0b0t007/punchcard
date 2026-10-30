@@ -6,6 +6,7 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
+use App\Http\Middleware\SetTenant;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -18,7 +19,9 @@ use App\Support\Tenancy\TenantContext;
  * Sets the TenantContext for a signed-in user (ADR 0006).
  *
  * A choice from the tenant switcher ("org:5" or "business:7") wins when the
- * user belongs to it. Otherwise, when every membership is in one organization:
+ * user belongs to it; an organization that is a single business's account
+ * (SingleBusinessAccounts) and the user works in that business gives the
+ * business. Otherwise, when every membership is in one organization:
  * - exactly one business there: that business (an owner or staff member, an
  *   independent café's owner, or HQ that also runs one site);
  * - org admin of it: the organization (every business in it);
@@ -58,7 +61,7 @@ final readonly class ResolveTenant
                 ->operating()
                 ->get();
 
-            [$type, $id] = $this->parseChoice($choice);
+            [$type, $id] = SetTenant::parseChoice($choice);
 
             $enter = function (Business $business) use ($memberships, $organizations): void {
                 $membership = $memberships->get($business->id);
@@ -81,7 +84,15 @@ final readonly class ResolveTenant
             }
 
             if ($type === 'org' && ($organization = $organizations->firstWhere('id', $id)) instanceof Organization) {
-                $this->context->set($organization, orgAdmin: true);
+                // A single business's account the user works in is that business, never a network of one
+                // (DescribeTenants offers the same): a stale choice opens the business.
+                $theBusiness = $businesses->firstWhere('organization_id', $organization->id);
+
+                if ($theBusiness instanceof Business && SingleBusinessAccounts::isTheAccount($organization->id)) {
+                    $enter($theBusiness);
+                } else {
+                    $this->context->set($organization, orgAdmin: true);
+                }
 
                 return;
             }
@@ -102,17 +113,5 @@ final readonly class ResolveTenant
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
         });
-    }
-
-    /**
-     * @return array{0: 'org'|'business'|null, 1: int}
-     */
-    private function parseChoice(?string $choice): array
-    {
-        if ($choice === null || preg_match('/^(org|business):([1-9]\d*)$/', $choice, $matches) !== 1) {
-            return [null, 0];
-        }
-
-        return [$matches[1] === 'org' ? 'org' : 'business', (int) $matches[2]];
     }
 }
