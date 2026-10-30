@@ -56,7 +56,7 @@ final readonly class StartImpersonation
         Auth::guard('web')->login($owner);
         $session->regenerate();
         $session->forget(['auth.password_confirmed_at', 'url.intended']);
-        $session->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
+        $session->put(SetTenant::SESSION_KEY, SetTenant::businessChoice($business->id));
         $impersonation->keep($session);
 
         return $impersonation;

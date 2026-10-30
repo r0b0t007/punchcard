@@ -40,6 +40,7 @@ type Document = {
  * verified). The files are never shown back.
  */
 export default function Verification({
+    businessId,
     verified,
     canSend,
     maxMegabytes,
@@ -47,6 +48,8 @@ export default function Verification({
     waitingMonths,
     documents,
 }: {
+    /** The business this page shows: sent back with each upload (DocumentRequest). */
+    businessId: number;
     verified: boolean;
     canSend: boolean;
     /** The largest file taken (DocumentRequest::MAX_KILOBYTES). */
@@ -132,6 +135,7 @@ export default function Verification({
                     {documents.map((document) => (
                         <DocumentRow
                             key={document.kind}
+                            businessId={businessId}
                             document={document}
                             canSend={canSend}
                             maxMegabytes={maxMegabytes}
@@ -188,12 +192,14 @@ function StateBox({
 }
 
 function DocumentRow({
+    businessId,
     document,
     canSend,
     maxMegabytes,
     showsErrors,
     onSend,
 }: {
+    businessId: number;
     document: Document;
     canSend: boolean;
     maxMegabytes: number;
@@ -249,7 +255,7 @@ function DocumentRow({
 
         router.post(
             store(document.kind).url,
-            { file },
+            { file, business: businessId },
             {
                 forceFormData: true,
                 preserveScroll: true,

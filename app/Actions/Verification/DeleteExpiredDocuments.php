@@ -147,6 +147,7 @@ final readonly class DeleteExpiredDocuments
         if ($owners->isNotEmpty()) {
             try {
                 Notification::send($owners, new DocumentsDeletedUnreviewedMail(
+                    businessId: $businessId,
                     businessName: $name,
                     kinds: array_values($documents->map(fn (BusinessDocument $document): DocumentKind => $document->kind)->unique()->all()),
                 ));

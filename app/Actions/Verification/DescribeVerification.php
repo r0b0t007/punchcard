@@ -30,6 +30,8 @@ final readonly class DescribeVerification
         $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
 
         return [
+            // Sent back with each upload (DocumentRequest): the business this page shows.
+            'businessId' => $business->id,
             'verified' => $business->verified_at !== null,
             'canSend' => $this->submitDocument->maySend($business),
             'maxMegabytes' => intdiv(DocumentRequest::MAX_KILOBYTES, 1024),

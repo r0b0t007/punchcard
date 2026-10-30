@@ -47,7 +47,7 @@ final readonly class ResolveOnboardingBusiness
         $user = $request->user();
         $business = $this->findUnfinishedBusiness->handle($user);
 
-        $choice = $business instanceof Business ? 'business:'.$business->id : $request->session()->get(SetTenant::SESSION_KEY);
+        $choice = $business instanceof Business ? SetTenant::businessChoice($business->id) : $request->session()->get(SetTenant::SESSION_KEY);
         $this->resolveTenant->handle($user, is_string($choice) ? $choice : null);
         $request->attributes->set(self::ATTRIBUTE, $business);
 

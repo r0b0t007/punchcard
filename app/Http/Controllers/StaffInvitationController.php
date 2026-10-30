@@ -71,7 +71,7 @@ final class StaffInvitationController extends Controller
             $request->session()->regenerate();
         }
 
-        $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$invitation->business_id);
+        $request->session()->put(SetTenant::SESSION_KEY, SetTenant::businessChoice($invitation->business_id));
         Inertia::flash('toast', ['type' => 'success', 'message' => __('You\'re on the staff of :business.', ['business' => $invitation->business->name])]);
 
         return to_route('dashboard');

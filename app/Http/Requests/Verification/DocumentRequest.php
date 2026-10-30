@@ -6,16 +6,20 @@ namespace App\Http\Requests\Verification;
 
 use App\Models\Business;
 use App\Support\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Validator;
 use LogicException;
 
 /**
  * A verification document (CHW-145): whoever runs the business worked in
  * (BusinessPolicy::update) sends a photo or a PDF, 10 MB at most. The type
  * is read from the file's content, never its name; nothing that can carry
- * a script (SVG, HTML) gets through.
+ * a script (SVG, HTML) gets through. It names the business its page shows
+ * (CHW-295): one switched since in another tab (a business's email link)
+ * is refused, never filed under the business now worked in.
  */
 final class DocumentRequest extends FormRequest
 {
@@ -37,6 +41,16 @@ final class DocumentRequest extends FormRequest
         return [
             'file' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:image/jpeg,image/png,application/pdf', 'max:'.self::MAX_KILOBYTES],
         ];
+    }
+
+    /** @return list<Closure(Validator): void> */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($this->integer('business') !== $this->business()?->id) {
+                $validator->errors()->add('file', __('These documents changed since you opened this page. Reload it and look again.'));
+            }
+        }];
     }
 
     /**
