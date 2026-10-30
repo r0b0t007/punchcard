@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
-use App\Actions\Tenancy\SelectBusiness;
 use App\Enums\DocumentKind;
 use App\Models\User;
+use App\Support\Auth\MailedLink;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,7 +18,7 @@ use Illuminate\Notifications\Notification;
  * the platform never decided on (DeleteExpiredDocuments). Which ones, and
  * the verification page to send them again. Only to a business that can
  * still send; queued, in each owner's language.
- * Its button opens the business it names (CHW-295, SelectBusiness::link).
+ * Its button opens the business it names (CHW-295, MailedLink::toBusiness).
  */
 final class DocumentsDeletedUnreviewedMail extends Notification implements ShouldQueue
 {
@@ -56,7 +56,7 @@ final class DocumentsDeletedUnreviewedMail extends Notification implements Shoul
                 $this->kinds === [DocumentKind::IdDocument] => __('You sent us the owner\'s ID for :business more than :months months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
                 default => __('You sent us the proof of address of :business more than :months months ago, and we never finished checking it. We don\'t keep verification documents longer than that, so we deleted it.', $sent),
             })
-            ->action($several ? __('Send them again') : __('Send it again'), SelectBusiness::link($this->businessId, 'verification', $notifiable))
+            ->action($several ? __('Send them again') : __('Send it again'), MailedLink::toBusiness($this->businessId, 'verification', $notifiable))
             ->line($several
                 ? __(':business keeps working meanwhile. Send them again whenever you want the business verified.', $names)
                 : __(':business keeps working meanwhile. Send it again whenever you want the business verified.', $names));

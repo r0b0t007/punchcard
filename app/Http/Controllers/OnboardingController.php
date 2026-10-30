@@ -149,7 +149,7 @@ final class OnboardingController extends Controller
         $saveShippingStep->handle($business, $request->shipping());
 
         // Set up: the dashboard works in this business from now on (the tenant switcher can change it).
-        $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$business->id);
+        $request->session()->put(SetTenant::SESSION_KEY, SetTenant::businessChoice($business->id));
 
         return to_route('dashboard');
     }

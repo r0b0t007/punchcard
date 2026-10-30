@@ -25,6 +25,12 @@ final readonly class SetTenant
 {
     public const string SESSION_KEY = 'tenant';
 
+    /** The choice that works in one business, as kept under SESSION_KEY. */
+    public static function businessChoice(int $businessId): string
+    {
+        return 'business:'.$businessId;
+    }
+
     public function __construct(
         private ResolveTenant $resolveTenant,
         private TenantContext $context,

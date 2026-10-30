@@ -16,7 +16,8 @@ use App\Notifications\StamperTappedWhileOffMail;
 use App\Support\Auth\MailedLink;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
-use Inertia\Testing\AssertableInertia;
+use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Tenants;
 
@@ -62,7 +63,9 @@ it('links each email to the business it names', function (): void {
 
     foreach ($mails as $page => $pageMails) {
         foreach ($pageMails as $mail) {
-            expect($mail->toMail($this->owner)->actionUrl)->toBe(($this->link)($page));
+            expect($mail->toMail($this->owner)->actionUrl)->toBe(($this->link)($page))
+                // Never mailed to anyone but a user: a link to the page itself would open whichever business is selected.
+                ->and(fn (): MailMessage => $mail->toMail(new AnonymousNotifiable))->toThrow(LogicException::class);
         }
     }
 });
@@ -74,7 +77,7 @@ it('selects the business named, then shows its verification page', function (): 
         ->assertRedirect(route('verification.show'))
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a1->id);
 
-    $this->get(route('verification.show'))->assertInertia(fn (Assert $page): AssertableInertia => $page
+    $this->get(route('verification.show'))->assertInertia(fn (Assert $page): Assert => $page
         ->component('business/verification')
         ->where('documents.0.status', 'submitted'));
 });
@@ -84,7 +87,7 @@ it('selects the business named, then shows its stampers', function (): void {
         ->assertRedirect(route('stampers.index'))
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a1->id);
 
-    $this->get(route('stampers.index'))->assertInertia(fn (Assert $page): AssertableInertia => $page
+    $this->get(route('stampers.index'))->assertInertia(fn (Assert $page): Assert => $page
         ->component('business/stampers')
         ->where('sites.0.id', $this->tenants->locationOf($this->tenants->a1)->id)
         ->where('sites.0.stampers.0.id', $this->stamper->id));

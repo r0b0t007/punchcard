@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Actions\Fraud\AlertCapStreak;
-use App\Actions\Tenancy\SelectBusiness;
 use App\Models\User;
+use App\Support\Auth\MailedLink;
 use Carbon\CarbonImmutable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -18,7 +18,7 @@ use Illuminate\Notifications\Notification;
  * can lower the limit. The customer's first name only (a customer the business served on
  * each of those days); the card and business names are the business's own
  * text, their brackets escaped, as in StaffInvitationMail.
- * Its button opens the business it names (CHW-295, SelectBusiness::link).
+ * Its button opens the business it names (CHW-295, MailedLink::toBusiness).
  */
 final class DailyCapStreakMail extends Notification
 {
@@ -52,7 +52,7 @@ final class DailyCapStreakMail extends Notification
                 'business' => Plain::text($this->business),
                 'dates' => $this->dates(),
             ]))
-            ->action(__('See your stampers'), SelectBusiness::link($this->businessId, 'stampers', $notifiable))
+            ->action(__('See your stampers'), MailedLink::toBusiness($this->businessId, 'stampers', $notifiable))
             ->line(__('It may be a loyal regular, or someone collecting stamps for others. If the limit is too high, whoever runs the card can lower it in its settings.'));
     }
 

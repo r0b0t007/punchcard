@@ -57,7 +57,7 @@ beforeEach(function (): void {
 
     $this->as = fn (User $user, ?Business $business = null) => $this->actingAs($user)->withSession([SetTenant::SESSION_KEY => 'business:'.($business ?? $this->tenants->a1)->id]);
     $this->send = fn (DocumentKind $kind, UploadedFile $file, ?User $as = null) => ($this->as)($as ?? $this->owner)
-        ->post(route('verification.store', $kind), ['file' => $file]);
+        ->post(route('verification.store', $kind), ['file' => $file, 'business' => $this->tenants->a1->id]);
     $this->documents = fn (): array => $this->context->bypass(fn (): array => BusinessDocument::query()->orderBy('id')->get()->all());
     $this->pdf = fn (string $name = 'id.pdf', int $kb = 200): UploadedFile => UploadedFile::fake()->create($name, $kb, 'application/pdf');
 });
@@ -205,17 +205,31 @@ it('lets the platform admin signed in as the owner read the page, never send', f
     app(StartImpersonation::class)->handle($admin, $this->tenants->a1, $this->owner, app('session')->driver());
 
     $this->get(route('verification.show'))->assertOk();
-    $this->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)()])->assertRedirect();
+    $this->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)(), 'business' => $this->tenants->a1->id])->assertRedirect();
 
     expect(($this->documents)())->toBe([])
         ->and(Storage::disk(BusinessDocument::DISK)->allFiles())->toBe([]);
 });
 
 it('keeps a franchisee to its own business, whatever business its session names', function (): void {
-    ($this->as)($this->owner, $this->tenants->a2)->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)()]);
+    ($this->as)($this->owner, $this->tenants->a2)->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)(), 'business' => $this->tenants->a1->id]);
 
     expect(array_map(fn (BusinessDocument $d): int => $d->business_id, ($this->documents)()))->not->toContain($this->tenants->a2->id);
 });
+
+it('refuses a document sent from a page showing another business, filing it nowhere', function (?string $shown): void {
+    // An owner of A1 and A2 whose session moved to A1 (an email's link, CHW-295) while a tab still shows A2.
+    $this->tenants->member($this->owner, $this->tenants->a2, BusinessRole::Owner);
+    $this->context->bypass(fn () => $this->tenants->a2->forceFill(['status' => BusinessStatus::Pending, 'verified_at' => null])->save());
+    $business = ['a2' => $this->tenants->a2->id, 'none' => null][$shown];
+
+    ($this->as)($this->owner)->post(route('verification.store', DocumentKind::IdDocument), array_filter(['file' => ($this->pdf)(), 'business' => $business]))
+        ->assertSessionHasErrors(['file' => 'These documents changed since you opened this page. Reload it and look again.']);
+
+    expect(($this->documents)())->toBe([])
+        ->and(Storage::disk(BusinessDocument::DISK)->allFiles())->toBe([])
+        ->and(app(DescribeVerification::class)->handle($this->tenants->a2)['businessId'])->toBe($this->tenants->a2->id);
+})->with(['a2', 'none']);
 
 it('shows a verified business nothing to send, and its checklist done without documents', function (): void {
     $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => BusinessStatus::Verified, 'verified_at' => now()])->save());
@@ -278,7 +292,7 @@ it('keeps each owner\'s documents to the business they work in', function (): vo
 
     $this->context->bypass(fn () => $this->tenants->b1->forceFill(['status' => BusinessStatus::Pending, 'verified_at' => null])->save());
     $other = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
-    ($this->as)($other, $this->tenants->b1)->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)()])->assertRedirect();
+    ($this->as)($other, $this->tenants->b1)->post(route('verification.store', DocumentKind::IdDocument), ['file' => ($this->pdf)(), 'business' => $this->tenants->b1->id])->assertRedirect();
 
     expect(array_map(fn (BusinessDocument $d): int => $d->business_id, ($this->documents)()))->toBe([$this->tenants->a1->id, $this->tenants->b1->id]);
 });

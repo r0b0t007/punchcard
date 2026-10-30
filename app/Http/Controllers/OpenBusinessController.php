@@ -6,32 +6,33 @@ namespace App\Http\Controllers;
 
 use App\Actions\Tenancy\SelectBusiness;
 use App\Http\Middleware\SetTenant;
+use App\Http\Requests\OpenBusinessRequest;
 use App\Models\User;
+use App\Support\Auth\MailedLink;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 
 /**
  * A business's page from its emails (CHW-295): the verification emails'
- * and the fraud alerts' signed link (SelectBusiness::link) selects the
- * business it names, as the tenant switcher would, then opens the page.
- * Anyone but the user it was mailed to, someone who doesn't work there
- * (any more), or a business that no longer operates gets a 404 and keeps
- * the business they had selected. Who may see the page is still the
- * page's own rule.
+ * and the fraud alerts' signed link (MailedLink::toBusiness), for the user
+ * it was mailed to (OpenBusinessRequest), selects the business it names,
+ * as the tenant switcher would, then opens the page. Someone who doesn't
+ * work there (any more), or a business that no longer operates, gets a 404
+ * and keeps the business they had selected. Who may see the page is still
+ * the page's own rule.
  */
 final class OpenBusinessController extends Controller
 {
-    public function __invoke(Request $request, int $business, string $page, SelectBusiness $selectBusiness): RedirectResponse
+    public function __invoke(OpenBusinessRequest $request, int $business, string $page, SelectBusiness $selectBusiness): RedirectResponse
     {
         $user = $request->user();
         assert($user instanceof User);
 
-        if ($request->integer('for') !== $user->id || ! $selectBusiness->handle($user, $business)) {
+        if (! $selectBusiness->handle($user, $business)) {
             abort(404);
         }
 
-        $request->session()->put(SetTenant::SESSION_KEY, 'business:'.$business);
+        $request->session()->put(SetTenant::SESSION_KEY, SetTenant::businessChoice($business));
 
-        return to_route(SelectBusiness::PAGES[$page]);
+        return to_route(MailedLink::BUSINESS_PAGES[$page]);
     }
 }
