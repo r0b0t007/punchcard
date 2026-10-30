@@ -10,11 +10,13 @@ use App\Actions\Admin\SuspendBusiness;
 use App\Actions\Admin\VerifyBusiness;
 use App\Enums\BusinessStatus;
 use App\Filament\Concerns\NotifiesRefusals;
+use App\Filament\Resources\Businesses\Pages\ViewBusiness;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
 use Carbon\CarbonInterface;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\Textarea;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Gate;
@@ -43,12 +45,20 @@ final class BusinessStatusActions
             ->icon(Heroicon::OutlinedCheckBadge)
             ->color('success')
             ->authorize(fn (Business $record): bool => Gate::allows('verify', $record))
-            ->visible(fn (Business $record): bool => self::offered($record, $record->status === BusinessStatus::Pending))
+            // In the list, which shows no documents, only while none wait: they are read on the business's page.
+            ->visible(fn (Business $record, HasActions $livewire): bool => self::offered($record, $record->status === BusinessStatus::Pending
+                && ($livewire instanceof ViewBusiness || ! $record->getAttribute(BusinessesTable::DOCUMENTS_WAITING))))
             ->requiresConfirmation()
             ->modalDescription(__('Records that the platform reviewed this business. It changes nothing it can do.'))
-            ->action(fn (Business $record) => self::change(
+            // The documents the page showed when Verify was clicked, kept in a locked property: the ones it accepts (CHW-294).
+            ->mountUsing(function (HasActions $livewire): void {
+                if ($livewire instanceof ViewBusiness) {
+                    $livewire->documentsToVerify = $livewire->documentsShown;
+                }
+            })
+            ->action(fn (Business $record, HasActions $livewire) => self::change(
                 $record,
-                fn () => app(VerifyBusiness::class)->handle($record),
+                fn () => app(VerifyBusiness::class)->handle($record, $livewire instanceof ViewBusiness ? $livewire->documentsToVerify : []),
                 __(':business is verified.', ['business' => $record->name]),
             ));
     }

@@ -50,7 +50,7 @@ beforeEach(function (): void {
 it('verifies a pending business and records who did', function (): void {
     ($this->status)(BusinessStatus::Pending);
 
-    app(VerifyBusiness::class)->handle($this->business);
+    app(VerifyBusiness::class)->handle($this->business, []);
 
     expect(($this->fresh)()->status)->toBe(BusinessStatus::Verified)
         ->and(($this->fresh)()->verified_at)->not->toBeNull()
@@ -127,7 +127,7 @@ it('refuses an admin whose account was deleted meanwhile, and records nothing', 
     ($this->status)(BusinessStatus::Pending);
     User::query()->whereKey($this->admin->id)->delete();
 
-    expect(fn () => app(VerifyBusiness::class)->handle($this->business))->toThrow(LogicException::class, 'no longer exists')
+    expect(fn () => app(VerifyBusiness::class)->handle($this->business, []))->toThrow(LogicException::class, 'no longer exists')
         ->and(($this->audits)())->toBe([]);
 });
 
@@ -138,7 +138,7 @@ it('refuses a change that does not apply, and records nothing', function (string
     };
 
     $run = match ($action) {
-        'verify' => fn () => app(VerifyBusiness::class)->handle($this->business),
+        'verify' => fn () => app(VerifyBusiness::class)->handle($this->business, []),
         'suspend' => fn () => app(SuspendBusiness::class)->handle($this->business, 'A reason'),
         'suspend without a reason' => fn () => app(SuspendBusiness::class)->handle($this->business, '   '),
         'reinstate' => fn () => app(ReinstateBusiness::class)->handle($this->business),

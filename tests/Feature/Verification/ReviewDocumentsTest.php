@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\Admin\BusinessStatusRefused;
 use App\Actions\Admin\StartImpersonation;
 use App\Actions\Admin\VerifyBusiness;
+use App\Actions\Verification\DeleteExpiredDocuments;
 use App\Actions\Verification\DocumentRefused;
 use App\Actions\Verification\ReadDocument;
 use App\Actions\Verification\RequestNewDocuments;
@@ -13,6 +15,7 @@ use App\Enums\BusinessStatus;
 use App\Enums\DocumentKind;
 use App\Enums\DocumentStatus;
 use App\Enums\PlatformRole;
+use App\Filament\Resources\Businesses\Pages\ListBusinesses;
 use App\Filament\Resources\Businesses\Pages\ViewBusiness;
 use App\Http\Middleware\SetTenant;
 use App\Models\AuditLog;
@@ -21,11 +24,13 @@ use App\Models\BusinessDocument;
 use App\Models\User;
 use App\Notifications\NewDocumentsNeededMail;
 use App\Support\Tenancy\TenantContext;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -261,7 +266,7 @@ describe('asking for new documents', function (): void {
             $this->context->bypass(fn () => $this->business->forceFill(['status' => BusinessStatus::Pending, 'archived_at' => null])->save());
         }
 
-        app(VerifyBusiness::class)->handle($this->business);
+        app(VerifyBusiness::class)->handle($this->business, [$id->id]);
 
         expect($request([$id->id]))->toThrow(DocumentRefused::class)
             ->and(($this->fresh)($id)->status)->toBe(DocumentStatus::Accepted)
@@ -281,6 +286,71 @@ describe('asking for new documents', function (): void {
         $new = ($this->send)(DocumentKind::ProofOfAddress);
         expect($this->context->bypass(fn (): array => BusinessDocument::query()->where('kind', DocumentKind::ProofOfAddress)->pluck('id')->all()))->toBe([$new->id]);
         Storage::disk(BusinessDocument::DISK)->assertMissing($address->path);
+    });
+});
+
+describe('verifying the business', function (): void {
+    beforeEach(function (): void {
+        $this->actingAs($this->admin);
+        $this->verify = fn (array $ids): Closure => fn () => app(VerifyBusiness::class)->handle($this->business, $ids);
+        $this->unchanged = fn (): bool => $this->context->bypass(fn (): bool => $this->business->refresh()->status === BusinessStatus::Pending)
+            && ($this->audits)('business.verified') === [];
+    });
+
+    it('accepts the documents the admin saw, deleting them on the day 3 months later, and records which', function (): void {
+        $id = ($this->send)(DocumentKind::IdDocument);
+        $address = ($this->send)(DocumentKind::ProofOfAddress);
+
+        app(VerifyBusiness::class)->handle($this->business, [$address->id, $id->id]);
+
+        expect([($this->fresh)($id), ($this->fresh)($address)])->each(fn ($document) => $document
+            ->status->toBe(DocumentStatus::Accepted)
+            ->decided_at->toDateTimeString()->toBe('2026-10-23 10:00:00')
+            ->deletes_at->toDateTimeString()->toBe('2027-01-23 00:00:00'))
+            ->and($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified)
+            ->and(($this->audits)('business.verified')[0]['context'])->toBe(['document_ids' => [$id->id, $address->id], 'kinds' => ['id_document', 'proof_of_address']]);
+    });
+
+    it('refuses when a document was sent or replaced since the page was read, and changes nothing', function (): void {
+        $id = ($this->send)(DocumentKind::IdDocument);
+        $address = ($this->send)(DocumentKind::ProofOfAddress);
+        $replaced = ($this->send)(DocumentKind::IdDocument);
+
+        expect(($this->verify)([$id->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page. Reload it and look again.')
+            ->and(($this->verify)([$id->id, $address->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->verify)([$address->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->verify)([]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->fresh)($address)->status)->toBe(DocumentStatus::Submitted)
+            ->and(($this->fresh)($replaced)->status)->toBe(DocumentStatus::Submitted)
+            ->and(($this->unchanged)())->toBeTrue();
+    });
+
+    it('refuses when the nightly cleanup deleted the documents since the page was read', function (): void {
+        $id = ($this->send)(DocumentKind::IdDocument);
+        Carbon::setTestNow(now()->addMonths((int) config('punchcard.documents.waiting_months'))->addDay());
+        app(DeleteExpiredDocuments::class)->handle(now());
+
+        expect(($this->verify)([$id->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->unchanged)())->toBeTrue();
+
+        // A business with no documents on file is still verified: Verify gates nothing (CHW-34).
+        app(VerifyBusiness::class)->handle($this->business, []);
+        expect($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified)
+            ->and(($this->audits)('business.verified')[0]['context'])->toBeEmpty();
+    });
+
+    it('never counts a document decided already, or another business\'s', function (): void {
+        $address = ($this->send)(DocumentKind::ProofOfAddress);
+        app(RequestNewDocuments::class)->handle($this->business, [$address->id], 'Blurry.');
+        $elsewhere = $this->context->bypass(fn (): BusinessDocument => BusinessDocument::factory()->for($this->tenants->b1)->create());
+
+        expect(($this->verify)([$address->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->verify)([$elsewhere->id]))->toThrow(BusinessStatusRefused::class, 'These documents changed since you opened this page.')
+            ->and(($this->unchanged)())->toBeTrue();
+
+        app(VerifyBusiness::class)->handle($this->business, []);
+        expect(($this->fresh)($address)->status)->toBe(DocumentStatus::Rejected)
+            ->and(($this->fresh)($elsewhere)->status)->toBe(DocumentStatus::Submitted);
     });
 });
 
@@ -310,5 +380,61 @@ describe('the business\'s page in A1', function (): void {
         ($this->send)(DocumentKind::ProofOfAddress);
         $this->context->bypass(fn () => $this->business->forceFill(['archived_at' => now()])->save());
         ($this->page)(fn (Testable $page): Testable => $page->assertActionHidden('requestNewDocuments'));
+    });
+
+    it('verifies with the documents the page showed, refusing one sent since', function (): void {
+        $id = ($this->send)(DocumentKind::IdDocument);
+        ($this->panel)();
+
+        $address = ($this->page)(function (Testable $page) use ($id): BusinessDocument {
+            $address = ($this->send)(DocumentKind::ProofOfAddress);
+            $page->callAction('verify')->assertNotified('These documents changed since you opened this page. Reload it and look again.')
+                ->assertActionVisible('verify');
+            expect(($this->fresh)($address)->status)->toBe(DocumentStatus::Submitted);
+
+            // What Verify accepts is the server's, never the browser's to set.
+            foreach (['documentsShown', 'documentsToVerify'] as $property) {
+                expect(fn () => $page->set($property, [$id->id, $address->id]))->toThrow(CannotUpdateLockedPropertyException::class);
+            }
+
+            // Shown now: verifying from the page accepts it.
+            $page->callAction('verify')->assertNotified('A1 is verified.');
+
+            return $address;
+        });
+
+        expect(($this->fresh)($id)->status)->toBe(DocumentStatus::Accepted)
+            ->and(($this->fresh)($address)->status)->toBe(DocumentStatus::Accepted);
+    });
+
+    it('verifies after asking for new documents, accepting the others, with no reload', function (): void {
+        $id = ($this->send)(DocumentKind::IdDocument);
+        $address = ($this->send)(DocumentKind::ProofOfAddress);
+        ($this->panel)();
+
+        ($this->page)(fn (Testable $page): Testable => $page
+            ->callAction('requestNewDocuments', ['documents' => [$address->id], 'reason' => 'Older than 3 months.'])
+            ->callAction('verify')->assertNotified('A1 is verified.'));
+
+        expect(($this->fresh)($id)->status)->toBe(DocumentStatus::Accepted)
+            ->and(($this->fresh)($address)->status)->toBe(DocumentStatus::Rejected);
+    });
+
+    it('offers Verify in the list only while no documents wait, as the list shows none', function (): void {
+        ($this->panel)();
+        $list = fn (Closure $then): mixed => $this->context->bypass(fn (): mixed => $then(Livewire::test(ListBusinesses::class)->set('activeTab', 'all')));
+
+        // Sent while the list was open, then Verify clicked as the browser still shows it: never accepted unseen.
+        $id = $list(function (Testable $page): BusinessDocument {
+            $page->assertActionVisible(TestAction::make('verify')->table($this->business));
+            $id = ($this->send)(DocumentKind::IdDocument);
+            $page->call('mountAction', 'verify', [], ['table' => true, 'recordKey' => $this->business->getKey()])->call('callMountedAction');
+
+            return $id;
+        });
+
+        expect(($this->fresh)($id)->status)->toBe(DocumentStatus::Submitted)
+            ->and($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Pending);
+        $list(fn (Testable $page): Testable => $page->assertActionHidden(TestAction::make('verify')->table($this->business)));
     });
 });

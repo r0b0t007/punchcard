@@ -159,7 +159,7 @@ it('shows a refusal as it is, when the business is archived as the admin acts', 
 it('shows a business\'s people, sites, stampers and history', function (): void {
     $this->tenants->stamper($this->tenants->a2);
     $uid = $this->context->bypass(fn (): string => $this->tenants->a2->stampers()->firstOrFail()->tag()->firstOrFail()->uid);
-    app(VerifyBusiness::class)->handle($this->tenants->a2);
+    app(VerifyBusiness::class)->handle($this->tenants->a2, []);
 
     ($this->screen)(ViewBusiness::class, fn (Testable $page) => $page
         ->assertSee('owner@cafe-a2.test')

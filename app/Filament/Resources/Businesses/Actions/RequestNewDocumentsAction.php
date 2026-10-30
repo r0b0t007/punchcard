@@ -7,7 +7,6 @@ namespace App\Filament\Resources\Businesses\Actions;
 use App\Actions\Verification\DocumentRefused;
 use App\Actions\Verification\RequestNewDocuments;
 use App\Enums\BusinessStatus;
-use App\Enums\DocumentStatus;
 use App\Filament\Concerns\NotifiesRefusals;
 use App\Filament\Resources\Businesses\Tables\BusinessesTable;
 use App\Models\Business;
@@ -60,7 +59,7 @@ final class RequestNewDocumentsAction
      */
     private static function waiting(Business $record): array
     {
-        return $record->documents->where('status', DocumentStatus::Submitted)
+        return $record->documents->filter(fn (BusinessDocument $document): bool => $document->isWaiting())
             ->mapWithKeys(fn (BusinessDocument $document): array => [$document->id => $document->kind->label()])
             ->all();
     }

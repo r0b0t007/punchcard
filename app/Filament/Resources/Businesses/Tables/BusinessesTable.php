@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Businesses\Tables;
 use App\Filament\AdminTime;
 use App\Filament\Resources\Businesses\Actions\BusinessStatusActions;
 use App\Models\Business;
+use App\Models\BusinessDocument;
 use App\Models\Location;
 use App\Models\Tap;
 use App\Support\Tenancy\PlatformBuilder;
@@ -24,12 +25,16 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class BusinessesTable
 {
+    /** Whether verification documents wait for review (CHW-294): Verify is offered on the business's page, never here. */
+    public const string DOCUMENTS_WAITING = 'documents_waiting';
+
     public static function configure(Table $table): Table
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->with(['organization', 'owners'])
                 ->withCount(['locations as open_locations_count' => self::open(...), 'currentStampers'])
+                ->withExists(['documents as '.self::DOCUMENTS_WAITING => self::waiting(...)])
                 ->withMax(['taps' => self::accepted(...)], 'created_at'))
             ->defaultSort('created_at')
             ->columns([
@@ -60,6 +65,12 @@ final class BusinessesTable
     private static function open(TenantBuilder $locations): void
     {
         $locations->open();
+    }
+
+    /** @param  TenantBuilder<BusinessDocument>  $documents */
+    private static function waiting(TenantBuilder $documents): void
+    {
+        $documents->waiting();
     }
 
     /** @param  PlatformBuilder<Tap>  $taps */

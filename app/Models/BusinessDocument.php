@@ -13,7 +13,9 @@ use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
 use Database\Factories\BusinessDocumentFactory;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -100,12 +102,29 @@ class BusinessDocument extends Model implements TenantModel
             ->keyBy(fn (self $document): string => $document->kind->value);
     }
 
+    /** Whether it waits for the platform admin's review: sent, not yet accepted or rejected. */
+    public function isWaiting(): bool
+    {
+        return $this->status === DocumentStatus::Submitted;
+    }
+
     /**
      * @return BelongsTo<Business, $this>
      */
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    /**
+     * Documents waiting for the platform admin's review (isWaiting).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function waiting(Builder $query): void
+    {
+        $query->where('status', DocumentStatus::Submitted);
     }
 
     /**

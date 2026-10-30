@@ -30,10 +30,11 @@ trait ChangesBusinessStatus
      * @param  bool  $lockStampers  lock the business's current stampers first and again after the
      *                              business row (see SuspendBusiness)
      * @param  (Closure(Business): void)|null  $afterSave  more of the change, in its transaction, on the saved row
+     * @param  (Closure(): array<string, mixed>)|null  $audit  what the audit entry records besides, read before $afterSave
      */
-    private function transition(Business $business, Closure $guard, Closure $fields, string $action, ?string $reason = null, bool $lockStampers = false, ?Closure $afterSave = null): Business
+    private function transition(Business $business, Closure $guard, Closure $fields, string $action, ?string $reason = null, bool $lockStampers = false, ?Closure $afterSave = null, ?Closure $audit = null): Business
     {
-        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $guard, $fields, $action, $reason, $lockStampers, $afterSave): Business {
+        return $this->context->bypass(fn (): Business => DB::transaction(function () use ($business, $guard, $fields, $action, $reason, $lockStampers, $afterSave, $audit): Business {
             if ($lockStampers) {
                 $this->lockStampers($business);
             }
@@ -49,12 +50,13 @@ trait ChangesBusinessStatus
             }
 
             $guard($locked);
+            $context = $audit instanceof Closure ? $audit() : [];
             $locked->forceFill($fields($locked))->save();
 
             if ($afterSave instanceof Closure) {
                 $afterSave($locked);
             }
-            $this->recordAudit->handle($action, $locked, $reason);
+            $this->recordAudit->handle($action, $locked, $reason, $context);
 
             return $locked;
         }));
