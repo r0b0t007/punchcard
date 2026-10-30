@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Actions\Tenancy\DescribeTenants;
 use App\Actions\Tenancy\HasMemberships;
 use App\Models\LoyaltyCard;
 use App\Models\User;
@@ -71,6 +72,12 @@ class HandleInertiaRequests extends Middleware
                 // The stampers page (CHW-36, B12): the same people (StamperPolicy::viewAny).
                 'stampers' => $this->managesStaff($request),
             ],
+            // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
+            // Only where the sidebar shows (the business app, settings): no other page pays its queries, a tap least of all.
+            // An admin signed in as an owner is held to that business (CHW-144): only it is offered.
+            'tenants' => fn (): ?array => $request->user() instanceof User && $request->is('business', 'business/*', 'settings', 'settings/*')
+                ? app(DescribeTenants::class)->handle($request->user(), onlyCurrent: $request->hasSession() && Impersonation::of($request->session()) instanceof Impersonation)
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
             'dir' => Locales::direction($locale),

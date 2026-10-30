@@ -6,6 +6,7 @@ namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
 use App\Enums\OrganizationRole;
+use App\Http\Middleware\SetTenant;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -58,7 +59,7 @@ final readonly class ResolveTenant
                 ->operating()
                 ->get();
 
-            [$type, $id] = $this->parseChoice($choice);
+            [$type, $id] = SetTenant::parseChoice($choice);
 
             $enter = function (Business $business) use ($memberships, $organizations): void {
                 $membership = $memberships->get($business->id);
@@ -102,17 +103,5 @@ final readonly class ResolveTenant
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
         });
-    }
-
-    /**
-     * @return array{0: 'org'|'business'|null, 1: int}
-     */
-    private function parseChoice(?string $choice): array
-    {
-        if ($choice === null || preg_match('/^(org|business):([1-9]\d*)$/', $choice, $matches) !== 1) {
-            return [null, 0];
-        }
-
-        return [$matches[1] === 'org' ? 'org' : 'business', (int) $matches[2]];
     }
 }

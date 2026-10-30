@@ -978,5 +978,10 @@
     "Decided": "تقرّر",
     "Deleted on": "يُحذف في",
     "Waiting": "قيد الانتظار",
-    "Rejected": "مرفوض"
+    "Rejected": "مرفوض",
+    "Whole network": "الشبكة كلها",
+    "Runs the network": "يدير الشبكة",
+    "Switch business": "تغيير النشاط التجاري",
+    "Where do you work today?": "أين تعمل اليوم؟",
+    "Choose a business. You can change it any time from the menu.": "اختر نشاطًا تجاريًا. يمكنك تغييره في أي وقت من القائمة."
 }
