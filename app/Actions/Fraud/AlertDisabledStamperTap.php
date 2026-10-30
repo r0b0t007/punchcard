@@ -41,6 +41,7 @@ final readonly class AlertDisabledStamperTap
             }
 
             $this->mailOwnersOnce($stamper->business, 'fraud-alert:stamper:'.$stamper->id, now()->addMinutes(self::QUIET_MINUTES), new StamperTappedWhileOffMail(
+                businessId: $stamper->business_id,
                 label: $stamper->label,
                 stamperId: $stamper->id,
                 site: $stamper->location->name ?? '',

@@ -358,7 +358,7 @@ describe('the daily limit reached three days in a row', function (): void {
     });
 
     it('never turns a name into a link', function (string $name): void {
-        $html = (string) (new DailyCapStreakMail($name, $name, $name, ['2026-10-15', '2026-10-16', '2026-10-17']))->toMail($this->owner)->render();
+        $html = (string) (new DailyCapStreakMail($this->tenants->a1->id, $name, $name, $name, ['2026-10-15', '2026-10-16', '2026-10-17']))->toMail($this->owner)->render();
 
         expect($html)->not->toContain('href="https://phish.example');
     })->with(['brackets' => '[Verify](https://phish.example)', 'escaped brackets' => '\\[Verify\\](https://phish.example)', 'double backslash' => '\\\\[Verify\\\\](https://phish.example)']);

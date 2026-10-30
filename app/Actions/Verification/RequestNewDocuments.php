@@ -87,6 +87,7 @@ final readonly class RequestNewDocuments
         }));
 
         Notification::send($owners, new NewDocumentsNeededMail(
+            businessId: $business->id,
             businessName: $name,
             kinds: array_values($rejected->map(fn (BusinessDocument $document): DocumentKind => $document->kind)->all()),
             reason: $reason,

@@ -10,6 +10,7 @@ use App\Enums\DocumentStatus;
 use App\Models\BusinessDocument;
 use App\Models\User;
 use App\Notifications\DocumentsDeletedUnreviewedMail;
+use App\Support\Auth\MailedLink;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -208,13 +209,13 @@ it('changes nothing and emails nobody when run again', function (): void {
 });
 
 it('tells the owner which documents went and how to send them again', function (array $kinds, string $subject, string $line, string $action): void {
-    $mail = (new DocumentsDeletedUnreviewedMail('Café Hafa', $kinds))->toMail($this->owner);
+    $mail = (new DocumentsDeletedUnreviewedMail($this->business->id, 'Café Hafa', $kinds))->toMail($this->owner);
 
     expect($mail->subject)->toBe($subject)
         ->and($mail->greeting)->toBe('Hello Yasmine,')
         ->and($mail->introLines)->toBe([$line])
         ->and($mail->actionText)->toBe($action)
-        ->and($mail->actionUrl)->toBe(route('verification.show'))
+        ->and($mail->actionUrl)->toBe(MailedLink::signedForGood('business.open', ['business' => $this->business->id, 'page' => 'verification', 'for' => $this->owner->id]))
         ->and($mail->outroLines)->toBe([str_contains($action, 'them')
             ? 'Café Hafa keeps working meanwhile. Send them again whenever you want the business verified.'
             : 'Café Hafa keeps working meanwhile. Send it again whenever you want the business verified.']);
@@ -229,10 +230,10 @@ it('tells the owner which documents went and how to send them again', function (
 
 it('writes the email in the owner\'s language', function (): void {
     app()->setLocale('ar');
-    $mail = (new DocumentsDeletedUnreviewedMail('مقهى الحافة', [DocumentKind::ProofOfAddress]))->toMail($this->owner);
+    $mail = (new DocumentsDeletedUnreviewedMail($this->business->id, 'مقهى الحافة', [DocumentKind::ProofOfAddress]))->toMail($this->owner);
 
     expect($mail->subject)->toBe('حذفنا الوثيقة التي أرسلها مقهى الحافة للتوثيق')
         ->and($mail->actionText)->toBe('إعادة الإرسال')
-        ->and((new DocumentsDeletedUnreviewedMail('مقهى الحافة', [DocumentKind::IdDocument, DocumentKind::ProofOfAddress]))->toMail($this->owner)->subject)
+        ->and((new DocumentsDeletedUnreviewedMail($this->business->id, 'مقهى الحافة', [DocumentKind::IdDocument, DocumentKind::ProofOfAddress]))->toMail($this->owner)->subject)
         ->toBe('حذفنا الوثيقتين اللتين أرسلهما مقهى الحافة للتوثيق');
 });

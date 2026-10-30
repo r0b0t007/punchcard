@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Tenancy\SelectBusiness;
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\MemberQrController;
 use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\OfflinePageController;
+use App\Http\Controllers\OpenBusinessController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\StaffController;
@@ -25,6 +27,7 @@ use App\Http\Controllers\TapController;
 use App\Http\Controllers\VerificationController;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
+use Illuminate\Routing\Middleware\ValidateSignature;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 
@@ -59,6 +62,9 @@ Route::middleware(['guest', NeverCache::class])->group(function (): void {
 Route::middleware(['auth', 'verified', 'tenant', 'pwa:business'])->prefix('business')->group(function (): void {
     // An owner still setting up goes to the onboarding wizard instead (CHW-31).
     Route::get('/', [DashboardController::class, 'show'])->middleware(RedirectToOnboarding::class)->name('dashboard');
+    // A business's page from its emails (CHW-295): selects the business the signed link names, then opens the page.
+    Route::get('open/{business}/{page}', OpenBusinessController::class)->whereNumber('business')
+        ->whereIn('page', array_keys(SelectBusiness::PAGES))->middleware(ValidateSignature::relative())->name('business.open');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
     Route::middleware(RedirectToOnboarding::class)->group(function (): void {
         Route::get('qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');

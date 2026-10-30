@@ -78,6 +78,7 @@ final readonly class AlertCapStreak
             }
 
             $this->mailOwnersOnce($business, "fraud-alert:cap:{$enrollmentId}:{$businessId}:".$last->toDateString(), now()->addDays(self::KEEP_DAYS), new DailyCapStreakMail(
+                businessId: $business->id,
                 customer: $enrollment->user?->firstName(),
                 card: $enrollment->card->name ?? '',
                 business: $business->name,

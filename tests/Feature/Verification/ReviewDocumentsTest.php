@@ -23,6 +23,7 @@ use App\Models\Business;
 use App\Models\BusinessDocument;
 use App\Models\User;
 use App\Notifications\NewDocumentsNeededMail;
+use App\Support\Auth\MailedLink;
 use App\Support\Tenancy\TenantContext;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -223,14 +224,14 @@ describe('asking for new documents', function (): void {
                     "Our reason: “\u{2068}Both scans are too blurry \\[here\\](https://evil.test).\u{2069}”",
                 ])
                 ->and($message->actionText)->toBe('Send new documents')
-                ->and($message->actionUrl)->toBe(route('verification.show'))
+                ->and($message->actionUrl)->toBe(MailedLink::signedForGood('business.open', ['business' => $this->business->id, 'page' => 'verification', 'for' => $english->id]))
                 ->and($message->outroLines)->toBe(['Café Hafa keeps working while we check. The documents we couldn\'t use are deleted as soon as you send new ones, or on 23 January at the latest.']);
 
             return true;
         });
 
         app()->setLocale('fr');
-        $french = (new NewDocumentsNeededMail($this->business->name, [DocumentKind::ProofOfAddress], 'Trop ancienne.', Carbon::parse('2027-01-23 00:00:00')->toImmutable(), 'Africa/Casablanca'))->toMail($this->owner);
+        $french = (new NewDocumentsNeededMail($this->business->id, $this->business->name, [DocumentKind::ProofOfAddress], 'Trop ancienne.', Carbon::parse('2027-01-23 00:00:00')->toImmutable(), 'Africa/Casablanca'))->toMail($this->owner);
         expect($french->subject)->toBe('Il nous faut un nouveau document pour vérifier '.$this->business->name)
             ->and($french->outroLines[0])->toContain('23 janvier');
     });

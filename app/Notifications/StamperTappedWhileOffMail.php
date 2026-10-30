@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Actions\Tenancy\SelectBusiness;
 use App\Models\User;
 use App\Support\LocalMoment;
 use Carbon\CarbonImmutable;
@@ -16,10 +17,12 @@ use Illuminate\Notifications\Notification;
  * by AlertDisabledStamperTap, itself queued, in the owner's language. The
  * stamper and site names are the business's own text: their brackets are
  * escaped, as in StaffInvitationMail.
+ * Its button opens the business it names (CHW-295, SelectBusiness::link).
  */
 final class StamperTappedWhileOffMail extends Notification
 {
     public function __construct(
+        public readonly int $businessId,
         public readonly ?string $label,
         public readonly int $stamperId,
         public readonly string $site,
@@ -47,7 +50,7 @@ final class StamperTappedWhileOffMail extends Notification
             ->line(LocalMoment::of($this->tappedAt, $this->timezone)['day'] === 'today'
                 ? __('Someone tapped :stamper at :site today at :time, while it is switched off. The tap was refused: no stamp was given.', $names)
                 : __('Someone tapped :stamper at :site on :date at :time, while it is switched off. The tap was refused: no stamp was given.', [...$names, 'date' => $local->translatedFormat('j F')]))
-            ->action(__('See your stampers'), route('stampers.index'))
+            ->action(__('See your stampers'), SelectBusiness::link($this->businessId, 'stampers', $notifiable))
             ->line(__('If it went missing, keep it off. If you found it, switch it on again from your stampers page. You get this email at most once an hour per stamper.'));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Actions\Tenancy\SelectBusiness;
 use App\Enums\DocumentKind;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -18,6 +19,7 @@ use Illuminate\Notifications\Notification;
  * Which ones, the admin's reason quoted as typed (on one line, its brackets
  * escaped: Plain, isolated from the line's direction), the verification page, and the day the unusable ones go
  * at the latest, at the business's time. Queued, in each owner's language.
+ * Its button opens the business it names (CHW-295, SelectBusiness::link).
  */
 final class NewDocumentsNeededMail extends Notification implements ShouldQueue
 {
@@ -27,6 +29,7 @@ final class NewDocumentsNeededMail extends Notification implements ShouldQueue
      * @param  list<DocumentKind>  $kinds
      */
     public function __construct(
+        public readonly int $businessId,
         public readonly string $businessName,
         public readonly array $kinds,
         public readonly string $reason,
@@ -59,7 +62,7 @@ final class NewDocumentsNeededMail extends Notification implements ShouldQueue
             })
             // Isolated (FSI, PDI): a reason in French or English reads whole inside an Arabic line.
             ->line(__('Our reason: “:reason”', ['reason' => "\u{2068}".Plain::text((string) preg_replace('/\s+/u', ' ', $this->reason))."\u{2069}"]))
-            ->action($several ? __('Send new documents') : __('Send a new document'), route('verification.show'))
+            ->action($several ? __('Send new documents') : __('Send a new document'), SelectBusiness::link($this->businessId, 'verification', $notifiable))
             ->line($several
                 ? __(':business keeps working while we check. The documents we couldn\'t use are deleted as soon as you send new ones, or on :date at the latest.', [...$names, 'date' => $date])
                 : __(':business keeps working while we check. The document we couldn\'t use is deleted as soon as you send a new one, or on :date at the latest.', [...$names, 'date' => $date]));

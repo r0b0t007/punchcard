@@ -27,6 +27,19 @@ final class MailedLink
         return self::onTheApp(URL::temporarySignedRoute($route, $expires, $parameters, absolute: false));
     }
 
+    /**
+     * A route's URL, signed with no end, as signed() is otherwise: for a link
+     * that only opens what its user may open anyway, checked each time
+     * (CHW-295, a business's emails). The signature keeps another site from
+     * sending the user to it.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    public static function signedForGood(string $route, array $parameters): string
+    {
+        return self::onTheApp(URL::signedRoute($route, $parameters, absolute: false));
+    }
+
     /** A path and query on the app's own address (app.url). */
     public static function onTheApp(string $pathAndQuery): string
     {
