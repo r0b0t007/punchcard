@@ -168,7 +168,7 @@ it('accepts the documents waiting when the business is verified, deleting them o
     ($this->send)(DocumentKind::IdDocument, ($this->pdf)());
     ($this->send)(DocumentKind::ProofOfAddress, ($this->pdf)('bill.pdf'));
 
-    app(VerifyBusiness::class)->handle($this->tenants->a1);
+    app(VerifyBusiness::class)->handle($this->tenants->a1, array_map(fn (BusinessDocument $d): int => $d->id, ($this->documents)()));
 
     expect(array_map(fn (BusinessDocument $d): array => [$d->status, $d->decided_at?->toDateTimeString(), $d->deletes_at?->toDateTimeString()], ($this->documents)()))
         ->toBe(array_fill(0, 2, [DocumentStatus::Accepted, '2026-10-22 10:00:00', '2027-01-22 00:00:00']));
