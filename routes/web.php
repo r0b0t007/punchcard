@@ -70,10 +70,10 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
     Route::prefix('open/{business}/{page}')->whereNumber('business')->whereIn('page', array_keys(MailedLink::BUSINESS_PAGES))
         ->middleware(ValidateSignature::relative())->withoutMiddleware('verified')->group(function (): void {
             Route::get('/', [OpenBusinessController::class, 'show'])->name('business.open');
-            Route::post('/', [OpenBusinessController::class, 'switchAccount'])->name('business.open.switch-account');
+            Route::post('/', [OpenBusinessController::class, 'switchAccount'])->withoutMiddleware(EnsureTenantUnchanged::class)->name('business.open.switch-account');
         });
-    // The tenant switcher (CHW-147): work in another business or network, then its dashboard.
-    Route::put('tenant', [TenantController::class, 'update'])->name('tenant.update');
+    // The tenant switcher (CHW-147): work in another business or network, then its dashboard; from a stale tab too.
+    Route::put('tenant', [TenantController::class, 'update'])->withoutMiddleware(EnsureTenantUnchanged::class)->name('tenant.update');
     // The printable QR stand, its owner's (CHW-31); an owner still setting up finishes the wizard first.
     Route::middleware(RedirectToOnboarding::class)->group(function (): void {
         Route::get('qr-stand', [QrStandController::class, 'show'])->name('business.qr-stand');

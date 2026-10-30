@@ -10,9 +10,12 @@ import CustomerLayout from '@/layouts/customer-layout';
 import I18nLayout from '@/layouts/i18n-layout';
 import OnboardingLayout from '@/layouts/onboarding-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { withTenantHeader } from '@/lib/tenant-guard';
+import { followTenant, withTenantHeader } from '@/lib/tenant-guard';
 
 const appName = import.meta.env.VITE_APP_NAME || 'punchcard';
+
+// Every visit names the tenant of the page on screen (CHW-147, 10f): follow it from the first page.
+followTenant();
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

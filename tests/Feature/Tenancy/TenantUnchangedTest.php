@@ -2,17 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Actions\Admin\StartImpersonation;
 use App\Enums\BusinessRole;
 use App\Enums\DocumentKind;
+use App\Enums\PlatformRole;
 use App\Http\Middleware\EnsureTenantUnchanged;
 use App\Http\Middleware\SetTenant;
 use App\Models\StaffInvitation;
 use App\Models\User;
+use App\Support\Auth\MailedLink;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 use Tests\Support\Tenants;
 
 /*
@@ -49,11 +53,11 @@ beforeEach(function (): void {
 
 it('refuses every change sent from a page of another business, before reading it', function (): void {
     $guarded = collect(Route::getRoutes()->getRoutes())
-        ->filter(fn (RouteDefinition $route): bool => in_array(EnsureTenantUnchanged::class, $route->gatherMiddleware(), true))
-        ->flatMap(fn (RouteDefinition $route): array => array_map(fn (string $method): array => [$method, $route], array_diff($route->methods(), ['GET', 'HEAD'])))
-        ->reject(fn (array $pair): bool => in_array($pair[1]->getName(), ['tenant.update', 'business.open.switch-account'], true));
+        ->filter(fn (RouteDefinition $route): bool => EnsureTenantUnchanged::covers($route))
+        ->flatMap(fn (RouteDefinition $route): array => array_map(fn (string $method): array => [$method, $route], array_diff($route->methods(), ['GET', 'HEAD'])));
 
-    // Every one the business app has: a new one is guarded too, or this list says why not.
+    // Every one the business app has: a new one is guarded too, or opts out where it is defined (the switch, signing
+    // out from an email's link: they act on no tenant's data).
     expect($guarded->map(fn (array $pair): string => $pair[0].' '.$pair[1]->getName())->sort()->values()->all())->toBe([
         'DELETE counter.disarm', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
         'PATCH cards.status', 'PATCH stampers.status',
@@ -92,10 +96,37 @@ it('leaves a request without the header to the route\'s own rules', function ():
     expect(($this->invitations)())->toBe(1);
 });
 
-it('lets the switch itself through from a page of another business', function (): void {
+it('lets the switch, and signing out from an email\'s link, through from a page of another business', function (): void {
     ($this->onA1)()->put(route('tenant.update'), ['choice' => SetTenant::businessChoice($this->tenants->a2->id)], ($this->a2Page)())
         ->assertRedirect(route('dashboard'))
         ->assertSessionHas(SetTenant::SESSION_KEY, SetTenant::businessChoice($this->tenants->a2->id));
+
+    $link = MailedLink::toBusiness($this->tenants->a1->id, 'verification', User::factory()->create());
+    ($this->onA1)()->post($link, [], ($this->a2Page)())->assertRedirect(route('business.login'));
+    $this->assertGuest();
+});
+
+it('never refuses a page asked for, a poll of a page left behind included', function (): void {
+    ($this->onA1)()->get(route('counter.show'), ($this->a2Page)())->assertOk();
+});
+
+it('lets staff save from their own counter', function (): void {
+    $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
+    $stamper = $this->tenants->stamper($this->tenants->a1);
+
+    $this->actingAs($staff)->post(route('counter.arm', $stamper), ['qty' => 1], ($this->shown)(SetTenant::businessChoice($this->tenants->a1->id)))
+        ->assertRedirect(route('counter.show'))
+        ->assertInertiaFlashMissing('toast');
+});
+
+it('leaves an admin signed in as an owner to the impersonation guard, which refuses first', function (): void {
+    $admin = User::factory()->withTwoFactor()->create();
+    $admin->assignRole(Role::findOrCreate(PlatformRole::Admin->value, 'web'));
+    $this->actingAs($admin);
+    app(StartImpersonation::class)->handle($admin, $this->tenants->a1, $this->owner, app('session')->driver());
+
+    $this->post(route('staff.invitations.store'), ['email' => 'nadia@example.com'], ($this->a2Page)())
+        ->assertInertiaFlash('toast.message', 'Not while you are signed in as the owner: nothing was changed.');
 });
 
 it('names the network, or no business, worked in now', function (): void {
@@ -120,8 +151,10 @@ it('passes a page rendered with no business while none is chosen', function (): 
 });
 
 it('tells each business page the tenant it is rendered for, and no other page', function (): void {
+    // When rendered (the server's clock): the latest render is where the session works, for the app's other tabs.
+    $this->freezeTime();
     ($this->onA1)()->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenant', ['choice' => SetTenant::businessChoice($this->tenants->a1->id), 'name' => 'Amal Gauthier']));
+        ->where('tenant', ['choice' => SetTenant::businessChoice($this->tenants->a1->id), 'name' => 'Amal Gauthier', 'at' => now()->getTimestampMs()]));
     // Full screen, no sidebar: still named, for counter mode's saves.
     ($this->onA1)()->get(route('counter.show'))->assertInertia(fn (Assert $page): Assert => $page
         ->where('tenant.choice', SetTenant::businessChoice($this->tenants->a1->id)));
@@ -131,10 +164,10 @@ it('tells each business page the tenant it is rendered for, and no other page', 
     $this->tenants->admin($this->owner, $this->tenants->orgA);
     $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => SetTenant::organizationChoice($this->tenants->orgA->id)])->get(route('dashboard'))
         ->assertInertia(fn (Assert $page): Assert => $page
-            ->where('tenant', ['choice' => SetTenant::organizationChoice($this->tenants->orgA->id), 'name' => 'Pâtisserie Amal']));
+            ->where('tenant.choice', SetTenant::organizationChoice($this->tenants->orgA->id))->where('tenant.name', 'Pâtisserie Amal'));
 
     $this->tenants->member($this->owner, $this->tenants->b1, BusinessRole::Owner);
     $this->flushSession();
     $this->actingAs($this->owner)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenant', ['choice' => EnsureTenantUnchanged::NONE, 'name' => null]));
+        ->where('tenant.choice', EnsureTenantUnchanged::NONE)->where('tenant.name', null));
 });
