@@ -40,7 +40,7 @@ export function TenantMark({ entry }: { entry: TenantEntry | null }) {
         );
     }
 
-    if (entry.choice.startsWith('org:')) {
+    if (entry.kind === 'network') {
         return (
             <span className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent text-sidebar-accent-foreground">
                 <Network className="size-4" aria-hidden />
@@ -129,11 +129,15 @@ export function TenantSwitcher() {
                             size="lg"
                             variant="trigger"
                             tooltip={current?.name ?? t('Switch business')}
-                            aria-label={t('Switch business')}
                             data-test="tenant-switcher"
                         >
                             <TenantMark entry={current} />
                             <TenantLabel entry={current} />
+                            {current ? (
+                                <span className="sr-only">
+                                    {t('Switch business')}
+                                </span>
+                            ) : null}
                             <ChevronsUpDown className="ms-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
@@ -149,7 +153,7 @@ export function TenantSwitcher() {
                         }
                     >
                         {tenants.groups.map((group, index) => (
-                            <DropdownMenuGroup key={group.organization}>
+                            <DropdownMenuGroup key={group.organizationId}>
                                 {index > 0 ? <DropdownMenuSeparator /> : null}
                                 <div className="px-2 pt-2 pb-1 text-xs font-semibold text-muted-foreground">
                                     <bdi>{group.organization}</bdi>

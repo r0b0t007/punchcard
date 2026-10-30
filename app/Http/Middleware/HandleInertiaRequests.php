@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Actions\Tenancy\DescribeTenants;
 use App\Actions\Tenancy\HasMemberships;
+use App\Actions\Tenancy\ResolveTenant;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\Impersonation;
@@ -73,11 +74,7 @@ class HandleInertiaRequests extends Middleware
                 'stampers' => $this->managesStaff($request),
             ],
             // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
-            // Only where the sidebar shows (the business app, settings): no other page pays its queries, a tap least of all.
-            // An admin signed in as an owner is held to that business (CHW-144): only it is offered.
-            'tenants' => fn (): ?array => $request->user() instanceof User && $request->is('business', 'business/*', 'settings', 'settings/*')
-                ? app(DescribeTenants::class)->handle($request->user(), onlyCurrent: $request->hasSession() && Impersonation::of($request->session()) instanceof Impersonation)
-                : null,
+            'tenants' => fn (): ?array => $this->tenants($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'locale' => $locale,
             'dir' => Locales::direction($locale),
@@ -101,6 +98,43 @@ class HandleInertiaRequests extends Middleware
         }
 
         return ['owner' => (string) $request->user()->name, 'business' => $impersonation->businessName, 'endsAt' => $impersonation->endsAt->toIso8601String()];
+    }
+
+    /**
+     * The tenant switcher's data (DescribeTenants), only where the sidebar shows: the business app, but not its
+     * full-screen pages (counter mode, scanning, the QR stand), and settings. No other page pays its queries, a
+     * tap least of all. An admin signed in as an owner is held to that business (CHW-144): only it is offered.
+     *
+     * Settings run outside the tenant (the privacy export reads a customer's cards in every organization), so
+     * there the session's choice is resolved just to name it, and the context put back.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function tenants(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! $request->is('business', 'business/*', 'settings', 'settings/*') || $request->routeIs('counter.*', 'business.qr-stand*')) {
+            return null;
+        }
+
+        $onlyCurrent = $request->hasSession() && Impersonation::of($request->session()) instanceof Impersonation;
+
+        if (! $request->is('settings', 'settings/*')) {
+            return app(DescribeTenants::class)->handle($user, $onlyCurrent);
+        }
+
+        $context = app(TenantContext::class);
+        $before = $context->snapshot();
+        $choice = $request->hasSession() ? $request->session()->get(SetTenant::SESSION_KEY) : null;
+
+        try {
+            app(ResolveTenant::class)->handle($user, is_string($choice) ? $choice : null);
+
+            return app(DescribeTenants::class)->handle($user, $onlyCurrent);
+        } finally {
+            $context->restore($before);
+        }
     }
 
     /** Whether the user works in a business (owner, staff or HQ), so has a counter there; no business, no counter. */

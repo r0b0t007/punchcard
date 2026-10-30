@@ -2,6 +2,7 @@
 export type TenantEntry = {
     /** As SetTenant keeps it: "business:7" or "org:5" (a network). */
     choice: string;
+    kind: 'business' | 'network';
     name: string;
     /** The user's role there, translated. */
     role: string;
@@ -14,5 +15,9 @@ export type TenantEntry = {
 /** The tenant switcher (CHW-147): where the user works now, and everything they may choose, by organization. */
 export type Tenants = {
     current: TenantEntry | null;
-    groups: { organization: string; entries: TenantEntry[] }[];
+    groups: {
+        organizationId: number;
+        organization: string;
+        entries: TenantEntry[];
+    }[];
 } | null;

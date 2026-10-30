@@ -24,6 +24,7 @@ use Inertia\Response;
  * for the business or one of its locations (?location=). Staff and
  * customers get neither: a customer goes to My cards (CHW-27). At the
  * organization level HQ gets a note: the network view is B18 (CHW-133).
+ * With neither chosen, the page asks where they work today (CHW-147).
  */
 final class DashboardController extends Controller
 {
@@ -52,6 +53,8 @@ final class DashboardController extends Controller
                 ? $describeDashboard->handle($business, $request->integer('location') ?: null, CarbonImmutable::now())
                 : null,
             'atOrganization' => ! $business instanceof Business && $context->organizationId() !== null,
+            // No business or network resolved (CHW-147, design 10d): ask where they work today.
+            'choosing' => $context->organizationId() === null,
         ]);
     }
 }

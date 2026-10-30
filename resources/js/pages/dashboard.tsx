@@ -19,20 +19,22 @@ export default function Dashboard({
     checklist,
     stats,
     atOrganization,
+    choosing,
 }: {
     checklist: Checklist | null;
     stats: DashboardStats | null;
     atOrganization: boolean;
+    /** No business or network resolved: ask where they work today (DashboardController). */
+    choosing: boolean;
 }) {
     const { t } = useTranslation();
     const { tenants } = usePage().props;
-    const choosing = tenants !== null && tenants.current === null;
 
     return (
         <>
             <Head title={t('Dashboard')} />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {choosing ? (
+                {choosing && tenants !== null ? (
                     <section className="flex max-w-xl flex-col gap-4">
                         <div className="space-y-1">
                             <h1 className="font-display text-title font-bold">

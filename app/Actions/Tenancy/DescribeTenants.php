@@ -27,7 +27,7 @@ use Illuminate\Support\Collection;
  * there the business is the account, and its owner sees just the business.
  * Null for someone who works nowhere (a customer).
  *
- * @phpstan-type Entry array{choice: string, name: string, role: string, logoUrl: string|null, initial: string, current: bool}
+ * @phpstan-type Entry array{choice: string, kind: 'business'|'network', name: string, role: string, logoUrl: string|null, initial: string, current: bool}
  */
 final readonly class DescribeTenants
 {
@@ -35,7 +35,7 @@ final readonly class DescribeTenants
 
     /**
      * @param  bool  $onlyCurrent  only the one worked in: an admin signed in as an owner is held to it (CHW-144)
-     * @return array{current: Entry|null, groups: list<array{organization: string, entries: list<Entry>}>}|null
+     * @return array{current: Entry|null, groups: list<array{organizationId: int, organization: string, entries: list<Entry>}>}|null
      */
     public function handle(User $user, bool $onlyCurrent = false): ?array
     {
@@ -51,34 +51,27 @@ final readonly class DescribeTenants
             return null;
         }
 
-        $entry = fn (string $choice, string $name, string $role, Organization $organization): array => [
-            'choice' => $choice,
-            'name' => $name,
-            'role' => $role,
-            'logoUrl' => $organization->logoUrl(),
-            'initial' => mb_strtoupper(mb_substr($name, 0, 1)),
-            'current' => $choice === $current,
-        ];
-
         $organizations = $businesses->map(fn (Business $business): Organization => $business->organization)
             ->merge($networks)->unique('id')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
 
-        $groups = array_values($organizations->map(fn (Organization $organization): array => [
+        // Plain arrays, not a Collection: its generics would widen an entry's kind to a string.
+        $groups = array_values(array_filter(array_map(fn (Organization $organization): array => [
+            'organizationId' => $organization->id,
             'organization' => $organization->name,
             'entries' => array_values(array_filter([
-                ...$networks->where('id', $organization->id)->map(fn (Organization $network): array => $entry(
-                    SetTenant::organizationChoice($network->id), __('Whole network'), __('Runs the network'), $network,
-                ))->values()->all(),
-                ...$businesses->where('organization_id', $organization->id)->map(fn (Business $business): array => $entry(
-                    SetTenant::businessChoice($business->id), $business->name, (string) $memberships->get($business->id)?->role?->getLabel(), $organization,
-                ))->values()->all(),
+                ...array_map(fn (Organization $network): array => $this->entry(
+                    SetTenant::organizationChoice($network->id), true, __('Whole network'), __('Runs the network'), $network, $current,
+                ), $networks->where('id', $organization->id)->values()->all()),
+                ...array_map(fn (Business $business): array => $this->entry(
+                    SetTenant::businessChoice($business->id), false, $business->name, (string) $memberships->get($business->id)?->role?->getLabel(), $organization, $current,
+                ), $businesses->where('organization_id', $organization->id)->values()->all()),
             ], fn (array $candidate): bool => ! $onlyCurrent || $candidate['current'])),
-        ])->filter(fn (array $group): bool => $group['entries'] !== [])->all());
+        ], $organizations->all()), fn (array $group): bool => $group['entries'] !== []));
 
         $entries = array_merge(...array_column($groups, 'entries'));
 
         return [
-            'current' => collect($entries)->firstWhere('current', true),
+            'current' => array_values(array_filter($entries, fn (array $entry): bool => $entry['current']))[0] ?? null,
             'groups' => $groups,
         ];
     }
@@ -95,6 +88,24 @@ final readonly class DescribeTenants
         return [
             ...$networks->map(fn (Organization $network): string => SetTenant::organizationChoice($network->id))->values()->all(),
             ...$businesses->map(fn (Business $business): string => SetTenant::businessChoice($business->id))->values()->all(),
+        ];
+    }
+
+    /**
+     * One business or network as the switcher shows it, ticked when it is the one worked in.
+     *
+     * @return Entry
+     */
+    private function entry(string $choice, bool $network, string $name, string $role, Organization $organization, ?string $current): array
+    {
+        return [
+            'choice' => $choice,
+            'kind' => $network ? 'network' : 'business',
+            'name' => $name,
+            'role' => $role,
+            'logoUrl' => $organization->logoUrl(),
+            'initial' => mb_strtoupper(mb_substr($name, 0, 1)),
+            'current' => $choice === $current,
         ];
     }
 

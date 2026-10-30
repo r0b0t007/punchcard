@@ -49,18 +49,19 @@ beforeEach(function (): void {
     $this->tenants->member($this->salma, $this->tenants->a2, BusinessRole::Staff);
 
     $this->entry = fn (string $choice, string $name, string $role, bool $current = false): array => [
-        'choice' => $choice, 'name' => $name, 'role' => $role, 'logoUrl' => null, 'initial' => mb_substr($name, 0, 1), 'current' => $current,
+        'choice' => $choice, 'kind' => str_starts_with($choice, 'org:') ? 'network' : 'business', 'name' => $name, 'role' => $role, 'logoUrl' => null, 'initial' => mb_substr($name, 0, 1), 'current' => $current,
     ];
     $this->on = fn (User $user, ?string $choice) => $this->actingAs($user)->withSession($choice === null ? [] : [SetTenant::SESSION_KEY => $choice]);
 });
 
 it('lists every business and network the user may work in, by organization, the current one marked', function (): void {
     ($this->on)($this->salma, 'business:'.$this->tenants->b1->id)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('choosing', false)
         ->where('tenants.current', ($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true))
         ->where('tenants.groups', [
             // An independent café's owner runs its organization too, but there the business is the account: no network entry.
-            ['organization' => 'Café Hafa', 'entries' => [($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true)]],
-            ['organization' => 'Pâtisserie Amal', 'entries' => [
+            ['organizationId' => $this->tenants->orgB->id, 'organization' => 'Café Hafa', 'entries' => [($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true)]],
+            ['organizationId' => $this->tenants->orgA->id, 'organization' => 'Pâtisserie Amal', 'entries' => [
                 ($this->entry)('org:'.$this->tenants->orgA->id, 'Whole network', 'Runs the network'),
                 ($this->entry)('business:'.$this->tenants->a1->id, 'Amal Gauthier', 'Owner'),
                 ($this->entry)('business:'.$this->tenants->a2->id, 'Amal Maârif', 'Staff'),
@@ -76,8 +77,10 @@ it('leaves out what it would not honour: a business suspended or archived, a mem
     });
 
     ($this->on)($this->salma, 'org:'.$this->tenants->orgA->id)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
+        // Working across the network is a choice made: the note, not the question.
+        ->where('choosing', false)
         ->where('tenants.current', ($this->entry)('org:'.$this->tenants->orgA->id, 'Whole network', 'Runs the network', true))
-        ->where('tenants.groups', [['organization' => 'Pâtisserie Amal', 'entries' => [
+        ->where('tenants.groups', [['organizationId' => $this->tenants->orgA->id, 'organization' => 'Pâtisserie Amal', 'entries' => [
             ($this->entry)('org:'.$this->tenants->orgA->id, 'Whole network', 'Runs the network', true),
         ]]]));
 });
@@ -85,13 +88,30 @@ it('leaves out what it would not honour: a business suspended or archived, a mem
 it('names the one business of someone who works in one, and nothing for a customer', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a2);
 
-    ($this->on)($staff, null)->get(route('counter.show'))->assertInertia(fn (Assert $page): Assert => $page
+    ($this->on)($staff, null)->get(route('profile.edit'))->assertInertia(fn (Assert $page): Assert => $page
         ->where('tenants.current', ($this->entry)('business:'.$this->tenants->a2->id, 'Amal Maârif', 'Staff', true))
         ->count('tenants.groups', 1));
+    // Counter mode and the QR stand are full screen: no sidebar, so no switcher to pay for.
+    ($this->on)($staff, null)->get(route('counter.show'))->assertInertia(fn (Assert $page): Assert => $page->where('tenants', null));
 
     ($this->on)(User::factory()->create(), null)->get(route('app.cards'))->assertInertia(fn (Assert $page): Assert => $page->where('tenants', null));
     // Outside the business app and settings, nobody pays its queries.
     ($this->on)($this->salma, null)->get(route('app.cards'))->assertInertia(fn (Assert $page): Assert => $page->where('tenants', null));
+});
+
+it('names the business chosen on the settings pages too, and leaves them outside the tenant', function (): void {
+    ($this->on)($this->salma, 'business:'.$this->tenants->a1->id)->get(route('profile.edit'))->assertInertia(fn (Assert $page): Assert => $page
+        ->component('settings/profile')
+        ->where('tenants.current', ($this->entry)('business:'.$this->tenants->a1->id, 'Amal Gauthier', 'Owner', true)));
+
+    // Resolved only to name it: the privacy export reads a customer's cards in every organization.
+    expect($this->context->organizationId())->toBeNull();
+});
+
+it('opens the business, not a network of one, for a stale choice of a café\'s own organization', function (): void {
+    ($this->on)($this->salma, 'org:'.$this->tenants->orgB->id)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('choosing', false)
+        ->where('tenants.current', ($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true)));
 });
 
 it('shows each user only their own: a franchisee its shop, another organization nothing of this one', function (): void {
@@ -99,11 +119,11 @@ it('shows each user only their own: a franchisee its shop, another organization 
     $elsewhere = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
 
     ($this->on)($franchisee, null)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenants.groups', [['organization' => 'Pâtisserie Amal', 'entries' => [
+        ->where('tenants.groups', [['organizationId' => $this->tenants->orgA->id, 'organization' => 'Pâtisserie Amal', 'entries' => [
             ($this->entry)('business:'.$this->tenants->a1->id, 'Amal Gauthier', 'Owner', true),
         ]]]));
     ($this->on)($elsewhere, null)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenants.groups', [['organization' => 'Café Hafa', 'entries' => [
+        ->where('tenants.groups', [['organizationId' => $this->tenants->orgB->id, 'organization' => 'Café Hafa', 'entries' => [
             ($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true),
         ]]]));
 });
@@ -113,7 +133,7 @@ it('leaves out an archived organization, and offers a café\'s organization to a
     $headOffice = $this->tenants->admin(User::factory()->create(), $this->tenants->orgB);
 
     ($this->on)($this->salma, null)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenants.groups', [['organization' => 'Café Hafa', 'entries' => [
+        ->where('tenants.groups', [['organizationId' => $this->tenants->orgB->id, 'organization' => 'Café Hafa', 'entries' => [
             ($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true),
         ]]]));
     // Runs the café's organization without working in the café (after a hand-over): where ResolveTenant puts them.
@@ -184,7 +204,7 @@ it('keeps an admin signed in as an owner in the business they opened', function 
     app(StartImpersonation::class)->handle($admin, $this->tenants->b1, $this->salma, app('session')->driver());
 
     $this->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('tenants.groups', [['organization' => 'Café Hafa', 'entries' => [
+        ->where('tenants.groups', [['organizationId' => $this->tenants->orgB->id, 'organization' => 'Café Hafa', 'entries' => [
             ($this->entry)('business:'.$this->tenants->b1->id, 'Café Hafa', 'Owner', true),
         ]]]));
     $this->put(route('tenant.update'), ['choice' => 'business:'.$this->tenants->a1->id])->assertStatus(303);
@@ -195,6 +215,7 @@ it('keeps an admin signed in as an owner in the business they opened', function 
 it('asks where they work today when no business is chosen', function (): void {
     ($this->on)($this->salma, null)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
         ->component('dashboard')
+        ->where('choosing', true)
         ->where('tenants.current', null)
         ->count('tenants.groups', 2)
         ->where('stats', null)
