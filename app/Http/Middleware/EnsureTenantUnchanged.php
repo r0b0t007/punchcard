@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Inertia;
+use Inertia\Support\Header;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,10 +20,12 @@ use Symfony\Component\HttpFoundation\Response;
  * is refused before anything reads it, route bindings included: nothing is
  * saved, and the dashboard of the business worked in now says why.
  *
- * Not a permission check (the user may work in both): a request without the
- * header (no Inertia page sent it) is left to the route's own rules. A
- * route that acts on no tenant's data (the switch itself, signing out from
- * an email's link) opts out where it is defined (withoutMiddleware).
+ * An Inertia visit that names no tenant comes from a page older than the
+ * header (a tab still running the bundle from before it): stale too, and
+ * refused the same way (CHW-317). Not a permission check (the user may work
+ * in both): a plain request, not Inertia's, is left to the route's own
+ * rules. A route that acts on no tenant's data (the switch itself, signing
+ * out from an email's link) opts out where it is defined (withoutMiddleware).
  */
 final readonly class EnsureTenantUnchanged
 {
@@ -60,7 +63,9 @@ final readonly class EnsureTenantUnchanged
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->isMethodSafe() || ! $request->headers->has(self::HEADER) || $request->headers->get(self::HEADER) === self::choiceOf($this->context)) {
+        $shown = $request->headers->get(self::HEADER);
+
+        if ($request->isMethodSafe() || ($shown === null && ! $request->headers->has(Header::INERTIA)) || $shown === self::choiceOf($this->context)) {
             return $next($request);
         }
 

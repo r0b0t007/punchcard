@@ -47,6 +47,8 @@ beforeEach(function (): void {
     $this->onA1 = fn () => $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => SetTenant::businessChoice($this->tenants->a1->id)]);
     $this->shown = fn (string $choice): array => [EnsureTenantUnchanged::HEADER => $choice];
     $this->a2Page = fn (): array => ($this->shown)(SetTenant::businessChoice($this->tenants->a2->id));
+    // An Inertia visit from a page, as tenant-guard.ts sends it.
+    $this->inertiaFrom = fn (string $choice): array => ['X-Inertia' => 'true', ...($this->shown)($choice)];
     $this->invite = fn (array $headers) => ($this->onA1)()->post(route('staff.invitations.store'), ['email' => 'nadia@example.com'], $headers);
     $this->invitations = fn (): int => $this->context->bypass(fn (): int => StaffInvitation::query()->count());
 });
@@ -90,9 +92,20 @@ it('saves nothing from a page of another business, and what its page shows saves
     expect(($this->invitations)())->toBe(1);
 });
 
-it('leaves a request without the header to the route\'s own rules', function (): void {
+it('leaves a plain request, not Inertia\'s, to the route\'s own rules', function (): void {
     ($this->invite)([])->assertSessionHasNoErrors();
 
+    expect(($this->invitations)())->toBe(1);
+});
+
+it('refuses an Inertia visit that names no tenant: a page from before the header', function (): void {
+    ($this->invite)(['X-Inertia' => 'true'])
+        ->assertRedirect(route('dashboard'))
+        ->assertInertiaFlash('toast.message', 'Not saved. You switched to Amal Gauthier in another tab, so this page now shows Amal Gauthier.');
+    expect(($this->invitations)())->toBe(0);
+
+    // The same visit from a page that names it saves.
+    ($this->invite)(($this->inertiaFrom)(SetTenant::businessChoice($this->tenants->a1->id)))->assertSessionHasNoErrors();
     expect(($this->invitations)())->toBe(1);
 });
 
