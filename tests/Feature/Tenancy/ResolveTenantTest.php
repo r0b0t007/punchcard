@@ -142,6 +142,15 @@ it('gives the owner of a suspended independent café no tenant, even when they c
         ->get('/_tenant')->assertExactJson(Tenants::context(null));
 })->with(['no choice' => null, 'organization chosen' => 'org:']);
 
+it('opens an independent café, never a network of one, when its owner chooses its organization', function (): void {
+    $owner = User::factory()->create();
+    $business = app(CreateIndependentBusiness::class)->handle($owner, 'Café Hafa');
+
+    // A stale choice (CHW-147): the café is the account, as the switcher offers it (Memberships::businessThatIs).
+    $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => SetTenant::organizationChoice($business->organization_id)])
+        ->get('/_tenant')->assertExactJson(Tenants::context($business->organization_id, $business->id, orgAdmin: true, role: BusinessRole::Owner));
+});
+
 it('keeps franchise HQ working while its franchisees are suspended', function (): void {
     $user = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
     app(TenantContext::class)->bypass(fn (): int => Business::query()->whereKey([$this->tenants->a1->id, $this->tenants->a2->id])->update(['status' => BusinessStatus::Suspended]));
