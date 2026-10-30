@@ -126,6 +126,7 @@ it('opens only for the user it was mailed to, switching nothing for anyone else'
 
     ($this->onA2)($coOwner)->get(($this->link)('stampers'))
         ->assertForbidden()
+        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/other-account'))
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a2->id);
     ($this->onA2)($coOwner)->get(str_replace('for='.$this->owner->id, 'for='.$coOwner->id, ($this->link)('stampers')))->assertForbidden();
     ($this->onA2)($coOwner)->get(($this->link)('stampers', $coOwner))->assertRedirect(route('stampers.index'));
@@ -167,20 +168,36 @@ it('tells another account signed in whom the link is for, half hidden, and opens
         ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a2->id);
 });
 
-it('gives a 404 for a link whose account is gone', function (): void {
+it('gives a 404, and signs nobody out, for a link whose account is gone', function (string $how): void {
     $gone = User::factory()->create();
     $link = ($this->link)('verification', $gone);
-    $gone->delete();
+    // Deleted, or anonymised: kept for the stamp ledger, but nobody can sign in to it.
+    $how === 'deleted' ? $gone->delete() : $gone->forceFill(['anonymised_at' => now()])->save();
 
     ($this->onA2)()->get($link)->assertNotFound();
+    ($this->onA2)()->post($link)->assertNotFound();
+
+    $this->assertAuthenticatedAs($this->owner);
+})->with(['deleted', 'anonymised']);
+
+it('tells an account not verified yet too', function (): void {
+    ($this->onA2)(User::factory()->unverified()->create())->get(($this->link)('verification'))
+        ->assertForbidden()
+        ->assertInertia(fn (Assert $page): Assert => $page->component('auth/other-account'));
 });
 
 it('signs out the other account, then opens the link once the account it was mailed to signs in', function (): void {
     $omar = User::factory()->create();
     $link = ($this->link)('verification');
 
-    ($this->onA2)($omar)->post($link)->assertRedirect(route('business.login'));
+    $omar->forceFill(['remember_token' => 'kept-on-his-phone'])->save();
+
+    ($this->onA2)($omar)->post($link)
+        ->assertRedirect(route('business.login'))
+        ->assertSessionMissing(SetTenant::SESSION_KEY);
     $this->assertGuest();
+    // This browser only: his other devices stay signed in.
+    expect($omar->fresh()->remember_token)->toBe('kept-on-his-phone');
 
     $this->post(route('login.store'), ['email' => $this->owner->email, 'password' => 'password'])->assertRedirect($link);
     $this->get($link)->assertRedirect(route('verification.show'))
@@ -194,4 +211,27 @@ it('signs nobody out for a link it did not sign', function (): void {
     ($this->onA2)($omar)->post(route('business.open.switch-account', ['business' => $this->tenants->a1->id, 'page' => 'verification', 'for' => $this->owner->id]))->assertForbidden();
 
     $this->assertAuthenticatedAs($omar);
+});
+
+it('opens the link, signing nobody out, once the account it was mailed to is signed in', function (): void {
+    $link = ($this->link)('verification');
+
+    // The page left open in a tab, then the right account signed in in another.
+    ($this->onA2)()->post($link)->assertRedirect($link);
+
+    $this->assertAuthenticatedAs($this->owner);
+});
+
+it('reads whom the link is for from the signed link alone, never from a body', function (): void {
+    $omar = User::factory()->create();
+    $victim = User::factory()->create(['email' => 'zineb@elsewhere.ma']);
+    $this->owner->forceFill(['email' => 'salma@cafehafa.ma'])->save();
+    $link = ($this->link)('verification');
+    $withBody = fn (User $for) => ($this->onA2)($omar)->call('GET', $link, server: ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'text/html'], content: (string) json_encode(['for' => $for->id]));
+
+    // Naming another user: still the one it was mailed to, never anyone's address on demand.
+    $withBody($victim)->assertForbidden()->assertInertia(fn (Assert $page): Assert => $page->where('sentTo', 's***@cafehafa.ma'));
+    // Naming themselves: still not theirs.
+    $withBody($omar)->assertForbidden()->assertInertia(fn (Assert $page): Assert => $page->component('auth/other-account'))
+        ->assertSessionHas(SetTenant::SESSION_KEY, 'business:'.$this->tenants->a2->id);
 });
