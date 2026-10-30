@@ -50,13 +50,15 @@ final class BusinessStatusActions
                 && ($livewire instanceof ViewBusiness || ! $record->getAttribute(BusinessesTable::DOCUMENTS_WAITING))))
             ->requiresConfirmation()
             ->modalDescription(__('Records that the platform reviewed this business. It changes nothing it can do.'))
-            // The documents shown when Verify was clicked, kept on the server: the ones it accepts (CHW-294).
-            ->mountUsing(fn (HasActions $livewire) => $livewire->mergeMountedActionArguments([
-                'documents' => $livewire instanceof ViewBusiness ? $livewire->documentsShown : [],
-            ]))
-            ->action(fn (Business $record, array $arguments) => self::change(
+            // The documents the page showed when Verify was clicked, kept in a locked property: the ones it accepts (CHW-294).
+            ->mountUsing(function (HasActions $livewire): void {
+                if ($livewire instanceof ViewBusiness) {
+                    $livewire->documentsToVerify = $livewire->documentsShown;
+                }
+            })
+            ->action(fn (Business $record, HasActions $livewire) => self::change(
                 $record,
-                fn () => app(VerifyBusiness::class)->handle($record, array_values(array_map(intval(...), (array) ($arguments['documents'] ?? [])))),
+                fn () => app(VerifyBusiness::class)->handle($record, $livewire instanceof ViewBusiness ? $livewire->documentsToVerify : []),
                 __(':business is verified.', ['business' => $record->name]),
             ));
     }

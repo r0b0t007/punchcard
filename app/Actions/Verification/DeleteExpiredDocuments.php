@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Verification;
 
 use App\Enums\DocumentKind;
-use App\Enums\DocumentStatus;
 use App\Models\Business;
 use App\Models\BusinessDocument;
 use App\Notifications\DocumentsDeletedUnreviewedMail;
@@ -163,7 +162,7 @@ final readonly class DeleteExpiredDocuments
     /** @return TenantBuilder<BusinessDocument> */
     private function waitingSince(CarbonImmutable $sentBefore): TenantBuilder
     {
-        return BusinessDocument::query()->where('status', DocumentStatus::Submitted)->where('created_at', '<=', $sentBefore);
+        return BusinessDocument::query()->waiting()->where('created_at', '<=', $sentBefore);
     }
 
     private function deleteOrphans(Filesystem $disk, CarbonImmutable $before): int

@@ -63,7 +63,7 @@ final readonly class RequestNewDocuments
                 throw new DocumentRefused(__('Only a business waiting to be verified can be asked for new documents.'));
             }
 
-            $documents = BusinessDocument::query()->where('business_id', $locked->id)->where('status', DocumentStatus::Submitted)
+            $documents = BusinessDocument::query()->where('business_id', $locked->id)->waiting()
                 ->whereKey($documentIds)->orderBy('id')->get();
 
             if ($documents->count() !== count(array_unique($documentIds))) {

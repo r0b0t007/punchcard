@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\Pages;
 
-use App\Enums\DocumentStatus;
 use App\Filament\Resources\Businesses\Actions\BusinessStatusActions;
 use App\Filament\Resources\Businesses\Actions\ImpersonateOwnerAction;
 use App\Filament\Resources\Businesses\Actions\RequestNewDocumentsAction;
@@ -26,21 +25,30 @@ class ViewBusiness extends ViewRecord
     protected static string $resource = BusinessResource::class;
 
     /**
-     * The waiting verification documents the page last showed, by id: what
-     * Verify accepts (CHW-294). Set on each render, never by the browser.
+     * The waiting verification documents the page last showed, by id (CHW-294).
+     * Set on each render, never by the browser.
      *
      * @var list<int>
      */
     #[Locked]
     public array $documentsShown = [];
 
+    /**
+     * $documentsShown as it was when Verify was clicked: what Verify accepts,
+     * not what the modal's own render loads behind it.
+     *
+     * @var list<int>
+     */
+    #[Locked]
+    public array $documentsToVerify = [];
+
     public function rendering(): void
     {
         $business = $this->getRecord();
 
         $this->documentsShown = $business instanceof Business ? array_values($business->documents
-            ->filter(fn (BusinessDocument $document): bool => $document->status === DocumentStatus::Submitted)
-            ->map(fn (BusinessDocument $document): int => $document->id)->sort()->all()) : [];
+            ->filter(fn (BusinessDocument $document): bool => $document->isWaiting())
+            ->map(fn (BusinessDocument $document): int => $document->id)->all()) : [];
     }
 
     protected function resolveRecord(int|string $key): Model

@@ -7,10 +7,10 @@ namespace App\Actions\Admin;
 use App\Actions\Admin\Concerns\ChangesBusinessStatus;
 use App\Actions\Verification\DeleteExpiredDocuments;
 use App\Enums\BusinessStatus;
+use App\Enums\DocumentKind;
 use App\Enums\DocumentStatus;
 use App\Models\Business;
 use App\Models\BusinessDocument;
-use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -26,8 +26,9 @@ use App\Support\Tenancy\TenantContext;
  * is refused, nothing changed, unless they are exactly the ones waiting
  * under the business's row lock (as SubmitDocument and the nightly cleanup
  * take it). One sent, replaced or deleted since is never accepted unseen,
- * and a business is never verified on documents gone meanwhile. Whether
- * any are needed stays as decided for CHW-34: none.
+ * and a business is never verified on documents gone meanwhile. The audit
+ * entry names the documents accepted. Whether any are needed stays as
+ * decided for CHW-34: none.
  */
 final readonly class VerifyBusiness
 {
@@ -38,7 +39,7 @@ final readonly class VerifyBusiness
     /** @param  list<int>  $documentIds  the waiting documents the admin's page showed */
     public function handle(Business $business, array $documentIds): Business
     {
-        $seen = array_values(array_unique($documentIds));
+        $seen = array_unique($documentIds);
         sort($seen);
 
         return $this->transition(
@@ -51,25 +52,24 @@ final readonly class VerifyBusiness
                     ]));
                 }
 
-                if ($this->waiting($locked)->orderBy('id')->pluck('id')->all() !== $seen) {
+                if (BusinessDocument::query()->where('business_id', $locked->id)->waiting()->orderBy('id')->pluck('id')->all() !== $seen) {
                     throw new BusinessStatusRefused(__('These documents changed since you opened this page. Reload it and look again.'));
                 }
             },
             fn (): array => ['status' => BusinessStatus::Verified, 'verified_at' => now()],
             'business.verified',
-            afterSave: function (Business $locked): void {
-                $this->waiting($locked)->update([
+            afterSave: function () use ($seen): void {
+                BusinessDocument::query()->whereKey($seen)->update([
                     'status' => DocumentStatus::Accepted,
                     'decided_at' => now(),
                     'deletes_at' => DeleteExpiredDocuments::deletesAt(now()),
                 ]);
             },
+            audit: fn (): array => $seen === [] ? [] : [
+                'document_ids' => $seen,
+                'kinds' => BusinessDocument::query()->whereKey($seen)->orderBy('id')->pluck('kind')
+                    ->map(fn (DocumentKind $kind): string => $kind->value)->all(),
+            ],
         );
-    }
-
-    /** @return TenantBuilder<BusinessDocument> */
-    private function waiting(Business $locked): TenantBuilder
-    {
-        return BusinessDocument::query()->where('business_id', $locked->id)->where('status', DocumentStatus::Submitted);
     }
 }

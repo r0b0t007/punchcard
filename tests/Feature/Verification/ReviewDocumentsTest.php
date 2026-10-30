@@ -30,6 +30,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -296,7 +297,7 @@ describe('verifying the business', function (): void {
             && ($this->audits)('business.verified') === [];
     });
 
-    it('accepts the documents the admin saw, deleting them on the day 3 months later', function (): void {
+    it('accepts the documents the admin saw, deleting them on the day 3 months later, and records which', function (): void {
         $id = ($this->send)(DocumentKind::IdDocument);
         $address = ($this->send)(DocumentKind::ProofOfAddress);
 
@@ -306,7 +307,8 @@ describe('verifying the business', function (): void {
             ->status->toBe(DocumentStatus::Accepted)
             ->decided_at->toDateTimeString()->toBe('2026-10-23 10:00:00')
             ->deletes_at->toDateTimeString()->toBe('2027-01-23 00:00:00'))
-            ->and($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified);
+            ->and($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified)
+            ->and(($this->audits)('business.verified')[0]['context'])->toBe(['document_ids' => [$id->id, $address->id], 'kinds' => ['id_document', 'proof_of_address']]);
     });
 
     it('refuses when a document was sent or replaced since the page was read, and changes nothing', function (): void {
@@ -333,7 +335,8 @@ describe('verifying the business', function (): void {
 
         // A business with no documents on file is still verified: Verify gates nothing (CHW-34).
         app(VerifyBusiness::class)->handle($this->business, []);
-        expect($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified);
+        expect($this->context->bypass(fn (): BusinessStatus => $this->business->refresh()->status))->toBe(BusinessStatus::Verified)
+            ->and(($this->audits)('business.verified')[0]['context'])->toBeEmpty();
     });
 
     it('never counts a document decided already, or another business\'s', function (): void {
@@ -383,11 +386,16 @@ describe('the business\'s page in A1', function (): void {
         $id = ($this->send)(DocumentKind::IdDocument);
         ($this->panel)();
 
-        $address = ($this->page)(function (Testable $page): BusinessDocument {
+        $address = ($this->page)(function (Testable $page) use ($id): BusinessDocument {
             $address = ($this->send)(DocumentKind::ProofOfAddress);
             $page->callAction('verify')->assertNotified('These documents changed since you opened this page. Reload it and look again.')
                 ->assertActionVisible('verify');
             expect(($this->fresh)($address)->status)->toBe(DocumentStatus::Submitted);
+
+            // What Verify accepts is the server's, never the browser's to set.
+            foreach (['documentsShown', 'documentsToVerify'] as $property) {
+                expect(fn () => $page->set($property, [$id->id, $address->id]))->toThrow(CannotUpdateLockedPropertyException::class);
+            }
 
             // Shown now: verifying from the page accepts it.
             $page->callAction('verify')->assertNotified('A1 is verified.');

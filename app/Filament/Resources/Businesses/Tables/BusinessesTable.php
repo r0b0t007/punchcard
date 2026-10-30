@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\Tables;
 
-use App\Enums\DocumentStatus;
 use App\Filament\AdminTime;
 use App\Filament\Resources\Businesses\Actions\BusinessStatusActions;
 use App\Models\Business;
@@ -71,7 +70,7 @@ final class BusinessesTable
     /** @param  TenantBuilder<BusinessDocument>  $documents */
     private static function waiting(TenantBuilder $documents): void
     {
-        $documents->where('status', DocumentStatus::Submitted);
+        $documents->waiting();
     }
 
     /** @param  PlatformBuilder<Tap>  $taps */
