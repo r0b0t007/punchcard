@@ -20,14 +20,17 @@ export default function AuthSimpleLayout({
                             <Wordmark />
                         </Link>
 
-                        <div className="space-y-2 text-center">
-                            <h1 className="font-display text-form-title font-bold text-balance">
-                                {title}
-                            </h1>
-                            <p className="text-center text-md text-pretty text-muted-foreground">
-                                {description}
-                            </p>
-                        </div>
+                        {/* A page with its own heading (other-account) passes none: no empty h1. */}
+                        {title || description ? (
+                            <div className="space-y-2 text-center">
+                                <h1 className="font-display text-form-title font-bold text-balance">
+                                    {title}
+                                </h1>
+                                <p className="text-center text-md text-pretty text-muted-foreground">
+                                    {description}
+                                </p>
+                            </div>
+                        ) : null}
                     </div>
                     {children}
                 </div>
