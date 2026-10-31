@@ -48,7 +48,13 @@ beforeEach(function (): void {
     // A reward the stamp of $source unlocked, at A1 (or the other card's own business).
     $this->unlocked = fn (StampSource $source, ?CardEnrollment $enrollment = null, array $attributes = [], ?Business $at = null): Reward => app(TenantContext::class)->bypass(function () use ($source, $enrollment, $attributes, $at): Reward {
         $enrollment ??= $this->enrollment;
-        $stamp = $this->tenants->stamp($enrollment, $at ?? $this->tenants->a1, ['source' => $source]);
+        // What Postgres' checks ask of each kind: a staff stamp's reason, a tap's stamper and counter.
+        $kind = match ($source) {
+            StampSource::Manual => ['reason' => 'Forgot the card'],
+            StampSource::Nfc => (fn ($stamper): array => ['stamper_id' => $stamper->id, 'nfc_tag_id' => $stamper->nfc_tag_id, 'counter' => 1])($this->tenants->stamper($at ?? $this->tenants->a1)),
+            default => [],
+        };
+        $stamp = $this->tenants->stamp($enrollment, $at ?? $this->tenants->a1, ['source' => $source, ...$kind]);
 
         return Reward::factory()->for($enrollment, 'enrollment')->create(['stamp_event_id' => $stamp->id, 'reward_text' => 'A free coffee', ...$attributes]);
     });
@@ -118,7 +124,7 @@ it('pushes nothing for a reward redeemed while its job was reading it', function
     DB::listen(function (QueryExecuted $query) use ($reward, $raced): void {
         if (! $raced->done && str_starts_with(strtolower($query->sql), 'select') && str_contains($query->sql, 'push_sent_at')) {
             $raced->done = true;
-            DB::table('rewards')->where('id', $reward->id)->update(['status' => RewardStatus::Redeemed->value, 'redeemed_at' => now()]);
+            DB::table('rewards')->where('id', $reward->id)->update(['status' => RewardStatus::Redeemed->value, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id]);
         }
     });
 
@@ -145,7 +151,7 @@ it('pushes a reward a staff scan unlocked, through the stamp itself, and queues 
 });
 
 it('never pushes a reward no longer available, or one of another card', function (): void {
-    $redeemed = ($this->unlocked)(StampSource::Qr, attributes: ['status' => RewardStatus::Redeemed]);
+    $redeemed = ($this->unlocked)(StampSource::Qr, attributes: ['status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id]);
     $someoneElse = User::factory()->create();
     $someoneElse->updatePushSubscription('https://fcm.googleapis.com/fcm/send/their-phone', 'BTheirKey', 'TheirSecret');
     $theirs = ($this->unlocked)(StampSource::Qr, $this->tenants->enroll($someoneElse, $this->tenants->cardB), at: $this->tenants->b1);
