@@ -16,6 +16,7 @@ use App\Http\Controllers\MovedToBusinessController;
 use App\Http\Controllers\MyCardsController;
 use App\Http\Controllers\OfflinePageController;
 use App\Http\Controllers\OpenBusinessController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\QrStandController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\StaffController;
@@ -156,6 +157,9 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::get('app/qr', [MemberQrController::class, 'show'])->name('app.qr');
     Route::get('app/cards/{enrollment}', [MyCardsController::class, 'show'])->whereNumber('enrollment')->name('app.cards.show');
     Route::patch('app/cards/{enrollment}/follow', [MyCardsController::class, 'follow'])->whereNumber('enrollment')->name('app.cards.follow');
+    // A phone's notifications on or off (CHW-41), from lib/push.ts once the browser has (un)subscribed.
+    Route::post('app/push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:30,1')->name('push.subscribe');
+    Route::delete('app/push/subscriptions', [PushSubscriptionController::class, 'destroy'])->middleware('throttle:30,1')->name('push.unsubscribe');
     Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
     Route::get('rewards/{reward}/redeem', [RewardController::class, 'show'])->whereNumber('reward')->middleware('throttle:reward-screen')->block(10, 10)->name('rewards.redeem.show');
     Route::post('rewards/{reward}/redeem', [RewardController::class, 'redeem'])->whereNumber('reward')->middleware('throttle:reward-window')->block(10, 10)->name('rewards.redeem');

@@ -36,7 +36,7 @@ use LogicException;
  *   reward they redeemed as staff): the user is anonymised. The row and its
  *   id stay, so the ledger, counters, rewards and redemption records stay
  *   true, but nothing in it identifies the person (name, email, password,
- *   2FA, locale, passkeys, sessions, reset tokens, referral codes, follows, cards with
+ *   2FA, locale, passkeys, sessions, reset tokens, referral codes, follows, phones with notifications on, cards with
  *   nothing on them) and nobody can sign in to it again; the email is free to
  *   sign up with again. The new email is unguessable (and the domain refused
  *   at signup), so nobody can take it first and block the deletion. Changing
@@ -109,6 +109,8 @@ final readonly class DeleteAccount
 
             DB::table('sessions')->where('user_id', $user->id)->delete();
             DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            // Their phones hear nothing more (CHW-41): a morph, so no foreign key takes them with the row.
+            $user->pushSubscriptions()->delete();
             Tap::query()->where('user_id', $user->id)->update(['ip' => null, 'user_agent' => null, 'claim_token_hash' => null]);
             // An arming they made gives nothing more (CHW-29). Named by nobody once the account goes (Postgres empties
             // armed_by), it would otherwise read as an arming from before armers were named, and still pay out.

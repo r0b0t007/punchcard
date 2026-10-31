@@ -24,6 +24,8 @@ Route::middleware(['auth'])->group(function (): void {
     Route::get('settings/privacy', [PrivacyController::class, 'edit'])->name('privacy.edit');
     Route::patch('settings/privacy/marketing', [PrivacyController::class, 'updateMarketing'])->middleware('throttle:30,1')->name('privacy.marketing');
     // A place followed or left from Privacy (the same Follow as on the card's page): {enrollment} is one of their own cards.
+    // "Rewards ready" (CHW-41, 11c): the account's choice, for every phone with notifications on.
+    Route::patch('settings/privacy/notifications', [PrivacyController::class, 'updateNotifications'])->middleware('throttle:30,1')->name('privacy.notifications');
     Route::patch('settings/privacy/follows/{enrollment}', [PrivacyController::class, 'follow'])->whereNumber('enrollment')->middleware('throttle:30,1')->name('privacy.follow');
     // Download my data (CHW-58): confirm it's you (15 minutes) from the page, then back to it; the file itself never cached, 5 an hour.
     // A POST page load: browsers never preload one, so the service worker leaves it to the network and the file saves (WebKit).
