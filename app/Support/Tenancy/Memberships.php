@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use App\Enums\BusinessRole;
 use App\Models\Business;
 use App\Models\BusinessMember;
 use App\Models\Organization;
@@ -20,21 +21,17 @@ use Illuminate\Support\Collection;
 final readonly class Memberships
 {
     /**
-     * @param  Collection<int, BusinessMember>  $members  by business id
+     * @param  Collection<int, BusinessMember>  $members  every row, by business id (the businesses may not operate)
      * @param  Collection<int, Business>  $businesses  operating, by name
      * @param  Collection<int, Organization>  $administered  operating, org admin of
+     * @param  list<int>  $accounts  the organizations of those businesses that are a single business's account
      */
     public function __construct(
         public Collection $members,
         public Collection $businesses,
         public Collection $administered,
+        public array $accounts,
     ) {}
-
-    /** Whether the user runs or works anywhere: a customer has no memberships. */
-    public function isEmpty(): bool
-    {
-        return $this->businesses->isEmpty() && $this->administered->isEmpty();
-    }
 
     /**
      * The business that is an organization's account, when the user works
@@ -46,7 +43,13 @@ final readonly class Memberships
     {
         $business = $this->businesses->firstWhere('organization_id', $organization->id);
 
-        return $business instanceof Business && SingleBusinessAccounts::isTheAccount($organization->id) ? $business : null;
+        return $business instanceof Business && in_array($organization->id, $this->accounts, true) ? $business : null;
+    }
+
+    /** Whether the user owns a business that is its organization's account: they run its program and brand too (CHW-22). */
+    public function ownsTheAccount(Business $business): bool
+    {
+        return $this->members->get($business->id)?->role === BusinessRole::Owner && $this->businessThatIs($business->organization) === $business;
     }
 
     /**

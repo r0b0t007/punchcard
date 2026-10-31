@@ -8,7 +8,6 @@ use App\Http\Middleware\SetTenant;
 use App\Models\Business;
 use App\Models\Organization;
 use App\Models\User;
-use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantContext;
 
 /**

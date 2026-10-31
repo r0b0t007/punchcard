@@ -49,7 +49,8 @@ final readonly class ResolveTenant
     {
         $this->context->clear();
 
-        $this->context->bypass(function () use ($user, $choice): void {
+        // Read outside any tenant inside FindMemberships alone: nothing here reads the database on its own.
+        (function () use ($user, $choice): void {
             $found = $this->findMemberships->handle($user);
             $memberships = $found->members;
             $businesses = $found->businesses;
@@ -57,7 +58,7 @@ final readonly class ResolveTenant
 
             [$type, $id] = SetTenant::parseChoice($choice);
 
-            $enter = function (Business $business) use ($memberships, $organizations): void {
+            $enter = function (Business $business) use ($found, $memberships, $organizations): void {
                 $membership = $memberships->get($business->id);
                 $role = $membership?->role;
 
@@ -67,7 +68,7 @@ final readonly class ResolveTenant
                     orgAdmin: $organizations->contains('id', $business->organization_id),
                     businessRole: $role instanceof BusinessRole ? $role : null,
                     locationId: $role === BusinessRole::Staff ? $membership->location_id : null,
-                    ownsTheAccount: $role === BusinessRole::Owner && SingleBusinessAccounts::isTheAccount($business->organization_id),
+                    ownsTheAccount: $found->ownsTheAccount($business),
                 );
             };
 
@@ -106,6 +107,6 @@ final readonly class ResolveTenant
             if ($organizations->count() === 1) {
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
-        });
+        })();
     }
 }

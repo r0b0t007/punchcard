@@ -21,6 +21,6 @@ final readonly class HasMemberships
 
     public function handle(User $user): bool
     {
-        return ! $this->findMemberships->handle($user)->isEmpty();
+        return $this->findMemberships->any($user);
     }
 }
