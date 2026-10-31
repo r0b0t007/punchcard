@@ -2,20 +2,12 @@ import { router } from '@inertiajs/react';
 import { Bell, BellOff, Share } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
-import { IosInstallSteps } from '@/components/tap/install-sheet';
+import IosPushSteps from '@/components/push/ios-push-steps';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
 import { useTranslation } from '@/hooks/use-translation';
 import { usePush } from '@/lib/push';
 import type { PushState } from '@/lib/push';
@@ -154,30 +146,7 @@ export default function PhoneNotifications({ push }: { push: PushSettings }) {
                 {t('Offers come from the places you follow, below.')}
             </p>
 
-            <Sheet open={steps} onOpenChange={setSteps}>
-                <SheetContent side="bottom" className="mx-auto max-w-md">
-                    <SheetHeader>
-                        <SheetTitle>
-                            <span className="block pe-8 font-display text-2xl leading-tight font-bold">
-                                {t('Keep punchcard on your home screen')}
-                            </span>
-                        </SheetTitle>
-                        <SheetDescription>
-                            <span className="block text-base">
-                                {t(
-                                    'Then open it from there to turn notifications on.',
-                                )}
-                            </span>
-                        </SheetDescription>
-                    </SheetHeader>
-                    <IosInstallSteps />
-                    <SheetFooter>
-                        <Button size="lg" onClick={() => setSteps(false)}>
-                            {t('Got it')}
-                        </Button>
-                    </SheetFooter>
-                </SheetContent>
-            </Sheet>
+            <IosPushSteps open={steps} onOpenChange={setSteps} />
         </div>
     );
 }

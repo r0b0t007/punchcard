@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Account;
 
+use App\Actions\Push\DescribePush;
 use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\Organization;
 use App\Models\User;
-use App\Support\Push\PushKey;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -27,7 +27,7 @@ use App\Support\Tenancy\TenantContext;
  */
 final readonly class DescribePrivacy
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private DescribePush $describePush) {}
 
     /**
      * @return array{
@@ -46,16 +46,8 @@ final readonly class DescribePrivacy
                 'since' => ($on ? $user->marketing_opt_in_at : $user->marketing_opt_out_at)?->toIso8601String(),
                 'mustVerify' => ! $user->hasVerifiedEmail(),
             ],
-            // Notifications on this phone (CHW-41, 11c): the app's VAPID key to subscribe with (none set, none offered),
-            // the account's "Rewards ready", and its phones as SHA-256 of their endpoints (never the endpoints, which work
-            // like a password to the push service): this phone is "On" only if it is one of them, so the same phone
-            // signed in as someone else reads "Off" (lib/push.ts).
-            'push' => [
-                'publicKey' => PushKey::public(),
-                'rewards' => $user->push_rewards,
-                'phones' => array_values(array_map(fn (string $endpoint): string => hash('sha256', $endpoint),
-                    $user->pushSubscriptions()->orderBy('id')->pluck('endpoint')->all())),
-            ],
+            // Notifications on this phone (CHW-41, 11c).
+            'push' => $this->describePush->handle($user),
             'programs' => $this->programs($user),
         ];
     }

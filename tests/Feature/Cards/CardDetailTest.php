@@ -235,3 +235,10 @@ it('shows a card whose stored tiers are malformed, without its tiers', function 
     ($this->show)($this->tenants->enroll($this->customer, $this->tenants->cardB))->assertOk()
         ->assertInertia(fn ($page) => $page->where('tiers', null));
 });
+
+it('gives the card\'s page the customer\'s notifications, for the ask after following (CHW-41, 11a)', function (): void {
+    config(['webpush.vapid.public_key' => 'BAppPublicKey', 'webpush.vapid.private_key' => 'app-private-key']);
+
+    ($this->show)()->assertInertia(fn ($page) => $page->component('app/card')
+        ->where('push', ['publicKey' => 'BAppPublicKey', 'rewards' => true, 'phones' => []]));
+});

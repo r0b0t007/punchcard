@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StampSource;
+use App\Models\CardEnrollment;
 use App\Models\NfcTag;
 use App\Models\User;
 use App\Support\Nfc\FakeTap;
@@ -92,4 +93,20 @@ it('counts up to the stamp on screen, not the stamps since', function (): void {
 
     // The first stamp's screen, opened again: still the first visit.
     ($this->offersInstall)(false);
+});
+
+it('gives the stamp screen the customer\'s notifications, for the ask under a reward (CHW-41, 11a)', function (): void {
+    config(['webpush.vapid.public_key' => 'BAppPublicKey', 'webpush.vapid.private_key' => 'app-private-key']);
+    $this->customer->updatePushSubscription('https://fcm.googleapis.com/fcm/send/phone-1', 'BPhoneKey', 'PhoneSecret');
+
+    // A plain stamp: nothing to ask under.
+    ($this->tap)(5);
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->where('push', null));
+
+    // The stamp that fills the card unlocks a reward: the ask has what it needs.
+    app(TenantContext::class)->bypass(fn () => CardEnrollment::query()->where('user_id', $this->customer->id)->update(['current_stamps' => $this->tenants->cardA->stamps_required - 1]));
+    $this->travel(1)->days();
+    ($this->tap)(6);
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->has('rewards', 1)
+        ->where('push', ['publicKey' => 'BAppPublicKey', 'rewards' => true, 'phones' => [hash('sha256', 'https://fcm.googleapis.com/fcm/send/phone-1')]]));
 });

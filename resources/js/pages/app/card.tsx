@@ -1,4 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import {
     ChevronLeft,
     Clock,
@@ -9,6 +10,8 @@ import {
     Phone,
     QrCode,
 } from 'lucide-react';
+import type { PushSettings } from '@/components/push/phone-notifications';
+import PushAsk from '@/components/push/push-ask';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
@@ -60,13 +63,16 @@ type Props = {
     canFollow: boolean;
     /** Consent needs a verified email. */
     mustVerify: boolean;
+    /** Notifications for this customer (DescribePush). */
+    push: PushSettings;
 };
 
 /**
  * C6 Card detail (CHW-27): one of the customer's cards in full. The card and
  * its banner, a progressive card's tiers, its reward and terms, what the
  * café tells its customers, "Follow for offers", the latest stamps and the
- * places that honour it (Claude Design `CH CardDetail`, CHW-217).
+ * places that honour it (Claude Design `CH CardDetail`, CHW-217). Right
+ * after following, the ask for notifications on this phone (CHW-41, 11a).
  */
 export default function MyCard({
     id,
@@ -83,10 +89,13 @@ export default function MyCard({
     following,
     canFollow,
     mustVerify,
+    push,
 }: Props) {
     const { t, locale } = useTranslation();
     // SetFollow says why it refused (a closed café, an email to verify).
     const { errors } = usePage().props;
+    // Followed just now, on this page: the moment to ask.
+    const [justFollowed, setJustFollowed] = useState(false);
     const hasInfo =
         Boolean(info.hours) || Boolean(info.phone) || info.links.length > 0;
 
@@ -243,7 +252,11 @@ export default function MyCard({
                                 router.patch(
                                     follow.url(id),
                                     { follow: checked === true },
-                                    { preserveScroll: true },
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () =>
+                                            setJustFollowed(checked === true),
+                                    },
                                 )
                             }
                         />
@@ -270,6 +283,18 @@ export default function MyCard({
                             <InputError message={errors.follow} />
                         </div>
                     </section>
+                ) : null}
+
+                {justFollowed && following ? (
+                    <PushAsk
+                        push={push}
+                        title={t("Get :business's offers on this phone?", {
+                            business: card.businessName,
+                        })}
+                        body={t(
+                            'As notifications. You can stop them any time in Settings.',
+                        )}
+                    />
                 ) : null}
 
                 <WalletPlaceholders />

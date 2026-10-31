@@ -1,4 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import PushAsk from '@/components/push/push-ask';
+import type { PushSettings } from '@/components/push/phone-notifications';
 import InstallSheet from '@/components/tap/install-sheet';
 import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
@@ -22,7 +24,8 @@ type UnlockedReward = {
  * C2: the stamp landed (CHW-25). C3 when it unlocked a reward (CHW-26): the
  * card glows complete, the reward is announced, and it can be redeemed now
  * or kept for later. From the customer's second visit on, the install sheet
- * (C13, CHW-35), but never over a reward.
+ * (C13, CHW-35), but never over a reward. Under a reward just unlocked, the
+ * ask for notifications on this phone (CHW-41, 11a).
  */
 export default function TapStamped({
     card,
@@ -33,6 +36,7 @@ export default function TapStamped({
     fresh,
     enrollmentId,
     offerInstall,
+    push,
 }: {
     card: TapCard | null;
     given: number;
@@ -44,6 +48,8 @@ export default function TapStamped({
     enrollmentId: number | null;
     /** The customer's second visit or later (DescribeTap). */
     offerInstall: boolean;
+    /** Notifications for the signed-in customer (DescribePush). */
+    push: PushSettings | null;
 }) {
     const { t, locale } = useTranslation();
     const added = t(':count stamp added|:count stamps added', {
@@ -78,6 +84,16 @@ export default function TapStamped({
                                     {t('Save for later')}
                                 </Link>
                             </Button>
+                            {/* On the first look only, under the reward, never over it. */}
+                            {fresh && push ? (
+                                <PushAsk
+                                    push={push}
+                                    title={t('Know when a reward is ready')}
+                                    body={t(
+                                        'Get a notification on this phone when you unlock one, wherever you got the stamp.',
+                                    )}
+                                />
+                            ) : null}
                         </>
                     ) : (
                         <>

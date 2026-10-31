@@ -55,6 +55,7 @@ use LogicException;
  * @property string|null $redeemed_scan_id the staff member's scan it was redeemed with (RedeemScan, CHW-30)
  * @property Carbon|null $redeem_window_opened_at when the customer's redeem window opened (OpenRedeemWindow)
  * @property Carbon|null $redeem_window_until when it closes
+ * @property Carbon|null $push_sent_at when "Your reward is ready" was pushed to the customer's phones (PushRewardsReady, CHW-41)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -268,6 +269,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
             'redeemed_at' => 'datetime',
             'redeem_window_opened_at' => 'datetime',
             'redeem_window_until' => 'datetime',
+            'push_sent_at' => 'datetime',
         ];
     }
 

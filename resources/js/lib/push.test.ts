@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import {
     applicationServerKey,
+    askHeldAway,
+    asksFor,
     forgetThisPhone,
     pushStateFrom,
     thisAccounts,
@@ -183,5 +185,26 @@ describe('turning off and signing out', () => {
         });
         vi.spyOn(console, 'error').mockImplementation(() => {});
         await expect(forgetThisPhone()).resolves.toBeUndefined();
+    });
+});
+
+describe('the ask under a moment (11a)', () => {
+    it('is for a phone that could turn them on, or an iPhone that must add the app first', () => {
+        expect(asksFor('off')).toBe(true);
+        expect(asksFor('ios-needs-install')).toBe(true);
+    });
+
+    it('is not for a phone that has them, said no, or cannot have them', () => {
+        for (const state of ['on', 'blocked', 'unsupported', null] as const) {
+            expect(asksFor(state)).toBe(false);
+        }
+    });
+
+    it('stays away while "Not now" holds, and comes back after', () => {
+        const now = Date.parse('2026-10-31T10:00:00Z');
+
+        expect(askHeldAway(null, now)).toBe(false);
+        expect(askHeldAway(now + 1, now)).toBe(true);
+        expect(askHeldAway(now, now)).toBe(false);
     });
 });
