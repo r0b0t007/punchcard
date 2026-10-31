@@ -4,6 +4,7 @@ import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { forgetOfflineCards } from '@/lib/offline-cards';
+import { forgetThisPhone } from '@/lib/push';
 import { logout } from '@/routes';
 import { useTranslation } from '@/hooks/use-translation';
 import { send } from '@/routes/verification';
@@ -36,6 +37,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                             onClick={() => {
                                 router.clearHistory();
                                 void forgetOfflineCards();
+                                void forgetThisPhone();
                             }}
                             className="mx-auto block text-sm"
                         >

@@ -8,6 +8,7 @@ use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Push\PushKey;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -31,6 +32,7 @@ final readonly class DescribePrivacy
     /**
      * @return array{
      *     marketing: array{on: bool, since: string|null, mustVerify: bool},
+     *     push: array{publicKey: string|null, rewards: bool, phones: list<string>},
      *     programs: list<array{enrollmentId: int, organization: string, logoUrl: string|null, following: bool, changedAt: string|null, canFollow: bool}>,
      * }
      */
@@ -43,6 +45,16 @@ final readonly class DescribePrivacy
                 'on' => $on,
                 'since' => ($on ? $user->marketing_opt_in_at : $user->marketing_opt_out_at)?->toIso8601String(),
                 'mustVerify' => ! $user->hasVerifiedEmail(),
+            ],
+            // Notifications on this phone (CHW-41, 11c): the app's VAPID key to subscribe with (none set, none offered),
+            // the account's "Rewards ready", and its phones as SHA-256 of their endpoints (never the endpoints, which work
+            // like a password to the push service): this phone is "On" only if it is one of them, so the same phone
+            // signed in as someone else reads "Off" (lib/push.ts).
+            'push' => [
+                'publicKey' => PushKey::public(),
+                'rewards' => $user->push_rewards,
+                'phones' => array_values(array_map(fn (string $endpoint): string => hash('sha256', $endpoint),
+                    $user->pushSubscriptions()->orderBy('id')->pluck('endpoint')->all())),
             ],
             'programs' => $this->programs($user),
         ];

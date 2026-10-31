@@ -26,6 +26,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use NotificationChannels\WebPush\PushSubscription;
 
 /**
  * Download my data (CHW-58, C12): everything punchcard keeps about the
@@ -37,7 +38,8 @@ use Illuminate\Support\Facades\DB;
  *   every reward;
  * - follows, taps for as long as they are kept (punchcard.taps.retention_days),
  *   member QR scans, sign-in links and staff invitations sent to the
- *   email, passkeys, sessions, and roles at businesses and organizations.
+ *   email, notifications (rewards ready, and each phone's push service),
+ *   passkeys, sessions, and roles at businesses and organizations.
  *
  * Never another person: staff are "staff", never named; a referrer is a
  * yes or no. Never a secret: no password, 2FA secret, passkey credential,
@@ -175,6 +177,16 @@ final readonly class ExportMyData
                     'accepted_at' => $this->date($invitation->accepted_at),
                 ])->all(),
                 // Not tenant tables: plain reads, kept to the user.
+                // A phone by its push service only: its endpoint and keys let anyone push to it.
+                'notifications' => [
+                    'rewards_ready' => $user->push_rewards,
+                    'phones' => $user->pushSubscriptions()->orderBy('id')->get(['endpoint', 'created_at', 'updated_at'])
+                        ->map(fn (PushSubscription $phone): array => [
+                            'push_service' => parse_url($phone->endpoint, PHP_URL_HOST),
+                            'added_at' => $this->date($phone->created_at),
+                            'updated_at' => $this->date($phone->updated_at),
+                        ])->all(),
+                ],
                 'passkeys' => DB::table('passkeys')->where('user_id', $user->id)->orderBy('id')->get(['name', 'created_at', 'last_used_at'])
                     ->map(fn (object $passkey): array => [
                         'name' => $passkey->name,

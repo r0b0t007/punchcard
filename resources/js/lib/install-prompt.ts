@@ -98,7 +98,7 @@ export async function install(): Promise<void> {
  * a touch screen), not another browser or an app's own browser: Share → Add
  * to Home Screen.
  */
-function isIosSafari(userAgent: string, touchPoints: number): boolean {
+export function isIosSafari(userAgent: string, touchPoints: number): boolean {
     const apple =
         /iP(hone|ad|od)/.test(userAgent) ||
         (/Macintosh/.test(userAgent) && touchPoints > 1);

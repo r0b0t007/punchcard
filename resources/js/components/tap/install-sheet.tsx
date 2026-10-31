@@ -92,17 +92,7 @@ export default function InstallSheet({
                     </SheetDescription>
                 </SheetHeader>
 
-                {offer === 'ios' ? (
-                    <ol className="flex flex-col gap-3 px-4">
-                        <Step number={1} icon={<Share />}>
-                            {t('Tap Share in the toolbar')}
-                        </Step>
-                        <Step number={2} icon={<SquarePlus />}>
-                            {t('Choose Add to Home Screen')}
-                        </Step>
-                        <Step number={3}>{t('Tap Add')}</Step>
-                    </ol>
-                ) : null}
+                {offer === 'ios' ? <IosInstallSteps /> : null}
 
                 <SheetFooter>
                     {offer === 'android' ? (
@@ -129,6 +119,23 @@ export default function InstallSheet({
                 </SheetFooter>
             </SheetContent>
         </Sheet>
+    );
+}
+
+/** Share, Add to Home Screen, Add: Safari on an iPhone (here, and from Settings' notifications, CHW-41). */
+export function IosInstallSteps() {
+    const { t } = useTranslation();
+
+    return (
+        <ol className="flex flex-col gap-3 px-4">
+            <Step number={1} icon={<Share />}>
+                {t('Tap Share in the toolbar')}
+            </Step>
+            <Step number={2} icon={<SquarePlus />}>
+                {t('Choose Add to Home Screen')}
+            </Step>
+            <Step number={3}>{t('Tap Add')}</Step>
+        </ol>
     );
 }
 

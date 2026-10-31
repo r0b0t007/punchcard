@@ -2,6 +2,8 @@ import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import { Download } from 'lucide-react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
+import PhoneNotifications from '@/components/push/phone-notifications';
+import type { PushSettings } from '@/components/push/phone-notifications';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,14 +45,17 @@ type Marketing = {
  * A checkbox, as on a card's page (C6), each state with its date in the
  * device's timezone (a customer has no site). The page waits for one change
  * to land before taking the next, so a second click never cancels the first.
+ * Notifications on this phone first (CHW-41, 11c).
  */
 export default function Privacy({
     marketing,
+    push,
     programs,
     download,
     status,
 }: {
     marketing: Marketing;
+    push: PushSettings;
     programs: Program[];
     /** ready: confirmed it's them in the last 15 minutes, so the file downloads straight away. */
     download: { ready: boolean; token: string };
@@ -83,6 +88,8 @@ export default function Privacy({
     return (
         <>
             <Head title={t('Privacy settings')} />
+
+            <PhoneNotifications push={push} />
 
             <div className="space-y-6">
                 <Heading

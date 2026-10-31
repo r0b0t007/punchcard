@@ -17,6 +17,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/hooks/use-translation';
 import { forgetOfflineCards } from '@/lib/offline-cards';
+import { forgetThisPhone } from '@/lib/push';
 import { confirm as confirmItsYou } from '@/routes/profile';
 
 /**
@@ -88,6 +89,7 @@ export default function DeleteUser({
                                 // Nothing of the account stays on the phone (CHW-35).
                                 router.clearHistory();
                                 void forgetOfflineCards();
+                                void forgetThisPhone();
                             }}
                             resetOnSuccess
                             className="space-y-6"

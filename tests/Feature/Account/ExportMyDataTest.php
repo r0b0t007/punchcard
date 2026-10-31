@@ -28,7 +28,7 @@ use Tests\Support\Tenants;
 |
 | Everything punchcard keeps about the customer, in one JSON file: the
 | account, consents, each card with its stamps and rewards, follows, recent
-| taps, passkeys, sessions and memberships. Only after confirming it's them
+| taps, notifications, passkeys, sessions and memberships. Only after confirming it's them
 | in the last 15 minutes, at most 5 times an hour. Never another customer's
 | data, never a staff member's name, never a secret.
 |
@@ -140,6 +140,7 @@ it('never holds another customer\'s data, even at the same place', function (): 
     ConsentEvent::record($other->id, ConsentEvent::KIND_PROGRAM_OFFERS, true, ConsentEvent::SOURCE_CARD, $this->tenants->orgA->id);
     $this->tenants->member($other, $this->tenants->a1);
     DB::table('sessions')->insert(['id' => 'their-session', 'user_id' => $other->id, 'ip_address' => '198.51.100.10', 'user_agent' => 'Their laptop', 'payload' => '', 'last_activity' => now()->unix()]);
+    $other->updatePushSubscription('https://fcm.googleapis.com/fcm/send/their-phone', 'BTheirKey', 'TheirSecret');
 
     $response = ($this->download)();
     $data = ($this->data)($response);
@@ -150,6 +151,7 @@ it('never holds another customer\'s data, even at the same place', function (): 
         ->and($data['taps'])->toBe([])
         ->and($data['consents']['log'])->toBe([])
         ->and($data['sessions'])->toBe([])
+        ->and($data['notifications']['phones'])->toBe([])
         ->and($data['memberships'])->toBe([])
         ->and($response->getContent())->not->toContain('Other Person')->not->toContain('other@example.com')
         ->not->toContain('their-secret-reason')->not->toContain('198.51.100.9');
@@ -179,6 +181,22 @@ it('holds recent taps, passkeys and sessions, and never a secret', function (): 
     foreach (['secret-password', $this->customer->password, 'TOTP-SECRET-VALUE', 'remember-me-token', 'credential-id-value', 'public-key-value',
         'session-id-value', 'session-payload-value', hash('sha256', 'a-session-token'), '4242', '203.0.113.99'] as $secret) {
         expect($response->getContent())->not->toContain((string) $secret);
+    }
+});
+
+it('holds the notifications chosen and each phone that gets them, never its address or keys', function (): void {
+    $this->customer->forceFill(['push_rewards' => false])->save();
+    $this->customer->updatePushSubscription('https://fcm.googleapis.com/fcm/send/phone-endpoint-value', 'BPhonePublicKeyValue', 'PhoneAuthSecretValue', 'aes128gcm');
+
+    $response = ($this->download)();
+
+    expect(($this->data)($response)['notifications'])->toBe([
+        'rewards_ready' => false,
+        'phones' => [['push_service' => 'fcm.googleapis.com', 'added_at' => '2026-10-18T10:00:00+00:00', 'updated_at' => '2026-10-18T10:00:00+00:00']],
+    ]);
+
+    foreach (['phone-endpoint-value', 'BPhonePublicKeyValue', 'PhoneAuthSecretValue'] as $secret) {
+        expect($response->getContent())->not->toContain($secret);
     }
 });
 

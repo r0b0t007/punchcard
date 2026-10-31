@@ -8,9 +8,11 @@ use App\Actions\Account\DescribePrivacy;
 use App\Actions\Account\ExportMyData;
 use App\Actions\Account\SetMarketingConsent;
 use App\Actions\Cards\SetFollow;
+use App\Actions\Push\SetRewardNotifications;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FollowRequest;
 use App\Http\Requests\Settings\MarketingConsentRequest;
+use App\Http\Requests\Settings\RewardNotificationsRequest;
 use App\Models\ConsentEvent;
 use App\Models\User;
 use App\Support\Auth\RecentConfirmation;
@@ -72,6 +74,16 @@ final class PrivacyController extends Controller
             'X-Content-Type-Options' => 'nosniff',
             'Content-Disposition' => 'attachment; filename="punchcard-data-'.$now->utc()->toDateString().'.json"',
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /** "Rewards ready", on or off, for every phone with notifications on (CHW-41, 11c). */
+    public function updateNotifications(RewardNotificationsRequest $request, SetRewardNotifications $setRewardNotifications): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $setRewardNotifications->handle($user, $request->boolean('rewards'));
+
+        return to_route('privacy.edit');
     }
 
     /** A place's offers, followed or left from here: the same Follow as on the card's page (C6), on one of their own cards. */
