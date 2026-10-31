@@ -12,6 +12,7 @@ use App\Actions\Push\SetRewardNotifications;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FollowRequest;
 use App\Http\Requests\Settings\MarketingConsentRequest;
+use App\Http\Requests\Settings\RewardNotificationsRequest;
 use App\Models\ConsentEvent;
 use App\Models\User;
 use App\Support\Auth\RecentConfirmation;
@@ -76,11 +77,11 @@ final class PrivacyController extends Controller
     }
 
     /** "Rewards ready", on or off, for every phone with notifications on (CHW-41, 11c). */
-    public function updateNotifications(Request $request, SetRewardNotifications $setRewardNotifications): RedirectResponse
+    public function updateNotifications(RewardNotificationsRequest $request, SetRewardNotifications $setRewardNotifications): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
-        $setRewardNotifications->handle($user, (bool) $request->validate(['rewards' => ['required', 'boolean']])['rewards']);
+        $setRewardNotifications->handle($user, $request->boolean('rewards'));
 
         return to_route('privacy.edit');
     }

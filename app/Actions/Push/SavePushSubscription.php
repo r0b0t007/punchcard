@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Push;
 
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,6 +18,16 @@ use Illuminate\Support\Facades\DB;
 final readonly class SavePushSubscription
 {
     public function handle(User $user, string $endpoint, string $publicKey, string $authToken, string $contentEncoding): void
+    {
+        try {
+            $this->save($user, $endpoint, $publicKey, $authToken, $contentEncoding);
+        } catch (UniqueConstraintViolationException) {
+            // Another account turned this phone on in the same instant: its row is there now, and moves to this one.
+            $this->save($user, $endpoint, $publicKey, $authToken, $contentEncoding);
+        }
+    }
+
+    private function save(User $user, string $endpoint, string $publicKey, string $authToken, string $contentEncoding): void
     {
         DB::transaction(function () use ($user, $endpoint, $publicKey, $authToken, $contentEncoding): void {
             $locked = User::query()->whereKey($user->id)->lockForUpdate()->first();

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Push\DeletePushSubscription;
 use App\Actions\Push\SavePushSubscription;
 use App\Http\Requests\PushSubscriptionRequest;
+use App\Http\Requests\UnsubscribePhoneRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
@@ -27,13 +28,12 @@ final class PushSubscriptionController extends Controller
     }
 
     /** This phone hears nothing more: the user's own row for it, if any. */
-    public function destroy(Request $request): Response
+    public function destroy(UnsubscribePhoneRequest $request, DeletePushSubscription $deletePushSubscription): Response
     {
         $user = $request->user();
         assert($user instanceof User);
 
-        $request->validate(['endpoint' => ['required', 'string']]);
-        $user->deletePushSubscription($request->string('endpoint')->toString());
+        $deletePushSubscription->handle($user, $request->endpoint());
 
         return response()->noContent();
     }

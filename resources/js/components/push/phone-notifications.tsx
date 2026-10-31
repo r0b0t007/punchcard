@@ -26,6 +26,8 @@ export type PushSettings = {
     publicKey: string | null;
     /** The account's "Rewards ready", for every phone. */
     rewards: boolean;
+    /** The account's phones, as SHA-256 of their endpoints: this one is "On" only if listed. */
+    phones: string[];
 };
 
 /**
@@ -35,7 +37,10 @@ export type PushSettings = {
  */
 export default function PhoneNotifications({ push }: { push: PushSettings }) {
     const { t } = useTranslation();
-    const { state, busy, failed, turnOn, turnOff } = usePush(push.publicKey);
+    const { state, busy, failed, turnOn, turnOff } = usePush(
+        push.publicKey,
+        push.phones,
+    );
     const [saving, setSaving] = useState(false);
     const [steps, setSteps] = useState(false);
 
