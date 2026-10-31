@@ -18,9 +18,30 @@ final class SingleBusinessAccounts
 {
     public static function isTheAccount(mixed $organizationId): bool
     {
-        return app(TenantContext::class)->bypass(fn (): bool => Business::query()
-            ->where('organization_id', $organizationId)
+        return is_numeric($organizationId) && self::among([(int) $organizationId]) !== [];
+    }
+
+    /**
+     * Those of the organizations that are a single business's account, in one query (CHW-315, Memberships).
+     *
+     * @param  list<int>  $organizationIds
+     * @return list<int>
+     */
+    public static function among(array $organizationIds): array
+    {
+        if ($organizationIds === []) {
+            return [];
+        }
+
+        /** @var list<int> */
+        return app(TenantContext::class)->bypass(fn (): array => Business::query()
+            ->whereIn('organization_id', $organizationIds)
             ->whereHas('organization', fn ($organization) => $organization->where('type', '!=', OrganizationType::Franchise))
-            ->count() === 1);
+            ->groupBy('organization_id')
+            ->havingRaw('count(*) = 1')
+            ->pluck('organization_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all());
     }
 }

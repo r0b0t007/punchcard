@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Tenancy;
 
 use App\Enums\BusinessRole;
-use App\Enums\OrganizationRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
-use App\Models\BusinessMember;
 use App\Models\Organization;
-use App\Models\OrganizationMember;
 use App\Models\User;
 use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantContext;
@@ -40,30 +37,28 @@ use App\Support\Tenancy\TenantContext;
  * makes an unknown value fail closed). The owner of the only business of an
  * independent café or a chain is its org admin too (CHW-22): there the
  * business is the account, so they run the card program and the brand.
+ *
+ * The memberships, and what counts as operating, come from FindMemberships,
+ * as for the switcher (DescribeTenants) and home (HasMemberships).
  */
 final readonly class ResolveTenant
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private FindMemberships $findMemberships) {}
 
     public function handle(User $user, ?string $choice = null): void
     {
         $this->context->clear();
 
-        $this->context->bypass(function () use ($user, $choice): void {
-            $memberships = BusinessMember::query()->where('user_id', $user->id)->get(['business_id', 'role', 'location_id'])->keyBy('business_id');
-            $businesses = Business::query()
-                ->whereIn('id', $memberships->keys())
-                ->operating()
-                ->with('organization')
-                ->get();
-            $organizations = Organization::query()
-                ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->where('role', OrganizationRole::OrgAdmin)->select('organization_id'))
-                ->operating()
-                ->get();
+        // Read outside any tenant inside FindMemberships alone: nothing here reads the database on its own.
+        (function () use ($user, $choice): void {
+            $found = $this->findMemberships->handle($user);
+            $memberships = $found->members;
+            $businesses = $found->businesses;
+            $organizations = $found->administered;
 
             [$type, $id] = SetTenant::parseChoice($choice);
 
-            $enter = function (Business $business) use ($memberships, $organizations): void {
+            $enter = function (Business $business) use ($found, $memberships, $organizations): void {
                 $membership = $memberships->get($business->id);
                 $role = $membership?->role;
 
@@ -73,7 +68,7 @@ final readonly class ResolveTenant
                     orgAdmin: $organizations->contains('id', $business->organization_id),
                     businessRole: $role instanceof BusinessRole ? $role : null,
                     locationId: $role === BusinessRole::Staff ? $membership->location_id : null,
-                    ownsTheAccount: $role === BusinessRole::Owner && SingleBusinessAccounts::isTheAccount($business->organization_id),
+                    ownsTheAccount: $found->ownsTheAccount($business),
                 );
             };
 
@@ -86,9 +81,9 @@ final readonly class ResolveTenant
             if ($type === 'org' && ($organization = $organizations->firstWhere('id', $id)) instanceof Organization) {
                 // A single business's account the user works in is that business, never a network of one
                 // (DescribeTenants offers the same): a stale choice opens the business.
-                $theBusiness = $businesses->firstWhere('organization_id', $organization->id);
+                $theBusiness = $found->businessThatIs($organization);
 
-                if ($theBusiness instanceof Business && SingleBusinessAccounts::isTheAccount($organization->id)) {
+                if ($theBusiness instanceof Business) {
                     $enter($theBusiness);
                 } else {
                     $this->context->set($organization, orgAdmin: true);
@@ -112,6 +107,6 @@ final readonly class ResolveTenant
             if ($organizations->count() === 1) {
                 $this->context->set($organizations->first(), orgAdmin: true);
             }
-        });
+        })();
     }
 }

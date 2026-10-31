@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Tenancy;
 
-use App\Enums\OrganizationRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
-use App\Models\BusinessMember;
 use App\Models\Organization;
-use App\Models\OrganizationMember;
 use App\Models\User;
-use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Support\Collection;
 
 /**
  * What the tenant switcher offers (CHW-147, design 10a and 10d): every
@@ -24,14 +19,15 @@ use Illuminate\Support\Collection;
  *
  * A network is left out where the organization is a single business's
  * account (SingleBusinessAccounts) and the user works in that business:
- * there the business is the account, and its owner sees just the business.
- * Null for someone who works nowhere (a customer).
+ * there the business is the account, and its owner sees just the business
+ * (Memberships::networks, the rule ResolveTenant applies too). Null for
+ * someone who works nowhere (a customer).
  *
  * @phpstan-type Entry array{choice: string, kind: 'business'|'network', name: string, role: string, logoUrl: string|null, initial: string, current: bool}
  */
 final readonly class DescribeTenants
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private FindMemberships $findMemberships) {}
 
     /**
      * @param  bool  $onlyCurrent  only the one worked in: an admin signed in as an owner is held to it (CHW-144)
@@ -45,7 +41,8 @@ final readonly class DescribeTenants
             default => null,
         };
 
-        [$memberships, $businesses, $networks] = $this->find($user);
+        $found = $this->findMemberships->handle($user);
+        [$memberships, $businesses, $networks] = [$found->members, $found->businesses, $found->networks()];
 
         if ($businesses->isEmpty() && $networks->isEmpty()) {
             return null;
@@ -83,7 +80,8 @@ final readonly class DescribeTenants
      */
     public function choices(User $user): array
     {
-        [, $businesses, $networks] = $this->find($user);
+        $found = $this->findMemberships->handle($user);
+        [$businesses, $networks] = [$found->businesses, $found->networks()];
 
         return [
             ...$networks->map(fn (Organization $network): string => SetTenant::organizationChoice($network->id))->values()->all(),
@@ -107,27 +105,5 @@ final readonly class DescribeTenants
             'initial' => mb_strtoupper(mb_substr($name, 0, 1)),
             'current' => $choice === $current,
         ];
-    }
-
-    /**
-     * The user's memberships, the operating businesses they work in, and the operating networks they run.
-     *
-     * @return array{0: Collection<int, BusinessMember>, 1: Collection<int, Business>, 2: Collection<int, Organization>}
-     */
-    private function find(User $user): array
-    {
-        /** @var array{0: Collection<int, BusinessMember>, 1: Collection<int, Business>, 2: Collection<int, Organization>} */
-        return $this->context->bypass(function () use ($user): array {
-            $memberships = BusinessMember::query()->where('user_id', $user->id)->get(['business_id', 'role'])->keyBy('business_id');
-            $businesses = Business::query()->whereIn('id', $memberships->keys())->operating()->with('organization')->orderBy('name')->get();
-            $networks = Organization::query()
-                ->whereIn('id', OrganizationMember::query()->where('user_id', $user->id)->where('role', OrganizationRole::OrgAdmin)->select('organization_id'))
-                ->operating()
-                ->get()
-                ->reject(fn (Organization $organization): bool => $businesses->contains('organization_id', $organization->id)
-                    && SingleBusinessAccounts::isTheAccount($organization->id));
-
-            return [$memberships, $businesses, $networks];
-        });
     }
 }
