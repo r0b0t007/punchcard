@@ -8,6 +8,7 @@ use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Push\PushKey;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -31,6 +32,7 @@ final readonly class DescribePrivacy
     /**
      * @return array{
      *     marketing: array{on: bool, since: string|null, mustVerify: bool},
+     *     push: array{publicKey: string|null, rewards: bool},
      *     programs: list<array{enrollmentId: int, organization: string, logoUrl: string|null, following: bool, changedAt: string|null, canFollow: bool}>,
      * }
      */
@@ -44,6 +46,9 @@ final readonly class DescribePrivacy
                 'since' => ($on ? $user->marketing_opt_in_at : $user->marketing_opt_out_at)?->toIso8601String(),
                 'mustVerify' => ! $user->hasVerifiedEmail(),
             ],
+            // Notifications on this phone (CHW-41, 11c): the app's VAPID key to subscribe with (none set, none offered),
+            // and the account's "Rewards ready".
+            'push' => ['publicKey' => PushKey::public(), 'rewards' => $user->push_rewards],
             'programs' => $this->programs($user),
         ];
     }

@@ -18,6 +18,7 @@ import {
     routeFor,
 } from './sw-routes';
 import type { StaticRoute, SwRoute } from './sw-routes';
+import { notificationFrom, pageToOpen } from './sw-push';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -128,4 +129,48 @@ self.addEventListener('message', (event) => {
     if (event.data?.type === 'SKIP_WAITING') {
         void self.skipWaiting();
     }
+});
+
+// A notification (CHW-41): shown as the server sent it (sw-push.ts).
+self.addEventListener('push', (event) => {
+    let payload: unknown = null;
+
+    try {
+        payload = event.data?.json();
+    } catch {
+        // Not JSON: punchcard's name alone, leading home.
+    }
+
+    const { title, options } = notificationFrom(payload);
+
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// A tap on it opens its page in the app's window if one is open, else a new one; never another site.
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = pageToOpen(event.notification.data, self.location.origin);
+
+    event.waitUntil(
+        (async () => {
+            const windows = await self.clients.matchAll({
+                type: 'window',
+                includeUncontrolled: true,
+            });
+            const open = windows.find(
+                (client) => new URL(client.url).origin === self.location.origin,
+            );
+
+            if (open) {
+                await open.focus();
+                await open
+                    .navigate(url)
+                    .catch(() => self.clients.openWindow(url));
+
+                return;
+            }
+
+            await self.clients.openWindow(url);
+        })(),
+    );
 });

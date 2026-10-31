@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -43,6 +44,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $pending_email_expires_at when its link stops working
  * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: not on (CHW-23)
  * @property Carbon|null $marketing_opt_out_at when they turned news off in the settings (CHW-58)
+ * @property bool $push_rewards whether their phones with notifications on hear about a reward unlocked (CHW-41)
  * @property Carbon|null $last_active_at when the account was last used: signed in, a stamp proving they were there, a redemption (RecordActivity, CHW-58)
  * @property Carbon|null $inactivity_warned_at when it was warned it would go for lack of use; activity withdraws it (CHW-58)
  * @property Carbon|null $inactivity_deletes_at the day that warning promised: never deleted before it (CHW-58)
@@ -54,7 +56,12 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements FilamentUser, HasLocalePreference, MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasPushSubscriptions, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    /** As the columns default, for a user not read back yet. */
+    protected $attributes = [
+        'push_rewards' => true,
+    ];
 
     /**
      * The Filament panel at /admin is for platform admins only (CHW-22): a
@@ -87,6 +94,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'adult_confirmed_at' => 'datetime',
             'marketing_opt_in_at' => 'datetime',
             'marketing_opt_out_at' => 'datetime',
+            'push_rewards' => 'boolean',
             'last_active_at' => 'datetime',
             'inactivity_warned_at' => 'datetime',
             'inactivity_deletes_at' => 'datetime',
