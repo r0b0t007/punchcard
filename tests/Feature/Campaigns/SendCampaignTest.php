@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Campaigns\CampaignLimit;
 use App\Actions\Campaigns\DeliverCampaign;
 use App\Actions\Campaigns\SendCampaignBatch;
 use App\Enums\BusinessRole;
@@ -16,11 +17,16 @@ use App\Models\Follow;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Notifications\CampaignMessage;
+use App\Notifications\RewardReady;
 use App\Support\Campaigns\CampaignText;
 use App\Support\Tenancy\TenantContext;
+use GuzzleHttp\Psr7\Request;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Minishlink\WebPush\MessageSentReport;
+use NotificationChannels\WebPush\WebPushChannel;
 use Tests\Support\Tenants;
 
 /*
@@ -66,8 +72,8 @@ it('sends the business\'s followers with a phone a notification titled with its 
     ($this->send)()->assertRedirect(route('dashboard'))->assertSessionHasNoErrors();
 
     $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::query()->sole());
-    expect($campaign->only(['business_id', 'organization_id', 'created_by', 'audience_count', 'sent_count']))->toBe([
-        'business_id' => $this->tenants->a1->id, 'organization_id' => $this->tenants->orgA->id, 'created_by' => $this->owner->id, 'audience_count' => 1, 'sent_count' => 1,
+    expect($campaign->only(['business_id', 'organization_id', 'created_by', 'audience_count']))->toBe([
+        'business_id' => $this->tenants->a1->id, 'organization_id' => $this->tenants->orgA->id, 'created_by' => $this->owner->id, 'audience_count' => 1,
     ])->and($campaign->status)->toBe(CampaignStatus::Sent)
         ->and($campaign->sent_at)->not->toBeNull();
 
@@ -105,7 +111,7 @@ it('makes one campaign of a double tap on Send', function (): void {
     Notification::assertSentToTimes($reached, CampaignMessage::class, 1);
 });
 
-it('hands the audience out in batches, each adding who got it', function (): void {
+it('hands the audience with a phone out in batches', function (): void {
     Queue::fake([PushCampaignBatch::class]);
     $first = ($this->follower)();
     $second = ($this->follower)();
@@ -115,10 +121,24 @@ it('hands the audience out in batches, each adding who got it', function (): voi
 
     Queue::assertPushed(PushCampaignBatch::class, fn (PushCampaignBatch $batch): bool => $batch->userIds === [$first->id, $second->id]);
     $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::query()->sole());
-    expect($campaign->status)->toBe(CampaignStatus::Sent)->and($campaign->sent_count)->toBe(0);
+    expect($campaign->status)->toBe(CampaignStatus::Sent);
 
     (new PushCampaignBatch($campaign->id, [$first->id, $second->id]))->handle(app(SendCampaignBatch::class));
-    expect(app(TenantContext::class)->bypass(fn (): int => $campaign->refresh()->sent_count))->toBe(2);
+    Notification::assertSentTo([$first, $second], CampaignMessage::class);
+});
+
+it('counts a follower once a push service accepted their notification, never a refused one', function (): void {
+    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create());
+    $message = new CampaignMessage($campaign->id, 'A1 · Slow Tuesday?', 'Two stamps.', null);
+    $report = fn (bool $accepted): MessageSentReport => new MessageSentReport(new Request('POST', 'https://fcm.googleapis.com/fcm/send/1'), null, $accepted);
+    $customer = User::factory()->create();
+
+    event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(false), $report(true)]));
+    event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(false)]));
+    event(new NotificationSent($customer, $message, WebPushChannel::class, []));
+    event(new NotificationSent($customer, new RewardReady(1, 1, 'A1', 'A coffee'), WebPushChannel::class, [$report(true)]));
+
+    expect(app(TenantContext::class)->bypass(fn (): int => $campaign->refresh()->sent_count))->toBe(1);
 });
 
 it('reaches its audience as it is when it goes: not who stopped following meanwhile', function (): void {
@@ -146,6 +166,18 @@ it('sends nothing for a canceled campaign, and cancels one whose delivery failed
     Notification::assertNothingSent();
     expect(app(TenantContext::class)->bypass(fn (): array => [$canceled->refresh()->status, $failed->refresh()->status, $sent->refresh()->status]))
         ->toBe([CampaignStatus::Canceled, CampaignStatus::Canceled, CampaignStatus::Sent]);
+});
+
+it('marks a delivery that failed midway sent, with what it handed out, never stuck', function (): void {
+    $midway = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create());
+    app(TenantContext::class)->bypass(fn () => Campaign::query()->whereKey($midway->id)->update(['status' => CampaignStatus::Sending, 'sent_count' => 4]));
+
+    (new PushCampaign($midway->id))->failed(new RuntimeException('Timed out.'));
+
+    $midway = app(TenantContext::class)->bypass(fn (): Campaign => $midway->refresh());
+    expect($midway->status)->toBe(CampaignStatus::Sent)
+        ->and($midway->sent_at)->not->toBeNull()
+        ->and($midway->sent_count)->toBe(4);
 });
 
 it('opens My cards for a follower without the card chosen', function (): void {
@@ -200,6 +232,7 @@ it('allows 3 campaigns in any 7 days, canceled ones aside', function (): void {
     ($this->send)()->assertSessionHasErrors('campaign');
 
     // A sister franchisee has its own 3.
+    ($this->follower)(at: $this->tenants->a2);
     $sisterOwner = $this->tenants->member(User::factory()->create(), $this->tenants->a2, BusinessRole::Owner);
     ($this->send)(as: $sisterOwner)->assertSessionHasNoErrors();
 
@@ -209,6 +242,7 @@ it('allows 3 campaigns in any 7 days, canceled ones aside', function (): void {
 });
 
 it('counts the campaigns scheduled in the next 7 days too', function (): void {
+    ($this->follower)();
     app(TenantContext::class)->bypass(fn () => Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->addDays(6)]));
 
     ($this->send)()->assertSessionHasErrors('campaign');
@@ -221,9 +255,37 @@ it('counts the campaigns scheduled in the next 7 days too', function (): void {
 });
 
 it('leaves out the campaigns scheduled 7 days ahead or more', function (): void {
-    app(TenantContext::class)->bypass(fn () => Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->addDays(7)->addMinute()]));
+    ($this->follower)();
+    // To the second, as the database keeps it: exactly 7 days ahead is the next week.
+    $this->freezeSecond();
+    app(TenantContext::class)->bypass(fn () => Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->addDays(7)]));
 
     ($this->send)()->assertSessionHasNoErrors();
+});
+
+it('allows a campaign whose every week stays within 3, though more go within 7 days either side', function (): void {
+    ($this->follower)();
+    app(TenantContext::class)->bypass(fn () => collect([-6, -5, 6])->each(fn (int $days) => Campaign::factory()->for($this->tenants->a1)->create(['send_at' => now()->addDays($days)])));
+
+    ($this->send)()->assertSessionHasNoErrors();
+
+    // Now [-6, +1) holds -6, -5 and today's: full. Another one today is refused.
+    ($this->send)()->assertSessionHasErrors('campaign');
+});
+
+it('says when the next campaign can go, later ones already scheduled counted in', function (): void {
+    app(TenantContext::class)->bypass(function (): void {
+        Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->subDay()]);
+        Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->addDays(12)]);
+    });
+    $limit = fn () => app(CampaignLimit::class)->handle($this->tenants->a1, now());
+
+    // Yesterday's leave in 6 days, but the three in 12 days fill that week: in 19 days, theirs leave too.
+    expect($limit()['used'])->toBe(3)
+        ->and($limit()['nextAt']?->toDateTimeString())->toBe(now()->addDays(19)->startOfSecond()->toDateTimeString());
+
+    app(TenantContext::class)->bypass(fn () => Campaign::query()->where('send_at', '>', now())->update(['status' => CampaignStatus::Canceled]));
+    expect($limit()['nextAt']?->toDateTimeString())->toBe(now()->addDays(6)->startOfSecond()->toDateTimeString());
 });
 
 it('never delivers a campaign before its time', function (): void {
@@ -271,19 +333,21 @@ it('shares 40 characters between the business\'s name and the title, the title k
         ->and(mb_strlen(CampaignText::notificationTitle(str_repeat('n', 30), str_repeat('t', 15))))->toBe(40);
 });
 
-it('sends nothing, and says nobody got it, without a VAPID key on the server', function (): void {
+it('refuses a campaign nobody would get, and keeps the week\'s campaigns: no phone, or no VAPID key on the server', function (): void {
+    ($this->follower)(phone: false);
+    ($this->send)()->assertSessionHasErrors(['campaign' => 'Nobody in this audience has notifications on a phone yet.']);
+
     ($this->follower)();
     config(['webpush.vapid.public_key' => null]);
-
-    ($this->send)()->assertSessionHasNoErrors();
+    ($this->send)()->assertSessionHasErrors('campaign');
 
     Notification::assertNothingSent();
-    expect(app(TenantContext::class)->bypass(fn (): array => Campaign::query()->sole()->only(['audience_count', 'sent_count'])))->toBe(['audience_count' => 0, 'sent_count' => 0]);
+    expect(app(TenantContext::class)->bypass(fn (): int => Campaign::query()->count()))->toBe(0);
 });
 
 it('keeps the segment chosen', function (): void {
     ($this->follower)();
-    ($this->send)(['segment' => 'quiet_14d']);
+    ($this->send)(['segment' => 'top_10'])->assertSessionHasNoErrors();
 
-    expect(app(TenantContext::class)->bypass(fn (): CampaignSegment => Campaign::query()->sole()->segment))->toBe(CampaignSegment::Quiet);
+    expect(app(TenantContext::class)->bypass(fn (): CampaignSegment => Campaign::query()->sole()->segment))->toBe(CampaignSegment::Top);
 });

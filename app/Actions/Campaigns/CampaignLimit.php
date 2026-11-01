@@ -9,14 +9,16 @@ use App\Models\Business;
 use App\Models\Campaign;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Carbon;
 
 /**
  * How many campaigns a business may still send (CHW-42): at most
  * punchcard.campaigns.per_week in any 7 days, so followers keep wanting to
- * hear from it. A campaign going at $at counts the others going less than 7
- * days before or after it, canceled ones aside. nextAt: when the earliest of
- * them leaves the window, once none is left.
+ * hear from it, canceled ones aside.
+ *
+ * - used: the most campaigns already in one 7-day window that would also
+ *   hold one going at $at (the busiest week it would join);
+ * - nextAt, once none is left: the first moment a campaign leaves those
+ *   windows and leaves room, later campaigns already scheduled counted in.
  */
 final readonly class CampaignLimit
 {
@@ -24,24 +26,48 @@ final readonly class CampaignLimit
 
     public function __construct(private TenantContext $context) {}
 
-    /** @return array{used: int, max: int, nextAt: Carbon|null} */
+    /** @return array{used: int, max: int, nextAt: CarbonInterface|null} */
     public function handle(Business $business, CarbonInterface $at): array
     {
         $max = (int) config('punchcard.campaigns.per_week');
-        $near = $this->context->bypass(fn () => Campaign::query()
+        /** @var list<CarbonInterface> $times */
+        $times = $this->context->bypass(fn (): array => Campaign::query()
             ->where('business_id', $business->id)
             ->where('status', '!=', CampaignStatus::Canceled)
             ->where('send_at', '>', $at->copy()->subDays(self::DAYS))
-            ->where('send_at', '<', $at->copy()->addDays(self::DAYS))
             ->orderBy('send_at')
-            ->pluck('send_at'));
+            ->pluck('send_at')->all());
+        $used = $this->busiest($times, $at);
+        $nextAt = null;
 
-        $first = $near->first();
+        // Room only comes back when a campaign leaves the window: one of these moments.
+        foreach ($used >= $max ? $times : [] as $time) {
+            $leaves = $time->copy()->addDays(self::DAYS);
 
-        return [
-            'used' => $near->count(),
-            'max' => $max,
-            'nextAt' => $near->count() >= $max && $first instanceof Carbon ? $first->copy()->addDays(self::DAYS) : null,
-        ];
+            if ($leaves->greaterThan($at) && $this->busiest($times, $leaves) < $max) {
+                $nextAt = $leaves;
+
+                break;
+            }
+        }
+
+        return ['used' => $used, 'max' => $max, 'nextAt' => $nextAt];
+    }
+
+    /**
+     * The most of these campaigns in one 7-day window [start, start + 7 days)
+     * that also holds $at: one starting at $at, or at a campaign before it.
+     *
+     * @param  list<CarbonInterface>  $times
+     */
+    private function busiest(array $times, CarbonInterface $at): int
+    {
+        $earliest = $at->copy()->subDays(self::DAYS);
+        $starts = [$at, ...array_filter($times, fn (CarbonInterface $time): bool => $time->greaterThan($earliest) && $time->lessThanOrEqualTo($at))];
+
+        return max(array_map(fn (CarbonInterface $start): int => count(array_filter(
+            $times,
+            fn (CarbonInterface $time): bool => $time->greaterThanOrEqualTo($start) && $time->lessThan($start->copy()->addDays(self::DAYS)),
+        )), $starts));
     }
 }

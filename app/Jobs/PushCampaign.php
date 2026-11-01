@@ -18,9 +18,12 @@ use Throwable;
  * A campaign's delivery (CHW-42), queued in its business's tenant
  * (QueuedTenant), so the owner's request never waits on push services; it
  * hands the audience out in batches (DeliverCampaign). One try, short, inside
- * the queue's retry_after (config/queue.php). Failed before it went (its
- * business closed meanwhile, say), the campaign is canceled: it neither
- * holds one of the week's campaigns nor goes out late.
+ * the queue's retry_after (config/queue.php). When it fails:
+ *
+ * - before it went (its business closed meanwhile, say), the campaign is
+ *   canceled: it neither holds one of the week's campaigns nor goes out late;
+ * - midway, it is sent, with the batches already handed out (their pushes
+ *   counted): never stuck, never sent twice.
  */
 #[Tries(1)]
 #[Timeout(60)]
@@ -37,8 +40,11 @@ final class PushCampaign implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        app(TenantContext::class)->bypass(fn () => Campaign::query()->whereKey($this->campaignId)
-            ->where('status', CampaignStatus::Scheduled)
-            ->update(['status' => CampaignStatus::Canceled]));
+        app(TenantContext::class)->bypass(function (): void {
+            Campaign::query()->whereKey($this->campaignId)->where('status', CampaignStatus::Scheduled)
+                ->update(['status' => CampaignStatus::Canceled]);
+            Campaign::query()->whereKey($this->campaignId)->where('status', CampaignStatus::Sending)
+                ->update(['status' => CampaignStatus::Sent, 'sent_at' => now()]);
+        });
     }
 }

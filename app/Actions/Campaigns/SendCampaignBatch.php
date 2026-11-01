@@ -19,10 +19,11 @@ use Throwable;
  * (PushCampaignBatch): each of these followers with a phone gets the
  * notification (CampaignMessage), opening their own enrollment of the card
  * chosen, or My cards. One failing never stops the others; logged by id
- * only. Adds how many got it to the campaign.
+ * only. Each push a phone's push service accepts is counted as it goes
+ * (CountCampaignPush), so a batch cut short keeps what it sent.
  *
  * In bypass(): the reads are kept to the campaign's business and
- * organization, and the count is its delivery's.
+ * organization.
  */
 final readonly class SendCampaignBatch
 {
@@ -40,18 +41,14 @@ final readonly class SendCampaignBatch
                 ->whereIn('user_id', $userIds)
                 ->pluck('id', 'user_id')->all();
             $title = CampaignText::notificationTitle($business->name, $campaign->title);
-            $sent = 0;
 
             foreach (User::query()->whereKey($userIds)->get() as $user) {
                 try {
                     $user->notifyNow(new CampaignMessage($campaign->id, $title, $campaign->body, $enrollments[$user->id] ?? null));
-                    $sent++;
                 } catch (Throwable) {
                     Log::warning('A campaign notification failed.', ['campaign' => $campaign->id, 'user' => $user->id]);
                 }
             }
-
-            Campaign::query()->whereKey($campaignId)->increment('sent_count', $sent);
         });
     }
 }

@@ -8,8 +8,6 @@ use App\Enums\CampaignStatus;
 use App\Jobs\PushCampaignBatch;
 use App\Models\Business;
 use App\Models\Campaign;
-use App\Models\User;
-use App\Support\Push\PushKey;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -18,10 +16,13 @@ use App\Support\Tenancy\TenantContext;
  * - Once: it is claimed (scheduled to sending) while due, so a job run again,
  *   or a canceled campaign, sends nothing.
  * - To its audience as it is now (CampaignAudience): someone who stopped
- *   following meanwhile gets nothing. Those of them with a phone are handed
- *   out in batches of BATCH, each its own short job (PushCampaignBatch,
- *   SendCampaignBatch), which adds how many got it.
- * - Then sent: handed out. Nobody without the app's VAPID key.
+ *   following meanwhile gets nothing. Those of them with a phone
+ *   (DescribeAudience::withPhone, nobody without the app's VAPID key) are
+ *   handed out in batches of BATCH, each its own short job
+ *   (PushCampaignBatch, SendCampaignBatch); each push a phone's push service
+ *   accepts is counted (CountCampaignPush).
+ * - Then sent: handed out. A delivery failing midway is sent too, with what
+ *   it handed out (PushCampaign::failed()).
  *
  * In bypass(): its status is its delivery's, and the reads are kept to the
  * campaign's business and organization. The batches are queued in the
@@ -29,7 +30,8 @@ use App\Support\Tenancy\TenantContext;
  */
 final readonly class DeliverCampaign
 {
-    public const int BATCH = 50;
+    /** Small: each push waits on a phone's push service (config/webpush.php client timeout), all inside the batch job's timeout. */
+    public const int BATCH = 10;
 
     public function __construct(private TenantContext $context, private CampaignAudience $audience) {}
 
@@ -45,17 +47,11 @@ final readonly class DeliverCampaign
                 return;
             }
 
-            if (PushKey::public() !== null) {
-                $campaign = Campaign::query()->findOrFail($campaignId);
-                $business = Business::query()->whereKey($campaign->business_id)->where('organization_id', $campaign->organization_id)->firstOrFail();
+            $campaign = Campaign::query()->findOrFail($campaignId);
+            $business = Business::query()->whereKey($campaign->business_id)->where('organization_id', $campaign->organization_id)->firstOrFail();
 
-                foreach (array_chunk($this->audience->handle($business)[$campaign->segment->value], 1000) as $chunk) {
-                    $withPhone = User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->orderBy('id')->pluck('id')->all();
-
-                    foreach (array_chunk($withPhone, self::BATCH) as $batch) {
-                        PushCampaignBatch::dispatch($campaignId, $batch);
-                    }
-                }
+            foreach (array_chunk(DescribeAudience::withPhone($this->audience->handle($business)[$campaign->segment->value]), self::BATCH) as $batch) {
+                PushCampaignBatch::dispatch($campaignId, $batch);
             }
 
             Campaign::query()->whereKey($campaignId)->update(['status' => CampaignStatus::Sent, 'sent_at' => now()]);

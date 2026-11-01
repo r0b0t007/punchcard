@@ -18,4 +18,10 @@ final class CampaignRefused extends RuntimeException
             'date' => $nextAt->copy()->setTimezone($timezone)->translatedFormat('l j F, H:i'),
         ]));
     }
+
+    /** Nobody in the audience has a phone with notifications on: it would reach no one, and use one of the week's. */
+    public static function nobody(): self
+    {
+        return new self(__('Nobody in this audience has notifications on a phone yet.'));
+    }
 }

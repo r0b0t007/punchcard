@@ -1020,5 +1020,6 @@
     "As notifications. You can stop them any time in Settings.": "En notifications. Vous pouvez les arrêter à tout moment dans les Paramètres.",
     "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "Sur iPhone, les notifications passent par punchcard sur l’écran d’accueil. Ajoutez-le, puis activez-les depuis là.",
     "You have sent :max campaigns in 7 days. The next one can go from :date.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir dès le :date.",
-    "Sent to :count person.|Sent to :count people.": "Envoyée à :count personne.|Envoyée à :count personnes."
+    "Sent to :count person.|Sent to :count people.": "Envoyée à :count personne.|Envoyée à :count personnes.",
+    "Nobody in this audience has notifications on a phone yet.": "Personne dans cette audience n’a encore activé les notifications sur un téléphone."
 }
