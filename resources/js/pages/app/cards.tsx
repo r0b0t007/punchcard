@@ -1,6 +1,8 @@
 import { Head, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
 import MyCardsView from '@/components/my-cards-view';
+import RedeemNotice from '@/components/rewards/redeem-notice';
+import type { RedeemNoticeData } from '@/components/rewards/redeem-notice';
 import { useTranslation } from '@/hooks/use-translation';
 import {
     saveSnapshot,
@@ -18,10 +20,13 @@ export default function MyCards({
     firstName,
     rewardsReady,
     cards,
+    redeemNotices,
 }: {
     firstName: string;
     rewardsReady: number;
     cards: MyCard[];
+    /** Rewards staff redeemed with a scan that nothing told the customer about yet (CHW-228, 14b). */
+    redeemNotices: RedeemNoticeData[];
 }) {
     const { t } = useTranslation();
     const { props, version } = usePage();
@@ -61,6 +66,9 @@ export default function MyCards({
                 firstName={firstName}
                 rewardsReady={rewardsReady}
                 cards={cards}
+                notices={redeemNotices.map((notice) => (
+                    <RedeemNotice key={notice.id} notice={notice} />
+                ))}
             />
         </>
     );

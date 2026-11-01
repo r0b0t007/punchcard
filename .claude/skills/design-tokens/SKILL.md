@@ -98,6 +98,7 @@ above: keep the two in step.
 | Notifications on this phone: the ask under a reward unlocked (C3) and a place just followed (C6), its iPhone Safari pointer (11a), Settings' Notifications (C12) with the phone's states (11c), and the reward-ready notification (11d) (CHW-41) | `Punchcard Push Review.dc.html`                                       |
 | B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                                                                                                                                         | `BA Stampers.dc.html`                                                 |
 | B9 campaigns: the composer (12a), the Campaigns page and its states (12c), the notification on a lock screen (12d) (CHW-42)                                                                                                                      | `Punchcard Campaigns Review.dc.html`                                  |
+| A reward staff redeemed with a scan: the push on a lock screen (14a) and My cards' notice until Got it (14b) (CHW-228)                                                                                                                           | `Punchcard Redeem Notice Review.dc.html`                              |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.

@@ -163,6 +163,8 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::get('app/qr', [MemberQrController::class, 'show'])->name('app.qr');
     Route::get('app/cards/{enrollment}', [MyCardsController::class, 'show'])->whereNumber('enrollment')->name('app.cards.show');
     Route::patch('app/cards/{enrollment}/follow', [MyCardsController::class, 'follow'])->whereNumber('enrollment')->name('app.cards.follow');
+    // Got it on My cards' notice of a reward staff redeemed with a scan (CHW-228).
+    Route::patch('app/rewards/{reward}/notice', [MyCardsController::class, 'dismissRedeemNotice'])->whereNumber('reward')->middleware('throttle:30,1')->name('rewards.notice.dismiss');
     // A phone's notifications on or off (CHW-41), from lib/push.ts once the browser has (un)subscribed.
     Route::post('app/push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:30,1')->name('push.subscribe');
     Route::delete('app/push/subscriptions', [PushSubscriptionController::class, 'destroy'])->middleware('throttle:30,1')->name('push.unsubscribe');

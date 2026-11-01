@@ -77,7 +77,7 @@ final readonly class RedeemReward
         }));
 
         if ($result->redeemedNow) {
-            EnrollmentChanged::dispatch($result->reward->enrollment_id, $result->reward->organization_id, $presence->businessId, [], [$result->reward->id]);
+            EnrollmentChanged::dispatch($result->reward->enrollment_id, $result->reward->organization_id, $presence->businessId, [], [$result->reward->id], byScan: $presence->scanId !== null);
         }
 
         return $result;

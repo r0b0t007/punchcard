@@ -6,7 +6,8 @@ import { loginLink, signIn } from './helpers';
 /**
  * Staff scanning a customer's member QR (CHW-30, S2, S3), on a phone: the
  * customer opens My QR, staff type its short code (headless browsers have
- * no camera), add two stamps, then redeem the customer's reward.
+ * no camera), add two stamps, then redeem the customer's reward, which
+ * My cards then tells the customer about (CHW-228).
  *
  * Needs the demo data (php artisan db:seed): Café Hafa's staff member
  * (staff@cafe.demo.test) and its stamper 1. A new customer each run, so
@@ -81,6 +82,14 @@ test("staff type a customer's short code, add two stamps and redeem their reward
     await expect(staff.locator('[data-test="scan-redeemed"]')).toContainText(
         'Free mint tea',
     );
+
+    // The customer is told (CHW-228): no phone of theirs gets notifications, so My cards says so until Got it.
+    await customer.goto('/app');
+    const notice = customer.locator('[data-test="redeem-notice"]');
+    await expect(notice).toContainText('Free mint tea');
+    await expect(notice).toContainText('Café Hafa');
+    await notice.locator('[data-test="redeem-notice-dismiss"]').click();
+    await expect(notice).toHaveCount(0);
 
     await customerContext.close();
     await staffContext.close();
