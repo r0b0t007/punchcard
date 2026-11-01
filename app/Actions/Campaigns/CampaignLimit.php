@@ -16,7 +16,8 @@ use Carbon\CarbonInterface;
  * hear from it, canceled ones aside.
  *
  * - used: the most campaigns already in one 7-day window that would also
- *   hold one going at $at (the busiest week it would join);
+ *   hold one going at $at (the busiest week it would join); left, how many
+ *   more may go;
  * - nextAt, once none is left: the first moment a campaign leaves those
  *   windows and leaves room, later campaigns already scheduled counted in.
  */
@@ -26,7 +27,7 @@ final readonly class CampaignLimit
 
     public function __construct(private TenantContext $context) {}
 
-    /** @return array{used: int, max: int, nextAt: CarbonInterface|null} */
+    /** @return array{used: int, left: int, max: int, nextAt: CarbonInterface|null} */
     public function handle(Business $business, CarbonInterface $at): array
     {
         $max = (int) config('punchcard.campaigns.per_week');
@@ -51,7 +52,7 @@ final readonly class CampaignLimit
             }
         }
 
-        return ['used' => $used, 'max' => $max, 'nextAt' => $nextAt];
+        return ['used' => $used, 'left' => max(0, $max - $used), 'max' => $max, 'nextAt' => $nextAt];
     }
 
     /**

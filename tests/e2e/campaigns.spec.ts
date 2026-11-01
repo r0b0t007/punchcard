@@ -41,3 +41,45 @@ test('the owner opens Campaigns from the sidebar and sees what was sent', async 
         contentType: 'image/png',
     });
 });
+
+test('the owner composes a campaign and sees it on a lock screen; nobody to send to, Send waits', async ({
+    page,
+}, testInfo) => {
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/business/campaigns');
+    await page.locator('[data-test="new-campaign"]').click();
+    await expect(page).toHaveURL(/\/business\/campaigns\/create$/);
+
+    await page.locator('[data-test="audience-top_10"]').click();
+    await expect(page.locator('[data-test="audience-top_10"]')).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    // A radio group: the arrow keys move the choice, and the focus with it.
+    await page.keyboard.press('ArrowLeft');
+    await expect(
+        page.locator('[data-test="audience-quiet_14d"]'),
+    ).toHaveAttribute('aria-checked', 'true');
+    await expect(
+        page.locator('[data-test="audience-quiet_14d"]'),
+    ).toBeFocused();
+    await page.locator('#title').fill('Slow Tuesday?');
+    await page.locator('#body').fill('Two stamps for every coffee until 4 pm.');
+
+    const preview = page.locator('[data-test="lock-preview"]');
+    await expect(preview).toContainText('Café Hafa · Slow Tuesday?');
+    await expect(preview).toContainText(
+        'Two stamps for every coffee until 4 pm.',
+    );
+
+    // The demo has no VAPID key, so no phone gets notifications: nothing to send to.
+    await expect(page.locator('[data-test="campaign-reach"]')).toHaveText(
+        'None of them has notifications on a phone yet.',
+    );
+    await expect(page.locator('[data-test="campaign-send"]')).toBeDisabled();
+
+    await testInfo.attach('composer', {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+    });
+});
