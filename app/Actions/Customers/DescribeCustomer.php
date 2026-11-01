@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Customers;
 
-use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
@@ -13,6 +12,7 @@ use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Cards\CustomerCard;
 use App\Support\LocalMoment;
+use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 
 /**
@@ -33,65 +33,80 @@ final readonly class DescribeCustomer
 
     public const int MOST = 500;
 
+    public function __construct(private TenantContext $context) {}
+
     /**
      * @return array{
      *     customer: array{id: int, name: string, status: string, visits: int, usualGapDays: int|null, lastVisitDays: int, rewardsRedeemed: int},
      *     cards: list<array{id: int, name: string, rewardText: string, stamps: int, toReward: int|null}>,
      *     history: list<array{key: string, kind: string, source: string|null, qty: int, card: string|null, location: string|null, by: string|null, reason: string|null, byScan: bool, at: array{day: string, date: string, time: string}}>,
      *     shown: int,
+     *     step: int,
      *     more: bool,
      * }
      */
     public function handle(Business $business, BusinessCustomer $customer, int $shown, CarbonImmutable $now): array
     {
         $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
-        $theirs = CardEnrollment::query()->where('user_id', $customer->user_id)->with('card')->orderBy('id')->get();
-        $enrollmentIds = $theirs->pluck('id')->all();
+        // Every card of theirs in the organization, as the summary counts them: a card stamped only at a sister
+        // franchisee can still be redeemed here. The stamps and redemptions read below are this business's only.
+        $theirs = $this->context->bypass(fn () => CardEnrollment::query()->where('organization_id', $business->organization_id)
+            ->where('user_id', $customer->user_id)->with('card:id,name')->get()->keyBy('id'));
+        $enrollmentIds = $theirs->keys()->all();
+        // Who on the staff, by first name and initial; no one for an account since deleted.
+        $staff = fn (?User $user): ?string => ! $user instanceof User || $user->isAnonymised() ? null : $user->shortName();
 
         $stamps = StampEvent::query()->where('business_id', $business->id)->whereIn('enrollment_id', $enrollmentIds)
-            ->with(['location:id,name,timezone', 'staff:id,name'])
+            ->with(['location:id,name,timezone', 'staff:id,name,anonymised_at'])
             ->latest('created_at')->latest('id')->limit($shown + 1)->get()
             ->map(fn (StampEvent $stamp): array => ['sort' => [$stamp->created_at->getTimestamp(), 0, $stamp->id], 'event' => [
                 'key' => 'stamp-'.$stamp->id,
                 'kind' => 'stamp',
                 'source' => $stamp->source->value,
                 'qty' => $stamp->qty,
-                'card' => $theirs->firstWhere('id', $stamp->enrollment_id)?->card?->name,
+                'card' => $theirs->get($stamp->enrollment_id)?->card?->name,
                 'location' => $stamp->location?->name,
-                'by' => in_array($stamp->source, [StampSource::Qr, StampSource::Manual, StampSource::Correction], true) ? $stamp->staff?->shortName() : null,
+                // Whoever gave it: scanned, by hand, taken back, or armed the stamper for a tap.
+                'by' => $staff($stamp->staff),
                 'reason' => $stamp->reason,
                 'byScan' => false,
                 'at' => LocalMoment::of($stamp->created_at, LocalMoment::timezoneOf($stamp->location), $now),
             ]]);
         $redeemed = Reward::query()->where('redeemed_business_id', $business->id)->whereIn('enrollment_id', $enrollmentIds)
-            ->with(['redeemedLocation:id,name,timezone', 'redeemedBy:id,name'])
+            ->with(['redeemedLocation:id,name,timezone', 'redeemedBy:id,name,anonymised_at'])
             ->latest('redeemed_at')->latest('id')->limit($shown + 1)->get()
-            ->map(fn (Reward $reward): array => ['sort' => [(int) $reward->redeemed_at?->getTimestamp(), 1, $reward->id], 'event' => [
-                'key' => 'redeemed-'.$reward->id,
-                'kind' => 'redeemed',
-                'source' => null,
-                'qty' => 0,
-                'card' => $reward->reward_text,
-                'location' => $reward->redeemedLocation?->name,
-                'by' => $reward->redeemedBy?->shortName(),
-                'reason' => null,
-                'byScan' => $reward->redeemed_by_scan,
-                'at' => LocalMoment::of($reward->redeemed_at ?? $now, LocalMoment::timezoneOf($reward->redeemedLocation), $now),
-            ]]);
+            ->map(function (Reward $reward) use ($staff, $now): array {
+                $at = $reward->redeemed_at ?? $now;
+
+                return ['sort' => [$at->getTimestamp(), 1, $reward->id], 'event' => [
+                    'key' => 'redeemed-'.$reward->id,
+                    'kind' => 'redeemed',
+                    'source' => null,
+                    'qty' => 0,
+                    'card' => $reward->reward_text,
+                    'location' => $reward->redeemedLocation?->name,
+                    'by' => $staff($reward->redeemedBy),
+                    'reason' => null,
+                    'byScan' => $reward->redeemed_by_scan,
+                    'at' => LocalMoment::of($at, LocalMoment::timezoneOf($reward->redeemedLocation), $now),
+                ]];
+            });
         // Newest first; in the same second, the redemption above the stamp it followed (a scan stamps, then redeems).
         $history = $stamps->concat($redeemed)->sortByDesc('sort')->values();
+        // The cards the business sees (shared across a franchise), with their progress.
+        $cards = CardEnrollment::query()->where('user_id', $customer->user_id)->with('card')->orderBy('id')->get();
 
         return [
             'customer' => [
                 'id' => $customer->id,
-                'name' => (string) User::query()->whereKey($customer->user_id)->first()?->shortName(),
+                'name' => (string) $customer->user?->shortName(),
                 'status' => $customer->status($now)->value,
                 'visits' => $customer->visits,
                 'usualGapDays' => $customer->usual_gap_days,
                 'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
             ],
-            'cards' => array_values($theirs->filter(fn (CardEnrollment $enrollment): bool => $enrollment->card !== null)
+            'cards' => array_values($cards->filter(fn (CardEnrollment $enrollment): bool => $enrollment->card !== null)
                 ->map(function (CardEnrollment $enrollment): array {
                     $card = $enrollment->card;
 
@@ -105,7 +120,9 @@ final readonly class DescribeCustomer
                 })->all()),
             'history' => array_values($history->take($shown)->map(fn (array $item): array => $item['event'])->all()),
             'shown' => $shown,
-            'more' => $history->count() > $shown,
+            'step' => self::SHOWN,
+            // Up to MOST: the page asks no further.
+            'more' => $shown < self::MOST && $history->count() > $shown,
         ];
     }
 }

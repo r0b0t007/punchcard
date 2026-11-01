@@ -59,12 +59,15 @@ export default function CustomerPage({
     cards,
     history,
     shown,
+    step,
     more,
 }: {
     customer: Customer;
     cards: CardProgress[];
     history: HistoryEvent[];
     shown: number;
+    /** How many more "Show older" asks for. */
+    step: number;
     more: boolean;
 }) {
     const { t } = useTranslation();
@@ -130,9 +133,9 @@ export default function CustomerPage({
                             >
                                 <Link
                                     href={show(customer.id, {
-                                        query: { shown: shown + 20 },
+                                        query: { shown: shown + step },
                                     })}
-                                    only={['history', 'shown', 'more']}
+                                    only={['history', 'shown', 'step', 'more']}
                                     preserveScroll
                                     preserveState
                                     data-test="customer-history-more"
@@ -151,12 +154,9 @@ export default function CustomerPage({
                                 value={
                                     customer.usualGapDays === null
                                         ? '—'
-                                        : t(
-                                              'every :count day|every :count days',
-                                              {
-                                                  count: customer.usualGapDays,
-                                              },
-                                          )
+                                        : t('every day|every :count days', {
+                                              count: customer.usualGapDays,
+                                          })
                                 }
                             />
                             <Fact
@@ -315,17 +315,27 @@ function how(tn: TranslateNodesFn, event: HistoryEvent): ReactNode {
     const staff = <bdi>{event.by ?? ''}</bdi>;
 
     if (event.kind === 'redeemed') {
-        return event.byScan && event.by
+        if (!event.byScan) {
+            return tn('with their own tap, :location', { location: where });
+        }
+
+        return event.by
             ? tn(':staff scanned their QR, :location', {
                   staff,
                   location: where,
               })
-            : tn('with their own tap, :location', { location: where });
+            : tn('by a staff scan, :location', { location: where });
     }
 
     switch (event.source) {
         case 'nfc':
-            return tn('tap at the stamper, :location', { location: where });
+            // An armed tap names whoever armed the stamper.
+            return event.by
+                ? tn('tap at the stamper, armed by :staff, :location', {
+                      staff,
+                      location: where,
+                  })
+                : tn('tap at the stamper, :location', { location: where });
         case 'qr':
             return event.by
                 ? tn(':staff scanned their QR, :location', {

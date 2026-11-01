@@ -11,6 +11,7 @@ use App\Http\Middleware\SetTenant;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
+use App\Models\LoyaltyCard;
 use App\Models\Reward;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -115,13 +116,48 @@ it('lists a redemption above the stamp it followed in the same second, as a scan
         ->where('history.1.key', 'stamp-'.$stamp->id));
 });
 
+it('lists a reward redeemed here from a card stamped only at the sister franchisee, as it counts it', function (): void {
+    ($this->stampAt)('2026-10-20 06:00:00');
+    // A second franchise card, stamped only at A2, and redeemed at A1 by a scan.
+    $other = $this->context->bypass(function (): CardEnrollment {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create(['name' => 'Pastry card']);
+        $card->businesses()->attach([$this->tenants->a1->id, $this->tenants->a2->id]);
+
+        return $this->tenants->enroll($this->user, $card);
+    });
+    $this->tenants->stamp($other, $this->tenants->a2);
+    $reward = $this->context->bypass(fn (): Reward => tap(Reward::factory()->for($other, 'enrollment')->create(), fn (Reward $reward) => $reward->forceFill([
+        'status' => RewardStatus::Redeemed, 'redeemed_at' => '2026-10-30 14:00:00', 'redeemed_by_scan' => true,
+        'redeemed_business_id' => $this->tenants->a1->id, 'redeemed_location_id' => $this->tenants->locationOf($this->tenants->a1)->id,
+    ])->save()));
+
+    ($this->open)(($this->summarised)())->assertInertia(fn (Assert $page): Assert => $page
+        ->where('customer.rewardsRedeemed', 1)
+        ->where('history.0.key', 'redeemed-'.$reward->id)
+        // The staff account since deleted: a scan, with no name.
+        ->where('history.0.by', null)
+        ->where('history.0.byScan', true)
+        ->has('history', 2));
+});
+
+it('names the staff who armed a tap, and no one for an account since deleted', function (): void {
+    $armed = ($this->stampAt)('2026-10-20 06:00:00', values: ['staff_id' => $this->staff->id]);
+    $gone = User::factory()->create(['name' => 'Deleted user', 'anonymised_at' => now()]);
+    ($this->stampAt)('2026-10-21 06:00:00', StampSource::Qr, values: ['staff_id' => $gone->id]);
+
+    ($this->open)(($this->summarised)())->assertInertia(fn (Assert $page): Assert => $page
+        ->where('history.0.by', null)
+        ->where('history.1.key', 'stamp-'.$armed->id)
+        ->where('history.1.by', 'Yasmine A.'));
+});
+
 it('shows 20 events, then 20 more on asking', function (): void {
     foreach (range(1, DescribeCustomer::SHOWN + 5) as $hour) {
         ($this->stampAt)(Carbon::parse('2026-10-01 00:00:00')->addHours($hour)->toDateTimeString());
     }
     $customer = ($this->summarised)();
 
-    ($this->open)($customer)->assertInertia(fn (Assert $page): Assert => $page->has('history', DescribeCustomer::SHOWN)->where('more', true)
+    ($this->open)($customer)->assertInertia(fn (Assert $page): Assert => $page->has('history', DescribeCustomer::SHOWN)->where('more', true)->where('step', DescribeCustomer::SHOWN)
         ->where('history.0.at.time', '05:00'));
     ($this->open)($customer, ['shown' => 40])->assertInertia(fn (Assert $page): Assert => $page->has('history', DescribeCustomer::SHOWN + 5)->where('more', false));
     ($this->open)($customer, ['shown' => 5])->assertSessionHasErrors('shown');
@@ -144,6 +180,16 @@ it('never opens another business\'s customer, a sister franchisee\'s included', 
         return $this->context->bypass(fn (): BusinessCustomer => BusinessCustomer::query()->where('business_id', $this->tenants->b1->id)->sole());
     })(),
 ]);
+
+it('offers no more past the most it shows', function (): void {
+    foreach (range(1, DescribeCustomer::MOST + 1) as $minute) {
+        ($this->stampAt)(Carbon::parse('2026-10-01 00:00:00')->addMinutes($minute)->toDateTimeString(), StampSource::Qr);
+    }
+
+    ($this->open)(($this->summarised)(), ['shown' => DescribeCustomer::MOST])->assertInertia(fn (Assert $page): Assert => $page
+        ->has('history', DescribeCustomer::MOST)
+        ->where('more', false));
+});
 
 it('keeps a customer from staff', function (): void {
     ($this->stampAt)('2026-10-29 06:00:00');

@@ -1109,7 +1109,6 @@
     "Nothing here yet.": "Rien ici pour l’instant.",
     "Show older": "Voir plus ancien",
     "Usually": "D’habitude",
-    "every :count day|every :count days": "tous les :count jours|tous les :count jours",
     "Every reward earned.": "Toutes les récompenses obtenues.",
     ":count more stamp to :reward.|:count more stamps to :reward.": "Encore :count tampon avant :reward.|Encore :count tampons avant :reward.",
     ":reward redeemed": ":reward utilisé",
@@ -1120,5 +1119,8 @@
     ":staff scanned their QR, :location": ":staff a scanné son QR, :location",
     "with their own tap, :location": "en touchant le tampon, :location",
     "tap at the stamper, :location": "touché au tampon, :location",
-    ":staff, :location": ":staff, :location"
+    ":staff, :location": ":staff, :location",
+    "every day|every :count days": "tous les jours|tous les :count jours",
+    "by a staff scan, :location": "par un scan du personnel, :location",
+    "tap at the stamper, armed by :staff, :location": "touché au tampon, préparé par :staff, :location"
 }

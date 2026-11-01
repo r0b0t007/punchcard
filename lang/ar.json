@@ -1109,7 +1109,6 @@
     "Nothing here yet.": "لا شيء هنا بعد.",
     "Show older": "عرض الأقدم",
     "Usually": "عادةً",
-    "every :count day|every :count days": "كل يوم|كل يوم|كل يومين|كل :count أيام|كل :count يومًا|كل :count يوم",
     "Every reward earned.": "حصل على كل المكافآت.",
     ":count more stamp to :reward.|:count more stamps to :reward.": "لا أختام أخرى قبل :reward.|بقي ختم واحد قبل :reward.|بقي ختمان قبل :reward.|بقيت :count أختام قبل :reward.|بقي :count ختمًا قبل :reward.|بقي :count ختم قبل :reward.",
     ":reward redeemed": "استُبدل :reward",
@@ -1120,5 +1119,8 @@
     ":staff scanned their QR, :location": "مسح :staff رمز QR الخاص به، :location",
     "with their own tap, :location": "بلمس جهاز الختم، :location",
     "tap at the stamper, :location": "لمس جهاز الختم، :location",
-    ":staff, :location": ":staff، :location"
+    ":staff, :location": ":staff، :location",
+    "every day|every :count days": "كل يوم|كل يوم|كل يومين|كل :count أيام|كل :count يومًا|كل :count يوم",
+    "by a staff scan, :location": "بمسح من الموظفين، :location",
+    "tap at the stamper, armed by :staff, :location": "لمس جهاز الختم، جهّزه :staff، :location"
 }
