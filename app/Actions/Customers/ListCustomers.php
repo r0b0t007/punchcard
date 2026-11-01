@@ -63,7 +63,7 @@ final readonly class ListCustomers
 
         $tab = fn () => $ofBusiness()
             ->inSegment($segment, $now)
-            ->when($search !== null, fn (\Illuminate\Database\Eloquent\Builder $query) => $this->named($query, (string) $search))
+            ->when($search !== null, fn (Builder $query) => $this->named($query, (string) $search))
             ->orderByDesc($segment === CustomerSegment::New ? 'first_visit_at' : 'last_visit_at')
             ->orderByDesc('id');
         $customers = $tab()->paginate(self::PER_PAGE, page: $page);
