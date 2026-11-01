@@ -92,7 +92,9 @@ it('redeems a reward with the next tap inside its window, instead of stamping', 
         ->and($reward->redeem_window_opened_at)->toBeNull()
         ->and($reward->redeem_window_until)->toBeNull()
         ->and(($this->stamps)())->toBe(0);
-    Event::assertDispatched(EnrollmentChanged::class, fn (EnrollmentChanged $changed): bool => $changed->rewardIds === [] && $changed->redeemedRewardIds === [$this->reward->id]);
+    // The customer's own tap: nothing to tell them about it (CHW-228).
+    expect($this->context->bypass(fn () => $this->reward->fresh())->redeemed_by_scan)->toBeFalse();
+    Event::assertDispatched(EnrollmentChanged::class, fn (EnrollmentChanged $changed): bool => $changed->rewardIds === [] && $changed->redeemedRewardIds === [$this->reward->id] && ! $changed->byScan);
 });
 
 it('redeems with a tap at the window\'s last second, and with a tap inside it claimed after it closed', function (): void {

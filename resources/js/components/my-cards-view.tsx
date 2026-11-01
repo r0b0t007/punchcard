@@ -26,10 +26,13 @@ export default function MyCardsView({
     rewardsReady,
     cards,
     offline,
+    notices,
 }: {
     firstName: string;
     rewardsReady: number;
     cards: MyCard[];
+    /** Online only: notices above the cards, such as a reward staff redeemed with a scan (CHW-228). */
+    notices?: ReactNode;
     /** Shown from the copy kept on the phone: when it was saved, and a way to try again. */
     offline?: { updatedAt: string; onRetry: () => void };
 }) {
@@ -115,6 +118,8 @@ export default function MyCardsView({
                     </Link>
                 )}
             </header>
+
+            {notices}
 
             {cards.length === 0 ? (
                 <section className="flex flex-col items-center gap-3 rounded-card border border-dashed bg-card px-6 py-8 text-center">

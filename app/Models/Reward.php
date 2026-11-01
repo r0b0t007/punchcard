@@ -52,10 +52,12 @@ use LogicException;
  * @property int|null $redeemed_by
  * @property int|null $redeemed_business_id
  * @property int|null $redeemed_location_id
- * @property string|null $redeemed_scan_id the staff member's scan it was redeemed with (RedeemScan, CHW-30)
+ * @property string|null $redeemed_scan_id the staff member's scan it was redeemed with (RedeemScan, CHW-30); null once the scan is pruned
+ * @property bool $redeemed_by_scan staff redeemed it with a scan of the customer's QR, kept after the scan is pruned (CHW-228)
  * @property Carbon|null $redeem_window_opened_at when the customer's redeem window opened (OpenRedeemWindow)
  * @property Carbon|null $redeem_window_until when it closes
  * @property Carbon|null $push_sent_at when "Your reward is ready" was pushed to the customer's phones (PushRewardsReady, CHW-41)
+ * @property Carbon|null $redeem_notice_at when the customer was told staff redeemed it with a scan (PushScanRedemption, DismissRedeemNotice, CHW-228)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -86,7 +88,7 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     private const array WINDOW_COLUMNS = ['redeem_window_opened_at', 'redeem_window_until'];
 
     /** Redemption fields a new reward cannot have outside bypass(). */
-    private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id', 'redeemed_scan_id'];
+    private const array REDEMPTION_COLUMNS = ['redeemed_at', 'redeemed_by', 'redeemed_business_id', 'redeemed_location_id', 'redeemed_scan_id', 'redeemed_by_scan'];
 
     /**
      * A reward's outcome, and its redeem window: only the redeem Actions (the
@@ -270,6 +272,8 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
             'redeem_window_opened_at' => 'datetime',
             'redeem_window_until' => 'datetime',
             'push_sent_at' => 'datetime',
+            'redeem_notice_at' => 'datetime',
+            'redeemed_by_scan' => 'boolean',
         ];
     }
 

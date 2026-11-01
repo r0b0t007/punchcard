@@ -67,6 +67,7 @@ final readonly class RedeemReward
                 'redeemed_business_id' => $presence->businessId,
                 'redeemed_location_id' => $presence->locationId,
                 'redeemed_scan_id' => $presence->scanId,
+                'redeemed_by_scan' => $presence->scanId !== null,
                 'redeem_window_opened_at' => null,
                 'redeem_window_until' => null,
             ])->save();
@@ -77,7 +78,7 @@ final readonly class RedeemReward
         }));
 
         if ($result->redeemedNow) {
-            EnrollmentChanged::dispatch($result->reward->enrollment_id, $result->reward->organization_id, $presence->businessId, [], [$result->reward->id]);
+            EnrollmentChanged::dispatch($result->reward->enrollment_id, $result->reward->organization_id, $presence->businessId, [], [$result->reward->id], byScan: $presence->scanId !== null);
         }
 
         return $result;
