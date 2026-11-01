@@ -21,28 +21,47 @@ final readonly class DescribeAudience
     /** @return array<value-of<CampaignSegment>, array{followers: int, reach: int}> */
     public function handle(Business $business): array
     {
-        $segments = [];
+        $segments = $this->audience->handle($business);
+        // Every segment is part of All: who has a phone is read once.
+        $withPhone = array_flip(self::withPhone($segments[CampaignSegment::All->value]));
 
-        foreach (CampaignSegment::cases() as $segment) {
-            $ids = $this->audience->handle($business, $segment);
-            $segments[$segment->value] = ['followers' => count($ids), 'reach' => self::reach($ids)];
-        }
-
-        return $segments;
+        return array_map(fn (array $ids): array => [
+            'followers' => count($ids),
+            'reach' => count(array_intersect_key(array_flip($ids), $withPhone)),
+        ], $segments);
     }
 
     /**
-     * Those of them with a phone with notifications on.
+     * How many of them have a phone with notifications on.
      *
      * @param  list<int>  $ids
      */
     public static function reach(array $ids): int
     {
+        return count(self::withPhone($ids));
+    }
+
+    /**
+     * Those of them with a phone with notifications on; nobody without the app's VAPID key.
+     *
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    private static function withPhone(array $ids): array
+    {
         if (PushKey::public() === null) {
-            return 0;
+            return [];
         }
 
+        $found = [];
+
         // In chunks: a big organization's followers would pass a database's bound parameters.
-        return array_sum(array_map(fn (array $chunk): int => User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->count(), array_chunk($ids, 1000)));
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            foreach (User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->pluck('id') as $id) {
+                $found[] = (int) $id;
+            }
+        }
+
+        return $found;
     }
 }

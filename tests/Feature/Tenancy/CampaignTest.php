@@ -75,6 +75,21 @@ it('leaves a campaign\'s status and counts to its delivery, and never deletes on
     expect($campaign->refresh()->sent_count)->toBe(3);
 });
 
+it('keeps what a campaign said, to whom and from whom, and the campaign itself, even in bypass()', function (string $column, mixed $value): void {
+    $this->context->bypass(fn () => Campaign::query()->whereKey($this->campaigns['a1']->id)->update([$column => $value]));
+})->throws(LogicException::class, 'never change')->with([
+    'its title' => ['title', 'Something else'],
+    'its message' => ['body', 'Something else'],
+    'its audience' => ['segment', 'top_10'],
+    'its card' => ['card_id', null],
+    'its author' => ['created_by', null],
+    'its idempotency key' => ['idempotency_key', 'a7d1c3e2-5f4b-4c8d-9e0a-1b2c3d4e5f60'],
+]);
+
+it('never deletes a campaign, even in bypass()', function (): void {
+    $this->context->bypass(fn () => Campaign::query()->findOrFail($this->campaigns['a1']->id)->delete());
+})->throws(LogicException::class, 'kept');
+
 it('lets only who runs the business see and send its campaigns', function (string $who, string $business, bool $allowed): void {
     $people = [
         'owner of A1' => fn (): User => $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner),
@@ -86,10 +101,22 @@ it('lets only who runs the business see and send its campaigns', function (strin
     $gate = Gate::forUser($user);
 
     expect($gate->allows('create', [Campaign::class, $this->tenants->{$business}]))->toBe($allowed)
-        ->and($gate->allows('viewAny', [Campaign::class, $this->tenants->{$business}]))->toBe($allowed);
+        ->and($gate->allows('viewAny', [Campaign::class, $this->tenants->{$business}]))->toBe($allowed)
+        ->and($gate->allows('view', $this->campaigns[$business]))->toBe($allowed);
 })->with([
     'the owner, for their business' => ['owner of A1', 'a1', true],
     'staff' => ['staff of A1', 'a1', false],
     'the owner, for a sister franchisee' => ['owner of A1', 'a2', false],
     'another organization\'s owner' => ['owner of B1', 'a1', false],
 ]);
+
+it('lets the franchise HQ working in a franchisee send its campaigns, never another franchisee\'s', function (): void {
+    $hq = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, orgAdmin: true);
+    $gate = Gate::forUser($hq);
+
+    expect($gate->allows('create', [Campaign::class, $this->tenants->a1]))->toBeTrue()
+        ->and($gate->allows('view', $this->campaigns['a1']))->toBeTrue()
+        ->and($gate->allows('create', [Campaign::class, $this->tenants->a2]))->toBeFalse()
+        ->and($gate->allows('view', $this->campaigns['b1']))->toBeFalse();
+});
