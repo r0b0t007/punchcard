@@ -38,7 +38,8 @@ afterEach(function (): void {
 });
 
 it('shows the owner the business\'s campaigns, newest first, with when each was sent and who it went to', function (): void {
-    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Africa/Casablanca'])->save());
+    // A fixed offset (UTC+4, no daylight saving): Morocco's differs between tz databases.
+    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save());
     $older = ($this->campaign)($this->tenants->a1, ['title' => 'Rainy day tea', 'segment' => 'top_10', 'status' => CampaignStatus::Sent, 'send_at' => '2026-10-28 15:00:00', 'sent_at' => '2026-10-28 15:40:00', 'audience_count' => 10, 'sent_count' => 9]);
     $today = ($this->campaign)($this->tenants->a1, ['title' => 'Slow Tuesday?', 'segment' => 'quiet_14d', 'status' => CampaignStatus::Sent, 'send_at' => '2026-11-04 09:02:00', 'sent_at' => '2026-11-04 09:20:00', 'audience_count' => 31, 'sent_count' => 30]);
     $going = ($this->campaign)($this->tenants->a1, ['title' => 'Going now', 'status' => CampaignStatus::Sending, 'send_at' => '2026-11-04 10:01:00', 'audience_count' => 12]);
@@ -49,9 +50,9 @@ it('shows the owner the business\'s campaigns, newest first, with when each was 
         ->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('business/campaigns/index')
             ->where('campaigns', [
-                ['id' => $going->id, 'title' => 'Going now', 'segment' => 'all', 'status' => 'sending', 'at' => ['day' => 'today', 'date' => '2026-11-04', 'time' => '11:01'], 'people' => 12],
-                ['id' => $today->id, 'title' => 'Slow Tuesday?', 'segment' => 'quiet_14d', 'status' => 'sent', 'at' => ['day' => 'today', 'date' => '2026-11-04', 'time' => '10:02'], 'people' => 31],
-                ['id' => $older->id, 'title' => 'Rainy day tea', 'segment' => 'top_10', 'status' => 'sent', 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '16:00'], 'people' => 10],
+                ['id' => $going->id, 'title' => 'Going now', 'segment' => 'all', 'status' => 'sending', 'at' => ['day' => 'today', 'date' => '2026-11-04', 'time' => '14:01'], 'people' => 12],
+                ['id' => $today->id, 'title' => 'Slow Tuesday?', 'segment' => 'quiet_14d', 'status' => 'sent', 'at' => ['day' => 'today', 'date' => '2026-11-04', 'time' => '13:02'], 'people' => 31],
+                ['id' => $older->id, 'title' => 'Rainy day tea', 'segment' => 'top_10', 'status' => 'sent', 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '19:00'], 'people' => 10],
             ])
             ->where('left', 0)
             ->where('max', 3)
