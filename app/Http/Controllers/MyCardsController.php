@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Cards\DescribeMyCard;
 use App\Actions\Cards\ListMyCards;
 use App\Actions\Cards\SetFollow;
+use App\Actions\Push\DescribePush;
 use App\Http\Requests\FollowRequest;
 use App\Http\Requests\MyCardRequest;
 use App\Models\User;
@@ -38,12 +39,16 @@ final class MyCardsController extends Controller
         return Inertia::render('app/cards', $listMyCards->handle($user, CarbonImmutable::now()));
     }
 
-    public function show(MyCardRequest $request, DescribeMyCard $describeMyCard): Response
+    public function show(MyCardRequest $request, DescribeMyCard $describeMyCard, DescribePush $describePush): Response
     {
         $user = $request->user();
         assert($user instanceof User);
 
-        return Inertia::render('app/card', $describeMyCard->handle($request->enrollment(), $user, CarbonImmutable::now()));
+        return Inertia::render('app/card', [
+            ...$describeMyCard->handle($request->enrollment(), $user, CarbonImmutable::now()),
+            // Following asks for notifications under the box (CHW-41, 11a).
+            'push' => $describePush->handle($user),
+        ]);
     }
 
     public function follow(FollowRequest $request, SetFollow $setFollow): RedirectResponse

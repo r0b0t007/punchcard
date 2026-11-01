@@ -1012,5 +1012,11 @@
     "On iPhone, add punchcard to your home screen, then open it from there.": "على iPhone، أضف punchcard إلى الشاشة الرئيسية ثم افتحه من هناك.",
     "Not here": "غير متاحة",
     "This browser can't show notifications.": "لا يمكن لهذا المتصفح عرض الإشعارات.",
-    "We couldn't change this phone's notifications. Try again later.": "تعذّر تغيير إشعارات هذا الهاتف. حاول مجددًا لاحقًا."
+    "We couldn't change this phone's notifications. Try again later.": "تعذّر تغيير إشعارات هذا الهاتف. حاول مجددًا لاحقًا.",
+    "Your reward is ready: :reward": "مكافأتك جاهزة: :reward",
+    "Know when a reward is ready": "اعرف متى تكون المكافأة جاهزة",
+    "Get a notification on this phone when you unlock one, wherever you got the stamp.": "تلقّ إشعارًا على هذا الهاتف عندما تفتح واحدة، أينما حصلت على الطابع.",
+    "Get :business's offers on this phone?": "هل تريد عروض :business على هذا الهاتف؟",
+    "As notifications. You can stop them any time in Settings.": "في شكل إشعارات. يمكنك إيقافها في أي وقت من الإعدادات.",
+    "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "على iPhone، تصل الإشعارات عبر punchcard على الشاشة الرئيسية. أضفه ثم فعّلها من هناك."
 }

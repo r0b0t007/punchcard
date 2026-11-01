@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isIosSafari, isStandalone } from '@/lib/install-prompt';
+import { isIosSafari, isStandalone, snoozeUntil } from '@/lib/install-prompt';
 import { subscribe, unsubscribe } from '@/routes/push';
 
 /**
@@ -295,6 +295,40 @@ export async function turnOff(
     }
 
     return currentState(publicKey, phones);
+}
+
+const ASK_KEY = 'punchcard-push-ask';
+
+/**
+ * Whether the ask under a moment (11a) is for this phone: it could turn
+ * them on (on an iPhone, once added to the home screen). Not where it has
+ * them, said no, or can't have them.
+ */
+export function asksFor(state: PushState | null): boolean {
+    return state === 'off' || state === 'ios-needs-install';
+}
+
+/** Whether "Not now" still holds the ask away at `now`. */
+export function askHeldAway(putAwayUntil: number | null, now: number): boolean {
+    return putAwayUntil !== null && putAwayUntil > now;
+}
+
+/** Until when the ask is put away on this browser, if it is. */
+export function askPutAwayUntil(): number | null {
+    try {
+        return Number(localStorage.getItem(ASK_KEY)) || null;
+    } catch {
+        return null;
+    }
+}
+
+/** "Not now": the ask stays away for a month on this browser, as the install sheet does. */
+export function putAskAway(now: number): void {
+    try {
+        localStorage.setItem(ASK_KEY, String(snoozeUntil(now)));
+    } catch {
+        // Private mode or storage blocked: the ask may come back sooner.
+    }
 }
 
 /**

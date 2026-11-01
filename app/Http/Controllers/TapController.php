@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Push\DescribeRewardAsk;
 use App\Actions\Taps\ClaimPendingTaps;
 use App\Actions\Taps\DescribeTap;
 use App\Actions\Taps\TakeTap;
@@ -45,7 +46,7 @@ final class TapController extends Controller
         return to_route('taps.result');
     }
 
-    public function show(Request $request, TapSession $session, DescribeTap $describeTap): Response|RedirectResponse
+    public function show(Request $request, TapSession $session, DescribeTap $describeTap, DescribeRewardAsk $describeRewardAsk): Response|RedirectResponse
     {
         $tap = $session->shown();
 
@@ -60,7 +61,11 @@ final class TapController extends Controller
 
         $screen = $describeTap->handle($tap);
 
-        return Inertia::render($screen['component'], [...$screen['props'], 'fresh' => $session->firstLookAt($tap)]);
+        return Inertia::render($screen['component'], [
+            ...$screen['props'],
+            'fresh' => $session->firstLookAt($tap),
+            'push' => $describeRewardAsk->handle($screen, $request->user()),
+        ]);
     }
 
     public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse

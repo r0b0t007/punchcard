@@ -22,6 +22,7 @@ final readonly class EnrollmentChanged implements ShouldDispatchAfterCommit
     /**
      * @param  list<int>  $rewardIds  the rewards this change unlocked
      * @param  list<int>  $redeemedRewardIds  the rewards this change redeemed
+     * @param  bool  $byOwnTap  the customer's own NFC tap made it: its screen (C3) already says what it unlocked
      */
     public function __construct(
         public int $enrollmentId,
@@ -29,5 +30,6 @@ final readonly class EnrollmentChanged implements ShouldDispatchAfterCommit
         public int $businessId,
         public array $rewardIds,
         public array $redeemedRewardIds = [],
+        public bool $byOwnTap = false,
     ) {}
 }
