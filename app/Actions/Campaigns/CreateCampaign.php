@@ -35,7 +35,7 @@ final readonly class CreateCampaign
 
     public function handle(Business $business, User $by, string $idempotencyKey, CampaignSegment $segment, string $title, string $body, ?int $cardId): Campaign
     {
-        $reach = DescribeAudience::reach($this->audience->handle($business, $segment));
+        $reach = DescribeAudience::reach($this->audience->handle($business)[$segment->value]);
 
         [$campaign, $created] = DB::transaction(function () use ($business, $by, $idempotencyKey, $segment, $title, $body, $cardId, $reach): array {
             Business::query()->whereKey($business->id)->lock('for no key update')->first();

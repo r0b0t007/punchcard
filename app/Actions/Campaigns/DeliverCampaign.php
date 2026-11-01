@@ -49,7 +49,7 @@ final readonly class DeliverCampaign
                 $campaign = Campaign::query()->findOrFail($campaignId);
                 $business = Business::query()->whereKey($campaign->business_id)->where('organization_id', $campaign->organization_id)->firstOrFail();
 
-                foreach (array_chunk($this->audience->handle($business, $campaign->segment), 1000) as $chunk) {
+                foreach (array_chunk($this->audience->handle($business)[$campaign->segment->value], 1000) as $chunk) {
                     $withPhone = User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->orderBy('id')->pluck('id')->all();
 
                     foreach (array_chunk($withPhone, self::BATCH) as $batch) {
