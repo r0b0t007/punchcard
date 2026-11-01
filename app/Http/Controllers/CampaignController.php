@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\CampaignRefused;
 use App\Actions\Campaigns\CreateCampaign;
 use App\Actions\Campaigns\DescribeCampaigns;
+use App\Actions\Campaigns\DescribeComposer;
 use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
 use App\Models\Campaign;
@@ -23,6 +24,8 @@ use Inertia\Response;
  *
  * - GET /business/campaigns: its latest campaigns, and how many of the
  *   week's are left (DescribeCampaigns);
+ * - GET /business/campaigns/create: the composer, with each audience's
+ *   size and who would get it (DescribeComposer);
  * - POST /business/campaigns: a notification to an audience of its
  *   followers, now (CreateCampaign), within its weekly limit.
  */
@@ -34,6 +37,14 @@ final class CampaignController extends Controller
         Gate::authorize('viewAny', [Campaign::class, $business]);
 
         return Inertia::render('business/campaigns/index', $describeCampaigns->handle($business));
+    }
+
+    public function create(TenantContext $context, DescribeComposer $describeComposer): Response
+    {
+        $business = $context->business() ?? abort(403);
+        Gate::authorize('create', [Campaign::class, $business]);
+
+        return Inertia::render('business/campaigns/create', $describeComposer->handle($business));
     }
 
     public function store(StoreCampaignRequest $request, CreateCampaign $createCampaign): RedirectResponse

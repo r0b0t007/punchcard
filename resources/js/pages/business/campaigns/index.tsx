@@ -1,12 +1,13 @@
-import { Head } from '@inertiajs/react';
-import { Megaphone } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Megaphone, Plus } from 'lucide-react';
 import Heading from '@/components/heading';
+import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
-import { index } from '@/routes/campaigns';
+import { create, index } from '@/routes/campaigns';
 
 type Segment = 'all' | 'quiet_14d' | 'top_10';
 type Status = 'scheduled' | 'sending' | 'sent' | 'canceled';
@@ -43,13 +44,24 @@ export default function Campaigns({
         <>
             <Head title={t('Campaigns')} />
             <div className="flex max-w-5xl flex-col gap-6 p-4">
-                <Heading
-                    title={t('Campaigns')}
-                    description={t(':count of :max campaigns left this week.', {
-                        count: left,
-                        max,
-                    })}
-                />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <Heading
+                        title={t('Campaigns')}
+                        description={t(
+                            ':count of :max campaigns left this week.',
+                            {
+                                count: left,
+                                max,
+                            },
+                        )}
+                    />
+                    <Button asChild>
+                        <Link href={create()} data-test="new-campaign">
+                            <Plus aria-hidden="true" />
+                            {t('New campaign')}
+                        </Link>
+                    </Button>
+                </div>
 
                 {campaigns.length === 0 ? (
                     <div
