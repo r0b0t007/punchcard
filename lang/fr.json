@@ -1020,7 +1020,6 @@
     "As notifications. You can stop them any time in Settings.": "En notifications. Vous pouvez les arrêter à tout moment dans les Paramètres.",
     "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "Sur iPhone, les notifications passent par punchcard sur l’écran d’accueil. Ajoutez-le, puis activez-les depuis là.",
     "You have sent :max campaigns in 7 days. The next one can go from :date.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir dès le :date.",
-    "Sent to :count person.|Sent to :count people.": "Envoyée à :count personne.|Envoyée à :count personnes.",
     "Nobody in this audience has notifications on a phone yet.": "Personne dans cette audience n’a encore activé les notifications sur un téléphone.",
     "Campaigns": "Campagnes",
     "No campaigns yet": "Aucune campagne",
@@ -1076,5 +1075,7 @@
     "Schedule": "Programmer",
     "Cancel this campaign?": "Annuler cette campagne ?",
     "Nobody gets “:title”, and it no longer counts in the week’s campaigns.": "Personne ne recevra « :title », et elle ne compte plus dans les campagnes de la semaine.",
-    "Cancel the campaign": "Annuler la campagne"
+    "Cancel the campaign": "Annuler la campagne",
+    "On its way to :count person.|On its way to :count people.": "En route vers :count personne.|En route vers :count personnes.",
+    "That time doesn’t exist that day: the clocks change.": "Cette heure n’existe pas ce jour-là : on change d’heure."
 }

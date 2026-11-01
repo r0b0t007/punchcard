@@ -356,7 +356,7 @@ final class DemoSeeder extends Seeder
 
     /**
      * Café Hafa's campaigns (CHW-42), for its Campaigns page: two sent, one
-     * this week and one the week before, and one scheduled for the weekend.
+     * this week and one the week before, and one scheduled weeks ahead.
      */
     private function campaigns(): void
     {
@@ -384,9 +384,10 @@ final class DemoSeeder extends Seeder
             'business_id' => $business->id,
             'idempotency_key' => $this->faker->uuid(),
             'title' => 'Weekend brunch',
-            'body' => 'Brunch is back on Saturday from 9: come early for a table.',
+            'body' => 'Brunch is back from 9: come early for a table.',
             'segment' => CampaignSegment::All,
-            'send_at' => now()->addDays(4)->setTime(9, 0),
+            // Weeks ahead: still to go, and cancelable, long after the demo is seeded.
+            'send_at' => now()->addDays(25)->setTime(9, 0),
             'audience_count' => 12,
         ])->save();
     }

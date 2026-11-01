@@ -1020,7 +1020,6 @@
     "As notifications. You can stop them any time in Settings.": "في شكل إشعارات. يمكنك إيقافها في أي وقت من الإعدادات.",
     "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "على iPhone، تصل الإشعارات عبر punchcard على الشاشة الرئيسية. أضفه ثم فعّلها من هناك.",
     "You have sent :max campaigns in 7 days. The next one can go from :date.": "أرسلت :max حملات خلال 7 أيام. يمكن إرسال التالية ابتداءً من :date.",
-    "Sent to :count person.|Sent to :count people.": "لم تُرسل إلى أحد.|أُرسلت إلى شخص واحد.|أُرسلت إلى شخصين.|أُرسلت إلى :count أشخاص.|أُرسلت إلى :count شخصًا.|أُرسلت إلى :count شخص.",
     "Nobody in this audience has notifications on a phone yet.": "لم يفعّل أحد في هذه الفئة الإشعارات على هاتف بعد.",
     "Campaigns": "الحملات",
     "No campaigns yet": "لا حملات بعد",
@@ -1076,5 +1075,7 @@
     "Schedule": "جدولة",
     "Cancel this campaign?": "إلغاء هذه الحملة؟",
     "Nobody gets “:title”, and it no longer counts in the week’s campaigns.": "لن يتلقى أحد «:title»، ولن تُحتسب ضمن حملات الأسبوع.",
-    "Cancel the campaign": "إلغاء الحملة"
+    "Cancel the campaign": "إلغاء الحملة",
+    "On its way to :count person.|On its way to :count people.": "في طريقها إلى لا أحد.|في طريقها إلى شخص واحد.|في طريقها إلى شخصين.|في طريقها إلى :count أشخاص.|في طريقها إلى :count شخصًا.|في طريقها إلى :count شخص.",
+    "That time doesn’t exist that day: the clocks change.": "هذا الوقت غير موجود في ذلك اليوم: تتغير الساعة."
 }

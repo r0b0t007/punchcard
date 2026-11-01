@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Campaigns;
 
-use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Support\Campaigns\CampaignText;
@@ -63,7 +62,7 @@ final readonly class DescribeComposer
             'bodyMax' => CampaignText::BODY,
             'site' => $site?->name,
             'now' => LocalMoment::of(now(), $timezone),
-            'scheduleDays' => StoreCampaignRequest::SCHEDULE_DAYS,
+            'scheduleDays' => CreateCampaign::SCHEDULE_DAYS,
         ];
     }
 }

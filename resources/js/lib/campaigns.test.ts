@@ -33,10 +33,19 @@ describe("a later campaign's day and time", () => {
         expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
     });
 
-    it('suggests the next full hour, never past the day', () => {
-        expect(nextHour('14:02')).toBe('15:00');
-        expect(nextHour('09:59')).toBe('10:00');
-        expect(nextHour('23:40')).toBe('23:00');
+    it('suggests the next full hour, tomorrow at midnight after 23:00', () => {
+        expect(nextHour('2026-11-04', '14:02')).toEqual({
+            date: '2026-11-04',
+            time: '15:00',
+        });
+        expect(nextHour('2026-11-04', '09:59')).toEqual({
+            date: '2026-11-04',
+            time: '10:00',
+        });
+        expect(nextHour('2026-12-31', '23:40')).toEqual({
+            date: '2027-01-01',
+            time: '00:00',
+        });
     });
 });
 

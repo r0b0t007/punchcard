@@ -37,6 +37,7 @@ use LogicException;
  * @property CampaignSegment $segment
  * @property CampaignStatus $status
  * @property Carbon $send_at
+ * @property Carbon|null $queued_at when its delivery was queued: at once sent now, by the scheduler for later
  * @property Carbon|null $sent_at
  * @property int $audience_count who could get it when it was created: followers in the segment with a phone
  * @property int $sent_count
@@ -114,6 +115,7 @@ class Campaign extends Model implements TenantModel
             'segment' => CampaignSegment::class,
             'status' => CampaignStatus::class,
             'send_at' => 'datetime',
+            'queued_at' => 'datetime',
             'sent_at' => 'datetime',
         ];
     }

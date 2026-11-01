@@ -10,8 +10,10 @@ use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Support\LocalMoment;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * An owner's campaign (CHW-42, B9), sent now or scheduled for later:
@@ -27,8 +29,10 @@ use Illuminate\Support\Facades\DB;
  *   foreign key checks don't wait); who could get it is counted before it is
  *   taken (a scheduled one reaches its audience as it is then).
  * - Now: delivered through the queue (PushCampaign), in the business's
- *   tenant (QueuedTenant). Later: the scheduler queues it when it is due
- *   (DispatchDueCampaigns).
+ *   tenant (QueuedTenant), marked queued. Later: up to the end of the
+ *   SCHEDULE_DAYS-th day in the business's time (StoreCampaignRequest says
+ *   so to the owner; any other caller is refused here); the scheduler queues
+ *   it when it is due (DispatchDueCampaigns).
  *
  * Run by whoever runs the business, in their tenant (the model's guards
  * check it). The card it opens is checked by StoreCampaignRequest.
@@ -37,7 +41,15 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class CreateCampaign
 {
+    public const int SCHEDULE_DAYS = 30;
+
     public function __construct(private CampaignLimit $limit, private CampaignAudience $audience) {}
+
+    /** The last moment a campaign may be scheduled for: the end of the SCHEDULE_DAYS-th day, in the business's time. */
+    public static function latestSendAt(string $timezone, CarbonInterface $now): CarbonImmutable
+    {
+        return LocalMoment::dayEnd($timezone, $now->copy()->addDays(self::SCHEDULE_DAYS));
+    }
 
     public function handle(Business $business, User $by, string $idempotencyKey, CampaignSegment $segment, string $title, string $body, ?int $cardId, ?CarbonInterface $sendAt = null): Campaign
     {
@@ -54,7 +66,13 @@ final readonly class CreateCampaign
         }
 
         $sendAt ??= now();
-        $campaign = DB::transaction(function () use ($business, $by, $idempotencyKey, $segment, $title, $body, $cardId, $reach, $sendAt): Campaign {
+        $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
+
+        if ($sendAt->lessThan(now()->subMinute()) || ! $sendAt->lessThan(self::latestSendAt($timezone, now()))) {
+            throw new LogicException('A campaign goes now, or later within '.self::SCHEDULE_DAYS.' days.');
+        }
+
+        $campaign = DB::transaction(function () use ($business, $by, $idempotencyKey, $segment, $title, $body, $cardId, $reach, $sendAt, $timezone): Campaign {
             Business::query()->whereKey($business->id)->lock('for no key update')->first();
 
             // Posted twice at once: the second waited for the lock.
@@ -67,7 +85,7 @@ final readonly class CreateCampaign
             $limit = $this->limit->handle($business, $sendAt);
 
             if ($limit['used'] >= $limit['max']) {
-                throw CampaignRefused::limit($limit['max'], $limit['nextAt'] ?? now(), LocalMoment::timezoneOf($business->firstLocation()->first()));
+                throw CampaignRefused::limit($limit['max'], $limit['nextAt'] ?? now(), $timezone);
             }
 
             $campaign = (new Campaign)->forceFill([
@@ -79,6 +97,7 @@ final readonly class CreateCampaign
                 'card_id' => $cardId,
                 'segment' => $segment,
                 'send_at' => $sendAt,
+                'queued_at' => $sendAt->isFuture() ? null : now(),
                 'audience_count' => $reach,
             ]);
             $campaign->save();

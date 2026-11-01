@@ -67,7 +67,7 @@ final class CampaignController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $campaign->send_at->isFuture()
             ? trans_choice('Scheduled for :count person.|Scheduled for :count people.', $campaign->audience_count)
-            : trans_choice('Sent to :count person.|Sent to :count people.', $campaign->audience_count)]);
+            : trans_choice('On its way to :count person.|On its way to :count people.', $campaign->audience_count)]);
 
         return to_route('campaigns.index');
     }

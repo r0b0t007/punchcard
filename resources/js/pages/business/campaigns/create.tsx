@@ -86,6 +86,7 @@ export default function CreateCampaign({
     const { t, locale } = useTranslation();
     // One key per composer, made once, never rendered: a double tap on Send, or a retried post, is one campaign.
     const [idempotencyKey] = useState(newIdempotencyKey);
+    const suggested = nextHour(now.date, now.time);
     const form = useForm({
         idempotency_key: idempotencyKey,
         segment: 'all' as Segment,
@@ -93,8 +94,8 @@ export default function CreateCampaign({
         body: '',
         card: cards.length > 0 ? String(cards[0].id) : MY_CARDS,
         when: 'now' as When,
-        send_on: now.date,
-        send_time: nextHour(now.time),
+        send_on: suggested.date,
+        send_time: suggested.time,
     });
     const { data, setData, processing } = form;
     const errors = form.errors as Record<string, string | undefined>;
@@ -164,8 +165,10 @@ export default function CreateCampaign({
                     )}
                 />
 
-                {/* One notice: the week's campaigns sent (refused or not, it says when the next can go), or the server's refusal. */}
-                {full && nextAt ? (
+                {/* One notice: the server's refusal (its own moment's, for a later one), or the week's campaigns sent. */}
+                {errors.campaign ? (
+                    <Notice>{errors.campaign}</Notice>
+                ) : full && nextAt ? (
                     <Notice>
                         {momentLabel(locale, nextAt, {
                             today: (time) =>
@@ -183,8 +186,6 @@ export default function CreateCampaign({
                                 ),
                         })}
                     </Notice>
-                ) : errors.campaign ? (
-                    <Notice>{errors.campaign}</Notice>
                 ) : null}
 
                 <form

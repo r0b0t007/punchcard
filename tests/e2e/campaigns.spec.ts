@@ -8,7 +8,7 @@ import { signIn } from './helpers';
  *
  * Needs the demo data (php artisan db:seed): Café Hafa's owner
  * (owner@cafe.demo.test), its two sent campaigns and the one scheduled
- * for the weekend. Reads only: Cancel is opened, then kept.
+ * weeks ahead. Reads only: Cancel is opened, then kept.
  */
 test.skip(
     ({ browserName }) => browserName !== 'webkit',
@@ -33,7 +33,7 @@ test('the owner opens Campaigns from the sidebar and sees what was sent', async 
 
     const rows = page.locator('[data-test="campaign-row"]');
     await expect(rows).toHaveCount(3);
-    // The one scheduled for the weekend first: Cancel asks, and Keep it leaves it.
+    // The one scheduled weeks ahead first: Cancel asks, and Keep it leaves it.
     await expect(rows.nth(0)).toContainText('Weekend brunch');
     await rows.nth(0).locator('[data-test="cancel-campaign"]').click();
     await expect(page.getByText('Cancel this campaign?')).toBeVisible();

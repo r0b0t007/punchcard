@@ -12,13 +12,16 @@ use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
 
 /**
- * The scheduler's pass over campaigns (CHW-42, every minute): each scheduled
- * one now due is queued for delivery (PushCampaign) inside its own business's
- * tenant, so QueuedTenant carries it (and fails it, canceling the campaign,
- * if that business closed meanwhile). One more than LATE_MINUTES late (the
- * scheduler was down) is canceled instead: a campaign never goes out late,
- * "Slow Tuesday?" on Wednesday. A send-now one queued meanwhile is queued
- * again harmlessly: delivery claims a campaign once.
+ * The scheduler's pass over campaigns (CHW-42, every minute):
+ *
+ * - Each scheduled one now due and not queued yet is claimed (queued_at, one
+ *   conditional write, so a backlog never queues it twice) and queued for
+ *   delivery (PushCampaign) inside its own business's tenant, so QueuedTenant
+ *   carries it (and fails it, canceling the campaign, if that business closed
+ *   meanwhile). One sent now was queued as it was made.
+ * - One more than LATE_MINUTES past its time is canceled: a campaign never
+ *   goes out late ("Slow Tuesday?" on Wednesday), whether the scheduler or
+ *   the queue was down; delivery refuses it too (DeliverCampaign).
  *
  * In bypass() to find them across businesses; each queued from its tenant.
  */
@@ -31,23 +34,29 @@ final readonly class DispatchDueCampaigns
     /** @return array{queued: int, missed: int} */
     public function handle(CarbonInterface $now): array
     {
+        $late = $now->copy()->subMinutes(self::LATE_MINUTES);
         [$due, $missed] = $this->context->bypass(fn (): array => [
             Campaign::query()->where('status', CampaignStatus::Scheduled)
+                ->whereNull('queued_at')
                 ->where('send_at', '<=', $now)
-                ->where('send_at', '>', $now->copy()->subMinutes(self::LATE_MINUTES))
+                ->where('send_at', '>', $late)
                 ->orderBy('send_at')
                 ->get(['id', 'business_id', 'organization_id']),
             Campaign::query()->where('status', CampaignStatus::Scheduled)
-                ->where('send_at', '<=', $now->copy()->subMinutes(self::LATE_MINUTES))
+                ->where('send_at', '<=', $late)
                 ->update(['status' => CampaignStatus::Canceled]),
         ]);
+        $businesses = $this->context->bypass(fn () => Business::query()->with('organization')
+            ->whereKey($due->pluck('business_id')->unique()->values()->all())->get()->keyBy('id'));
         $queued = 0;
 
         foreach ($due as $campaign) {
-            $business = $this->context->bypass(fn (): ?Business => Business::query()->with('organization')
-                ->whereKey($campaign->business_id)->where('organization_id', $campaign->organization_id)->first());
+            $business = $businesses->get($campaign->business_id);
+            $claimed = $this->context->bypass(fn (): int => Campaign::query()->whereKey($campaign->id)
+                ->where('status', CampaignStatus::Scheduled)->whereNull('queued_at')
+                ->update(['queued_at' => $now]));
 
-            if (! $business instanceof Business) {
+            if (! $business instanceof Business || $business->organization_id !== $campaign->organization_id || $claimed !== 1) {
                 continue;
             }
 

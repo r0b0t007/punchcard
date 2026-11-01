@@ -42,11 +42,16 @@ export function addDays(date: string, days: number): string {
     return day.toISOString().slice(0, 10);
 }
 
-/** The next full hour after a time (H:i), a later campaign's first suggestion; "23:00" stays the last. */
-export function nextHour(time: string): string {
-    const hour = Math.min(Number(time.slice(0, 2)) + 1, 23);
+/** A later campaign's first suggestion: the next full hour after now (Y-m-d, H:i), tomorrow at midnight after 23:00. */
+export function nextHour(
+    date: string,
+    time: string,
+): { date: string; time: string } {
+    const hour = Number(time.slice(0, 2)) + 1;
 
-    return `${String(hour).padStart(2, '0')}:00`;
+    return hour > 23
+        ? { date: addDays(date, 1), time: '00:00' }
+        : { date, time: `${String(hour).padStart(2, '0')}:00` };
 }
 
 /** The composer's idempotency key, one per page load (a version 4 UUID). */
