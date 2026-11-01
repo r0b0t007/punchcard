@@ -5,6 +5,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterScanController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FinishSignUpController;
@@ -109,6 +110,8 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         // Verify your business (CHW-145): its documents, sent by whoever runs it, never shown back.
         Route::get('verification', [VerificationController::class, 'show'])->name('verification.show');
         Route::post('verification/{kind}', [VerificationController::class, 'store'])->middleware('throttle:verification-upload')->name('verification.store');
+        // Customers (CHW-44, B4, B5): who came in, from whoever runs the business.
+        Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
         // Campaigns (CHW-42, B9): a notification to the business's followers, from whoever runs it.
         Route::get('campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
         Route::get('campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');

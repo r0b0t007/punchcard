@@ -37,6 +37,17 @@ final class LocalMoment
         ];
     }
 
+    /**
+     * Calendar days from a moment to now in a site's time: 0 the same day, 1 the day before, whatever the hours
+     * between, and a clock change's 23 or 25 hour day counts as one.
+     */
+    public static function daysSince(CarbonInterface $at, string $timezone, ?CarbonInterface $now = null): int
+    {
+        $day = fn (CarbonInterface $moment): CarbonImmutable => CarbonImmutable::parse($moment->copy()->setTimezone($timezone)->format('Y-m-d'), 'UTC');
+
+        return (int) $day($at)->diffInDays($day($now ?? now()));
+    }
+
     /** When a site's day ends (its next local midnight), as UTC: a 23 or 25 hour day ends when it does. */
     public static function dayEnd(string $timezone, ?CarbonInterface $now = null): CarbonImmutable
     {

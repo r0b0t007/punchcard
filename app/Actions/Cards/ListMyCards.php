@@ -90,8 +90,7 @@ final readonly class ListMyCards
                     'logoUrl' => $organization->logoUrl(),
                     'rewardsReady' => (int) $ready->get($enrollment->id, 0),
                     'stampsToReward' => CustomerCard::stampsToReward($card, $enrollment),
-                    'lastVisitDaysAgo' => $lastVisit === null ? null : (int) round(abs($lastVisit->created_at->toImmutable()->setTimezone($timezone)->startOfDay()
-                        ->diffInDays($now->setTimezone($timezone)->startOfDay()))),
+                    'lastVisitDaysAgo' => $lastVisit === null ? null : LocalMoment::daysSince($lastVisit->created_at, $timezone, $now),
                     'paused' => ! $card->active,
                 ];
             }

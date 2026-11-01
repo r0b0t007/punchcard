@@ -1,5 +1,6 @@
 import { usePage } from '@inertiajs/react';
 import {
+    Contact,
     CreditCard,
     LayoutGrid,
     Megaphone,
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as campaigns } from '@/routes/campaigns';
+import { index as customers } from '@/routes/customers';
 import { index as cards } from '@/routes/cards';
 import { show as counter } from '@/routes/counter';
 import { index as staff } from '@/routes/staff';
@@ -31,6 +33,12 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
 ];
+
+const customersNavItem: NavItem = {
+    title: 'Customers',
+    href: customers(),
+    icon: Contact,
+};
 
 const cardsNavItem: NavItem = {
     title: 'Cards',
@@ -67,6 +75,7 @@ export function AppSidebar() {
     const items = [
         ...mainNavItems,
         ...(nav.counter ? [counterNavItem] : []),
+        ...(nav.customers ? [customersNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
         ...(nav.campaigns ? [campaignsNavItem] : []),
         ...(nav.stampers ? [stampersNavItem] : []),

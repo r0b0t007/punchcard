@@ -48,7 +48,8 @@ final readonly class RecentStamps
 
                 return [
                     'id' => $event->id,
-                    'customer' => $firstNames ? $customer?->firstName() : $customer?->name,
+                    // Staff at the counter see the first name; owners first name and initial (CHW-44), never more.
+                    'customer' => $firstNames ? $customer?->firstName() : $customer?->shortName(),
                     'card' => $event->enrollment?->card?->name,
                     'location' => $event->location?->name,
                     'source' => $event->source->value,
