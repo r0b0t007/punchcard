@@ -35,6 +35,7 @@ use Faker\Factory as FakerFactory;
 use Faker\Generator;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -120,6 +121,9 @@ final class DemoSeeder extends Seeder
                     NfcTag::query()->whereKey($tagId)->update(['last_counter' => $counter]);
                 }
             }));
+
+            // Each business's customers (CHW-44), from the stamps above, as after a deploy.
+            Artisan::call('punchcard:customers:summarise');
         } finally {
             $this->faker->seed();
         }

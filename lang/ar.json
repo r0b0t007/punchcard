@@ -1082,5 +1082,6 @@
     "Your :reward was redeemed": "تم استبدال :reward",
     "At :business :when, by staff scanning your QR. Not you? Tell the staff.": "في :business :when، حين مسح الموظفون رمز QR الخاص بك. لم تكن أنت؟ أخبر الموظفين.",
     "today at :time": "اليوم على الساعة :time",
-    "on :date at :time": "يوم :date على الساعة :time"
+    "on :date at :time": "يوم :date على الساعة :time",
+    ":count customer summarised.|:count customers summarised.": "لم يُلخَّص أي عميل.|لُخِّص عميل واحد.|لُخِّص عميلان.|لُخِّص :count عملاء.|لُخِّص :count عميلًا.|لُخِّص :count عميل."
 }

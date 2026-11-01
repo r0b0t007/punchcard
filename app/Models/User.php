@@ -131,9 +131,34 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
      */
     public function firstName(): ?string
     {
+        return $this->nameWords()[0] ?? null;
+    }
+
+    /**
+     * The first name and the initial of the last ("Salma T.", "سلمى ت."), how a business sees its customers
+     * (CHW-44): never more. The first name alone for a one-word name, null for a blank one.
+     */
+    public function shortName(): ?string
+    {
+        $words = $this->nameWords();
+
+        return match (count($words)) {
+            0 => null,
+            1 => $words[0],
+            default => $words[0].' '.mb_substr(end($words), 0, 1).'.',
+        };
+    }
+
+    /**
+     * The name's words, split on any space, a no-break or Arabic one too.
+     *
+     * @return list<string>
+     */
+    private function nameWords(): array
+    {
         $words = preg_split('/[\s\p{Z}]+/u', (string) $this->name, -1, PREG_SPLIT_NO_EMPTY);
 
-        return is_array($words) && $words !== [] ? $words[0] : null;
+        return is_array($words) ? $words : [];
     }
 
     /** The new address it asked for, while its link still works (RequestEmailChange). */
