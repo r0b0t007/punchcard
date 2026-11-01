@@ -4,7 +4,7 @@ import { signIn } from './helpers';
 /**
  * The Customers page (CHW-44, B4, design 15a), on a phone: the owner reaches
  * it from the sidebar, sees Café Hafa's customers by first name and
- * initial, switches tab, and finds one by first name.
+ * initial, switches tab, finds one by first name and opens her page (B5).
  *
  * Needs the demo data (php artisan db:seed), summarised by the seeder:
  * Café Hafa's owner (owner@cafe.demo.test) and its customers, among them
@@ -58,4 +58,20 @@ test('the owner opens Customers from the sidebar, switches tab and finds a custo
     // The demo customer, among others called Salma that the scan spec signs up.
     await expect(rows.filter({ hasText: 'Salma B.' })).toHaveCount(1);
     await expect(rows.filter({ hasNotText: 'Salma' })).toHaveCount(0);
+
+    // Her page (B5): her name, her cards, and what happened at the café.
+    await rows.filter({ hasText: 'Salma B.' }).getByRole('link').click();
+    await expect(page).toHaveURL(/\/business\/customers\/\d+$/);
+    await expect(page.getByRole('heading', { name: 'Salma B.' })).toBeVisible();
+    await expect(page.locator('[data-test="customer-card"]')).not.toHaveCount(
+        0,
+    );
+    await expect(page.locator('[data-test="customer-event"]')).not.toHaveCount(
+        0,
+    );
+
+    await testInfo.attach('customer', {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+    });
 });

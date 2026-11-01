@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import StatusChip from '@/components/customers/status-chip';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
+import { initials, lastVisit } from '@/lib/customers';
+import type { CustomerStatus } from '@/lib/customers';
 import { cn } from '@/lib/utils';
-import { index } from '@/routes/customers';
+import { index, show } from '@/routes/customers';
 
 type Segment = 'all' | 'regulars' | 'quiet' | 'lost' | 'new';
-type Status = 'active' | 'quiet' | 'lost';
 
 type CustomerRow = {
     id: number;
@@ -20,7 +22,7 @@ type CustomerRow = {
     /** Days since their last visit, in the business's time: 0 is today. */
     lastVisitDays: number;
     rewardsRedeemed: number;
-    status: Status;
+    status: CustomerStatus;
 };
 
 type Page = {
@@ -210,72 +212,49 @@ function CustomerItem({ customer }: { customer: CustomerRow }) {
     const last = lastVisit(t, customer.lastVisitDays);
 
     return (
-        <li
-            className="flex items-center gap-4 px-4 py-3 text-sm md:grid md:grid-cols-12"
-            data-test="customer-row"
-        >
-            <div className="flex min-w-0 flex-1 items-center gap-3 md:col-span-4">
-                <span
-                    aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold"
-                >
-                    {initials(customer.name)}
-                </span>
-                <div className="flex min-w-0 flex-col">
-                    {/* The customer's own name, in its own direction. */}
-                    <span className="truncate font-semibold">
-                        <bdi>{customer.name}</bdi>
+        <li data-test="customer-row">
+            {/* The whole row opens the customer (B5). */}
+            <Link
+                href={show(customer.id)}
+                className="flex items-center gap-4 px-4 py-3 text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none md:grid md:grid-cols-12"
+            >
+                <div className="flex min-w-0 flex-1 items-center gap-3 md:col-span-4">
+                    <span
+                        aria-hidden="true"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+                    >
+                        {initials(customer.name)}
                     </span>
-                    <span className="text-xs text-muted-foreground md:hidden">
-                        {t(':count visit|:count visits', {
-                            count: customer.visits,
-                        })}{' '}
-                        · {last} ·{' '}
-                        {t(':count redeemed', {
-                            count: customer.rewardsRedeemed,
-                        })}
-                    </span>
+                    <div className="flex min-w-0 flex-col">
+                        {/* The customer's own name, in its own direction. */}
+                        <span className="truncate font-semibold">
+                            <bdi>{customer.name}</bdi>
+                        </span>
+                        <span className="text-xs text-muted-foreground md:hidden">
+                            {t(':count visit|:count visits', {
+                                count: customer.visits,
+                            })}{' '}
+                            · {last} ·{' '}
+                            {t(':count redeemed', {
+                                count: customer.rewardsRedeemed,
+                            })}
+                        </span>
+                    </div>
                 </div>
-            </div>
-            <span className="hidden md:col-span-2 md:block">
-                {customer.visits}
-            </span>
-            <span className="hidden text-muted-foreground md:col-span-2 md:block">
-                {last}
-            </span>
-            <span className="hidden md:col-span-2 md:block">
-                {customer.rewardsRedeemed}
-            </span>
-            <span className="md:col-span-2">
-                <StatusChip status={customer.status} />
-            </span>
+                <span className="hidden md:col-span-2 md:block">
+                    {customer.visits}
+                </span>
+                <span className="hidden text-muted-foreground md:col-span-2 md:block">
+                    {last}
+                </span>
+                <span className="hidden md:col-span-2 md:block">
+                    {customer.rewardsRedeemed}
+                </span>
+                <span className="md:col-span-2">
+                    <StatusChip status={customer.status} />
+                </span>
+            </Link>
         </li>
-    );
-}
-
-function StatusChip({ status }: { status: Status }) {
-    const { t } = useTranslation();
-
-    return (
-        <span
-            className={cn(
-                'inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap',
-                status === 'active' && 'bg-success/15 text-success',
-                status === 'quiet' && 'bg-warning/15 text-warning',
-                status === 'lost' && 'bg-muted text-muted-foreground',
-            )}
-            data-test="customer-status"
-        >
-            <span
-                aria-hidden="true"
-                className="size-1.5 rounded-full bg-current"
-            />
-            {status === 'active'
-                ? t('Active')
-                : status === 'quiet'
-                  ? t('Going quiet')
-                  : t('Lost')}
-        </span>
     );
 }
 
@@ -367,26 +346,4 @@ function segmentName(t: TranslateFn, segment: Segment): string {
         case 'new':
             return t('New');
     }
-}
-
-function lastVisit(t: TranslateFn, days: number): string {
-    if (days === 0) {
-        return t('Today');
-    }
-
-    if (days === 1) {
-        return t('Yesterday');
-    }
-
-    return t(':count days ago', { count: days });
-}
-
-/** "ST" for "Salma T.": the first letter of each word. */
-function initials(name: string): string {
-    return name
-        .split(/\s+/u)
-        .filter((word) => word !== '')
-        .map((word) => Array.from(word)[0] ?? '')
-        .join('')
-        .slice(0, 2);
 }
