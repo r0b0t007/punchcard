@@ -63,7 +63,8 @@ return [
     'customers' => [
         // A business's customers (CHW-44, B4, docs/spec.md "Derived metrics"): going quiet after twice their usual
         // gap between visits, never sooner than quiet_min_days; lost after lost_days; new within new_days of their
-        // first visit; a regular from regular_visits visits, while neither quiet nor lost.
+        // first visit; a regular from regular_visits visits, while neither quiet nor lost. Each customer's dates are
+        // stored: after changing these, run `php artisan punchcard:customers:summarise`.
         'quiet_min_days' => 14,
         'lost_days' => 60,
         'new_days' => 30,

@@ -28,8 +28,10 @@ use Illuminate\Support\Facades\DB;
  * - Their usual gap is the days between their first and last visit over the
  *   visits between; they go quiet after twice that, never sooner than
  *   quiet_min_days, and are lost lost_days after their last visit
- *   (docs/spec.md "Derived metrics").
- * - No visit here, or an anonymised account: no row.
+ *   (docs/spec.md "Derived metrics"). Never quiet later than lost: someone
+ *   who comes monthly or less goes from active to lost.
+ * - No visit here, everything given here taken back (a stamp by hand for the
+ *   wrong customer, corrected), or an anonymised account: no row.
  * - Under the customer's row lock, so two summaries of them, or one and
  *   their account's deletion, run one after the other: the later one reads
  *   what the earlier committed.
@@ -49,23 +51,23 @@ final readonly class SummariseCustomer
             // their account's deletion (DeleteAccount locks the user first too).
             $user = User::query()->whereKey($userId)->lockForUpdate()->first();
             $theirs = CardEnrollment::query()->select('id')->where('organization_id', $organizationId)->where('user_id', $userId);
-            $stamps = StampEvent::query()
+            $here = StampEvent::query()
                 ->where('business_id', $businessId)
                 ->whereIn('enrollment_id', $theirs)
-                ->whereIn('source', StampSource::presenceValues())
-                ->get(['location_id', 'created_at']);
+                ->whereIn('source', [...StampSource::presenceValues(), StampSource::Correction->value])
+                ->get(['location_id', 'source', 'qty', 'created_at']);
+            $stamps = $here->reject(fn (StampEvent $stamp): bool => $stamp->source === StampSource::Correction);
             $row = BusinessCustomer::query()->where('business_id', $businessId)->where('user_id', $userId);
 
-            if ($stamps->isEmpty() || ! $user instanceof User || $user->isAnonymised()) {
+            if ($here->sum('qty') <= 0 || ! $user instanceof User || $user->isAnonymised()) {
                 $row->delete();
 
                 return;
             }
 
-            $timezones = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()
-                ->mapWithKeys(fn (Location $location): array => [$location->id => LocalMoment::timezoneOf($location)]);
+            $locations = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()->keyBy('id');
             $days = $stamps
-                ->map(fn (StampEvent $stamp): string => $stamp->created_at->copy()->setTimezone((string) $timezones->get($stamp->location_id, config('app.timezone')))->format('Y-m-d'))
+                ->map(fn (StampEvent $stamp): string => $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d'))
                 ->unique()->sort()->values();
             $visits = $days->count();
             /** @var Carbon $first */
@@ -74,6 +76,7 @@ final readonly class SummariseCustomer
             $last = $stamps->max('created_at');
             $gap = $visits > 1 ? Carbon::parse((string) $days->first())->diffInDays(Carbon::parse((string) $days->last())) / ($visits - 1) : null;
             $quietDays = max((int) config('punchcard.customers.quiet_min_days'), $gap === null ? 0 : (int) ceil(2 * $gap));
+            $lostAt = $last->copy()->addDays((int) config('punchcard.customers.lost_days'));
 
             BusinessCustomer::query()->updateOrCreate(['business_id' => $businessId, 'user_id' => $userId], [
                 'organization_id' => $organizationId,
@@ -81,11 +84,24 @@ final readonly class SummariseCustomer
                 'first_visit_at' => $first,
                 'last_visit_at' => $last,
                 'usual_gap_days' => $gap === null ? null : (int) round($gap),
-                'quiet_at' => $last->copy()->addDays($quietDays),
-                'lost_at' => $last->copy()->addDays((int) config('punchcard.customers.lost_days')),
+                'quiet_at' => $last->copy()->addDays($quietDays)->min($lostAt),
+                'lost_at' => $lostAt,
                 // Only a redemption sets where a reward was redeemed.
                 'rewards_redeemed' => Reward::query()->whereIn('enrollment_id', $theirs)->where('redeemed_business_id', $businessId)->count(),
             ]);
         }), attempts: 3);
+    }
+
+    /**
+     * Who came in to the business, with a presence stamp there: the customers
+     * it has, by user id. In bypass().
+     *
+     * @return list<int>
+     */
+    public function customersOf(int $businessId): array
+    {
+        return array_values($this->context->bypass(fn (): array => CardEnrollment::query()
+            ->whereIn('id', StampEvent::query()->select('enrollment_id')->where('business_id', $businessId)->whereIn('source', StampSource::presenceValues()))
+            ->distinct()->orderBy('user_id')->pluck('user_id')->map(fn (mixed $id): int => (int) $id)->all()));
     }
 }

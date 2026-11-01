@@ -36,7 +36,7 @@ use LogicException;
  * @property Carbon $first_visit_at
  * @property Carbon $last_visit_at
  * @property int|null $usual_gap_days days between their visits on average; null before a second visit
- * @property Carbon $quiet_at when they go quiet if they don't come back: twice their usual gap, at least quiet_min_days
+ * @property Carbon $quiet_at when they go quiet if they don't come back: twice their usual gap, at least quiet_min_days, at most lost_at
  * @property Carbon $lost_at when they are lost if they don't come back: lost_days after their last visit
  * @property int $rewards_redeemed rewards they redeemed here
  * @property Carbon|null $created_at

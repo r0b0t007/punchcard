@@ -79,13 +79,14 @@ it('counts a visit per day in the site\'s time, whatever the stamps that day', f
 });
 
 it('never counts corrections or system stamps as visits', function (): void {
-    ($this->stampAt)('2026-10-20 10:00:00', source: StampSource::Correction, qty: -1);
-    ($this->stampAt)('2026-10-21 10:00:00', source: StampSource::Bonus);
+    ($this->stampAt)('2026-10-20 10:00:00', source: StampSource::Bonus);
     ($this->summarise)();
 
     expect(($this->row)())->toBeNull();
 
-    ($this->stampAt)('2026-10-22 10:00:00', source: StampSource::Manual);
+    ($this->stampAt)('2026-10-22 10:00:00', source: StampSource::Manual, qty: 2);
+    ($this->stampAt)('2026-10-23 10:00:00', source: StampSource::Correction, qty: -1);
+    ($this->stampAt)('2026-10-24 10:00:00', source: StampSource::Bonus);
     ($this->summarise)();
 
     expect(($this->row)()->visits)->toBe(1);
@@ -255,6 +256,41 @@ it('sorts customers into the tabs as time goes by', function (): void {
         ->and(($this->row)(user: $other)->status(now()))->toBe(CustomerStatus::Lost);
 });
 
+it('loses a customer who comes monthly or less without a quiet spell, and no longer counts them a regular', function (): void {
+    // Every 40 days: twice is 80, past the 60 days that lose them.
+    foreach (['2026-07-01', '2026-08-10', '2026-09-19'] as $day) {
+        ($this->stampAt)($day.' 10:00:00');
+    }
+    ($this->summarise)();
+    $in = fn (CustomerSegment $segment): array => $this->context->bypass(fn (): array => BusinessCustomer::query()->inSegment($segment, now())->pluck('user_id')->all());
+
+    expect(($this->row)()->quiet_at->toDateTimeString())->toBe('2026-11-18 10:00:00')
+        ->and(($this->row)()->lost_at->toDateTimeString())->toBe('2026-11-18 10:00:00')
+        ->and($in(CustomerSegment::Regulars))->toBe([$this->customer->id]);
+
+    $this->travelTo(Carbon::parse('2026-11-18 10:00:00'));
+
+    expect($in(CustomerSegment::Lost))->toBe([$this->customer->id])
+        ->and($in(CustomerSegment::Regulars))->toBe([])
+        ->and($in(CustomerSegment::Quiet))->toBe([]);
+});
+
+it('keeps no customer whose stamps here were all taken back', function (): void {
+    // A stamp by hand for the wrong customer, corrected.
+    ($this->stampAt)('2026-10-30 10:00:00', source: StampSource::Manual);
+    ($this->stampAt)('2026-10-30 10:05:00', source: StampSource::Correction, qty: -1);
+    ($this->summarise)();
+
+    expect(($this->row)())->toBeNull();
+
+    // A real visit of two stamps, one taken back: still a visit.
+    ($this->stampAt)('2026-10-31 10:00:00', qty: 2);
+    ($this->stampAt)('2026-10-31 10:05:00', source: StampSource::Correction, qty: -1);
+    ($this->summarise)();
+
+    expect(($this->row)()->visits)->toBe(2);
+});
+
 it('takes a regular from 3 visits', function (): void {
     ($this->stampAt)('2026-10-25 10:00:00');
     ($this->stampAt)('2026-10-28 10:00:00');
@@ -275,13 +311,15 @@ it('summarises who came in before, for every business or one', function (): void
     ($this->stampAt)('2026-10-31 10:00:00');
     ($this->stampAt)('2026-10-30 10:00:00', $this->tenants->a2);
     $this->tenants->stamp($this->tenants->enroll($other, $this->tenants->cardB), $this->tenants->b1);
+    // Only a bonus at A1: never came in.
+    $this->tenants->stamp($this->tenants->enroll(User::factory()->create(), $this->tenants->cardA), $this->tenants->a1, ['source' => StampSource::Bonus]);
     $rows = fn (): array => $this->context->bypass(fn (): array => BusinessCustomer::query()->orderBy('business_id')->get()
         ->map(fn (BusinessCustomer $row): array => [$row->business_id, $row->user_id, $row->visits])->all());
 
     $this->artisan('punchcard:customers:summarise', ['--business' => $this->tenants->a2->id])->assertSuccessful();
     expect($rows())->toBe([[$this->tenants->a2->id, $this->customer->id, 1]]);
 
-    $this->artisan('punchcard:customers:summarise')->expectsOutput('Summarised 3 customers.')->assertSuccessful();
+    $this->artisan('punchcard:customers:summarise')->expectsOutput(trans_choice(':count customer summarised.|:count customers summarised.', 3))->assertSuccessful();
     expect($rows())->toBe([
         [$this->tenants->a1->id, $this->customer->id, 2],
         [$this->tenants->a2->id, $this->customer->id, 1],
