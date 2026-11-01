@@ -1,5 +1,12 @@
 import { usePage } from '@inertiajs/react';
-import { CreditCard, LayoutGrid, Nfc, Stamp, Users } from 'lucide-react';
+import {
+    CreditCard,
+    LayoutGrid,
+    Megaphone,
+    Nfc,
+    Stamp,
+    Users,
+} from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { TenantSwitcher } from '@/components/tenant-switcher';
@@ -10,6 +17,7 @@ import {
     SidebarHeader,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as campaigns } from '@/routes/campaigns';
 import { index as cards } from '@/routes/cards';
 import { show as counter } from '@/routes/counter';
 import { index as staff } from '@/routes/staff';
@@ -28,6 +36,12 @@ const cardsNavItem: NavItem = {
     title: 'Cards',
     href: cards(),
     icon: CreditCard,
+};
+
+const campaignsNavItem: NavItem = {
+    title: 'Campaigns',
+    href: campaigns(),
+    icon: Megaphone,
 };
 
 const counterNavItem: NavItem = {
@@ -54,6 +68,7 @@ export function AppSidebar() {
         ...mainNavItems,
         ...(nav.counter ? [counterNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
+        ...(nav.campaigns ? [campaignsNavItem] : []),
         ...(nav.stampers ? [stampersNavItem] : []),
         ...(nav.staff ? [staffNavItem] : []),
     ];

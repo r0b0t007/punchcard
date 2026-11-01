@@ -15,12 +15,13 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
-            /** The sidebar's pages the user may open: cards (CHW-32), staff (CHW-146), counter mode (CHW-29), stampers (CHW-36). */
+            /** The sidebar's pages the user may open: cards (CHW-32), staff (CHW-146), counter mode (CHW-29), stampers (CHW-36), campaigns (CHW-42). */
             nav: {
                 cards: boolean;
                 staff: boolean;
                 counter: boolean;
                 stampers: boolean;
+                campaigns: boolean;
             };
             /** The platform admin signed in as this owner (CHW-144): read-only until endsAt. */
             impersonating: {

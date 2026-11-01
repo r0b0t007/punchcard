@@ -1021,5 +1021,20 @@
     "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "على iPhone، تصل الإشعارات عبر punchcard على الشاشة الرئيسية. أضفه ثم فعّلها من هناك.",
     "You have sent :max campaigns in 7 days. The next one can go from :date.": "أرسلت :max حملات خلال 7 أيام. يمكن إرسال التالية ابتداءً من :date.",
     "Sent to :count person.|Sent to :count people.": "لم تُرسل إلى أحد.|أُرسلت إلى شخص واحد.|أُرسلت إلى شخصين.|أُرسلت إلى :count أشخاص.|أُرسلت إلى :count شخصًا.|أُرسلت إلى :count شخص.",
-    "Nobody in this audience has notifications on a phone yet.": "لم يفعّل أحد في هذه الفئة الإشعارات على هاتف بعد."
+    "Nobody in this audience has notifications on a phone yet.": "لم يفعّل أحد في هذه الفئة الإشعارات على هاتف بعد.",
+    "Campaigns": "الحملات",
+    ":left of :max campaigns left this week.": "تبقّى :left من :max حملات هذا الأسبوع.",
+    "No campaigns yet": "لا حملات بعد",
+    "Send your followers an offer to fill a slow day. They only get it if they follow you for offers.": "أرسل عرضًا إلى متابعيك لملء يوم هادئ. لا يصل إلا إلى من يتابعك للعروض.",
+    "Campaign": "الحملة",
+    "Who": "من",
+    "All followers": "كل المتابعين",
+    "Not seen in 14 days": "لم يزوروا منذ 14 يومًا",
+    "Top 10": "أفضل 10",
+    "Sending": "جارٍ الإرسال",
+    "Canceled": "أُلغيت",
+    ":date, :time": ":date، :time",
+    "Sent today :time": "أُرسلت اليوم :time",
+    "Sent :date": "أُرسلت :date",
+    ":count person|:count people": "لا أحد|شخص واحد|شخصان|:count أشخاص|:count شخصًا|:count شخص"
 }

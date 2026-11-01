@@ -6,23 +6,36 @@ namespace App\Http\Controllers;
 
 use App\Actions\Campaigns\CampaignRefused;
 use App\Actions\Campaigns\CreateCampaign;
+use App\Actions\Campaigns\DescribeCampaigns;
 use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
+use App\Models\Campaign;
 use App\Models\User;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Campaigns (CHW-42, B9), whoever runs the business's (owner or org admin),
  * never its staff's:
  *
+ * - GET /business/campaigns: its latest campaigns, and how many of the
+ *   week's are left (DescribeCampaigns);
  * - POST /business/campaigns: a notification to an audience of its
  *   followers, now (CreateCampaign), within its weekly limit.
- *
- * The composer and the campaigns page come with the next part of CHW-42.
  */
 final class CampaignController extends Controller
 {
+    public function index(TenantContext $context, DescribeCampaigns $describeCampaigns): Response
+    {
+        $business = $context->business() ?? abort(403);
+        Gate::authorize('viewAny', [Campaign::class, $business]);
+
+        return Inertia::render('business/campaigns/index', $describeCampaigns->handle($business));
+    }
+
     public function store(StoreCampaignRequest $request, CreateCampaign $createCampaign): RedirectResponse
     {
         /** @var Business $business authorized by the request */
@@ -38,6 +51,6 @@ final class CampaignController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => trans_choice('Sent to :count person.|Sent to :count people.', $campaign->audience_count)]);
 
-        return to_route('dashboard');
+        return to_route('campaigns.index');
     }
 }

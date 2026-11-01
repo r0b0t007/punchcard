@@ -1021,5 +1021,20 @@
     "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "Sur iPhone, les notifications passent par punchcard sur l’écran d’accueil. Ajoutez-le, puis activez-les depuis là.",
     "You have sent :max campaigns in 7 days. The next one can go from :date.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir dès le :date.",
     "Sent to :count person.|Sent to :count people.": "Envoyée à :count personne.|Envoyée à :count personnes.",
-    "Nobody in this audience has notifications on a phone yet.": "Personne dans cette audience n’a encore activé les notifications sur un téléphone."
+    "Nobody in this audience has notifications on a phone yet.": "Personne dans cette audience n’a encore activé les notifications sur un téléphone.",
+    "Campaigns": "Campagnes",
+    ":left of :max campaigns left this week.": "Encore :left campagnes sur :max cette semaine.",
+    "No campaigns yet": "Aucune campagne",
+    "Send your followers an offer to fill a slow day. They only get it if they follow you for offers.": "Envoyez une offre à vos abonnés pour remplir un jour calme. Seuls ceux qui vous suivent pour vos offres la reçoivent.",
+    "Campaign": "Campagne",
+    "Who": "Qui",
+    "All followers": "Tous les abonnés",
+    "Not seen in 14 days": "Pas vus depuis 14 jours",
+    "Top 10": "Top 10",
+    "Sending": "Envoi en cours",
+    "Canceled": "Annulée",
+    ":date, :time": ":date, :time",
+    "Sent today :time": "Envoyée aujourd’hui :time",
+    "Sent :date": "Envoyée le :date",
+    ":count person|:count people": ":count personne|:count personnes"
 }
