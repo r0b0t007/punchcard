@@ -1104,5 +1104,21 @@
     "No customers yet": "Aucun client pour l’instant",
     "No one here yet": "Personne ici pour l’instant",
     "Search looks at first names. Try fewer letters, or another tab.": "La recherche porte sur les prénoms. Essayez moins de lettres, ou un autre onglet.",
-    "Customers appear here after their first stamp: a tap, a scan of their QR, or a stamp added by hand.": "Vos clients apparaissent ici après leur premier tampon : en touchant le tampon, en scannant leur QR, ou ajouté à la main."
+    "Customers appear here after their first stamp: a tap, a scan of their QR, or a stamp added by hand.": "Vos clients apparaissent ici après leur premier tampon : en touchant le tampon, en scannant leur QR, ou ajouté à la main.",
+    "At this business, newest first": "Ici, les plus récents d’abord",
+    "Nothing here yet.": "Rien ici pour l’instant.",
+    "Show older": "Voir plus ancien",
+    "Usually": "D’habitude",
+    "every :count day|every :count days": "tous les :count jours|tous les :count jours",
+    "Every reward earned.": "Toutes les récompenses obtenues.",
+    ":count more stamp to :reward.|:count more stamps to :reward.": "Encore :count tampon avant :reward.|Encore :count tampons avant :reward.",
+    ":reward redeemed": ":reward utilisé",
+    "+:count stamp, added by hand|+:count stamps, added by hand": "+:count tampon, ajouté à la main|+:count tampons, ajoutés à la main",
+    "−:count stamp, taken back|−:count stamps, taken back": "−:count tampon, repris|−:count tampons, repris",
+    "+:count bonus stamp|+:count bonus stamps": "+:count tampon offert|+:count tampons offerts",
+    "+:count stamp|+:count stamps": "+:count tampon|+:count tampons",
+    ":staff scanned their QR, :location": ":staff a scanné son QR, :location",
+    "with their own tap, :location": "en touchant le tampon, :location",
+    "tap at the stamper, :location": "touché au tampon, :location",
+    ":staff, :location": ":staff, :location"
 }

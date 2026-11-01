@@ -1104,5 +1104,21 @@
     "No customers yet": "لا عملاء بعد",
     "No one here yet": "لا أحد هنا بعد",
     "Search looks at first names. Try fewer letters, or another tab.": "البحث يشمل الأسماء الأولى. جرّب حروفًا أقل، أو تبويبًا آخر.",
-    "Customers appear here after their first stamp: a tap, a scan of their QR, or a stamp added by hand.": "يظهر العملاء هنا بعد أول ختم لهم: بلمس جهاز الختم، أو بمسح رمز QR الخاص بهم، أو بختم يُضاف يدويًا."
+    "Customers appear here after their first stamp: a tap, a scan of their QR, or a stamp added by hand.": "يظهر العملاء هنا بعد أول ختم لهم: بلمس جهاز الختم، أو بمسح رمز QR الخاص بهم، أو بختم يُضاف يدويًا.",
+    "At this business, newest first": "هنا، الأحدث أولًا",
+    "Nothing here yet.": "لا شيء هنا بعد.",
+    "Show older": "عرض الأقدم",
+    "Usually": "عادةً",
+    "every :count day|every :count days": "كل يوم|كل يوم|كل يومين|كل :count أيام|كل :count يومًا|كل :count يوم",
+    "Every reward earned.": "حصل على كل المكافآت.",
+    ":count more stamp to :reward.|:count more stamps to :reward.": "لا أختام أخرى قبل :reward.|بقي ختم واحد قبل :reward.|بقي ختمان قبل :reward.|بقيت :count أختام قبل :reward.|بقي :count ختمًا قبل :reward.|بقي :count ختم قبل :reward.",
+    ":reward redeemed": "استُبدل :reward",
+    "+:count stamp, added by hand|+:count stamps, added by hand": "⁦+:count⁩ ختم، أضيف يدويًا|⁦+:count⁩ ختم، أضيف يدويًا|⁦+:count⁩ ختم، أضيفا يدويًا|⁦+:count⁩ أختام، أضيفت يدويًا|⁦+:count⁩ ختمًا، أضيفت يدويًا|⁦+:count⁩ ختم، أضيفت يدويًا",
+    "−:count stamp, taken back|−:count stamps, taken back": "⁦−:count⁩ ختم، استُرجع|⁦−:count⁩ ختم، استُرجع|⁦−:count⁩ ختم، استُرجعا|⁦−:count⁩ أختام، استُرجعت|⁦−:count⁩ ختمًا، استُرجعت|⁦−:count⁩ ختم، استُرجعت",
+    "+:count bonus stamp|+:count bonus stamps": "⁦+:count⁩ ختم مجاني|⁦+:count⁩ ختم مجاني|⁦+:count⁩ ختم مجاني|⁦+:count⁩ أختام مجانية|⁦+:count⁩ ختمًا مجانيًا|⁦+:count⁩ ختم مجاني",
+    "+:count stamp|+:count stamps": "⁦+:count⁩ ختم|⁦+:count⁩ ختم|⁦+:count⁩ ختم|⁦+:count⁩ أختام|⁦+:count⁩ ختمًا|⁦+:count⁩ ختم",
+    ":staff scanned their QR, :location": "مسح :staff رمز QR الخاص به، :location",
+    "with their own tap, :location": "بلمس جهاز الختم، :location",
+    "tap at the stamper, :location": "لمس جهاز الختم، :location",
+    ":staff, :location": ":staff، :location"
 }
