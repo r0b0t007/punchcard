@@ -83,7 +83,7 @@ it('keeps what a campaign said, to whom and from whom, and the campaign itself, 
     'its audience' => ['segment', 'top_10'],
     'its card' => ['card_id', null],
     'its author' => ['created_by', null],
-    'its idempotency key' => ['idempotency_key', 'a7d1c3e2-5f4b-4c8d-9e0a-1b2c3d4e5f60'],
+    'its idempotency key' => ['idempotency_key', 'another key'],
 ]);
 
 it('never deletes a campaign, even in bypass()', function (): void {

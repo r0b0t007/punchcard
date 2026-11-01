@@ -7,3 +7,7 @@ c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:gene
 c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:213
 c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:224
 c67a07ddaf5756d21c9184d7137367f87710ecdd:tests/Unit/Nfc/SunVerifierTest.php:generic-api-key:236
+
+# A made-up UUID standing for an idempotency key in a test, in one commit of PR #146 (CHW-42);
+# the next commit replaced it with a plain string. Tied to that commit only.
+0cb2801dd83702eb9169b750fbef946407e49d34:tests/Feature/Tenancy/CampaignTest.php:generic-api-key:86
