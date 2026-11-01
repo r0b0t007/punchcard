@@ -7,6 +7,7 @@ use App\Actions\Campaigns\DescribeAudience;
 use App\Enums\CampaignSegment;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\LoyaltyCard;
 use App\Models\User;
@@ -47,7 +48,7 @@ beforeEach(function (): void {
         return $customer;
     };
     $this->visit = fn (Business $at, int $daysAgo = 1, int $qty = 1, StampSource $source = StampSource::Qr): array => [$at, $daysAgo, $qty, $source];
-    $this->audience = fn (Business $business, CampaignSegment $segment = CampaignSegment::All): array => app(CampaignAudience::class)->handle($business, $segment);
+    $this->audience = fn (Business $business, CampaignSegment $segment = CampaignSegment::All): array => app(CampaignAudience::class)->handle($business)[$segment->value];
 });
 
 it('reaches the organization\'s followers who came in to this business, and nobody else', function (): void {
@@ -77,9 +78,13 @@ it('reaches the followers not seen here in 14 days or more, by this business\'s 
     $fourteen = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 14)]);
     $thirteen = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 13)]);
     $quietHereBusyThere = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 30), ($this->visit)($this->tenants->a2, 1)]);
-    $cameBack = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 30), ($this->visit)($a1, 2)]);
+    $cameBack = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 30, 2), ($this->visit)($a1, 2)]);
+    // A correction today is the staff's, not a visit: still not seen in 30 days.
+    $correctedToday = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 30, 2)]);
+    $enrollment = app(TenantContext::class)->bypass(fn (): CardEnrollment => CardEnrollment::query()->where('user_id', $correctedToday->id)->sole());
+    $this->tenants->stamp($enrollment, $a1, ['qty' => -1, 'source' => StampSource::Correction, 'reason' => 'Given by mistake']);
 
-    expect(($this->audience)($a1, CampaignSegment::Quiet))->toBe([$fourteen->id, $quietHereBusyThere->id]);
+    expect(($this->audience)($a1, CampaignSegment::Quiet))->toBe([$fourteen->id, $quietHereBusyThere->id, $correctedToday->id]);
 });
 
 it('reaches the 10 followers with the most stamps here in 90 days, the latest first among equals', function (): void {
@@ -89,6 +94,10 @@ it('reaches the 10 followers with the most stamps here in 90 days, the latest fi
     $tiedLater = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 4, 2)]);
     $longAgo = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 91, 50)]);
     $elsewhere = ($this->customer)($this->tenants->cardA, [($this->visit)($this->tenants->a2, 1, 50), ($this->visit)($a1, 1, 1)]);
+    // 30 stamps given here by mistake, 29 of them taken back with a correction: 1, below everyone above.
+    $corrected = ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 2, 30)]);
+    $enrollment = app(TenantContext::class)->bypass(fn (): CardEnrollment => CardEnrollment::query()->where('user_id', $corrected->id)->sole());
+    $this->tenants->stamp($enrollment, $a1, ['qty' => -29, 'source' => StampSource::Correction, 'reason' => 'Given by mistake']);
 
     expect(($this->audience)($a1, CampaignSegment::Top))->toBe([...$regulars->pluck('id')->all(), $tiedLater->id]);
 });

@@ -23,7 +23,8 @@ use LogicException;
  * A notification a business's owner sends its followers (CHW-42, B9): site
  * data, so a franchisee sees its own, the org admin the organization's. The
  * owner creates it, scheduled (CreateCampaign); its status and counts are its
- * delivery's (DeliverCampaign), in bypass(). Never deleted.
+ * delivery's (DeliverCampaign), in bypass(). What it says, to whom and from
+ * whom never changes, and it is never deleted, even in bypass().
  *
  * @property int $id
  * @property int $organization_id
@@ -54,6 +55,9 @@ class Campaign extends Model implements TenantModel
     /** @use HasFactory<CampaignFactory> */
     use HasFactory;
 
+    /** What a campaign says, to whom and from whom: never changed once created, even in bypass(). */
+    public const array SENT_AS = ['title', 'body', 'card_id', 'segment', 'created_by', 'idempotency_key'];
+
     /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
     protected $attributes = ['status' => 'scheduled', 'audience_count' => 0, 'sent_count' => 0, 'open_count' => 0];
 
@@ -71,29 +75,34 @@ class Campaign extends Model implements TenantModel
             return;
         }
 
-        $status = $values['status'] ?? CampaignStatus::Scheduled->value;
         $unsent = ($values['sent_at'] ?? null) === null && (int) ($values['sent_count'] ?? 0) === 0 && (int) ($values['open_count'] ?? 0) === 0;
 
-        if (($status instanceof CampaignStatus ? $status : CampaignStatus::tryFrom((string) $status)) !== CampaignStatus::Scheduled || ! $unsent) {
+        if (CampaignStatus::tryFrom((string) ($values['status'] ?? '')) !== CampaignStatus::Scheduled || ! $unsent) {
             throw new LogicException('A campaign is created scheduled and unsent; its status and what was sent move with its delivery, in TenantContext::bypass().');
         }
     }
 
     /**
-     * Sent words stay as they were sent, and the counts are its delivery's.
+     * Kept, even in bypass(), with its words, audience, card and author as
+     * they were sent (results, B10, read them back). Only its delivery moves
+     * the rest (status, when, counts), in bypass().
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values
      */
     public function assertTenantWrite(string $operation, array $values): void
     {
-        if (app(TenantContext::class)->isBypassed()) {
-            return;
+        if ($operation === 'delete') {
+            throw new LogicException('A campaign is kept: a scheduled one is canceled.');
         }
 
-        throw new LogicException($operation === 'delete'
-            ? 'A campaign is kept: a scheduled one is canceled, in TenantContext::bypass().'
-            : 'A campaign changes with its delivery only, in TenantContext::bypass().');
+        if (array_intersect_key($values, array_flip(self::SENT_AS)) !== []) {
+            throw new LogicException('A campaign keeps what it says, to whom and from whom: '.implode(', ', self::SENT_AS).' never change.');
+        }
+
+        if (! app(TenantContext::class)->isBypassed()) {
+            throw new LogicException('A campaign changes with its delivery only, in TenantContext::bypass().');
+        }
     }
 
     /**
