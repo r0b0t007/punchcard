@@ -10,6 +10,8 @@ use App\Actions\Tenancy\CreateIndependentBusiness;
 use App\Enums\BusinessCategory;
 use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
+use App\Enums\CampaignSegment;
+use App\Enums\CampaignStatus;
 use App\Enums\CardMode;
 use App\Enums\OrganizationRole;
 use App\Enums\OrganizationType;
@@ -17,6 +19,7 @@ use App\Enums\RewardStatus;
 use App\Enums\RewardType;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\Campaign;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
@@ -111,6 +114,7 @@ final class DemoSeeder extends Seeder
 
                 $this->program(...$cafe);
                 $this->program(...$franchise);
+                $this->campaigns();
 
                 foreach ($this->tagCounters as $tagId => $counter) {
                     NfcTag::query()->whereKey($tagId)->update(['last_counter' => $counter]);
@@ -348,6 +352,33 @@ final class DemoSeeder extends Seeder
         $location = $this->location($business, "Atlas {$city}", "Boulevard Mohammed V, {$city}");
 
         return [$business, $this->stamper($business, $location, 'Counter'), $owner];
+    }
+
+    /**
+     * Two campaigns Café Hafa sent (CHW-42), for its Campaigns page: one this
+     * week, one the week before.
+     */
+    private function campaigns(): void
+    {
+        $business = Business::query()->where('name', 'Café Hafa')->sole();
+
+        foreach ([
+            ['Slow Tuesday?', 'Two stamps for every coffee until 4 pm today. See you soon!', CampaignSegment::Quiet, 2, 6],
+            ['Rainy day tea', 'Mint tea on the house with any pastry, while it rains.', CampaignSegment::Top, 9, 10],
+        ] as [$title, $body, $segment, $daysAgo, $people]) {
+            (new Campaign)->forceFill([
+                'business_id' => $business->id,
+                'idempotency_key' => $this->faker->uuid(),
+                'title' => $title,
+                'body' => $body,
+                'segment' => $segment,
+                'status' => CampaignStatus::Sent,
+                'send_at' => now()->subDays($daysAgo)->setTime(10, 2),
+                'sent_at' => now()->subDays($daysAgo)->setTime(10, 2, 30),
+                'audience_count' => $people,
+                'sent_count' => $people,
+            ])->save();
+        }
     }
 
     /**

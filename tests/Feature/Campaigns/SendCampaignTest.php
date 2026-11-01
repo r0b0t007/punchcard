@@ -69,7 +69,7 @@ it('sends the business\'s followers with a phone a notification titled with its 
     $reached = ($this->follower)();
     $noPhone = ($this->follower)(phone: false);
 
-    ($this->send)()->assertRedirect(route('dashboard'))->assertSessionHasNoErrors();
+    ($this->send)()->assertRedirect(route('campaigns.index'))->assertSessionHasNoErrors();
 
     $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::query()->sole());
     expect($campaign->only(['business_id', 'organization_id', 'created_by', 'audience_count']))->toBe([
@@ -105,7 +105,7 @@ it('makes one campaign of a double tap on Send', function (): void {
     $key = (string) Str::uuid();
 
     ($this->send)(['idempotency_key' => $key])->assertSessionHasNoErrors();
-    ($this->send)(['idempotency_key' => $key])->assertRedirect(route('dashboard'))->assertSessionHasNoErrors();
+    ($this->send)(['idempotency_key' => $key])->assertRedirect(route('campaigns.index'))->assertSessionHasNoErrors();
 
     expect(app(TenantContext::class)->bypass(fn (): int => Campaign::query()->count()))->toBe(1);
     Notification::assertSentToTimes($reached, CampaignMessage::class, 1);

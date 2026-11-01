@@ -97,9 +97,10 @@ above: keep the two in step.
 | A tab left on another business: the notice as soon as another tab switches, and the toast when a save is refused (10f-2, CHW-147)                                                                                                                | `Punchcard Stale Tab Review.dc.html`                                  |
 | Notifications on this phone: the ask under a reward unlocked (C3) and a place just followed (C6), its iPhone Safari pointer (11a), Settings' Notifications (C12) with the phone's states (11c), and the reward-ready notification (11d) (CHW-41) | `Punchcard Push Review.dc.html`                                       |
 | B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                                                                                                                                         | `BA Stampers.dc.html`                                                 |
+| B9 campaigns: the composer (12a), the Campaigns page and its states (12c), the notification on a lock screen (12d) (CHW-42)                                                                                                                      | `Punchcard Campaigns Review.dc.html`                                  |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.
 
-Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8–B11, B14–B19, M1. Filament (A1–A4) stays
+Not designed yet (design with their issue): C7, C8, C11, C14, B4, B5, B8, B10, B11, B14–B19, M1. Filament (A1–A4) stays
 stock.
