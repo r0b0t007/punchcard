@@ -55,6 +55,11 @@ return [
         'max_per_tap' => 10,
     ],
 
+    'campaigns' => [
+        // A business's campaigns in any 7 days (CHW-42, CampaignLimit), so its followers keep wanting to hear from it.
+        'per_week' => (int) env('CAMPAIGNS_PER_WEEK', 3),
+    ],
+
     'privacy' => [
         // The inactivity rule (CHW-58, docs/privacy/retention.md): an account unused this long is deleted, or anonymised
         // when it has history. Its owner is emailed this many days before, and always gets that long to sign in.

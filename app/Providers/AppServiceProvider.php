@@ -249,6 +249,9 @@ class AppServiceProvider extends ServiceProvider
         // Staff invitations (CHW-146): each mails an address, so a few an hour per owner.
         RateLimiter::for('staff-invite', fn (Request $request): Limit => Limit::perHour(20)->by('staff-invite:'.$request->user()?->getAuthIdentifier()));
 
+        // Campaigns (CHW-42): the weekly limit is the business's (CampaignLimit); this only stops a stream of posts.
+        RateLimiter::for('campaign-send', fn (Request $request): Limit => Limit::perHour(20)->by('campaign-send:'.$request->user()?->getAuthIdentifier()));
+
         // Verification documents (CHW-145): a few tries per document, never a stream of 10 MB files.
         RateLimiter::for('verification-upload', fn (Request $request): Limit => Limit::perHour(20)->by('verification-upload:'.$request->user()?->getAuthIdentifier()));
 

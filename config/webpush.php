@@ -31,7 +31,9 @@ return [
     // The app's own connection.
     'database_connection' => null,
 
-    'client_options' => [],
+    // Guzzle's, for each push service: a slow one gives up after 5 seconds, so a campaign's batch
+    // (DeliverCampaign::BATCH) stays inside its job's timeout, and a reward push never hangs a worker.
+    'client_options' => ['timeout' => 5],
 
     'automatic_padding' => env('WEBPUSH_AUTOMATIC_PADDING', true),
 

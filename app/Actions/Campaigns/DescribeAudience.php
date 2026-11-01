@@ -42,12 +42,14 @@ final readonly class DescribeAudience
     }
 
     /**
-     * Those of them with a phone with notifications on; nobody without the app's VAPID key.
+     * Those of them with a phone with notifications on, by id; nobody without
+     * the app's VAPID key. Who a campaign is counted for, and sent to
+     * (DeliverCampaign).
      *
      * @param  list<int>  $ids
      * @return list<int>
      */
-    private static function withPhone(array $ids): array
+    public static function withPhone(array $ids): array
     {
         if (PushKey::public() === null) {
             return [];
@@ -57,7 +59,7 @@ final readonly class DescribeAudience
 
         // In chunks: a big organization's followers would pass a database's bound parameters.
         foreach (array_chunk($ids, 1000) as $chunk) {
-            foreach (User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->pluck('id') as $id) {
+            foreach (User::query()->whereKey($chunk)->whereHas('pushSubscriptions')->orderBy('id')->pluck('id') as $id) {
                 $found[] = (int) $id;
             }
         }
