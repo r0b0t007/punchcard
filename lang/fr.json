@@ -1018,5 +1018,7 @@
     "Get a notification on this phone when you unlock one, wherever you got the stamp.": "Recevez une notification sur ce téléphone quand vous en débloquez une, où que vous ayez eu le tampon.",
     "Get :business's offers on this phone?": "Recevoir les offres de :business sur ce téléphone ?",
     "As notifications. You can stop them any time in Settings.": "En notifications. Vous pouvez les arrêter à tout moment dans les Paramètres.",
-    "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "Sur iPhone, les notifications passent par punchcard sur l’écran d’accueil. Ajoutez-le, puis activez-les depuis là."
+    "On iPhone, notifications come through punchcard on your home screen. Add it, then turn them on there.": "Sur iPhone, les notifications passent par punchcard sur l’écran d’accueil. Ajoutez-le, puis activez-les depuis là.",
+    "You have sent :max campaigns in 7 days. The next one can go from :date.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir dès le :date.",
+    "Sent to :count person.|Sent to :count people.": "Envoyée à :count personne.|Envoyée à :count personnes."
 }
