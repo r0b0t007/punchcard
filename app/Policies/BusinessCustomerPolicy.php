@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Models\Business;
-use App\Models\BusinessCustomer;
 use App\Models\User;
 use App\Policies\Concerns\ReadsTenant;
 
@@ -17,10 +16,5 @@ final class BusinessCustomerPolicy
     public function viewAny(User $user, Business $business): bool
     {
         return $this->runs($business->organization_id, $business->id);
-    }
-
-    public function view(User $user, BusinessCustomer $customer): bool
-    {
-        return $this->runs($customer->organization_id, $customer->business_id);
     }
 }

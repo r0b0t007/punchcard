@@ -148,7 +148,7 @@ it('keeps a franchisee\'s figures, stamps and customers to its own business', fu
             ->where('stats.kpis.activeCustomers.value', 1)
             ->where('stats.kpis.rewardsRedeemed.value', 0)
             ->has('stats.recentStamps', 1)
-            ->where('stats.recentStamps.0.customer', $both->user->name)
+            ->where('stats.recentStamps.0.customer', $both->user->shortName())
             ->has('stats.topCustomers', 1)
             ->where('stats.topCustomers.0.name', $both->user->shortName()));
 
@@ -182,7 +182,7 @@ it('lists the latest stamps here, newest first, corrections included', function 
     $recent = ($this->stats)($this->tenants->b1)['recentStamps'];
 
     expect($recent)->toHaveCount(2)
-        ->and($recent[0])->toMatchArray(['customer' => $customer->user->name, 'source' => 'correction', 'sourceLabel' => 'Correction', 'qty' => -1, 'location' => 'B1 site'])
+        ->and($recent[0])->toMatchArray(['customer' => $customer->user->shortName(), 'source' => 'correction', 'sourceLabel' => 'Correction', 'qty' => -1, 'location' => 'B1 site'])
         ->and($recent[0]['at'])->toBe(['day' => 'other', 'date' => '2026-10-10', 'time' => '11:00'])
         ->and($recent[1]['qty'])->toBe(1);
 });

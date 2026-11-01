@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Contact, Search } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,11 +53,11 @@ export default function Customers({
 }) {
     const { t } = useTranslation();
     const [search, setSearch] = useState(q ?? '');
-    const typed = useRef(false);
 
-    // Looks the name up shortly after typing stops, staying on the tab.
+    // Looks the name up shortly after typing stops, staying on the tab; only when it differs from the one shown,
+    // so switching tabs or pages never searches again.
     useEffect(() => {
-        if (!typed.current) {
+        if (search.trim() === (q ?? '')) {
             return;
         }
 
@@ -70,7 +70,7 @@ export default function Customers({
         }, 300);
 
         return () => window.clearTimeout(timer);
-    }, [search, segment]);
+    }, [search, segment, q]);
 
     return (
         <>
@@ -91,10 +91,7 @@ export default function Customers({
                     <Input
                         type="search"
                         value={search}
-                        onChange={(event) => {
-                            typed.current = true;
-                            setSearch(event.target.value);
-                        }}
+                        onChange={(event) => setSearch(event.target.value)}
                         placeholder={t('Search by first name')}
                         aria-label={t('Search by first name')}
                         maxLength={60}
@@ -137,10 +134,7 @@ export default function Customers({
                 </nav>
 
                 {customers.length === 0 ? (
-                    <Empty
-                        searching={search.trim() !== ''}
-                        none={counts.all === 0}
-                    />
+                    <Empty searching={q !== null} none={counts.all === 0} />
                 ) : (
                     <>
                         <div className="overflow-hidden rounded-card border bg-card">

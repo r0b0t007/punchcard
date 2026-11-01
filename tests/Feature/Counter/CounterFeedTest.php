@@ -99,12 +99,12 @@ it('refreshes the feed with the stampers on a poll', function (): void {
         ->reloadOnly(['stampers', 'feed'], fn (Assert $reload): Assert => $reload->where('feed.0.customer', 'Salma')));
 });
 
-it('keeps full names on the owner\'s dashboard feed', function (): void {
+it('names customers by first name and initial on the dashboard feed of the owner (CHW-44)', function (): void {
     $owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
     ($this->stampFor)('Salma Tazi', $this->tenants->a1);
 
     ($this->as)($owner)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('stats.recentStamps.0.customer', 'Salma Tazi')
+        ->where('stats.recentStamps.0.customer', 'Salma T.')
         ->where('stats.recentStamps.0.card', 'A card'));
 });
 

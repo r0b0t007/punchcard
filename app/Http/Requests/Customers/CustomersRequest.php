@@ -58,6 +58,6 @@ class CustomersRequest extends FormRequest
 
     public function page(): int
     {
-        return max(1, $this->integer('page', 1));
+        return $this->integer('page', 1);
     }
 }

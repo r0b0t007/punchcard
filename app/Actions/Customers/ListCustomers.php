@@ -27,16 +27,20 @@ final readonly class ListCustomers
     public const int PER_PAGE = 25;
 
     /**
-     * Who is called that: a first name starts the name. % and _ are letters
-     * there, not patterns, so what only they make up matches no one.
+     * Who is called that: a first name starts the name. %, _ and \ are
+     * ignored, never patterns, so what only they make up matches no one.
      *
-     * @return Builder<User>|list<int>
+     * Looked up on this business's customers only, never the platform's users.
+     *
+     * @param  Builder<BusinessCustomer>  $query
      */
-    private function named(string $search): Builder|array
+    private function named(Builder $query, string $search): void
     {
         $letters = str_replace(['%', '_', '\\'], '', $search);
 
-        return $letters === '' ? [] : User::query()->select('id')->whereLike('name', $letters.'%');
+        $letters === ''
+            ? $query->whereKey([])
+            : $query->whereHas('user', fn (Builder $user) => $user->whereLike('name', $letters.'%'));
     }
 
     /**
@@ -57,18 +61,20 @@ final readonly class ListCustomers
             $counts[$each->value] = $ofBusiness()->inSegment($each, $now)->count();
         }
 
-        $customers = $ofBusiness()
+        $tab = fn () => $ofBusiness()
             ->inSegment($segment, $now)
-            ->when($search !== null, fn ($query) => $query->whereIn('user_id', $this->named((string) $search)))
+            ->when($search !== null, fn (\Illuminate\Database\Eloquent\Builder $query) => $this->named($query, (string) $search))
             ->orderByDesc($segment === CustomerSegment::New ? 'first_visit_at' : 'last_visit_at')
-            ->orderByDesc('id')
-            ->paginate(self::PER_PAGE, page: $page);
+            ->orderByDesc('id');
+        $customers = $tab()->paginate(self::PER_PAGE, page: $page);
+
+        // Past the last page (an old link, customers moved on): the last page.
+        if ($customers->total() > 0 && $customers->currentPage() > $customers->lastPage()) {
+            $customers = $tab()->paginate(self::PER_PAGE, page: $customers->lastPage());
+        }
         $names = User::query()->whereKey($customers->getCollection()->pluck('user_id')->all())->get(['id', 'name'])
             ->mapWithKeys(fn (User $user): array => [$user->id => (string) $user->shortName()]);
         $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
-        // Calendar days between the dates, in the business's time: a clock change's 23 or 25 hours are still a day.
-        $daysSince = fn (CarbonImmutable $at): int => (int) CarbonImmutable::parse($at->setTimezone($timezone)->format('Y-m-d'))
-            ->diffInDays(CarbonImmutable::parse($now->setTimezone($timezone)->format('Y-m-d')));
 
         return [
             'segment' => $segment->value,
@@ -78,7 +84,7 @@ final readonly class ListCustomers
                 'id' => $customer->id,
                 'name' => (string) $names->get($customer->user_id, ''),
                 'visits' => $customer->visits,
-                'lastVisitDays' => $daysSince($customer->last_visit_at->toImmutable()),
+                'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
                 'status' => $customer->status($now)->value,
             ])->all()),

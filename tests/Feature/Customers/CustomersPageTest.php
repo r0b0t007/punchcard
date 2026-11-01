@@ -120,6 +120,16 @@ it('shows 25 a page', function (): void {
         ->where('page', ['current' => 2, 'last' => 2, 'from' => 26, 'to' => 26, 'total' => 26]));
 });
 
+it('shows the last page for a page past it', function (): void {
+    foreach (range(1, ListCustomers::PER_PAGE + 1) as $day) {
+        ($this->customer)('Customer '.$day, ['last_visit_at' => now()->subDays($day)]);
+    }
+
+    ($this->open)(['page' => 5])->assertInertia(fn (Assert $page): Assert => $page
+        ->has('customers', 1)
+        ->where('page.current', 2));
+});
+
 it('refuses a tab it does not know', function (): void {
     ($this->open)(['segment' => 'everyone'])->assertSessionHasErrors('segment');
 });
