@@ -1059,5 +1059,6 @@
     "Send to :count person|Send to :count people": "لا أحد للإرسال إليه|أرسل إلى شخص واحد|أرسل إلى شخصين|أرسل إلى :count أشخاص|أرسل إلى :count شخصًا|أرسل إلى :count شخص",
     "Send to :count person now?|Send to :count people now?": "الإرسال إلى لا أحد؟|إرسال إلى شخص واحد الآن؟|إرسال إلى شخصين الآن؟|إرسال إلى :count أشخاص الآن؟|إرسال إلى :count شخصًا الآن؟|إرسال إلى :count شخص الآن؟",
     ":audience, at :business. A notification can’t be taken back once sent.": ":audience، في :business. لا يمكن استرجاع الإشعار بعد إرساله.",
-    "Send now": "أرسل الآن"
+    "Send now": "أرسل الآن",
+    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "أرسلت :max حملات خلال 7 أيام. يمكن إرسال التالية اليوم على الساعة :time."
 }

@@ -1059,5 +1059,6 @@
     "Send to :count person|Send to :count people": "Envoyer à :count personne|Envoyer à :count personnes",
     "Send to :count person now?|Send to :count people now?": "Envoyer à :count personne maintenant ?|Envoyer à :count personnes maintenant ?",
     ":audience, at :business. A notification can’t be taken back once sent.": ":audience, chez :business. Une notification envoyée ne peut pas être reprise.",
-    "Send now": "Envoyer"
+    "Send now": "Envoyer",
+    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir aujourd’hui à :time."
 }

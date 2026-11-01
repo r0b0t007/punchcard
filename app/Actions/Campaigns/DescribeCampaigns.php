@@ -47,7 +47,7 @@ final readonly class DescribeCampaigns
                     'at' => LocalMoment::of($campaign->send_at, $timezone),
                     'people' => $campaign->audience_count,
                 ])->all()),
-            'left' => max(0, $limit['max'] - $limit['used']),
+            'left' => $limit['left'],
             'max' => $limit['max'],
         ];
     }

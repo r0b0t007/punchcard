@@ -55,6 +55,14 @@ test('the owner composes a campaign and sees it on a lock screen; nobody to send
         'aria-checked',
         'true',
     );
+    // A radio group: the arrow keys move the choice, and the focus with it.
+    await page.keyboard.press('ArrowLeft');
+    await expect(
+        page.locator('[data-test="audience-quiet_14d"]'),
+    ).toHaveAttribute('aria-checked', 'true');
+    await expect(
+        page.locator('[data-test="audience-quiet_14d"]'),
+    ).toBeFocused();
     await page.locator('#title').fill('Slow Tuesday?');
     await page.locator('#body').fill('Two stamps for every coffee until 4 pm.');
 

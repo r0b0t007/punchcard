@@ -11,6 +11,9 @@ const alertVariants = cva(
         default: "bg-background text-foreground",
         destructive:
           "text-destructive-foreground [&>svg]:text-current *:data-[slot=alert-description]:text-destructive-foreground/80",
+        // A wait, not an error: the week's campaigns sent (CHW-42, design 12c).
+        warning:
+          "rounded-card border-warning/35 bg-warning/10 p-4 text-foreground *:data-[slot=alert-description]:text-foreground",
       },
     },
     defaultVariants: {

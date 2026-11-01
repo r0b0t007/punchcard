@@ -46,9 +46,9 @@ final readonly class DescribeComposer
         return [
             'business' => $business->name,
             'segments' => $this->describeAudience->handle($business),
-            'cards' => array_values(LoyaltyCard::query()->honouredBy($business->id)->where('active', true)->orderBy('id')->get(['id', 'name'])
+            'cards' => array_values(LoyaltyCard::query()->honouredBy($business->id)->where('active', true)->get(['id', 'name'])
                 ->map(fn (LoyaltyCard $card): array => ['id' => $card->id, 'name' => $card->name])->all()),
-            'left' => max(0, $limit['max'] - $limit['used']),
+            'left' => $limit['left'],
             'max' => $limit['max'],
             'nextAt' => $limit['nextAt'] === null ? null : LocalMoment::of($limit['nextAt'], LocalMoment::timezoneOf($business->firstLocation()->first())),
             'titleRoom' => CampaignText::titleRoom($business->name),

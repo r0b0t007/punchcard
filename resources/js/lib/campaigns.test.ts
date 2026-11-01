@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
     characters,
+    clip,
     newIdempotencyKey,
     notificationTitle,
-    titleRoom,
 } from '@/lib/campaigns';
 
 describe('a campaign title beside the business name (CampaignText)', () => {
-    it('shares 40 characters, the title keeping at least 15', () => {
-        expect(titleRoom('A1')).toBe(35);
-        expect(titleRoom('n'.repeat(30))).toBe(15);
-        // Characters, as mb_strlen: an Arabic name counts its letters.
-        expect(titleRoom('الحافة')).toBe(31);
+    it('counts and cuts in characters, as mb_strlen: an emoji or an Arabic letter is one', () => {
+        expect(characters('الحافة')).toBe(6);
+        expect(characters('☕🎉')).toBe(2);
+        expect(clip('🎉🎉🎉', 2)).toBe('🎉🎉');
+        expect(clip('Slow', 10)).toBe('Slow');
     });
 
     it('titles the notification with the name, cut to fit a long one', () => {

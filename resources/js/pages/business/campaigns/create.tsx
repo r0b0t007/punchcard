@@ -1,9 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Hourglass, Smartphone } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import LockPreview from '@/components/campaigns/lock-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -28,10 +29,11 @@ import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import {
     characters,
+    clip,
     newIdempotencyKey,
     notificationTitle,
 } from '@/lib/campaigns';
-import { calendarDate } from '@/lib/local-moment';
+import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn, typedDir } from '@/lib/utils';
 import { create, index, store } from '@/routes/campaigns';
@@ -71,9 +73,10 @@ export default function CreateCampaign({
     bodyMax: number;
 }) {
     const { t, locale } = useTranslation();
-    // One key per composer, never rendered: a double tap on Send, or a retried post, is one campaign.
+    // One key per composer, made once, never rendered: a double tap on Send, or a retried post, is one campaign.
+    const [idempotencyKey] = useState(newIdempotencyKey);
     const form = useForm({
-        idempotency_key: newIdempotencyKey(),
+        idempotency_key: idempotencyKey,
         segment: 'all' as Segment,
         title: '',
         body: '',
@@ -86,6 +89,35 @@ export default function CreateCampaign({
     const chosen = segments[data.segment];
     const full = left === 0;
     const canSend = chosen.reach > 0 && !full;
+    const order = Object.keys(segments) as Segment[];
+    const audienceCards = useRef<Partial<Record<Segment, HTMLButtonElement>>>(
+        {},
+    );
+
+    // A radio group: the arrow keys choose the next or previous audience (mirrored right to left), one Tab stop.
+    const moveAudience = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        const rtl = getComputedStyle(event.currentTarget).direction === 'rtl';
+        const steps: Record<string, number> = {
+            ArrowDown: 1,
+            ArrowUp: -1,
+            ArrowRight: rtl ? -1 : 1,
+            ArrowLeft: rtl ? 1 : -1,
+        };
+        const step = steps[event.key];
+
+        if (step === undefined) {
+            return;
+        }
+
+        event.preventDefault();
+        const next =
+            order[
+                (order.indexOf(data.segment) + step + order.length) %
+                    order.length
+            ];
+        setData('segment', next);
+        audienceCards.current[next]?.focus();
+    };
 
     const send = () => {
         form.transform((typed) => ({
@@ -112,18 +144,28 @@ export default function CreateCampaign({
                     )}
                 />
 
+                {/* One notice: the week's campaigns sent (refused or not, it says when the next can go), or the server's refusal. */}
                 {full && nextAt ? (
                     <Notice>
-                        {t(
-                            'You have sent :max campaigns in 7 days. The next one can go from :date.',
-                            {
-                                max,
-                                date: `${calendarDate(locale, nextAt.date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${nextAt.time}`,
-                            },
-                        )}
+                        {momentLabel(locale, nextAt, {
+                            today: (time) =>
+                                t(
+                                    'You have sent :max campaigns in 7 days. The next one can go today at :time.',
+                                    { max, time },
+                                ),
+                            other: (date, time) =>
+                                t(
+                                    'You have sent :max campaigns in 7 days. The next one can go from :date.',
+                                    {
+                                        max,
+                                        date: t(':date, :time', { date, time }),
+                                    },
+                                ),
+                        })}
                     </Notice>
+                ) : errors.campaign ? (
+                    <Notice>{errors.campaign}</Notice>
                 ) : null}
-                {errors.campaign ? <Notice>{errors.campaign}</Notice> : null}
 
                 <form
                     onSubmit={(event) => {
@@ -141,6 +183,7 @@ export default function CreateCampaign({
                                 role="radiogroup"
                                 aria-label={t('Who gets it')}
                                 className="grid gap-2.5 md:grid-cols-3"
+                                onKeyDown={moveAudience}
                             >
                                 {(Object.keys(segments) as Segment[]).map(
                                     (segment) => (
@@ -153,6 +196,10 @@ export default function CreateCampaign({
                                             onChoose={() =>
                                                 setData('segment', segment)
                                             }
+                                            buttonRef={(button) => {
+                                                audienceCards.current[segment] =
+                                                    button ?? undefined;
+                                            }}
                                         />
                                     ),
                                 )}
@@ -189,11 +236,13 @@ export default function CreateCampaign({
                                 id="title"
                                 dir={typedDir(data.title)}
                                 required
-                                maxLength={titleRoom}
                                 placeholder={t('Slow Tuesday?')}
                                 value={data.title}
                                 onChange={(event) =>
-                                    setData('title', event.target.value)
+                                    setData(
+                                        'title',
+                                        clip(event.target.value, titleRoom),
+                                    )
                                 }
                             />
                             <InputError message={errors.title} />
@@ -208,14 +257,16 @@ export default function CreateCampaign({
                                 id="body"
                                 dir={typedDir(data.body)}
                                 required
-                                maxLength={bodyMax}
                                 rows={3}
                                 placeholder={t(
                                     'Two stamps for every coffee until 4 pm today.',
                                 )}
                                 value={data.body}
                                 onChange={(event) =>
-                                    setData('body', event.target.value)
+                                    setData(
+                                        'body',
+                                        clip(event.target.value, bodyMax),
+                                    )
                                 }
                             />
                             <InputError message={errors.body} />
@@ -330,12 +381,14 @@ function AudienceCard({
     audience,
     chosen,
     onChoose,
+    buttonRef,
 }: {
     segment: Segment;
     business: string;
     audience: Audience;
     chosen: boolean;
     onChoose: () => void;
+    buttonRef: (button: HTMLButtonElement | null) => void;
 }) {
     const { t } = useTranslation();
     const description = {
@@ -349,6 +402,8 @@ function AudienceCard({
             type="button"
             role="radio"
             aria-checked={chosen}
+            tabIndex={chosen ? 0 : -1}
+            ref={buttonRef}
             onClick={onChoose}
             className={cn(
                 'relative flex flex-col gap-1 rounded-card border bg-card p-3.5 text-start outline-none focus-visible:ring-3 focus-visible:ring-ring',
@@ -394,14 +449,10 @@ function Counter({ value, max }: { value: string; max: number }) {
 
 function Notice({ children }: { children: React.ReactNode }) {
     return (
-        <div
-            role="alert"
-            className="flex items-start gap-3 rounded-card border border-warning/35 bg-warning/10 p-4 text-sm"
-            data-test="campaign-notice"
-        >
-            <Hourglass aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            <span>{children}</span>
-        </div>
+        <Alert variant="warning" data-test="campaign-notice">
+            <Hourglass aria-hidden="true" />
+            <AlertDescription>{children}</AlertDescription>
+        </Alert>
     );
 }
 

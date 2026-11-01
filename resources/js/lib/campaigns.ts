@@ -1,12 +1,11 @@
 /**
  * A campaign's words (CHW-42, design 12d), as CampaignText counts them on
  * the server: the notification's title is the business's name, then the
- * owner's title, TITLE characters in all; the title keeps at least
- * TITLE_MIN of them, a longer name is cut to fit. Characters, not UTF-16
- * units, as PHP's mb_strlen: an emoji or an Arabic letter is one.
+ * owner's title, TITLE characters in all, a long name cut to fit (the room
+ * the title gets comes from the server). Characters, not UTF-16 units, as
+ * PHP's mb_strlen: an emoji or an Arabic letter is one.
  */
-export const TITLE = 40;
-export const TITLE_MIN = 15;
+const TITLE = 40;
 
 const BETWEEN = ' · ';
 
@@ -15,12 +14,11 @@ export function characters(value: string): number {
     return Array.from(value).length;
 }
 
-/** How long the owner's title may be beside this business's name. */
-export function titleRoom(business: string): number {
-    return Math.max(
-        TITLE_MIN,
-        TITLE - characters(BETWEEN) - characters(business),
-    );
+/** What is typed, cut to max characters: the field stops where the counter and the server do. */
+export function clip(value: string, max: number): string {
+    const all = Array.from(value);
+
+    return all.length > max ? all.slice(0, max).join('') : value;
 }
 
 /** The notification's title, as the server sends it. */
