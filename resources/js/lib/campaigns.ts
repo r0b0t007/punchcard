@@ -34,6 +34,26 @@ export function notificationTitle(business: string, title: string): string {
     return `${name}${BETWEEN}${title}`;
 }
 
+/** A calendar date (Y-m-d) some days on, by the calendar: no timezone moves it. */
+export function addDays(date: string, days: number): string {
+    const day = new Date(`${date}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + days);
+
+    return day.toISOString().slice(0, 10);
+}
+
+/** A later campaign's first suggestion: the next full hour after now (Y-m-d, H:i), tomorrow at midnight after 23:00. */
+export function nextHour(
+    date: string,
+    time: string,
+): { date: string; time: string } {
+    const hour = Number(time.slice(0, 2)) + 1;
+
+    return hour > 23
+        ? { date: addDays(date, 1), time: '00:00' }
+        : { date, time: `${String(hour).padStart(2, '0')}:00` };
+}
+
 /** The composer's idempotency key, one per page load (a version 4 UUID). */
 export function newIdempotencyKey(): string {
     if (typeof crypto.randomUUID === 'function') {

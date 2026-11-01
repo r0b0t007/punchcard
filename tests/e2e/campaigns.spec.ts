@@ -7,7 +7,8 @@ import { signIn } from './helpers';
  * how many of the week's are left.
  *
  * Needs the demo data (php artisan db:seed): Café Hafa's owner
- * (owner@cafe.demo.test) and its two sent campaigns. Reads only.
+ * (owner@cafe.demo.test), its two sent campaigns and the one scheduled
+ * weeks ahead. Reads only: Cancel is opened, then kept.
  */
 test.skip(
     ({ browserName }) => browserName !== 'webkit',
@@ -23,18 +24,28 @@ test('the owner opens Campaigns from the sidebar and sees what was sent', async 
     await page.getByRole('link', { name: 'Campaigns' }).click();
 
     await expect(page).toHaveURL(/\/business\/campaigns$/);
+    // The phone's sidebar sheet stays open over the page it opened: close it first.
+    await page.keyboard.press('Escape');
     // How many are left moves with the days since the demo was seeded: not the count.
     await expect(
         page.getByText(/of 3 campaigns left this week\./),
     ).toBeVisible();
 
     const rows = page.locator('[data-test="campaign-row"]');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toContainText('Slow Tuesday?');
-    await expect(rows.nth(0)).toContainText('Not seen in 14 days');
-    await expect(rows.nth(0)).toContainText('6 people');
-    await expect(rows.nth(1)).toContainText('Rainy day tea');
-    await expect(rows.nth(1)).toContainText('Top 10');
+    await expect(rows).toHaveCount(3);
+    // The one scheduled weeks ahead first: Cancel asks, and Keep it leaves it.
+    await expect(rows.nth(0)).toContainText('Weekend brunch');
+    await rows.nth(0).locator('[data-test="cancel-campaign"]').click();
+    await expect(page.getByText('Cancel this campaign?')).toBeVisible();
+    await page.getByRole('button', { name: 'Keep it' }).click();
+    await expect(
+        rows.nth(0).locator('[data-test="cancel-campaign"]'),
+    ).toBeVisible();
+    await expect(rows.nth(1)).toContainText('Slow Tuesday?');
+    await expect(rows.nth(1)).toContainText('Not seen in 14 days');
+    await expect(rows.nth(1)).toContainText('6 people');
+    await expect(rows.nth(2)).toContainText('Rainy day tea');
+    await expect(rows.nth(2)).toContainText('Top 10');
 
     await testInfo.attach('campaigns', {
         body: await page.screenshot({ fullPage: true }),
@@ -77,6 +88,15 @@ test('the owner composes a campaign and sees it on a lock screen; nobody to send
         'None of them has notifications on a phone yet.',
     );
     await expect(page.locator('[data-test="campaign-send"]')).toBeDisabled();
+
+    // Later: a day and time in the café's time, and Send becomes Schedule.
+    await page.locator('[data-test="when-later"]').click();
+    await expect(page.locator('[data-test="send-on"]')).toBeVisible();
+    await expect(page.locator('[data-test="send-time"]')).toBeVisible();
+    await expect(page.getByText(/^In .+’s time\.$/)).toBeVisible();
+    await expect(page.locator('[data-test="campaign-send"]')).toHaveText(
+        'Schedule for 0 people',
+    );
 
     await testInfo.attach('composer', {
         body: await page.screenshot({ fullPage: true }),

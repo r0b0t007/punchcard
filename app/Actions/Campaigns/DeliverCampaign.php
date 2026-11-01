@@ -13,8 +13,10 @@ use App\Support\Tenancy\TenantContext;
 /**
  * A campaign's delivery (CHW-42), from its queued job (PushCampaign):
  *
- * - Once: it is claimed (scheduled to sending) while due, so a job run again,
- *   or a canceled campaign, sends nothing.
+ * - Once, and on time: it is claimed (scheduled to sending) while due and
+ *   less than DispatchDueCampaigns::LATE_MINUTES late, so a job run again, a
+ *   canceled campaign, or one a backlogged queue held past its hour, sends
+ *   nothing (the scheduler then cancels it).
  * - To its audience as it is now (CampaignAudience): someone who stopped
  *   following meanwhile gets nothing. Those of them with a phone
  *   (DescribeAudience::withPhone, nobody without the app's VAPID key) are
@@ -41,6 +43,7 @@ final readonly class DeliverCampaign
             $claimed = Campaign::query()->whereKey($campaignId)
                 ->where('status', CampaignStatus::Scheduled)
                 ->where('send_at', '<=', now())
+                ->where('send_at', '>', now()->subMinutes(DispatchDueCampaigns::LATE_MINUTES))
                 ->update(['status' => CampaignStatus::Sending]);
 
             if ($claimed !== 1) {

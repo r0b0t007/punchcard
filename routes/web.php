@@ -113,6 +113,7 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         Route::get('campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
         Route::get('campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
         Route::post('campaigns', [CampaignController::class, 'store'])->middleware('throttle:campaign-send')->name('campaigns.store');
+        Route::patch('campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->whereNumber('campaign')->name('campaigns.cancel');
     });
 });
 

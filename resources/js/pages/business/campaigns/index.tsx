@@ -1,13 +1,23 @@
 import { Head, Link } from '@inertiajs/react';
 import { Megaphone, Plus } from 'lucide-react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
-import { create, index } from '@/routes/campaigns';
+import { cancel, create, index } from '@/routes/campaigns';
 
 type Segment = 'all' | 'quiet_14d' | 'top_10';
 type Status = 'scheduled' | 'sending' | 'sent' | 'canceled';
@@ -141,13 +151,56 @@ function CampaignItem({ campaign }: { campaign: CampaignRow }) {
                 {when}
             </span>
             <span className="shrink-0 text-muted-foreground md:col-span-2 md:justify-self-end">
-                {campaign.status === 'canceled'
-                    ? null
-                    : t(':count person|:count people', {
-                          count: campaign.people,
-                      })}
+                {campaign.status === 'scheduled' ? (
+                    <CancelCampaign campaign={campaign} />
+                ) : campaign.status === 'canceled' ? null : (
+                    t(':count person|:count people', {
+                        count: campaign.people,
+                    })
+                )}
             </span>
         </li>
+    );
+}
+
+/** Cancel, on a campaign still to go: asks once; it frees one of the week's campaigns. */
+function CancelCampaign({ campaign }: { campaign: CampaignRow }) {
+    const { t } = useTranslation();
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm" data-test="cancel-campaign">
+                    {t('Cancel')}
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogTitle>{t('Cancel this campaign?')}</DialogTitle>
+                <DialogDescription>
+                    {t(
+                        'Nobody gets “:title”, and it no longer counts in the week’s campaigns.',
+                        { title: campaign.title },
+                    )}
+                </DialogDescription>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="secondary">{t('Keep it')}</Button>
+                    </DialogClose>
+                    <Button variant="destructive" asChild>
+                        <Link
+                            href={cancel(campaign.id)}
+                            as="button"
+                            preserveScroll
+                            onStart={() => setOpen(false)}
+                            data-test="confirm-cancel-campaign"
+                        >
+                            {t('Cancel the campaign')}
+                        </Link>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

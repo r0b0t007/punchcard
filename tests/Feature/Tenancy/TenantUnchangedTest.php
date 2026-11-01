@@ -68,7 +68,7 @@ it('refuses every change sent from a page of another business, before reading it
     // out from an email's link: they act on no tenant's data).
     expect($guarded->map(fn (array $pair): string => $pair[0].' '.$pair[1]->getName())->sort()->values()->all())->toBe([
         'DELETE counter.disarm', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
-        'PATCH cards.status', 'PATCH stampers.status',
+        'PATCH campaigns.cancel', 'PATCH cards.status', 'PATCH stampers.status',
         'POST business.qr-stand.printed', 'POST campaigns.store', 'POST cards.banner', 'POST cards.store', 'POST counter.arm', 'POST counter.scans.redeem',
         'POST counter.scans.stamp', 'POST counter.scans.store', 'POST staff.invitations.store', 'POST verification.store',
         'PUT cards.update',
