@@ -99,6 +99,7 @@ above: keep the two in step.
 | B12 stampers (switch off and on, held by support, refused taps), in `Punchcard Business App.dc.html` too                                                                                                                                         | `BA Stampers.dc.html`                                                 |
 | B9 campaigns: the composer (12a), the Campaigns page and its states (12c), the notification on a lock screen (12d) (CHW-42)                                                                                                                      | `Punchcard Campaigns Review.dc.html`                                  |
 | A reward staff redeemed with a scan: the push on a lock screen (14a) and My cards' notice until Got it (14b) (CHW-228)                                                                                                                           | `Punchcard Redeem Notice Review.dc.html`                              |
+| B4 customers: tabs with counts over the table (15a); B5 one customer, with stamps by hand, taking back and notes (15c) (CHW-44)                                                                                                                  | `Punchcard Customers Review.dc.html`                                  |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.

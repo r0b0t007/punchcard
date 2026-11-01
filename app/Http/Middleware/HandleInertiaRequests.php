@@ -75,6 +75,8 @@ class HandleInertiaRequests extends Middleware
                 'stampers' => $this->managesStaff($request),
                 // Campaigns (CHW-42, B9): the same people (CampaignPolicy::viewAny).
                 'campaigns' => $this->managesStaff($request),
+                // Customers (CHW-44, B4): the same people (BusinessCustomerPolicy::viewAny).
+                'customers' => $this->managesStaff($request),
             ],
             // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
             'tenants' => fn (): ?array => $this->tenants($request),

@@ -81,7 +81,7 @@ it('counts a customer\'s presence stamps on one local day as one visit, whatever
         ->and($stats['kpis']['activeCustomers']['value'])->toBe(1)
         ->and($stats['kpis']['returnRate']['value'])->toBe(0)
         ->and($stats['topCustomers'])->toHaveCount(1)
-        ->and($stats['topCustomers'][0])->toMatchArray(['name' => $first->user->name, 'visits' => 1, 'lastVisit' => '2026-10-10']);
+        ->and($stats['topCustomers'][0])->toMatchArray(['name' => $first->user->shortName(), 'visits' => 1, 'lastVisit' => '2026-10-10']);
 });
 
 it('cuts the 30 days at local midnight in the business\'s timezone', function (): void {
@@ -150,7 +150,7 @@ it('keeps a franchisee\'s figures, stamps and customers to its own business', fu
             ->has('stats.recentStamps', 1)
             ->where('stats.recentStamps.0.customer', $both->user->name)
             ->has('stats.topCustomers', 1)
-            ->where('stats.topCustomers.0.name', $both->user->name));
+            ->where('stats.topCustomers.0.name', $both->user->shortName()));
 
     // A system stamp here for a customer who only visited A2 shows without a name; a reward they redeemed here counts.
     ($this->stampAt)($onlyA2, $this->tenants->a1, '2026-10-08 10:00:00', ['source' => StampSource::Bonus, 'staff_id' => null, 'idempotency_key' => null]);
@@ -199,7 +199,7 @@ it('ranks the top customers by visits, then by their latest visit', function ():
     $top = ($this->stats)($this->tenants->b1)['topCustomers'];
 
     expect($top)->toHaveCount(10)
-        ->and(array_column($top, 'name'))->toBe(array_map(fn (int $index): string => $customers[$index]->user->name, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]))
+        ->and(array_column($top, 'name'))->toBe(array_map(fn (int $index): ?string => $customers[$index]->user->shortName(), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]))
         ->and($top[0]['visits'])->toBe(6);
 });
 

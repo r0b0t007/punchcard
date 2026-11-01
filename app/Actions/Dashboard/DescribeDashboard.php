@@ -219,7 +219,9 @@ final readonly class DescribeDashboard
 
         usort($ranked, fn (array $a, array $b): int => [$b['visits'], $b['last'], $a['id']] <=> [$a['visits'], $a['last'], $b['id']]);
         $ranked = array_slice($ranked, 0, self::LISTED);
-        $names = User::query()->whereKey(array_column($ranked, 'id'))->pluck('name', 'id');
+        // First name and initial (CHW-44): how a business sees its customers.
+        $names = User::query()->whereKey(array_column($ranked, 'id'))->get(['id', 'name'])
+            ->mapWithKeys(fn (User $user): array => [$user->id => (string) $user->shortName()]);
 
         return array_map(fn (array $customer): array => [
             'id' => $customer['id'],
