@@ -60,6 +60,16 @@ return [
         'per_week' => (int) env('CAMPAIGNS_PER_WEEK', 3),
     ],
 
+    'customers' => [
+        // A business's customers (CHW-44, B4, docs/spec.md "Derived metrics"): going quiet after twice their usual
+        // gap between visits, never sooner than quiet_min_days; lost after lost_days; new within new_days of their
+        // first visit; a regular from regular_visits visits, while neither quiet nor lost.
+        'quiet_min_days' => 14,
+        'lost_days' => 60,
+        'new_days' => 30,
+        'regular_visits' => 3,
+    ],
+
     'privacy' => [
         // The inactivity rule (CHW-58, docs/privacy/retention.md): an account unused this long is deleted, or anonymised
         // when it has history. Its owner is emailed this many days before, and always gets that long to sign in.

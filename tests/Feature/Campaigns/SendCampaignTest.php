@@ -274,6 +274,8 @@ it('allows a campaign whose every week stays within 3, though more go within 7 d
 });
 
 it('says when the next campaign can go, later ones already scheduled counted in', function (): void {
+    // One clock for the campaigns and the limit: a second ticking over between them is not the next week.
+    $this->freezeSecond();
     app(TenantContext::class)->bypass(function (): void {
         Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->subDay()]);
         Campaign::factory()->for($this->tenants->a1)->count(3)->create(['send_at' => now()->addDays(12)]);

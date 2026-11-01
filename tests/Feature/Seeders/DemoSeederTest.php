@@ -7,6 +7,7 @@ use App\Enums\OrganizationType;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
@@ -209,6 +210,18 @@ describe('the demo', function (): void {
         $customer = User::query()->where('email', 'customer@demo.test')->sole();
 
         expect($this->context->bypass(fn (): int => CardEnrollment::query()->where('user_id', $customer->id)->count()))->toBe(2);
+    });
+
+    it('lists the customers of each business, as summarised from its stamps (CHW-44)', function (): void {
+        $this->context->bypass(function (): void {
+            $cafe = Business::query()->where('name', 'Café Hafa')->sole();
+            $customers = BusinessCustomer::query()->where('business_id', $cafe->id)->get();
+            $customer = User::query()->where('email', 'customer@demo.test')->sole();
+
+            expect($customers)->toHaveCount(20)
+                ->and($customers->firstWhere('user_id', $customer->id)?->visits)->toBeGreaterThan(0)
+                ->and(BusinessCustomer::query()->distinct()->count('business_id'))->toBe(Business::query()->count());
+        });
     });
 });
 
