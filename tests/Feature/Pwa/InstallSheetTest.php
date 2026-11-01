@@ -109,4 +109,8 @@ it('gives the stamp screen the customer\'s notifications, for the ask under a re
     ($this->tap)(6);
     $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->has('rewards', 1)
         ->where('push', ['publicKey' => 'BAppPublicKey', 'rewards' => true, 'phones' => [hash('sha256', 'https://fcm.googleapis.com/fcm/send/phone-1')]]));
+
+    // "Rewards ready" turned off in Settings: turning this phone on would not bring them, so no ask.
+    $this->customer->forceFill(['push_rewards' => false])->save();
+    $this->get(route('taps.result'))->assertInertia(fn (Assert $page): Assert => $page->component('tap/stamped')->has('rewards', 1)->where('push', null));
 });

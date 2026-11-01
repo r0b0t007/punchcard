@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\Push\DescribePush;
+use App\Actions\Push\DescribeRewardAsk;
 use App\Actions\Taps\ClaimPendingTaps;
 use App\Actions\Taps\DescribeTap;
 use App\Actions\Taps\TakeTap;
@@ -46,7 +46,7 @@ final class TapController extends Controller
         return to_route('taps.result');
     }
 
-    public function show(Request $request, TapSession $session, DescribeTap $describeTap, DescribePush $describePush): Response|RedirectResponse
+    public function show(Request $request, TapSession $session, DescribeTap $describeTap, DescribeRewardAsk $describeRewardAsk): Response|RedirectResponse
     {
         $tap = $session->shown();
 
@@ -60,12 +60,12 @@ final class TapController extends Controller
         }
 
         $screen = $describeTap->handle($tap);
-        $user = $request->user();
-        // A reward just unlocked asks for notifications under it (C3, CHW-41 11a): the signed-in customer's.
-        $push = $screen['component'] === 'tap/stamped' && ($screen['props']['rewards'] ?? []) !== [] && $user instanceof User
-            ? $describePush->handle($user) : null;
 
-        return Inertia::render($screen['component'], [...$screen['props'], 'fresh' => $session->firstLookAt($tap), 'push' => $push]);
+        return Inertia::render($screen['component'], [
+            ...$screen['props'],
+            'fresh' => $session->firstLookAt($tap),
+            'push' => $describeRewardAsk->handle($screen, $request->user()),
+        ]);
     }
 
     public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse
