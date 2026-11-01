@@ -58,7 +58,8 @@ export function calendarDate(
 /**
  * "… at 10:42" today, "… on Monday 5 October at 10:42" another day: the
  * caller words each (its own t() calls, so the keys stay findable), this
- * formats the date in the locale.
+ * formats the date in the locale, in full unless the caller wants it
+ * shorter ("28 Oct" in a list).
  */
 export function momentLabel(
     locale: string,
@@ -67,17 +68,18 @@ export function momentLabel(
         today: (time: string) => string;
         other: (date: string, time: string) => string;
     },
+    dateFormat: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+    },
 ): string {
     if (moment.day === 'today') {
         return words.today(moment.time);
     }
 
     return words.other(
-        calendarDate(locale, moment.date, {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-        }),
+        calendarDate(locale, moment.date, dateFormat),
         moment.time,
     );
 }

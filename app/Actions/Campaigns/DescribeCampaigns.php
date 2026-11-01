@@ -11,9 +11,11 @@ use App\Support\LocalMoment;
 
 /**
  * The Campaigns page (CHW-42, design 12c): the business's latest campaigns,
- * newest first, each with when it went (or goes) in the business's time and
- * how many it reached: the pushes accepted once sent, who could get it
- * before. And how many of the week's campaigns are left (CampaignLimit).
+ * newest first, each with when the owner sent it (or when it goes) in the
+ * business's time, and who it went to: the followers in its audience with a
+ * phone, the number the owner was told on sending (the pushes accepted stay
+ * for results, B10). One due but not yet picked up by the queue reads as
+ * sending. And how many of the week's campaigns are left (CampaignLimit).
  * Read in the owner's tenant.
  */
 final readonly class DescribeCampaigns
@@ -41,9 +43,9 @@ final readonly class DescribeCampaigns
                     'id' => $campaign->id,
                     'title' => $campaign->title,
                     'segment' => $campaign->segment->value,
-                    'status' => $campaign->status->value,
-                    'at' => LocalMoment::of($campaign->sent_at ?? $campaign->send_at, $timezone),
-                    'people' => $campaign->status === CampaignStatus::Sent ? $campaign->sent_count : $campaign->audience_count,
+                    'status' => ($campaign->status === CampaignStatus::Scheduled && $campaign->send_at->lessThanOrEqualTo(now()) ? CampaignStatus::Sending : $campaign->status)->value,
+                    'at' => LocalMoment::of($campaign->send_at, $timezone),
+                    'people' => $campaign->audience_count,
                 ])->all()),
             'left' => max(0, $limit['max'] - $limit['used']),
             'max' => $limit['max'],

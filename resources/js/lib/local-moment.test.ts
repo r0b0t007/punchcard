@@ -34,5 +34,14 @@ describe('momentLabel', () => {
                 words,
             ),
         ).toBe('Monday, October 5 10:42');
+        // Shorter where the caller asks (a list's "28 Oct").
+        expect(
+            momentLabel(
+                'fr',
+                { day: 'other', date: '2026-10-28', time: '16:00' },
+                words,
+                { day: 'numeric', month: 'short' },
+            ),
+        ).toBe('28 oct. 16:00');
     });
 });

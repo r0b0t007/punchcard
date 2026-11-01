@@ -3,7 +3,7 @@ import { Megaphone } from 'lucide-react';
 import Heading from '@/components/heading';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
-import { calendarDate } from '@/lib/local-moment';
+import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 import { index } from '@/routes/campaigns';
@@ -16,9 +16,9 @@ type CampaignRow = {
     title: string;
     segment: Segment;
     status: Status;
-    /** When it went, or goes, in the business's time. */
+    /** When the owner sent it, or when it goes, in the business's time. */
     at: LocalMoment;
-    /** Sent: the pushes accepted; before: who could get it. */
+    /** Who it went, or goes, to: followers in the audience with a phone. */
     people: number;
 };
 
@@ -45,8 +45,8 @@ export default function Campaigns({
             <div className="flex max-w-5xl flex-col gap-6 p-4">
                 <Heading
                     title={t('Campaigns')}
-                    description={t(':left of :max campaigns left this week.', {
-                        left,
+                    description={t(':count of :max campaigns left this week.', {
+                        count: left,
                         max,
                     })}
                 />
@@ -67,9 +67,12 @@ export default function Campaigns({
                 ) : (
                     <div className="overflow-hidden rounded-card border bg-card">
                         <div className="hidden grid-cols-12 gap-4 border-b bg-muted px-4 py-3 text-xs font-semibold text-muted-foreground md:grid">
-                            <span className="col-span-5">{t('Campaign')}</span>
+                            <span className="col-span-4">{t('Campaign')}</span>
                             <span className="col-span-3">{t('Who')}</span>
-                            <span className="col-span-2">{t('When')}</span>
+                            <span className="col-span-3">{t('When')}</span>
+                            <span className="col-span-2 text-end">
+                                {t('Recipients')}
+                            </span>
                         </div>
                         <ul className="divide-y">
                             {campaigns.map((campaign) => (
@@ -96,7 +99,7 @@ function CampaignItem({ campaign }: { campaign: CampaignRow }) {
             className="flex items-center gap-4 px-4 py-3.5 text-sm md:grid md:grid-cols-12"
             data-test="campaign-row"
         >
-            <div className="flex min-w-0 flex-1 flex-col md:col-span-5">
+            <div className="flex min-w-0 flex-1 flex-col md:col-span-4">
                 {/* The owner's words, in their own direction, aligned with the page's. */}
                 <span className="truncate font-semibold">
                     <bdi>{campaign.title}</bdi>
@@ -110,7 +113,7 @@ function CampaignItem({ campaign }: { campaign: CampaignRow }) {
             </span>
             <span
                 className={cn(
-                    'hidden w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap md:col-span-2 md:inline-flex',
+                    'hidden w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap md:col-span-3 md:inline-flex',
                     campaign.status === 'sent' && 'bg-success/15 text-success',
                     (campaign.status === 'sending' ||
                         campaign.status === 'scheduled') &&
@@ -144,7 +147,7 @@ function audience(t: TranslateFn, segment: Segment): string {
     }[segment];
 }
 
-/** "Sent today 10:02", "Sent 28 Oct", "Sending", "Canceled"; scheduled ones come with CHW-42's last part. */
+/** "Sent today 10:02", "Sent 28 Oct", "Sending", "Canceled", or when a scheduled one goes ("8 Nov, 09:00"). */
 function moment(t: TranslateFn, locale: string, campaign: CampaignRow): string {
     if (campaign.status === 'sending') {
         return t('Sending');
@@ -154,18 +157,30 @@ function moment(t: TranslateFn, locale: string, campaign: CampaignRow): string {
         return t('Canceled');
     }
 
-    const date = calendarDate(locale, campaign.at.date, {
+    const short: Intl.DateTimeFormatOptions = {
         day: 'numeric',
         month: 'short',
-    });
+    };
 
-    if (campaign.status === 'scheduled') {
-        return t(':date, :time', { date, time: campaign.at.time });
-    }
-
-    return campaign.at.day === 'today'
-        ? t('Sent today :time', { time: campaign.at.time })
-        : t('Sent :date', { date });
+    return campaign.status === 'scheduled'
+        ? momentLabel(
+              locale,
+              campaign.at,
+              {
+                  today: (time) => t('Today :time', { time }),
+                  other: (date, time) => t(':date, :time', { date, time }),
+              },
+              short,
+          )
+        : momentLabel(
+              locale,
+              campaign.at,
+              {
+                  today: (time) => t('Sent today :time', { time }),
+                  other: (date) => t('Sent :date', { date }),
+              },
+              short,
+          );
 }
 
 Campaigns.layout = {
