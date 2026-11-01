@@ -34,6 +34,21 @@ export function notificationTitle(business: string, title: string): string {
     return `${name}${BETWEEN}${title}`;
 }
 
+/** A calendar date (Y-m-d) some days on, by the calendar: no timezone moves it. */
+export function addDays(date: string, days: number): string {
+    const day = new Date(`${date}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + days);
+
+    return day.toISOString().slice(0, 10);
+}
+
+/** The next full hour after a time (H:i), a later campaign's first suggestion; "23:00" stays the last. */
+export function nextHour(time: string): string {
+    const hour = Math.min(Number(time.slice(0, 2)) + 1, 23);
+
+    return `${String(hour).padStart(2, '0')}:00`;
+}
+
 /** The composer's idempotency key, one per page load (a version 4 UUID). */
 export function newIdempotencyKey(): string {
     if (typeof crypto.randomUUID === 'function') {

@@ -1060,5 +1060,21 @@
     "Send to :count person now?|Send to :count people now?": "Envoyer à :count personne maintenant ?|Envoyer à :count personnes maintenant ?",
     ":audience, at :business. A notification can’t be taken back once sent.": ":audience, chez :business. Une notification envoyée ne peut pas être reprise.",
     "Send now": "Envoyer",
-    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir aujourd’hui à :time."
+    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "Vous avez envoyé :max campagnes en 7 jours. La prochaine pourra partir aujourd’hui à :time.",
+    "Choose a time from now to :days days ahead.": "Choisissez un moment d’ici :days jours.",
+    "Scheduled for :count person.|Scheduled for :count people.": "Programmée pour :count personne.|Programmée pour :count personnes.",
+    "Campaign canceled: nobody gets it.": "Campagne annulée : personne ne la recevra.",
+    "This campaign is already on its way.": "Cette campagne est déjà en route.",
+    "Now": "Maintenant",
+    "Later": "Plus tard",
+    "Day": "Jour",
+    "Time": "Heure",
+    "In :site’s time.": "À l’heure de :site.",
+    "Schedule for :count person|Schedule for :count people": "Programmer pour :count personne|Programmer pour :count personnes",
+    "Schedule for :count person?|Schedule for :count people?": "Programmer pour :count personne ?|Programmer pour :count personnes ?",
+    ":audience, at :business, on :date at :time. You can cancel it until then.": ":audience, chez :business, le :date à :time. Vous pourrez l’annuler d’ici là.",
+    "Schedule": "Programmer",
+    "Cancel this campaign?": "Annuler cette campagne ?",
+    "Nobody gets “:title”, and it no longer counts in the week’s campaigns.": "Personne ne recevra « :title », et elle ne compte plus dans les campagnes de la semaine.",
+    "Cancel the campaign": "Annuler la campagne"
 }

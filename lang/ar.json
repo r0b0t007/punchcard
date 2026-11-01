@@ -1060,5 +1060,21 @@
     "Send to :count person now?|Send to :count people now?": "الإرسال إلى لا أحد؟|إرسال إلى شخص واحد الآن؟|إرسال إلى شخصين الآن؟|إرسال إلى :count أشخاص الآن؟|إرسال إلى :count شخصًا الآن؟|إرسال إلى :count شخص الآن؟",
     ":audience, at :business. A notification can’t be taken back once sent.": ":audience، في :business. لا يمكن استرجاع الإشعار بعد إرساله.",
     "Send now": "أرسل الآن",
-    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "أرسلت :max حملات خلال 7 أيام. يمكن إرسال التالية اليوم على الساعة :time."
+    "You have sent :max campaigns in 7 days. The next one can go today at :time.": "أرسلت :max حملات خلال 7 أيام. يمكن إرسال التالية اليوم على الساعة :time.",
+    "Choose a time from now to :days days ahead.": "اختر وقتًا من الآن حتى :days يومًا.",
+    "Scheduled for :count person.|Scheduled for :count people.": "لم تُجدول لأحد.|جُدولت لشخص واحد.|جُدولت لشخصين.|جُدولت لـ :count أشخاص.|جُدولت لـ :count شخصًا.|جُدولت لـ :count شخص.",
+    "Campaign canceled: nobody gets it.": "أُلغيت الحملة: لن يتلقاها أحد.",
+    "This campaign is already on its way.": "هذه الحملة في طريقها بالفعل.",
+    "Now": "الآن",
+    "Later": "لاحقًا",
+    "Day": "اليوم",
+    "Time": "الوقت",
+    "In :site’s time.": "بتوقيت :site.",
+    "Schedule for :count person|Schedule for :count people": "لا أحد للجدولة له|جدولة لشخص واحد|جدولة لشخصين|جدولة لـ :count أشخاص|جدولة لـ :count شخصًا|جدولة لـ :count شخص",
+    "Schedule for :count person?|Schedule for :count people?": "الجدولة لا لأحد؟|جدولة لشخص واحد؟|جدولة لشخصين؟|جدولة لـ :count أشخاص؟|جدولة لـ :count شخصًا؟|جدولة لـ :count شخص؟",
+    ":audience, at :business, on :date at :time. You can cancel it until then.": ":audience، في :business، يوم :date على الساعة :time. يمكنك إلغاؤها حتى ذلك الحين.",
+    "Schedule": "جدولة",
+    "Cancel this campaign?": "إلغاء هذه الحملة؟",
+    "Nobody gets “:title”, and it no longer counts in the week’s campaigns.": "لن يتلقى أحد «:title»، ولن تُحتسب ضمن حملات الأسبوع.",
+    "Cancel the campaign": "إلغاء الحملة"
 }

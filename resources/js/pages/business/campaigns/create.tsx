@@ -25,21 +25,25 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import {
+    addDays,
     characters,
     clip,
     newIdempotencyKey,
+    nextHour,
     notificationTitle,
 } from '@/lib/campaigns';
-import { momentLabel } from '@/lib/local-moment';
+import { calendarDate, momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn, typedDir } from '@/lib/utils';
 import { create, index, store } from '@/routes/campaigns';
 
 type Segment = 'all' | 'quiet_14d' | 'top_10';
 type Audience = { followers: number; reach: number };
+type When = 'now' | 'later';
 
 /** What tapping it opens: a card's id, or MY_CARDS. */
 const MY_CARDS = 'cards';
@@ -62,6 +66,9 @@ export default function CreateCampaign({
     nextAt,
     titleRoom,
     bodyMax,
+    site,
+    now,
+    scheduleDays,
 }: {
     business: string;
     segments: Record<Segment, Audience>;
@@ -71,6 +78,10 @@ export default function CreateCampaign({
     nextAt: LocalMoment | null;
     titleRoom: number;
     bodyMax: number;
+    /** The site whose time a later campaign is set in, and the moment there. */
+    site: string | null;
+    now: LocalMoment;
+    scheduleDays: number;
 }) {
     const { t, locale } = useTranslation();
     // One key per composer, made once, never rendered: a double tap on Send, or a retried post, is one campaign.
@@ -81,6 +92,9 @@ export default function CreateCampaign({
         title: '',
         body: '',
         card: cards.length > 0 ? String(cards[0].id) : MY_CARDS,
+        when: 'now' as When,
+        send_on: now.date,
+        send_time: nextHour(now.time),
     });
     const { data, setData, processing } = form;
     const errors = form.errors as Record<string, string | undefined>;
@@ -88,7 +102,9 @@ export default function CreateCampaign({
 
     const chosen = segments[data.segment];
     const full = left === 0;
-    const canSend = chosen.reach > 0 && !full;
+    const later = data.when === 'later';
+    // Later, the week's limit is the scheduled moment's: the server counts it then.
+    const canSend = chosen.reach > 0 && (later || !full);
     const order = Object.keys(segments) as Segment[];
     const audienceCards = useRef<Partial<Record<Segment, HTMLButtonElement>>>(
         {},
@@ -126,6 +142,10 @@ export default function CreateCampaign({
             title: typed.title,
             body: typed.body,
             card_id: typed.card === MY_CARDS ? null : Number(typed.card),
+            when: typed.when,
+            ...(typed.when === 'later'
+                ? { send_on: typed.send_on, send_time: typed.send_time }
+                : {}),
         }));
         form.submit(store(), {
             preserveScroll: true,
@@ -299,6 +319,81 @@ export default function CreateCampaign({
                             </Select>
                             <InputError message={errors.card_id} />
                         </div>
+
+                        <div className="grid gap-2.5">
+                            <Label id="when-label">{t('When')}</Label>
+                            <ToggleGroup
+                                type="single"
+                                variant="segmented"
+                                aria-labelledby="when-label"
+                                className="self-start justify-self-start"
+                                value={data.when}
+                                onValueChange={(when) =>
+                                    when && setData('when', when as When)
+                                }
+                            >
+                                <ToggleGroupItem
+                                    value="now"
+                                    data-test="when-now"
+                                >
+                                    {t('Now')}
+                                </ToggleGroupItem>
+                                <ToggleGroupItem
+                                    value="later"
+                                    data-test="when-later"
+                                >
+                                    {t('Later')}
+                                </ToggleGroupItem>
+                            </ToggleGroup>
+                            {later ? (
+                                <>
+                                    <div className="flex gap-2.5">
+                                        <Input
+                                            type="date"
+                                            aria-label={t('Day')}
+                                            required
+                                            min={now.date}
+                                            max={addDays(
+                                                now.date,
+                                                scheduleDays,
+                                            )}
+                                            value={data.send_on}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'send_on',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            data-test="send-on"
+                                        />
+                                        <Input
+                                            type="time"
+                                            aria-label={t('Time')}
+                                            required
+                                            className="max-w-36"
+                                            value={data.send_time}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'send_time',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            data-test="send-time"
+                                        />
+                                    </div>
+                                    {site ? (
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('In :site’s time.', { site })}
+                                        </p>
+                                    ) : null}
+                                    <InputError
+                                        message={
+                                            errors.send_on ?? errors.send_time
+                                        }
+                                    />
+                                </>
+                            ) : null}
+                        </div>
                     </div>
 
                     <aside className="flex flex-col gap-2.5 lg:sticky lg:top-4 lg:col-start-3 lg:row-span-2 lg:row-start-1">
@@ -325,9 +420,15 @@ export default function CreateCampaign({
                             disabled={!canSend || processing}
                             data-test="campaign-send"
                         >
-                            {t('Send to :count person|Send to :count people', {
-                                count: chosen.reach,
-                            })}
+                            {later
+                                ? t(
+                                      'Schedule for :count person|Schedule for :count people',
+                                      { count: chosen.reach },
+                                  )
+                                : t(
+                                      'Send to :count person|Send to :count people',
+                                      { count: chosen.reach },
+                                  )}
                         </Button>
                         <p className="text-center text-sm text-muted-foreground">
                             {t(':count of :max campaigns left this week.', {
@@ -342,19 +443,38 @@ export default function CreateCampaign({
             <Dialog open={confirming} onOpenChange={setConfirming}>
                 <DialogContent>
                     <DialogTitle>
-                        {t(
-                            'Send to :count person now?|Send to :count people now?',
-                            { count: chosen.reach },
-                        )}
+                        {later
+                            ? t(
+                                  'Schedule for :count person?|Schedule for :count people?',
+                                  { count: chosen.reach },
+                              )
+                            : t(
+                                  'Send to :count person now?|Send to :count people now?',
+                                  { count: chosen.reach },
+                              )}
                     </DialogTitle>
                     <DialogDescription>
-                        {t(
-                            ':audience, at :business. A notification can’t be taken back once sent.',
-                            {
-                                audience: audienceName(t, data.segment),
-                                business,
-                            },
-                        )}
+                        {later
+                            ? t(
+                                  ':audience, at :business, on :date at :time. You can cancel it until then.',
+                                  {
+                                      audience: audienceName(t, data.segment),
+                                      business,
+                                      date: calendarDate(locale, data.send_on, {
+                                          weekday: 'long',
+                                          day: 'numeric',
+                                          month: 'long',
+                                      }),
+                                      time: data.send_time,
+                                  },
+                              )
+                            : t(
+                                  ':audience, at :business. A notification can’t be taken back once sent.',
+                                  {
+                                      audience: audienceName(t, data.segment),
+                                      business,
+                                  },
+                              )}
                     </DialogDescription>
                     <DialogFooter>
                         <DialogClose asChild>
@@ -366,7 +486,7 @@ export default function CreateCampaign({
                             data-test="campaign-confirm"
                         >
                             {processing ? <Spinner /> : null}
-                            {t('Send now')}
+                            {later ? t('Schedule') : t('Send now')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

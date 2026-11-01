@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+    addDays,
     characters,
     clip,
     newIdempotencyKey,
+    nextHour,
     notificationTitle,
 } from '@/lib/campaigns';
 
@@ -22,6 +24,19 @@ describe('a campaign title beside the business name (CampaignText)', () => {
         const cut = notificationTitle('n'.repeat(30), 't'.repeat(15));
         expect(cut).toBe(`${'n'.repeat(21)}… · ${'t'.repeat(15)}`);
         expect(characters(cut)).toBe(40);
+    });
+});
+
+describe("a later campaign's day and time", () => {
+    it('counts days by the calendar, across months', () => {
+        expect(addDays('2026-11-04', 30)).toBe('2026-12-04');
+        expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    });
+
+    it('suggests the next full hour, never past the day', () => {
+        expect(nextHour('14:02')).toBe('15:00');
+        expect(nextHour('09:59')).toBe('10:00');
+        expect(nextHour('23:40')).toBe('23:00');
     });
 });
 

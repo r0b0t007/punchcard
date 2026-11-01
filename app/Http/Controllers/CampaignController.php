@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Campaigns\CampaignRefused;
+use App\Actions\Campaigns\CancelCampaign;
 use App\Actions\Campaigns\CreateCampaign;
 use App\Actions\Campaigns\DescribeCampaigns;
 use App\Actions\Campaigns\DescribeComposer;
@@ -27,7 +28,11 @@ use Inertia\Response;
  * - GET /business/campaigns/create: the composer, with each audience's
  *   size and who would get it (DescribeComposer);
  * - POST /business/campaigns: a notification to an audience of its
- *   followers, now (CreateCampaign), within its weekly limit.
+ *   followers, now or later (CreateCampaign), within its weekly limit;
+ * - PATCH /business/campaigns/{campaign}/cancel: a scheduled one, until it
+ *   goes (CancelCampaign).
+ *
+ * {campaign} resolves in the tenant: another business's is a 404.
  */
 final class CampaignController extends Controller
 {
@@ -55,12 +60,26 @@ final class CampaignController extends Controller
         $user = $request->user();
 
         try {
-            $campaign = $createCampaign->handle($business, $user, $request->string('idempotency_key')->toString(), $request->audience(), $request->string('title')->toString(), $request->string('body')->toString(), $request->cardId());
+            $campaign = $createCampaign->handle($business, $user, $request->string('idempotency_key')->toString(), $request->audience(), $request->string('title')->toString(), $request->string('body')->toString(), $request->cardId(), $request->sendAt());
         } catch (CampaignRefused $refused) {
             return back()->withErrors(['campaign' => $refused->getMessage()]);
         }
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => trans_choice('Sent to :count person.|Sent to :count people.', $campaign->audience_count)]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => $campaign->send_at->isFuture()
+            ? trans_choice('Scheduled for :count person.|Scheduled for :count people.', $campaign->audience_count)
+            : trans_choice('Sent to :count person.|Sent to :count people.', $campaign->audience_count)]);
+
+        return to_route('campaigns.index');
+    }
+
+    public function cancel(int $campaign, CancelCampaign $cancelCampaign): RedirectResponse
+    {
+        $scheduled = Campaign::query()->whereKey($campaign)->first() ?? abort(404);
+        Gate::authorize('cancel', $scheduled);
+
+        Inertia::flash('toast', $cancelCampaign->handle($scheduled)
+            ? ['type' => 'success', 'message' => __('Campaign canceled: nobody gets it.')]
+            : ['type' => 'error', 'message' => __('This campaign is already on its way.')]);
 
         return to_route('campaigns.index');
     }

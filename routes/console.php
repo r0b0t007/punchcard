@@ -2,6 +2,7 @@
 
 use App\Actions\Account\AnonymiseInactiveAccounts;
 use App\Actions\Account\WarnInactiveAccounts;
+use App\Actions\Campaigns\DispatchDueCampaigns;
 use App\Actions\Taps\ExpirePendingTaps;
 use App\Actions\Verification\DeleteExpiredDocuments;
 use Illuminate\Foundation\Inspiring;
@@ -18,6 +19,10 @@ Schedule::command('model:prune')->daily();
 
 // Marks signed-out taps nobody claimed in time as expired (punchcard.taps.pending_minutes).
 Schedule::call(fn (): int => app(ExpirePendingTaps::class)->handle())->name('punchcard:expire-pending-taps')->everyFiveMinutes();
+// Scheduled campaigns now due go to the queue in their business's tenant; one an hour late is canceled (CHW-42).
+// Logs counts only.
+Schedule::call(fn () => Log::info('Due campaigns queued.', app(DispatchDueCampaigns::class)->handle(now())))
+    ->name('punchcard:due-campaigns')->everyMinute()->withoutOverlapping()->onOneServer();
 
 // The inactivity rule (CHW-58, docs/privacy/retention.md): email accounts a month before they reach 24 months unused,
 // then delete or anonymise those whose warning's day has come. Two entries, so one failing never stops the other. Logs

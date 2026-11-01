@@ -31,4 +31,10 @@ final class CampaignPolicy
     {
         return $this->runs($business->organization_id, $business->id);
     }
+
+    /** A scheduled one, until it goes (CancelCampaign). */
+    public function cancel(User $user, Campaign $campaign): bool
+    {
+        return $this->runs($campaign->organization_id, $campaign->business_id);
+    }
 }

@@ -74,7 +74,11 @@ it('says when the next campaign can go once the week\'s are sent, in the busines
     ($this->open)($this->owner)
         ->assertInertia(fn (Assert $page): Assert => $page
             ->where('left', 0)
-            ->where('nextAt', ['day' => 'other', 'date' => '2026-11-10', 'time' => '14:02']));
+            ->where('nextAt', ['day' => 'other', 'date' => '2026-11-10', 'time' => '14:02'])
+            // Where a later campaign is set: the first site, its moment now, and how far ahead.
+            ->where('site', 'A1 site')
+            ->where('now', ['day' => 'today', 'date' => '2026-11-04', 'time' => '14:02'])
+            ->where('scheduleDays', 30));
 });
 
 it('keeps the composer from staff', function (): void {
