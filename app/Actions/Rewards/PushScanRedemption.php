@@ -18,7 +18,7 @@ use App\Support\Tenancy\TenantContext;
  * their QR (CHW-228, design 14a), from the queued listener on the redemption
  * (SendRedeemNotices): a safeguard, as the scan, not the customer, opened it.
  *
- * - Only rewards redeemed by a scan (redeemed_scan_id): never one the customer
+ * - Only rewards redeemed by a scan (redeemed_by_scan): never one the customer
  *   redeemed with their own tap, which they saw happen. A replayed
  *   redemption dispatches nothing (RedeemReward).
  * - Not once they were told (redeem_notice_at), nor to an anonymised account.
@@ -52,7 +52,7 @@ final readonly class PushScanRedemption
             $rewards = Reward::query()->whereKey($rewardIds)
                 ->where('enrollment_id', $enrollmentId)
                 ->where('status', RewardStatus::Redeemed)
-                ->whereNotNull('redeemed_scan_id')
+                ->where('redeemed_by_scan', true)
                 ->whereNull('redeem_notice_at')
                 ->get();
             $place = (string) Business::query()->whereKey($businessId)->where('organization_id', $organizationId)->value('name');

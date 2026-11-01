@@ -67,6 +67,7 @@ final readonly class RedeemReward
                 'redeemed_business_id' => $presence->businessId,
                 'redeemed_location_id' => $presence->locationId,
                 'redeemed_scan_id' => $presence->scanId,
+                'redeemed_by_scan' => $presence->scanId !== null,
                 'redeem_window_opened_at' => null,
                 'redeem_window_until' => null,
             ])->save();

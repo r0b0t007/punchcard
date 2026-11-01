@@ -25,7 +25,7 @@ final readonly class DismissRedeemNotice
         return $this->context->bypass(function () use ($user, $rewardId): bool {
             $theirs = Reward::query()->whereKey($rewardId)
                 ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
-                ->whereNotNull('redeemed_scan_id');
+                ->where('redeemed_by_scan', true);
 
             if (! (clone $theirs)->exists()) {
                 return false;

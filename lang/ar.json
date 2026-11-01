@@ -1078,8 +1078,8 @@
     "Cancel the campaign": "إلغاء الحملة",
     "On its way to :count person.|On its way to :count people.": "في طريقها إلى لا أحد.|في طريقها إلى شخص واحد.|في طريقها إلى شخصين.|في طريقها إلى :count أشخاص.|في طريقها إلى :count شخصًا.|في طريقها إلى :count شخص.",
     "That time doesn’t exist that day: the clocks change.": "هذا الوقت غير موجود في ذلك اليوم: تتغير الساعة.",
-    "Your :reward was redeemed at the counter. Not you? Tell the staff.": "استُبدل :reward عند الشباك. لم تكن أنت؟ أخبر الموظفين.",
-    "Your :reward was redeemed": "استُبدل :reward",
+    "Your :reward was redeemed at the counter. Not you? Tell the staff.": "تم استبدال :reward عند الشباك. لم تكن أنت؟ أخبر الموظفين.",
+    "Your :reward was redeemed": "تم استبدال :reward",
     "At :business :when, by staff scanning your QR. Not you? Tell the staff.": "في :business :when، حين مسح الموظفون رمز QR الخاص بك. لم تكن أنت؟ أخبر الموظفين.",
     "today at :time": "اليوم على الساعة :time",
     "on :date at :time": "يوم :date على الساعة :time"

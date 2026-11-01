@@ -1078,8 +1078,8 @@
     "Cancel the campaign": "Annuler la campagne",
     "On its way to :count person.|On its way to :count people.": "En route vers :count personne.|En route vers :count personnes.",
     "That time doesn’t exist that day: the clocks change.": "Cette heure n’existe pas ce jour-là : on change d’heure.",
-    "Your :reward was redeemed at the counter. Not you? Tell the staff.": "Votre :reward a été utilisé au comptoir. Ce n’était pas vous ? Prévenez le personnel.",
-    "Your :reward was redeemed": "Votre :reward a été utilisé",
+    "Your :reward was redeemed at the counter. Not you? Tell the staff.": "Votre récompense « :reward » a été utilisée au comptoir. Ce n’était pas vous ? Prévenez le personnel.",
+    "Your :reward was redeemed": "Votre récompense « :reward » a été utilisée",
     "At :business :when, by staff scanning your QR. Not you? Tell the staff.": "Chez :business :when, le personnel a scanné votre QR. Ce n’était pas vous ? Prévenez le personnel.",
     "today at :time": "aujourd’hui à :time",
     "on :date at :time": "le :date à :time"

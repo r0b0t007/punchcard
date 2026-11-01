@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Rewards;
 
 use App\Enums\RewardStatus;
-use App\Models\Business;
 use App\Models\CardEnrollment;
-use App\Models\Location;
 use App\Models\Reward;
 use App\Models\User;
 use App\Support\LocalMoment;
@@ -37,19 +35,18 @@ final readonly class DescribeRedeemNotices
             $rewards = Reward::query()
                 ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
                 ->where('status', RewardStatus::Redeemed)
-                ->whereNotNull('redeemed_scan_id')
+                ->where('redeemed_by_scan', true)
                 ->whereNull('redeem_notice_at')
                 ->where('redeemed_at', '>', now()->subDays(self::DAYS))
                 ->latest('redeemed_at')->latest('id')->limit(self::SHOWN)
+                ->with(['redeemedBusiness:id,name', 'redeemedLocation'])
                 ->get();
-            $businesses = Business::query()->whereKey($rewards->pluck('redeemed_business_id')->filter()->unique()->values()->all())->pluck('name', 'id');
-            $locations = Location::query()->whereKey($rewards->pluck('redeemed_location_id')->filter()->unique()->values()->all())->get()->keyBy('id');
 
             return array_values($rewards->map(fn (Reward $reward): array => [
                 'id' => $reward->id,
                 'reward' => $reward->reward_text,
-                'business' => (string) $businesses->get((int) $reward->redeemed_business_id, ''),
-                'at' => LocalMoment::of($reward->redeemed_at ?? now(), LocalMoment::timezoneOf($locations->get((int) $reward->redeemed_location_id))),
+                'business' => (string) $reward->redeemedBusiness?->name,
+                'at' => LocalMoment::of($reward->redeemed_at ?? now(), LocalMoment::timezoneOf($reward->redeemedLocation)),
             ])->all());
         });
     }

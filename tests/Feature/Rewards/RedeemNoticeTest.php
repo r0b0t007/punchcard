@@ -145,7 +145,7 @@ it('ignores a reward of another enrollment, or of another organization, named in
     $someoneElse = User::factory()->create();
     $theirs = $this->tenants->reward($this->tenants->enroll($someoneElse, $this->tenants->cardA));
     $this->context->bypass(fn () => Reward::query()->whereKey($theirs->id)->update([
-        'status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id, 'redeemed_scan_id' => $scan->id,
+        'status' => RewardStatus::Redeemed, 'redeemed_at' => now(), 'redeemed_business_id' => $this->tenants->a1->id, 'redeemed_scan_id' => $scan->id, 'redeemed_by_scan' => true,
     ]));
     ($this->phone)($this->customer);
     ($this->phone)($someoneElse);
@@ -170,12 +170,14 @@ it('queues for a redemption by scan only: never for one by tap, so the tap stays
 
 it('counts scan redemptions made before it shipped as told, so nobody gets a late "Not you?"', function (): void {
     ($this->redeemByScan)($this->reward);
-    $migration = require database_path('migrations/2026_11_01_110046_add_redeem_notice_at_to_rewards_table.php');
+    $migration = require database_path('migrations/2026_11_01_110046_add_scan_redemption_notice_to_rewards_table.php');
     $migration->down();
     $migration->up();
 
     ($this->notices)()->assertInertia(fn (Assert $page): Assert => $page->where('redeemNotices', []));
-    expect($this->context->bypass(fn () => Reward::query()->findOrFail($this->reward->id)->redeem_notice_at?->equalTo(now())))->toBeTrue();
+    $reward = $this->context->bypass(fn () => Reward::query()->findOrFail($this->reward->id));
+    expect($reward->redeem_notice_at?->equalTo(now()))->toBeTrue()
+        ->and($reward->redeemed_by_scan)->toBeTrue();
 });
 
 it('shows My cards\' notice when no phone got the push, in the redeeming site\'s time, until Got it', function (): void {
@@ -212,6 +214,19 @@ it('lets the customer dismiss only their own scan redemption\'s notice', functio
     $this->actingAs($this->customer)->patch(route('rewards.notice.dismiss', $tapped->id))->assertNotFound();
 
     ($this->notices)()->assertInertia(fn (Assert $page): Assert => $page->has('redeemNotices', 1));
+});
+
+it('keeps telling the customer once the scan itself is pruned, a day after it expired', function (): void {
+    ($this->redeemByScan)($this->reward);
+
+    $this->travel(2)->days();
+    $this->artisan('model:prune', ['--model' => [CounterScan::class]])->assertSuccessful();
+    // As Postgres's foreign key does when the scan goes; SQLite has none.
+    $this->context->bypass(fn () => Reward::query()->whereKey($this->reward->id)->update(['redeemed_scan_id' => null]));
+
+    ($this->notices)()->assertInertia(fn (Assert $page): Assert => $page->has('redeemNotices', 1));
+    $this->actingAs($this->customer)->patch(route('rewards.notice.dismiss', $this->reward->id))->assertRedirect(route('app.cards'));
+    ($this->notices)()->assertInertia(fn (Assert $page): Assert => $page->where('redeemNotices', []));
 });
 
 it('lets a notice go after 30 days', function (): void {
