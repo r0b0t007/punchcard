@@ -75,3 +75,58 @@ test('the owner opens Customers from the sidebar, switches tab and finds a custo
         contentType: 'image/png',
     });
 });
+
+test('the owner adds a stamp by hand with a reason, and keeps a note', async ({
+    page,
+}, testInfo) => {
+    await signIn(page, 'owner@cafe.demo.test');
+    // The least recent visit on the first page: the demo's visits end yesterday, so no cooldown or daily limit in
+    // the way (other specs stamp newer customers, who come first).
+    await page.goto('/business/customers');
+    const rows = page.locator('[data-test="customer-row"]');
+    await expect(rows).not.toHaveCount(0);
+    await rows.last().getByRole('link').click();
+    await expect(page).toHaveURL(/\/business\/customers\/\d+$/);
+
+    const reason = `Card forgotten ${Date.now()}`;
+    await page.locator('[data-test="add-stamps"]').click();
+    const dialog = page.locator('[data-test="add-stamps-dialog"]');
+    await dialog.getByRole('button', { name: 'One more' }).click();
+    await expect(dialog.locator('[data-test="add-stamps-qty"]')).toHaveText(
+        '2',
+    );
+    await dialog.getByLabel('Reason (required)').fill(reason);
+
+    await testInfo.attach('add-stamps', {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+    });
+
+    await dialog.locator('[data-test="add-stamps-submit"]').click();
+    // The stamp's follow-up work (the summary, the Wallet pass) runs in the request on a sync queue: give it time.
+    await expect(dialog).toBeHidden({ timeout: 20_000 });
+    // Newest first: the two stamps, with the reason and the owner's name.
+    const newest = page.locator('[data-test="customer-event"]').first();
+    await expect(newest).toContainText('+2 stamps, added by hand');
+    await expect(newest).toContainText(reason);
+
+    const note = `Prefers oat milk ${Date.now()}`;
+    await page.locator('[data-test="customer-note-body"]').fill(note);
+    await page.locator('[data-test="customer-note-save"]').click();
+    const notes = page.locator('[data-test="customer-note"]');
+    await expect(notes.first()).toContainText(note);
+    await expect(page.locator('[data-test="customer-note-body"]')).toHaveValue(
+        '',
+    );
+
+    await testInfo.attach('notes', {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+    });
+
+    await notes
+        .filter({ hasText: note })
+        .locator('[data-test="customer-note-delete"]')
+        .click();
+    await expect(notes.filter({ hasText: note })).toHaveCount(0);
+});

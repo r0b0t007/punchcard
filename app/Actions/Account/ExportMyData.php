@@ -10,6 +10,7 @@ use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\CounterScan;
+use App\Models\CustomerNote;
 use App\Models\Follow;
 use App\Models\Location;
 use App\Models\LoginLink;
@@ -37,7 +38,8 @@ use NotificationChannels\WebPush\PushSubscription;
  *   how, by whom: you, staff or punchcard, and the staff's reason) and
  *   every reward;
  * - follows, taps for as long as they are kept (punchcard.taps.retention_days),
- *   member QR scans, sign-in links and staff invitations sent to the
+ *   member QR scans, businesses' notes about them (CHW-44), sign-in
+ *   links and staff invitations sent to the
  *   email, notifications (rewards ready, and each phone's push service),
  *   passkeys, sessions, and roles at businesses and organizations.
  *
@@ -67,6 +69,7 @@ final readonly class ExportMyData
             $consents = ConsentEvent::query()->where('user_id', $user->id)->orderBy('id')->get();
             $taps = Tap::query()->where('user_id', $user->id)->where('created_at', '>=', $now->subDays((int) config('punchcard.taps.retention_days')))->orderBy('id')
                 ->get(['business_id', 'location_id', 'status', 'ip', 'user_agent', 'created_at']);
+            $notes = CustomerNote::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'body', 'created_at']);
             $scans = CounterScan::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'location_id', 'scanned_at', 'stamp_event_id']);
             $invitations = StaffInvitation::query()->where('email', $user->email)->orderBy('id')->get(['business_id', 'created_at', 'accepted_at']);
             $businessRoles = BusinessMember::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'business_id', 'role', 'created_at']);
@@ -75,7 +78,7 @@ final readonly class ExportMyData
             $cards = LoyaltyCard::query()->whereKey($enrollments->pluck('card_id')->unique()->all())->pluck('name', 'id');
             $organizations = Organization::query()->whereKey(collect([$enrollments, $follows, $consents, $businessRoles, $organizationRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('organization_id')->all())->filter()->unique()->all())->pluck('name', 'id');
-            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $scans, $invitations, $businessRoles])
+            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $scans, $notes, $invitations, $businessRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('business_id')->all())
                 ->merge($rewards->flatten()->pluck('redeemed_business_id'))->filter()->unique()->all())->pluck('name', 'id');
             $locations = Location::query()->whereKey(collect([$stamps->flatten(), $taps, $scans])
@@ -163,6 +166,13 @@ final readonly class ExportMyData
                     'business' => $businesses->get($scan->business_id),
                     'location' => $locations->get($scan->location_id),
                     'gave_stamp' => $scan->stamp_event_id !== null,
+                ])->all(),
+                // What a business's team wrote about them, never who: "staff".
+                'notes_about_you' => $notes->map(fn (CustomerNote $note): array => [
+                    'business' => $businesses->get($note->business_id),
+                    'written_at' => $this->date($note->created_at),
+                    'by' => 'staff',
+                    'text' => $note->body,
                 ])->all(),
                 'sign_in_links' => LoginLink::query()->where('email', $user->email)->orderBy('id')->get(['purpose', 'created_at', 'used_at'])
                     ->map(fn (LoginLink $link): array => [

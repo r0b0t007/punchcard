@@ -110,9 +110,13 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         // Verify your business (CHW-145): its documents, sent by whoever runs it, never shown back.
         Route::get('verification', [VerificationController::class, 'show'])->name('verification.show');
         Route::post('verification/{kind}', [VerificationController::class, 'store'])->middleware('throttle:verification-upload')->name('verification.store');
-        // Customers (CHW-44, B4, B5): who came in, from whoever runs the business.
+        // Customers (CHW-44, B4, B5): who came in, from whoever runs the business: stamps by hand or taken back, and notes.
         Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
+        Route::post('customers/{customer}/stamps', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.stamps.store');
+        Route::post('customers/{customer}/corrections', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.corrections.store');
+        Route::post('customers/{customer}/notes', [CustomerController::class, 'note'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.notes.store');
+        Route::delete('customers/{customer}/notes/{note}', [CustomerController::class, 'deleteNote'])->whereNumber(['customer', 'note'])->middleware('throttle:customer-change')->name('customers.notes.destroy');
         // Campaigns (CHW-42, B9): a notification to the business's followers, from whoever runs it.
         Route::get('campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
         Route::get('campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
