@@ -1,7 +1,17 @@
 import { Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { StickyNote, Trash2 } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslation } from '@/hooks/use-translation';
@@ -19,8 +29,8 @@ export type CustomerNote = {
 
 /**
  * The team's notes on a customer (CHW-44, B5, design 15c), newest first:
- * write one, or delete one with the bin. The customer never sees them here;
- * their data export has them.
+ * write one, or delete one with the bin, after a confirmation (it is gone
+ * for good). The customer never sees them here; their data export has them.
  */
 export default function NotesCard({
     customer,
@@ -111,26 +121,67 @@ export default function NotesCard({
                                     })}
                                 </p>
                             </div>
-                            <Button
-                                variant="ghost-destructive"
-                                size="icon"
-                                asChild
-                            >
-                                <Link
-                                    href={destroy([customer.id, note.id])}
-                                    as="button"
-                                    preserveScroll
-                                    aria-label={t('Delete note')}
-                                    title={t('Delete note')}
-                                    data-test="customer-note-delete"
-                                >
-                                    <Trash2 aria-hidden="true" />
-                                </Link>
-                            </Button>
+                            <DeleteNote customer={customer} note={note} />
                         </li>
                     ))}
                 </ul>
             ) : null}
         </section>
+    );
+}
+
+/**
+ * The bin, and the confirmation before a note goes for good. The dialog
+ * closes as the request starts: its note is gone once it succeeds.
+ */
+function DeleteNote({
+    customer,
+    note,
+}: {
+    customer: { id: number; name: string };
+    note: CustomerNote;
+}) {
+    const { t, tn } = useTranslation();
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button
+                    variant="ghost-destructive"
+                    size="icon"
+                    aria-label={t('Delete note')}
+                    title={t('Delete note')}
+                    data-test="customer-note-delete"
+                >
+                    <Trash2 aria-hidden="true" />
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogTitle>{t('Delete this note?')}</DialogTitle>
+                <DialogDescription>
+                    {tn(
+                        'It goes for your whole team, and from the data :name can ask for. This can’t be undone.',
+                        { name: <bdi>{customer.name}</bdi> },
+                    )}
+                </DialogDescription>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="secondary">{t('Keep it')}</Button>
+                    </DialogClose>
+                    <Button variant="destructive" asChild>
+                        <Link
+                            href={destroy([customer.id, note.id])}
+                            as="button"
+                            preserveScroll
+                            onStart={() => setOpen(false)}
+                            data-test="confirm-customer-note-delete"
+                        >
+                            {t('Delete note')}
+                        </Link>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

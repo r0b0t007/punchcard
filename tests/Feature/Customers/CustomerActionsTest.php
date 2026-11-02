@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Tenants;
@@ -68,6 +69,8 @@ afterEach(function (): void {
 });
 
 it('adds stamps by hand as the owner, with the reason, as a visit', function (): void {
+    // The queued summary never runs: the page is right at once all the same.
+    Queue::fake();
     $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
 
     ($this->send)('customers.stamps.store', ['qty' => 2])
@@ -77,8 +80,8 @@ it('adds stamps by hand as the owner, with the reason, as a visit', function ():
 
     expect(array_slice(($this->ledger)(), 1))->toBe([['manual', 2, $this->tenants->a1->id, $this->owner->id, 'Card forgotten at home']])
         ->and(($this->stamps)())->toBe(3)
-        // Today is a second visit (the summary follows the stamp).
-        ->and(($this->summarised)()->visits)->toBe(2);
+        // Today is a second visit.
+        ->and($this->context->bypass(fn (): int => BusinessCustomer::query()->whereKey($this->customer->id)->value('visits')))->toBe(2);
 });
 
 it('gives one stamp for one press, however often it is sent', function (): void {
@@ -101,7 +104,9 @@ it('holds stamps by hand to the cooldown and the daily cap, on how many', functi
     // A stamp ten minutes ago, within the 20-minute cooldown.
     $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => now()->subMinutes(10)]);
 
-    ($this->send)('customers.stamps.store')->assertSessionHasErrors('qty');
+    ($this->send)('customers.stamps.store')->assertSessionHasErrors(['qty' => __('Too soon after their last stamp on this card: the next one can be given from :time today.', [
+        'time' => now()->addMinutes(10)->setTimezone($this->site->timezone)->format('H:i'),
+    ])]);
 
     Carbon::setTestNow(now()->addHour());
     ($this->send)('customers.stamps.store', ['qty' => 5])->assertSessionHasErrors(['qty' => __('That goes over today’s limit on this card here.')]);
@@ -191,6 +196,9 @@ it('keeps notes for the team, newest first, signed with the short name', functio
 it('keeps a note to 1000 characters', function (): void {
     ($this->send)('customers.notes.store', ['body' => str_repeat('a', 1001)])->assertSessionHasErrors('body');
     ($this->send)('customers.notes.store', ['body' => ''])->assertSessionHasErrors('body');
+    ($this->send)('customers.notes.store', ['body' => "\u{200B}\u{2066}\u{2069}"])->assertSessionHasErrors('body');
+
+    expect($this->context->bypass(fn (): int => CustomerNote::query()->count()))->toBe(0);
 });
 
 it('never shows a franchisee the sister\'s notes on the same person', function (): void {
@@ -281,6 +289,8 @@ it('takes back once for one press, and refuses its key for other details', funct
 });
 
 it('sends the owner back to the list once every stamp given here is taken back', function (): void {
+    // At once, not once a queue worker gets to the summary.
+    Queue::fake();
     $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
 
     // No visit left here: no longer the business's customer.
@@ -320,4 +330,42 @@ it('still takes back stamps given here on a card switched off', function (): voi
     ($this->send)('customers.corrections.store')->assertSessionHasNoErrors();
 
     expect(($this->stamps)())->toBe(0);
+});
+
+it('says when a cooldown of a day or more ends: tomorrow, or on its day', function (int $minutes, string $message, string $format): void {
+    $this->context->bypass(fn () => LoyaltyCard::query()->whereKey($this->tenants->cardA->id)->update(['cooldown_min' => $minutes]));
+    $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => now()]);
+    $next = now()->addMinutes($minutes)->setTimezone($this->site->timezone);
+
+    ($this->send)('customers.stamps.store')->assertSessionHasErrors(['qty' => __($message, [
+        'time' => $next->format('H:i'),
+        'date' => $next->translatedFormat($format),
+    ])]);
+})->with([
+    'tomorrow' => [24 * 60, 'Too soon after their last stamp on this card: the next one can be given tomorrow from :time.', 'l j F'],
+    'a later day' => [3 * 24 * 60, 'Too soon after their last stamp on this card: the next one can be given on :date from :time.', 'l j F'],
+]);
+
+it('takes back stamps at a closed site, and only adds them at an open one', function (): void {
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => now()->subDays(2)]);
+    $this->context->bypass(fn () => $this->site->forceFill(['archived_at' => now()])->save());
+
+    ($this->as)($this->owner)->get(route('customers.show', $this->customer->id))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('locations', [])
+        ->where('correctionLocations', [['id' => $this->site->id, 'name' => $this->site->name]]));
+    ($this->send)('customers.stamps.store')->assertSessionHasErrors('location');
+    ($this->send)('customers.corrections.store')->assertSessionHasNoErrors();
+
+    expect(($this->stamps)())->toBe(0);
+});
+
+it('shows every note, past the first fifty', function (): void {
+    $this->context->bypass(fn () => collect(range(1, 51))->each(fn (int $n) => CustomerNote::query()->create([
+        'business_id' => $this->tenants->a1->id, 'user_id' => $this->user->id, 'body' => 'Note '.$n,
+    ])));
+
+    ($this->as)($this->owner)->get(route('customers.show', $this->customer->id))->assertInertia(fn (Assert $page): Assert => $page
+        ->has('notes', 51)
+        ->where('notes.50.body', 'Note 1'));
 });

@@ -66,6 +66,7 @@ export default function CustomerPage({
     step,
     more,
     locations,
+    correctionLocations,
     maxQty,
     notes,
     noteMax,
@@ -79,18 +80,21 @@ export default function CustomerPage({
     more: boolean;
     /** The open sites stamps can be given at. */
     locations: { id: number; name: string }[];
+    /** Every site of the business, a closed one too: stamps taken back stay possible where they were given. */
+    correctionLocations: { id: number; name: string }[];
     maxQty: number;
     notes: CustomerNote[];
     noteMax: number;
 }) {
     const { t } = useTranslation();
-    const canStamp = cards.length > 0 && locations.length > 0;
+    const canAdd = cards.length > 0 && locations.length > 0;
+    const canTakeBack = cards.length > 0 && correctionLocations.length > 0;
     const dialog = (takesBack: boolean) => (
         <StampDialog
             takesBack={takesBack}
             customer={customer}
             cards={cards}
-            locations={locations}
+            locations={takesBack ? correctionLocations : locations}
             maxQty={maxQty}
             trigger={
                 <Button
@@ -142,11 +146,11 @@ export default function CustomerPage({
                             <StatusChip status={customer.status} />
                         </div>
                     </div>
-                    {canStamp ? (
+                    {canAdd || canTakeBack ? (
                         <div className="flex w-full gap-2.5 md:w-auto md:flex-row-reverse">
                             {/* Add stamps first on a phone, last beside the name on a computer (15c). */}
-                            {dialog(false)}
-                            {dialog(true)}
+                            {canAdd ? dialog(false) : null}
+                            {canTakeBack ? dialog(true) : null}
                         </div>
                     ) : null}
                 </div>

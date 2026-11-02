@@ -74,14 +74,21 @@ class StampCustomerRequest extends CustomerRequest
             ->first();
     }
 
-    /** One of the business's open sites, or the owner's own when they are limited to one. */
+    /**
+     * Where: for stamps added, one of the business's open sites, or the owner's own when they are limited to one;
+     * for stamps taken back, any of its sites, an archived one too, so the ledger stays fixable (as AddStamps allows).
+     */
     public function location(): ?Location
     {
         $business = $this->business();
 
-        return $this->location ??= $business instanceof Business
-            ? app(ScanLocations::class)->find($business, app(TenantContext::class)->locationId(), $this->integer('location'))
-            : null;
+        if (! $business instanceof Business) {
+            return null;
+        }
+
+        return $this->location ??= $this->takesBack()
+            ? Location::query()->where('business_id', $business->id)->whereKey($this->integer('location'))->first()
+            : app(ScanLocations::class)->find($business, app(TenantContext::class)->locationId(), $this->integer('location'));
     }
 
     public function stampRequest(): StampRequest

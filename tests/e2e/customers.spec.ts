@@ -124,9 +124,11 @@ test('the owner adds a stamp by hand with a reason, and keeps a note', async ({
         contentType: 'image/png',
     });
 
+    // The bin asks first: a note goes for good.
     await notes
         .filter({ hasText: note })
         .locator('[data-test="customer-note-delete"]')
         .click();
+    await page.locator('[data-test="confirm-customer-note-delete"]').click();
     await expect(notes.filter({ hasText: note })).toHaveCount(0);
 });

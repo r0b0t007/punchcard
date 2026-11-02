@@ -16,7 +16,8 @@ class StoreNoteRequest extends CustomerRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'max:'.CustomerNote::MAX_LENGTH],
+            // Words, not only invisible characters.
+            'body' => ['required', 'string', 'max:'.CustomerNote::MAX_LENGTH, 'not_regex:/^[\p{C}\s]*$/u'],
         ];
     }
 

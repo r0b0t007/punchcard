@@ -1127,7 +1127,6 @@
     ":count stamp added, and a reward unlocked.|:count stamps added, and a reward unlocked.": "{0,1} :count tampon ajouté, et une récompense débloquée.|[2,*] :count tampons ajoutés, et une récompense débloquée.",
     ":count stamp added.|:count stamps added.": "{0,1} :count tampon ajouté.|[2,*] :count tampons ajoutés.",
     "Note deleted.": "Note supprimée.",
-    "Too soon after their last stamp on this card: the next one can be given from :date.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné à partir du :date.",
     "That goes over today’s limit on this card here.": "Cela dépasse la limite du jour sur cette carte ici.",
     "That is more than this business gave on this card.": "C’est plus que ce que cet établissement a donné sur cette carte.",
     "The card doesn’t have that many stamps.": "La carte n’a pas autant de tampons.",
@@ -1147,5 +1146,11 @@
     "Save note": "Enregistrer",
     "Delete note": "Supprimer la note",
     "This was already recorded. Reload the page to see it.": "C’est déjà enregistré. Rechargez la page pour le voir.",
-    "This card’s rewards need fixing in the card builder: nothing was added.": "Les récompenses de cette carte sont à corriger dans l’éditeur de carte : rien n’a été ajouté."
+    "This card’s rewards need fixing in the card builder: nothing was added.": "Les récompenses de cette carte sont à corriger dans l’éditeur de carte : rien n’a été ajouté.",
+    "Too soon after their last stamp on this card. Try again.": "Trop tôt après son dernier tampon sur cette carte. Réessayez.",
+    "Too soon after their last stamp on this card: the next one can be given from :time today.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné à partir de :time aujourd’hui.",
+    "Too soon after their last stamp on this card: the next one can be given tomorrow from :time.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné demain à partir de :time.",
+    "Too soon after their last stamp on this card: the next one can be given on :date from :time.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné le :date à partir de :time.",
+    "Delete this note?": "Supprimer cette note ?",
+    "It goes for your whole team, and from the data :name can ask for. This can’t be undone.": "Elle disparaît pour toute votre équipe, et des données que :name peut demander. C’est définitif."
 }
