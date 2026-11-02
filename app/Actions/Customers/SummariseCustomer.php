@@ -7,13 +7,16 @@ namespace App\Actions\Customers;
 use App\Enums\StampSource;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
+use App\Models\CustomerVisitDay;
 use App\Models\Location;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,6 +33,8 @@ use Illuminate\Support\Facades\DB;
  *   quiet_min_days, and are lost lost_days after their last visit
  *   (docs/spec.md "Derived metrics"). Never quiet later than lost: someone
  *   who comes monthly or less goes from active to lost.
+ * - Each day they came in to each site is kept too (CHW-45,
+ *   CustomerVisitDay), for the dashboard, whatever happened since.
  * - No visit here, everything given here taken back (a stamp by hand for the
  *   wrong customer, corrected), or an anonymised account: no row.
  * - Under the customer's row lock, so two summaries of them, or one and
@@ -57,7 +62,13 @@ final readonly class SummariseCustomer
                 ->whereIn('source', [...StampSource::presenceValues(), StampSource::Correction->value])
                 ->get(['location_id', 'source', 'qty', 'created_at']);
             $stamps = $here->reject(fn (StampEvent $stamp): bool => $stamp->source === StampSource::Correction);
+            $locations = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()->keyBy('id');
+            $localDay = fn (StampEvent $stamp): string => $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d');
             $row = BusinessCustomer::query()->where('business_id', $businessId)->where('user_id', $userId);
+
+            if ($user instanceof User) {
+                $this->recordVisitDays($businessId, $organizationId, $userId, $stamps, $localDay);
+            }
 
             if ($here->sum('qty') <= 0 || ! $user instanceof User || $user->isAnonymised()) {
                 $row->delete();
@@ -65,10 +76,7 @@ final readonly class SummariseCustomer
                 return;
             }
 
-            $locations = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()->keyBy('id');
-            $days = $stamps
-                ->map(fn (StampEvent $stamp): string => $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d'))
-                ->unique()->sort()->values();
+            $days = $stamps->map($localDay)->unique()->sort()->values();
             $visits = $days->count();
             /** @var Carbon $first */
             $first = $stamps->min('created_at');
@@ -90,6 +98,48 @@ final readonly class SummariseCustomer
                 'rewards_redeemed' => Reward::query()->whereIn('enrollment_id', $theirs)->where('redeemed_business_id', $businessId)->count(),
             ]);
         }), attempts: 3);
+    }
+
+    /**
+     * Their days at each site of the business (CHW-45): one row per site and
+     * local day with a presence stamp, with the day's latest, made to match
+     * the ledger: new and changed days written, and a day no longer found
+     * (after a site's timezone changed) removed. The ledger is append-only,
+     * so otherwise a day once seen stays, whatever was taken back since, as
+     * the dashboard has always counted visits.
+     *
+     * @param  Collection<int, StampEvent>  $stamps
+     * @param  Closure(StampEvent): string  $localDay
+     */
+    private function recordVisitDays(int $businessId, int $organizationId, int $userId, Collection $stamps, Closure $localDay): void
+    {
+        $days = $stamps
+            ->groupBy(fn (StampEvent $stamp): string => $stamp->location_id.' '.$localDay($stamp))
+            ->map(fn (Collection $day): array => [
+                'organization_id' => $organizationId,
+                'business_id' => $businessId,
+                'location_id' => (int) $day->first()?->location_id,
+                'user_id' => $userId,
+                'visited_on' => $localDay($day->firstOrFail()),
+                'last_at' => $day->max('created_at')?->utc()->format('Y-m-d H:i:s'),
+            ])
+            ->all();
+        $kept = CustomerVisitDay::query()->where('business_id', $businessId)->where('user_id', $userId)->get(['id', 'location_id', 'visited_on', 'last_at'])
+            ->keyBy(fn (CustomerVisitDay $day): string => $day->location_id.' '.$day->visited_on->toDateString());
+
+        // Only what changed: a regular's years of days are not rewritten at each stamp.
+        $changed = array_filter($days, fn (array $day, string $key): bool => $kept->get($key)?->last_at->toDateTimeString() !== $day['last_at'], ARRAY_FILTER_USE_BOTH);
+        // A day no longer found: the site's timezone changed since, and the visit moved to another day.
+        $moved = $kept->reject(fn (CustomerVisitDay $day, string $key): bool => array_key_exists($key, $days))->modelKeys();
+
+        if ($moved !== []) {
+            CustomerVisitDay::query()->whereKey($moved)->delete();
+        }
+
+        // In chunks: years of visits would pass a database's bound parameters (999 on an old SQLite).
+        foreach (array_chunk(array_values($changed), 150) as $chunk) {
+            CustomerVisitDay::query()->upsert($chunk, ['location_id', 'user_id', 'visited_on'], ['last_at']);
+        }
     }
 
     /**

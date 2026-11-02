@@ -12,8 +12,9 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 /**
- * Summarises every business's customers from the ledger (CHW-44): once after
- * deploying the customers list, for who came in before it, again after
+ * Summarises every business's customers from the ledger (CHW-44), and the
+ * days they came in (CHW-45): once after deploying the customers list and
+ * again after the visit days, for who came in before them, again after
  * changing config('punchcard.customers') or a site's timezone, or for one
  * business. A business at a time, so memory stays one business's customers.
  * Safe to run again: each customer is rewritten whole.

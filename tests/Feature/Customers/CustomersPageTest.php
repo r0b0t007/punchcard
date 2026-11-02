@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Customers\ListCustomers;
+use App\Actions\Customers\SummariseCustomer;
 use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
@@ -145,6 +146,7 @@ it('keeps the customers from staff, and from an organization admin outside a bus
 it('names the dashboard\'s top customers by first name and initial', function (): void {
     $customer = User::factory()->create(['name' => 'Salma Tazi']);
     $this->tenants->stamp($this->tenants->enroll($customer, $this->tenants->cardA), $this->tenants->a1);
+    app(SummariseCustomer::class)->handle($this->tenants->a1->id, $this->tenants->orgA->id, $customer->id);
 
     ($this->as)($this->owner)->get(route('dashboard'))->assertInertia(fn (Assert $page): Assert => $page->where('stats.topCustomers.0.name', 'Salma T.'));
 });
