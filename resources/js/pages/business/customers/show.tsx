@@ -1,7 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronLeft, Gift, Hand, Stamp, Undo2 } from 'lucide-react';
+import { ChevronLeft, Gift, Hand, Plus, Stamp, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import NotesCard from '@/components/customers/notes-card';
+import type { CustomerNote } from '@/components/customers/notes-card';
+import StampDialog from '@/components/customers/stamp-dialog';
 import StatusChip from '@/components/customers/status-chip';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn, TranslateNodesFn } from '@/hooks/use-translation';
@@ -52,7 +55,8 @@ type HistoryEvent = {
 /**
  * One customer (CHW-44, B5, design 15c): their status, what they usually
  * do, their progress on each card, and what happened at this business,
- * newest first, more on asking. The owner's, never staff's.
+ * newest first, more on asking. Stamps added by hand or taken back, with a
+ * reason, and the team's notes. The owner's, never staff's.
  */
 export default function CustomerPage({
     customer,
@@ -61,6 +65,11 @@ export default function CustomerPage({
     shown,
     step,
     more,
+    locations,
+    correctionLocations,
+    maxQty,
+    notes,
+    noteMax,
 }: {
     customer: Customer;
     cards: CardProgress[];
@@ -69,8 +78,43 @@ export default function CustomerPage({
     /** How many more "Show older" asks for. */
     step: number;
     more: boolean;
+    /** The open sites stamps can be given at. */
+    locations: { id: number; name: string }[];
+    /** Every site of the business, a closed one too: stamps taken back stay possible where they were given. */
+    correctionLocations: { id: number; name: string }[];
+    maxQty: number;
+    notes: CustomerNote[];
+    noteMax: number;
 }) {
     const { t } = useTranslation();
+    const canAdd = cards.length > 0 && locations.length > 0;
+    const canTakeBack = cards.length > 0 && correctionLocations.length > 0;
+    const dialog = (takesBack: boolean) => (
+        <StampDialog
+            takesBack={takesBack}
+            customer={customer}
+            cards={cards}
+            locations={takesBack ? correctionLocations : locations}
+            maxQty={maxQty}
+            trigger={
+                <Button
+                    variant={takesBack ? 'outline' : 'default'}
+                    className="flex-1 md:flex-none"
+                    data-test={takesBack ? 'take-back' : 'add-stamps'}
+                >
+                    {takesBack ? (
+                        <Undo2
+                            aria-hidden="true"
+                            className="rtl:-scale-x-100"
+                        />
+                    ) : (
+                        <Plus aria-hidden="true" />
+                    )}
+                    {takesBack ? t('Take back') : t('Add stamps')}
+                </Button>
+            }
+        />
+    );
 
     return (
         <>
@@ -87,19 +131,28 @@ export default function CustomerPage({
                     {t('Customers')}
                 </Link>
 
-                <div className="flex items-center gap-3">
-                    <span
-                        aria-hidden="true"
-                        className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold"
-                    >
-                        {initials(customer.name)}
-                    </span>
-                    <div className="flex flex-col gap-1">
-                        <h1 className="font-display text-title leading-none font-bold">
-                            <bdi>{customer.name}</bdi>
-                        </h1>
-                        <StatusChip status={customer.status} />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <span
+                            aria-hidden="true"
+                            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold"
+                        >
+                            {initials(customer.name)}
+                        </span>
+                        <div className="flex flex-col gap-1">
+                            <h1 className="font-display text-title leading-none font-bold">
+                                <bdi>{customer.name}</bdi>
+                            </h1>
+                            <StatusChip status={customer.status} />
+                        </div>
                     </div>
+                    {canAdd || canTakeBack ? (
+                        <div className="flex w-full gap-2.5 md:w-auto md:flex-row-reverse">
+                            {/* Add stamps first on a phone, last beside the name on a computer (15c). */}
+                            {canAdd ? dialog(false) : null}
+                            {canTakeBack ? dialog(true) : null}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="grid items-start gap-5 md:grid-cols-3">
@@ -180,6 +233,12 @@ export default function CustomerPage({
                                 <CardItem key={card.id} card={card} />
                             ))}
                         </section>
+
+                        <NotesCard
+                            customer={customer}
+                            notes={notes}
+                            maxLength={noteMax}
+                        />
                     </div>
                 </div>
             </div>

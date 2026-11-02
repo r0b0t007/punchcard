@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Actions\Customers;
 
+use App\Actions\Counter\ScanLocations;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
+use App\Models\CustomerNote;
+use App\Models\Location;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
@@ -22,7 +25,10 @@ use Carbon\CarbonImmutable;
  * each of the organization's cards the business sees (shared across a
  * franchise); and what happened at this business, newest first, $shown of
  * it: stamps (by tap, scan or hand, with who and why, and corrections) and
- * rewards redeemed here.
+ * rewards redeemed here. For adding stamps or taking them back: the sites
+ * they can be given at (added: the open ones; taken back: any). And the
+ * team's notes on them, newest first, every one, so the team can read and
+ * delete all that the customer's data export holds.
  *
  * Read in the owner's tenant: a franchisee's history is its own; a sister
  * franchisee's stamps count on the card, never in this history.
@@ -33,7 +39,7 @@ final readonly class DescribeCustomer
 
     public const int MOST = 500;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ScanLocations $scanLocations) {}
 
     /**
      * @return array{
@@ -43,6 +49,9 @@ final readonly class DescribeCustomer
      *     shown: int,
      *     step: int,
      *     more: bool,
+     *     locations: list<array{id: int, name: string}>,
+     *     correctionLocations: list<array{id: int, name: string}>,
+     *     notes: list<array{id: int, body: string, by: string|null, at: array{day: string, date: string, time: string}}>,
      * }
      */
     public function handle(Business $business, BusinessCustomer $customer, int $shown, CarbonImmutable $now): array
@@ -95,6 +104,8 @@ final readonly class DescribeCustomer
         $history = $stamps->concat($redeemed)->sortByDesc('sort')->values();
         // The cards the business sees (shared across a franchise), with their progress.
         $cards = CardEnrollment::query()->where('user_id', $customer->user_id)->with('card')->orderBy('id')->get();
+        $notes = CustomerNote::query()->where('business_id', $business->id)->where('user_id', $customer->user_id)
+            ->with('author:id,name,anonymised_at')->latest('id')->get();
 
         return [
             'customer' => [
@@ -123,6 +134,15 @@ final readonly class DescribeCustomer
             'step' => self::SHOWN,
             // Up to MOST: the page asks no further.
             'more' => $shown < self::MOST && $history->count() > $shown,
+            'locations' => $this->scanLocations->handle($business, $this->context->locationId()),
+            'correctionLocations' => array_values(Location::query()->where('business_id', $business->id)->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Location $location): array => ['id' => $location->id, 'name' => $location->name])->all()),
+            'notes' => array_values($notes->map(fn (CustomerNote $note): array => [
+                'id' => $note->id,
+                'body' => $note->body,
+                'by' => $staff($note->author),
+                'at' => LocalMoment::of($note->created_at, $timezone, $now),
+            ])->all()),
         ];
     }
 }
