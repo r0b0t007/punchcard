@@ -71,7 +71,7 @@ afterEach(function (): void {
 it('adds stamps by hand as the owner, with the reason, as a visit', function (): void {
     // The queued summary never runs: the page is right at once all the same.
     Queue::fake();
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1, 'lifetime_stamps' => 1]));
 
     ($this->send)('customers.stamps.store', ['qty' => 2])
         ->assertRedirect(route('customers.show', $this->customer->id))
@@ -94,7 +94,7 @@ it('gives one stamp for one press, however often it is sent', function (): void 
 });
 
 it('says when a reward unlocks', function (): void {
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => $this->tenants->cardA->stamps_required - 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => $this->tenants->cardA->stamps_required - 1, 'lifetime_stamps' => $this->tenants->cardA->stamps_required - 1]));
 
     ($this->send)('customers.stamps.store')
         ->assertInertiaFlash('toast', ['type' => 'success', 'message' => trans_choice(':count stamp added, and a reward unlocked.|:count stamps added, and a reward unlocked.', 1)]);
@@ -115,7 +115,7 @@ it('holds stamps by hand to the cooldown and the daily cap, on how many', functi
 });
 
 it('takes back stamps given here, with the reason, never more than were given here', function (): void {
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 5]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 5, 'lifetime_stamps' => 5]));
     // Stamps at the sister franchisee are not A1's to take back.
     $this->tenants->stamp($this->enrollment, $this->tenants->a2, ['qty' => 3, 'created_at' => now()->subHours(2)]);
 
@@ -276,7 +276,7 @@ it('gives the next stamp when the cooldown ends, not a minute before', function 
 it('takes back once for one press, and refuses its key for other details', function (): void {
     // Two given here, so one taken back leaves them a customer.
     $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => now()->subDays(2)]);
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1, 'lifetime_stamps' => 1]));
     $key = (string) Str::uuid();
 
     ($this->send)('customers.corrections.store', ['key' => $key])->assertSessionHasNoErrors();
@@ -291,7 +291,7 @@ it('takes back once for one press, and refuses its key for other details', funct
 it('sends the owner back to the list once every stamp given here is taken back', function (): void {
     // At once, not once a queue worker gets to the summary.
     Queue::fake();
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1, 'lifetime_stamps' => 1]));
 
     // No visit left here: no longer the business's customer.
     ($this->send)('customers.corrections.store')->assertRedirect(route('customers.index'));
@@ -323,7 +323,7 @@ it('never lets the org admin of the network, or another organization, stamp or k
 });
 
 it('still takes back stamps given here on a card switched off', function (): void {
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1, 'lifetime_stamps' => 1]));
     $this->context->bypass(fn () => LoyaltyCard::query()->whereKey($this->tenants->cardA->id)->update(['active' => false]));
 
     ($this->send)('customers.stamps.store')->assertSessionHasErrors(['enrollment' => __('This card isn’t running here: nothing was added.')]);
@@ -347,7 +347,7 @@ it('says when a cooldown of a day or more ends: tomorrow, or on its day', functi
 ]);
 
 it('takes back stamps at a closed site, and only adds them at an open one', function (): void {
-    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1]));
+    $this->context->bypass(fn () => CardEnrollment::query()->whereKey($this->enrollment->id)->update(['current_stamps' => 1, 'lifetime_stamps' => 1]));
     $this->tenants->stamp($this->enrollment, $this->tenants->a1, ['created_at' => now()->subDays(2)]);
     $this->context->bypass(fn () => $this->site->forceFill(['archived_at' => now()])->save());
 
