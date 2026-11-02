@@ -40,7 +40,14 @@ use Carbon\CarbonImmutable;
  *
  * A fixed number of queries, however many stamps: visits are read from the
  * customers' visit days, one row per customer and one per day, never from
- * the stamps themselves.
+ * the stamps themselves. Those are written on the queue after each stamp
+ * (SummariseCustomers), so a visit counts here once the queue has run it,
+ * while the latest stamps read the ledger at once; a job that failed every
+ * try is in failed_jobs, and punchcard:customers:summarise writes it again.
+ *
+ * A visit's day is the local day of the site it was made at; the windows
+ * are the business's days. Sites in two timezones (multi-location, CHW-53)
+ * can put a late visit at one on the business's next day.
  */
 final readonly class DescribeDashboard
 {

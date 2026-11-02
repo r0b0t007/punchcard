@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Onboarding;
 
 use App\Enums\OnboardingStep;
+use App\Jobs\SummariseBusinessCustomers;
 use App\Models\Business;
 use App\Models\Location;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,9 @@ use Illuminate\Support\Facades\DB;
  * The wizard's location step (CHW-31): the business's first site, its
  * address and timezone (stamps and rewards are shown in its local time).
  * Doing the step again updates that site rather than adding another; more
- * sites come with multi-location (CHW-53). Runs in the business's tenant.
+ * sites come with multi-location (CHW-53). A new timezone moves its visits
+ * to other local days: its customers are summarised again, on the queue
+ * (CHW-45). Runs in the business's tenant.
  */
 final readonly class SaveFirstLocation
 {
@@ -27,6 +30,11 @@ final readonly class SaveFirstLocation
 
             $location->fill(['name' => $name, 'address' => $address, 'timezone' => $timezone])->save();
             $this->completeStep->handle($business, OnboardingStep::Location);
+
+            // Its visits now fall on other local days: its customers are summarised again, after this commits.
+            if ($location->wasChanged('timezone')) {
+                SummariseBusinessCustomers::dispatch($business->id, $business->organization_id)->afterCommit();
+            }
 
             return $location;
         });

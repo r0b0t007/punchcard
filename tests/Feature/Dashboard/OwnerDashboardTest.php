@@ -255,6 +255,20 @@ it('counts a customer at two sites on one day as one visit to the business, and 
         ->and($visits($this->tenants->locationOf($this->tenants->b1)->id)['value'])->toBe(1);
 });
 
+it('puts a visit on its site\'s day, even a late one at a site in another timezone', function (): void {
+    // The business's days are its first site's (UTC+1); Dubai is UTC+4. 21:30 UTC is 22:30 on 10 Oct for the
+    // business, and already 11 Oct in Dubai: tomorrow for the business, so not in today's figures (CHW-53).
+    $this->travelTo(CarbonImmutable::parse('2026-10-10 21:45:00', 'UTC'));
+    $dubai = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->b1->id, 'timezone' => 'Asia/Dubai']));
+    ($this->stampAt)(($this->customer)($this->tenants->cardB), $this->tenants->b1, '2026-10-10 21:30:00', ['location_id' => $dubai->id]);
+
+    expect(($this->stats)($this->tenants->b1)['kpis']['visits']['value'])->toBe(0);
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-11 09:00:00', 'UTC'));
+
+    expect(($this->stats)($this->tenants->b1)['visitsPerDay'][29])->toBe(['date' => '2026-10-11', 'visits' => 1]);
+});
+
 it('counts only the business it is asked for, even read at the organization level', function (): void {
     $customer = ($this->customer)($this->tenants->cardA);
     ($this->stampAt)($customer, $this->tenants->a1, '2026-10-05 10:00:00');

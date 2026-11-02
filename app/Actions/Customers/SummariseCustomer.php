@@ -14,9 +14,7 @@ use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
-use Closure;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -63,11 +61,16 @@ final readonly class SummariseCustomer
                 ->get(['location_id', 'source', 'qty', 'created_at']);
             $stamps = $here->reject(fn (StampEvent $stamp): bool => $stamp->source === StampSource::Correction);
             $locations = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()->keyBy('id');
-            $localDay = fn (StampEvent $stamp): string => $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d');
+            // Each presence stamp's site, local day and moment, worked out once.
+            $presence = $stamps->map(fn (StampEvent $stamp): array => [
+                (int) $stamp->location_id,
+                $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d'),
+                $stamp->created_at->copy()->utc()->format('Y-m-d H:i:s'),
+            ])->values()->all();
             $row = BusinessCustomer::query()->where('business_id', $businessId)->where('user_id', $userId);
 
             if ($user instanceof User) {
-                $this->recordVisitDays($businessId, $organizationId, $userId, $stamps, $localDay);
+                $this->recordVisitDays($businessId, $organizationId, $userId, $presence);
             }
 
             if ($here->sum('qty') <= 0 || ! $user instanceof User || $user->isAnonymised()) {
@@ -76,7 +79,7 @@ final readonly class SummariseCustomer
                 return;
             }
 
-            $days = $stamps->map($localDay)->unique()->sort()->values();
+            $days = collect(array_column($presence, 1))->unique()->sort()->values();
             $visits = $days->count();
             /** @var Carbon $first */
             $first = $stamps->min('created_at');
@@ -108,22 +111,20 @@ final readonly class SummariseCustomer
      * so otherwise a day once seen stays, whatever was taken back since, as
      * the dashboard has always counted visits.
      *
-     * @param  Collection<int, StampEvent>  $stamps
-     * @param  Closure(StampEvent): string  $localDay
+     * @param  array<int, array{int, string, string}>  $presence  each presence stamp's site, local day and moment (UTC)
      */
-    private function recordVisitDays(int $businessId, int $organizationId, int $userId, Collection $stamps, Closure $localDay): void
+    private function recordVisitDays(int $businessId, int $organizationId, int $userId, array $presence): void
     {
-        $days = $stamps
-            ->groupBy(fn (StampEvent $stamp): string => $stamp->location_id.' '.$localDay($stamp))
-            ->map(fn (Collection $day): array => [
-                'organization_id' => $organizationId,
-                'business_id' => $businessId,
-                'location_id' => (int) $day->first()?->location_id,
-                'user_id' => $userId,
-                'visited_on' => $localDay($day->firstOrFail()),
-                'last_at' => $day->max('created_at')?->utc()->format('Y-m-d H:i:s'),
-            ])
-            ->all();
+        $days = [];
+
+        foreach ($presence as [$locationId, $day, $at]) {
+            $key = $locationId.' '.$day;
+
+            if (! isset($days[$key]) || $at > $days[$key]['last_at']) {
+                $days[$key] = ['organization_id' => $organizationId, 'business_id' => $businessId, 'location_id' => $locationId, 'user_id' => $userId, 'visited_on' => $day, 'last_at' => $at];
+            }
+        }
+
         $kept = CustomerVisitDay::query()->where('business_id', $businessId)->where('user_id', $userId)->get(['id', 'location_id', 'visited_on', 'last_at'])
             ->keyBy(fn (CustomerVisitDay $day): string => $day->location_id.' '.$day->visited_on->toDateString());
 
@@ -140,6 +141,23 @@ final readonly class SummariseCustomer
         foreach (array_chunk(array_values($changed), 150) as $chunk) {
             CustomerVisitDay::query()->upsert($chunk, ['location_id', 'user_id', 'visited_on'], ['last_at']);
         }
+    }
+
+    /**
+     * Every customer of the business summarised again, one at a time: after
+     * a site's timezone changed, or for who came in before the summaries.
+     *
+     * @return int how many
+     */
+    public function everyoneAt(int $businessId, int $organizationId): int
+    {
+        $customers = $this->customersOf($businessId);
+
+        foreach ($customers as $userId) {
+            $this->handle($businessId, $organizationId, $userId);
+        }
+
+        return count($customers);
     }
 
     /**

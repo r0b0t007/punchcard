@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Actions\Account\DeleteAccount;
 use App\Actions\Customers\SummariseCustomer;
+use App\Actions\Onboarding\SaveFirstLocation;
 use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRequest;
 use App\Enums\StampSource;
+use App\Jobs\SummariseBusinessCustomers;
 use App\Models\Business;
 use App\Models\CustomerVisitDay;
 use App\Models\Location;
@@ -15,6 +17,7 @@ use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\Support\Tenants;
 
@@ -125,6 +128,43 @@ it('moves a visit to its new day when the site\'s timezone changes, never counti
     $this->artisan('punchcard:customers:summarise')->assertSuccessful();
 
     expect(array_column(($this->days)(), 2))->toBe(['2026-10-31']);
+});
+
+it('summarises the business\'s customers again on the queue when its site\'s timezone changes, and only then', function (): void {
+    Queue::fake();
+    $location = $this->tenants->locationOf($this->tenants->a1);
+    $save = fn (string $timezone) => $this->context->bypass(fn () => app(SaveFirstLocation::class)->handle($this->tenants->a1->fresh(), $location->name, 'Rue de la Plage', $timezone));
+    $pushed = fn (): int => Queue::pushed(SummariseBusinessCustomers::class)->count();
+
+    $save('Asia/Dubai');
+    expect($pushed())->toBe(0);
+
+    $save('UTC');
+    expect($pushed())->toBe(1)
+        ->and(Queue::pushed(SummariseBusinessCustomers::class)->first())
+        ->businessId->toBe($this->tenants->a1->id)
+        ->organizationId->toBe($this->tenants->orgA->id);
+});
+
+it('moves every customer\'s visits to their new day when the business is summarised again', function (): void {
+    // 21:30 UTC: 30 Oct in UTC, 31 Oct in Dubai.
+    ($this->stampAt)('2026-10-30 21:30:00');
+    ($this->summarise)();
+    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'UTC'])->save());
+
+    (new SummariseBusinessCustomers($this->tenants->a1->id, $this->tenants->orgA->id))->handle(app(SummariseCustomer::class));
+
+    expect(array_column(($this->days)(), 2))->toBe(['2026-10-30']);
+});
+
+it('fills the days of who came in before when the table is created', function (): void {
+    ($this->stampAt)('2026-10-30 10:00:00');
+    $migration = require database_path('migrations/2026_11_02_190931_create_customer_visit_days_table.php');
+    $migration->down();
+
+    $migration->up();
+
+    expect(array_column(($this->days)(), 2))->toBe(['2026-10-30']);
 });
 
 it('writes only the days that changed', function (): void {

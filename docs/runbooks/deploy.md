@@ -191,15 +191,10 @@ keep the old release working: add a column or table in one release, use it in th
 Run it once by hand with "Deploy now" in Ploi and watch the log. Turn on Ploi's notifications for failed deploys (the
 site's Notifications, by email): the GitHub workflow only proves the deploy was triggered and the site still answers.
 
-Some releases add a table filled from the stamp ledger, which starts empty. Run its command once in `current/`
-after the release is live, in the site's terminal:
-
-| Release                                                             | Command                                     |
-| ------------------------------------------------------------------- | ------------------------------------------- |
-| The customers list (CHW-44) and the dashboard's visit days (CHW-45) | `php artisan punchcard:customers:summarise` |
-
-Until it has run, the Customers page lists only who stamped since the deploy, and the dashboard counts only their
-visits. It is safe to run again, and needed again after changing `config('punchcard.customers')` or a site's timezone.
+A table filled from the stamp ledger is filled by its own migration, before the release that reads it goes live: the
+dashboard's visit days (CHW-45) run `punchcard:customers:summarise`, which fills the customers list (CHW-44) too. Run
+that command again in `current/` after changing `config('punchcard.customers')`; a site's new timezone queues it for
+its business on its own.
 
 ## 8. Queue worker and scheduler
 

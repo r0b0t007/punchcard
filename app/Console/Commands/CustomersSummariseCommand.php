@@ -32,13 +32,7 @@ class CustomersSummariseCommand extends Command
             $businesses = Business::query()->when($business !== null, fn ($query) => $query->whereKey((int) $business))->lazyById(100);
 
             foreach ($businesses as $each) {
-                $customers = $summariseCustomer->customersOf($each->id);
-
-                foreach ($customers as $userId) {
-                    $summariseCustomer->handle($each->id, (int) $each->organization_id, $userId);
-                }
-
-                $count += count($customers);
+                $count += $summariseCustomer->everyoneAt($each->id, (int) $each->organization_id);
             }
 
             return $count;

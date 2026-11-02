@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -37,6 +38,10 @@ return new class extends Migration
             $table->index(['business_id', 'user_id']);
             $table->index('user_id');
         });
+
+        // Filled from the ledger before the release that reads it goes live (docs/runbooks/deploy.md: migrate runs
+        // first), so no dashboard starts empty. Nothing to do on a fresh database: it has no stamps.
+        Artisan::call('punchcard:customers:summarise');
     }
 
     public function down(): void
