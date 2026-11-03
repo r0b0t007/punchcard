@@ -56,7 +56,7 @@ final readonly class DescribeCustomer
      */
     public function handle(Business $business, BusinessCustomer $customer, int $shown, CarbonImmutable $now): array
     {
-        $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
+        $timezone = LocalMoment::timezoneOfBusiness($business->id);
         // Every card of theirs in the organization, as the summary counts them: a card stamped only at a sister
         // franchisee can still be redeemed here. The stamps and redemptions read below are this business's only.
         $theirs = $this->context->bypass(fn () => CardEnrollment::query()->where('organization_id', $business->organization_id)

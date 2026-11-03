@@ -233,7 +233,8 @@ describe('the demo', function (): void {
 
             expect($quiet)->toHaveCount(3)
                 ->and($quiet->pluck('user_id'))->not->toContain($customer->id)
-                ->and($quiet->every(fn (BusinessCustomer $away): bool => $away->last_visit_at->lessThanOrEqualTo(now()->subDays(20))))->toBeTrue();
+                // 20 days back, at any hour of the day: at least 19 days ago, whenever the suite runs.
+                ->and($quiet->every(fn (BusinessCustomer $away): bool => $away->last_visit_at->lessThanOrEqualTo(now()->subDays(19))))->toBeTrue();
         });
     });
 });

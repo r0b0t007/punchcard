@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { ChevronRight, Megaphone, Moon } from 'lucide-react';
-import type { DashboardStats } from '@/components/dashboard/types';
+import type { GoingQuietCustomers } from '@/components/dashboard/types';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -24,7 +24,7 @@ export default function GoingQuiet({
     goingQuiet,
     locationPicked,
 }: {
-    goingQuiet: DashboardStats['goingQuiet'];
+    goingQuiet: GoingQuietCustomers;
     locationPicked: boolean;
 }) {
     const { t } = useTranslation();

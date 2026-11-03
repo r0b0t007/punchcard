@@ -78,6 +78,12 @@ final class DemoSeeder extends Seeder
 
     private const int GOING_QUIET_DAYS = 20;
 
+    /**
+     * At least this many visits for those who stopped coming: their usual gap stays under a week, so they are going
+     * quiet (twice that, at least 14 days) whatever hour their last visit was.
+     */
+    private const int GOING_QUIET_VISITS = 8;
+
     /** Repeatable values; seeded only while run() works, then reseeded randomly (Faker seeds mt_rand, which fake() shares). */
     private readonly Generator $faker;
 
@@ -245,7 +251,8 @@ final class DemoSeeder extends Seeder
         foreach ($members as $listed) {
             [$member, $visitedAt] = $listed;
             $away = $listed[2] ?? 0;
-            $days = $this->faker->randomElements(range(max(1, $away), 60), $this->faker->numberBetween(count($visitedAt), 25));
+            $fewest = $away > 0 ? max(count($visitedAt), self::GOING_QUIET_VISITS) : count($visitedAt);
+            $days = $this->faker->randomElements(range(max(1, $away), 60), $this->faker->numberBetween($fewest, 25));
             rsort($days);
             $times = array_map(fn (mixed $day): CarbonInterface => Carbon::now()->subDays((int) $day)
                 ->setTime($this->faker->numberBetween(8, 21), $this->faker->numberBetween(0, 59)), $days);

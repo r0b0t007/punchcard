@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Dashboard\DescribeDashboard;
+use App\Actions\Dashboard\DescribeGoingQuiet;
 use App\Actions\Onboarding\DescribeChecklist;
 use App\Actions\Tenancy\HasMemberships;
 use App\Models\Business;
@@ -21,14 +22,15 @@ use Inertia\Response;
  * The dashboard. For whoever runs the current business (its owner, or an
  * org admin working in it): the setup checklist (CHW-31,
  * DescribeChecklist) and the owner dashboard (CHW-33, DescribeDashboard),
- * for the business or one of its locations (?location=). Staff and
+ * for the business or one of its locations (?location=), with who is going
+ * quiet at the business (CHW-45, DescribeGoingQuiet). Staff and
  * customers get neither: a customer goes to My cards (CHW-27). At the
  * organization level HQ gets a note: the network view is B18 (CHW-133).
  * With neither chosen, the page asks where they work today (CHW-147).
  */
 final class DashboardController extends Controller
 {
-    public function show(Request $request, TenantContext $context, DescribeChecklist $describeChecklist, DescribeDashboard $describeDashboard, HasMemberships $hasMemberships): Response|RedirectResponse
+    public function show(Request $request, TenantContext $context, DescribeChecklist $describeChecklist, DescribeDashboard $describeDashboard, DescribeGoingQuiet $describeGoingQuiet, HasMemberships $hasMemberships): Response|RedirectResponse
     {
         $user = $request->user();
 
@@ -51,6 +53,10 @@ final class DashboardController extends Controller
             'checklist' => fn (): ?array => $business instanceof Business && Gate::allows('update', $business) ? $describeChecklist->handle($business) : null,
             'stats' => fn (): ?array => $business instanceof Business && Gate::allows('viewStats', $business)
                 ? $describeDashboard->handle($business, $request->integer('location') ?: null, CarbonImmutable::now())
+                : null,
+            // The whole business's, whatever location is picked: apart from the stats, so the filter leaves it be.
+            'goingQuiet' => fn (): ?array => $business instanceof Business && Gate::allows('viewStats', $business)
+                ? $describeGoingQuiet->handle($business, CarbonImmutable::now())
                 : null,
             'atOrganization' => ! $business instanceof Business && $context->organizationId() !== null,
             // No business or network resolved (CHW-147, design 10d): ask where they work today.

@@ -81,6 +81,16 @@ it('shows the owner each tab\'s count and who came in, newest visit first, by fi
         ->where('nav.customers', true));
 });
 
+it('keeps counting days in the business\'s time once every site is archived, as the dashboard does', function (): void {
+    $salma = ($this->customer)('Salma Tazi', ['last_visit_at' => '2026-10-31 22:00:00']);
+    $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['archived_at' => now()])->save());
+
+    // Still Dubai's day, its first site's: today, not yesterday as in UTC.
+    ($this->open)()->assertInertia(fn (Assert $page): Assert => $page->where('customers.0.id', $salma->id)->where('customers.0.lastVisitDays', 0));
+    ($this->as)($this->owner)->get(route('customers.show', $salma->id))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('customer.lastVisitDays', 0));
+});
+
 it('shows one tab at a time, the newest first visit first in New', function (): void {
     $older = ($this->customer)('Imane Rami', ['first_visit_at' => now()->subDays(20)]);
     $newer = ($this->customer)('Salma Tazi', ['first_visit_at' => now()->subDays(5), 'last_visit_at' => now()->subDays(10)]);

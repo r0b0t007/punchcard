@@ -9,7 +9,6 @@ use App\Actions\Campaigns\CancelCampaign;
 use App\Actions\Campaigns\CreateCampaign;
 use App\Actions\Campaigns\DescribeCampaigns;
 use App\Actions\Campaigns\DescribeComposer;
-use App\Enums\CampaignSegment;
 use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
 use App\Models\Campaign;
@@ -51,10 +50,8 @@ final class CampaignController extends Controller
     {
         $business = $context->business() ?? abort(403);
         Gate::authorize('create', [Campaign::class, $business]);
-        // Anything else, or none: All.
-        $segment = CampaignSegment::tryFrom($request->string('segment')->toString()) ?? CampaignSegment::All;
 
-        return Inertia::render('business/campaigns/create', $describeComposer->handle($business, $segment));
+        return Inertia::render('business/campaigns/create', $describeComposer->handle($business, $request->query('segment')));
     }
 
     public function store(StoreCampaignRequest $request, CreateCampaign $createCampaign): RedirectResponse

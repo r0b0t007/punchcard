@@ -1,7 +1,10 @@
 import { Head, usePage } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
 import OwnerDashboard from '@/components/dashboard/owner-dashboard';
-import type { DashboardStats } from '@/components/dashboard/types';
+import type {
+    DashboardStats,
+    GoingQuietCustomers,
+} from '@/components/dashboard/types';
 import SetupChecklist from '@/components/setup-checklist';
 import type { Checklist } from '@/components/setup-checklist';
 import { switchTenant, TenantMark } from '@/components/tenant-switcher';
@@ -18,11 +21,14 @@ import { dashboard } from '@/routes';
 export default function Dashboard({
     checklist,
     stats,
+    goingQuiet,
     atOrganization,
     choosing,
 }: {
     checklist: Checklist | null;
     stats: DashboardStats | null;
+    /** Who is going quiet at the business (CHW-45), whatever location is picked. */
+    goingQuiet: GoingQuietCustomers | null;
     atOrganization: boolean;
     /** No business or network resolved: ask where they work today (DashboardController). */
     choosing: boolean;
@@ -89,7 +95,9 @@ export default function Dashboard({
                         )}
                     </p>
                 ) : null}
-                {stats ? <OwnerDashboard stats={stats} /> : null}
+                {stats ? (
+                    <OwnerDashboard stats={stats} goingQuiet={goingQuiet} />
+                ) : null}
             </div>
         </>
     );

@@ -82,6 +82,13 @@ it('starts from the audience asked for, as the dashboard\'s nudge asks for Going
     'an unknown one' => ['birthday', 'all'],
 ]);
 
+it('starts from All when the audience asked for is not one value', function (): void {
+    $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id])
+        ->get(route('campaigns.create').'?segment[]=going_quiet')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page->where('segment', 'all'));
+});
+
 it('says when the next campaign can go once the week\'s are sent, in the business\'s time', function (): void {
     $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save());
     $this->context->bypass(fn () => Campaign::factory()->for($this->tenants->a1)->count(3)->create(['status' => CampaignStatus::Sent, 'send_at' => now()->subDay(), 'sent_at' => now()->subDay()]));

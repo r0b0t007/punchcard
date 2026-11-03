@@ -16,8 +16,9 @@ use App\Support\LocalMoment;
  * - business: its name, which titles the notification (CampaignText);
  * - segments: each audience offered, its followers and who will get it on
  *   a phone (DescribeAudience);
- * - segment: the one chosen to start with: All, or the one asked for (the
- *   dashboard's nudge asks for GoingQuiet, CHW-45);
+ * - segment: the one chosen to start with: the one asked for when it is
+ *   offered (the dashboard's nudge asks for GoingQuiet, CHW-45); anything
+ *   else, or none, All;
  * - cards: what tapping it may open, the business's active cards;
  * - left, max, nextAt: the week's campaigns left, and when the next may go
  *   once none is (CampaignLimit), in the business's time;
@@ -33,6 +34,7 @@ final readonly class DescribeComposer
     public function __construct(private DescribeAudience $describeAudience, private CampaignLimit $limit) {}
 
     /**
+     * @param  array<mixed>|string|null  $asked  the audience asked for, as the address gave it
      * @return array{
      *     business: string,
      *     segments: array<string, array{followers: int, reach: int}>,
@@ -48,8 +50,9 @@ final readonly class DescribeComposer
      *     scheduleDays: int,
      * }
      */
-    public function handle(Business $business, CampaignSegment $segment = CampaignSegment::All): array
+    public function handle(Business $business, array|string|null $asked = null): array
     {
+        $segment = is_string($asked) ? CampaignSegment::tryFrom($asked) : null;
         $audiences = $this->describeAudience->handle($business);
         $limit = $this->limit->handle($business, now());
         $site = $business->firstLocation()->first();
@@ -61,7 +64,7 @@ final readonly class DescribeComposer
                 array_map(fn (CampaignSegment $offered): string => $offered->value, CampaignSegment::offered()),
                 array_map(fn (CampaignSegment $offered): array => $audiences[$offered->value], CampaignSegment::offered()),
             ),
-            'segment' => in_array($segment, CampaignSegment::offered(), true) ? $segment->value : CampaignSegment::All->value,
+            'segment' => $segment instanceof CampaignSegment && in_array($segment, CampaignSegment::offered(), true) ? $segment->value : CampaignSegment::All->value,
             'cards' => array_values(LoyaltyCard::query()->honouredBy($business->id)->where('active', true)->get(['id', 'name'])
                 ->map(fn (LoyaltyCard $card): array => ['id' => $card->id, 'name' => $card->name])->all()),
             'left' => $limit['left'],

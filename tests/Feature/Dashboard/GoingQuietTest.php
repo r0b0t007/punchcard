@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\Dashboard\DescribeDashboard;
+use App\Actions\Dashboard\DescribeGoingQuiet;
 use App\Enums\BusinessRole;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
@@ -51,12 +51,16 @@ beforeEach(function (): void {
             ...$values,
         ]);
     });
-    $this->goingQuiet = function (?int $locationId = null, ?Business $business = null): array {
+    $this->goingQuiet = function (?Business $business = null): array {
         $business ??= $this->tenants->a1;
         $this->context->set($this->context->bypass(fn () => $business->organization()->firstOrFail()), $business, orgAdmin: true);
 
-        return app(DescribeDashboard::class)->handle($business, $locationId, CarbonImmutable::now())['goingQuiet'];
+        return app(DescribeGoingQuiet::class)->handle($business, CarbonImmutable::now());
     };
+    $this->owner = fn (): User => $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
+    $this->dashboard = fn (User $user, array $query = []) => $this->actingAs($user)
+        ->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id])
+        ->get(route('dashboard', $query));
 });
 
 it('lists the 5 going quiet with the most visits, then the latest visit, and counts them all', function (): void {
@@ -97,15 +101,25 @@ it('takes those going quiet now: from the moment they are, until they are lost',
     expect(array_column(($this->goingQuiet)()['customers'], 'id'))->toEqualCanonicalizing([$justQuiet->id, $almostLost->id]);
 });
 
-it('keeps to the business\'s own customers, whatever location is picked', function (): void {
+it('keeps to the business\'s own customers, never a sister franchisee\'s', function (): void {
     $here = ($this->customer)('Salma Tazi');
     ($this->customer)('Omar Ziani', business: $this->tenants->a2);
-    $other = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->a1->id]));
 
     expect(($this->goingQuiet)())->toMatchArray(['count' => 1])
         ->and(($this->goingQuiet)()['customers'][0]['id'])->toBe($here->id)
-        ->and(($this->goingQuiet)($other->id))->toBe(($this->goingQuiet)())
-        ->and(($this->goingQuiet)(business: $this->tenants->a2)['count'])->toBe(1);
+        ->and(($this->goingQuiet)($this->tenants->a2)['count'])->toBe(1);
+});
+
+it('sends the whole business\'s apart from the figures: picking a location reloads the figures only', function (): void {
+    $salma = ($this->customer)('Salma Tazi');
+    $other = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->a1->id]));
+
+    ($this->dashboard)(($this->owner)(), ['location' => $other->id])
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->where('stats.location', $other->id)
+            ->where('goingQuiet.count', 1)
+            ->where('goingQuiet.customers.0.id', $salma->id)
+            ->reloadOnly('stats', fn (Assert $reload): Assert => $reload->has('stats')->missing('goingQuiet')));
 });
 
 it('shows nobody when nobody is going quiet', function (): void {
@@ -114,14 +128,14 @@ it('shows nobody when nobody is going quiet', function (): void {
     expect(($this->goingQuiet)())->toBe(['count' => 0, 'customers' => []]);
 });
 
-it('gives the owner the panel on the dashboard', function (): void {
+it('gives the owner the panel on the dashboard, never staff', function (): void {
     $salma = ($this->customer)('Salma Tazi');
-    $owner = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Owner);
 
-    $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id])
-        ->get(route('dashboard'))
+    ($this->dashboard)(($this->owner)())
         ->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page
-            ->where('stats.goingQuiet.count', 1)
-            ->where('stats.goingQuiet.customers.0.id', $salma->id));
+            ->where('goingQuiet.count', 1)
+            ->where('goingQuiet.customers.0.id', $salma->id));
+    // Staff have the counter, not the dashboard.
+    ($this->dashboard)($this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Staff))->assertRedirect(route('counter.show'));
 });
