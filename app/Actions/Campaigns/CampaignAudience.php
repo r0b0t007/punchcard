@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Campaigns;
 
 use App\Enums\CampaignSegment;
+use App\Enums\CustomerSegment;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\StampEvent;
@@ -22,15 +24,18 @@ use Illuminate\Support\Carbon;
  * account. Then each segment:
  *
  * - All: every one of them;
- * - Quiet: no presence stamp here for CampaignSegment::QUIET_DAYS days or more;
+ * - GoingQuiet: those going quiet here now (CHW-45): the Customers page's
+ *   rule, on their summary here (BusinessCustomer, CustomerSegment::Quiet);
+ * - Quiet, no longer offered: no presence stamp here for
+ *   CampaignSegment::QUIET_DAYS days or more;
  * - Top: the CampaignSegment::TOP with the most stamps here in
  *   CampaignSegment::TOP_DAYS days, net of the corrections made here (a
  *   stamp given by mistake and taken back counts for nothing), the latest
  *   first among equals.
  *
  * In bypass(): customer data across the organization, every read kept to the
- * business and its organization. Read once for the three segments; user ids,
- * by id (Top: by rank).
+ * business and its organization. Read once for every segment; user ids, by
+ * id (Top: by rank).
  */
 final readonly class CampaignAudience
 {
@@ -40,12 +45,18 @@ final readonly class CampaignAudience
     public function handle(Business $business): array
     {
         $visits = $this->context->bypass(fn (): array => $this->visits($business));
+        $goingQuiet = $this->context->bypass(fn (): array => BusinessCustomer::query()
+            ->where('business_id', $business->id)
+            ->inSegment(CustomerSegment::Quiet, now())
+            ->pluck('user_id')
+            ->all());
         $quietSince = now()->subDays(CampaignSegment::QUIET_DAYS);
 
         return [
             CampaignSegment::All->value => array_keys($visits),
-            CampaignSegment::Quiet->value => array_keys(array_filter($visits, fn (array $visit): bool => $visit['last']?->lessThanOrEqualTo($quietSince) === true)),
+            CampaignSegment::GoingQuiet->value => array_keys(array_intersect_key($visits, array_flip($goingQuiet))),
             CampaignSegment::Top->value => array_slice(array_keys($this->ranked(array_filter($visits, fn (array $visit): bool => $visit['recent'] > 0))), 0, CampaignSegment::TOP),
+            CampaignSegment::Quiet->value => array_keys(array_filter($visits, fn (array $visit): bool => $visit['last']?->lessThanOrEqualTo($quietSince) === true)),
         ];
     }
 

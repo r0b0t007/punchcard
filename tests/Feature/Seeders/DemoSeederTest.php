@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Tenancy\ResolveTenant;
+use App\Enums\CustomerSegment;
 use App\Enums\OrganizationType;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
@@ -221,6 +222,19 @@ describe('the demo', function (): void {
             expect($customers)->toHaveCount(20)
                 ->and($customers->firstWhere('user_id', $customer->id)?->visits)->toBeGreaterThan(0)
                 ->and(BusinessCustomer::query()->distinct()->count('business_id'))->toBe(Business::query()->count());
+        });
+    });
+
+    it('has café customers going quiet, never the demo customer, for the dashboard to show (CHW-45)', function (): void {
+        $this->context->bypass(function (): void {
+            $cafe = Business::query()->where('name', 'Café Hafa')->sole();
+            $quiet = BusinessCustomer::query()->where('business_id', $cafe->id)->inSegment(CustomerSegment::Quiet, now())->get();
+            $customer = User::query()->where('email', 'customer@demo.test')->sole();
+
+            expect($quiet)->toHaveCount(3)
+                ->and($quiet->pluck('user_id'))->not->toContain($customer->id)
+                // 20 days back, at any hour of the day: at least 19 days ago, whenever the suite runs.
+                ->and($quiet->every(fn (BusinessCustomer $away): bool => $away->last_visit_at->lessThanOrEqualTo(now()->subDays(19))))->toBeTrue();
         });
     });
 });

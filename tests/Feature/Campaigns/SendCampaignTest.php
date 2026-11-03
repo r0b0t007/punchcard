@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Campaigns\CampaignLimit;
 use App\Actions\Campaigns\DeliverCampaign;
 use App\Actions\Campaigns\SendCampaignBatch;
+use App\Actions\Customers\SummariseCustomer;
 use App\Enums\BusinessRole;
 use App\Enums\CampaignSegment;
 use App\Enums\CampaignStatus;
@@ -321,6 +322,7 @@ it('checks the audience, the title against the business\'s name, and the message
 })->with([
     'no idempotency key' => [['idempotency_key' => 'twice'], 'idempotency_key'],
     'an unknown audience' => [['segment' => 'birthday'], 'segment'],
+    'an audience no longer offered' => [['segment' => 'quiet_14d'], 'segment'],
     'no title' => [['title' => ''], 'title'],
     'a title too long beside the name' => [['title' => str_repeat('a', 36)], 'title'],
     'no message' => [['body' => ''], 'body'],
@@ -345,6 +347,20 @@ it('refuses a campaign nobody would get, and keeps the week\'s campaigns: no pho
 
     Notification::assertNothingSent();
     expect(app(TenantContext::class)->bypass(fn (): int => Campaign::query()->count()))->toBe(0);
+});
+
+it('sends to the followers going quiet, the dashboard\'s nudge (CHW-45)', function (): void {
+    $quiet = ($this->follower)();
+    ($this->follower)();
+    app(SummariseCustomer::class)->handle($this->tenants->a1->id, $this->tenants->orgA->id, $quiet->id);
+    // 20 days on, past the 14 a first-time customer is given; the other was never summarised, so is not quiet.
+    $this->travel(20)->days();
+
+    ($this->send)(['segment' => 'going_quiet'])->assertSessionHasNoErrors();
+
+    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::query()->sole());
+    expect($campaign->segment)->toBe(CampaignSegment::GoingQuiet)
+        ->and($campaign->audience_count)->toBe(1);
 });
 
 it('keeps the segment chosen', function (): void {

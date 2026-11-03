@@ -38,3 +38,17 @@ export type DashboardStats = {
     locations: { id: number; name: string }[];
     location: number | null;
 };
+
+/** DescribeGoingQuiet (CHW-45): who is going quiet at the business now, how many and the 5 with the most visits. */
+export type GoingQuietCustomers = {
+    count: number;
+    customers: {
+        id: number;
+        name: string;
+        visits: number;
+        /** Null before their second visit. */
+        usualGapDays: number | null;
+        /** In the business's time. */
+        lastVisitDays: number;
+    }[];
+};

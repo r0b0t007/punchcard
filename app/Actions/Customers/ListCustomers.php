@@ -74,7 +74,7 @@ final readonly class ListCustomers
         }
         $names = User::query()->whereKey($customers->getCollection()->pluck('user_id')->all())->get(['id', 'name'])
             ->mapWithKeys(fn (User $user): array => [$user->id => (string) $user->shortName()]);
-        $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
+        $timezone = LocalMoment::timezoneOfBusiness($business->id);
 
         return [
             'segment' => $segment->value,

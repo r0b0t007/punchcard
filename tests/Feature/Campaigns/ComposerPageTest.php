@@ -54,17 +54,39 @@ it('gives the owner each audience, the business\'s active cards, and how long th
         ->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('business/campaigns/create')
             ->where('business', 'A1')
+            // Going quiet took the place of Not seen in 14 days (CHW-45).
             ->where('segments', [
                 'all' => ['followers' => 1, 'reach' => 1],
-                'quiet_14d' => ['followers' => 0, 'reach' => 0],
+                'going_quiet' => ['followers' => 0, 'reach' => 0],
                 'top_10' => ['followers' => 1, 'reach' => 1],
             ])
+            ->where('segment', 'all')
             ->where('cards', [['id' => $this->tenants->cardA->id, 'name' => 'A card']])
             ->where('left', 3)
             ->where('max', 3)
             ->where('nextAt', null)
             ->where('titleRoom', 35)
             ->where('bodyMax', 120));
+});
+
+it('starts from the audience asked for, as the dashboard\'s nudge asks for Going quiet, else All', function (string $asked, string $chosen): void {
+    $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id])
+        ->get(route('campaigns.create', ['segment' => $asked]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page->where('segment', $chosen));
+})->with([
+    'going quiet' => ['going_quiet', 'going_quiet'],
+    'top 10' => ['top_10', 'top_10'],
+    // No longer offered, or no audience at all.
+    'not seen in 14 days' => ['quiet_14d', 'all'],
+    'an unknown one' => ['birthday', 'all'],
+]);
+
+it('starts from All when the audience asked for is not one value', function (): void {
+    $this->actingAs($this->owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id])
+        ->get(route('campaigns.create').'?segment[]=going_quiet')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page->where('segment', 'all'));
 });
 
 it('says when the next campaign can go once the week\'s are sent, in the business\'s time', function (): void {

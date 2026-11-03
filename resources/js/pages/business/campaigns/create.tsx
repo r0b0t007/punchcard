@@ -41,7 +41,7 @@ import type { LocalMoment } from '@/lib/local-moment';
 import { cn, typedDir } from '@/lib/utils';
 import { create, index, store } from '@/routes/campaigns';
 
-type Segment = 'all' | 'quiet_14d' | 'top_10';
+type Segment = 'all' | 'going_quiet' | 'top_10';
 type Audience = { followers: number; reach: number };
 type When = 'now' | 'later';
 
@@ -60,6 +60,7 @@ const MY_CARDS = 'cards';
 export default function CreateCampaign({
     business,
     segments,
+    segment: initialSegment,
     cards,
     left,
     max,
@@ -72,6 +73,8 @@ export default function CreateCampaign({
 }: {
     business: string;
     segments: Record<Segment, Audience>;
+    /** The audience chosen to start with: Going quiet from the dashboard's nudge (CHW-45). */
+    segment: Segment;
     cards: { id: number; name: string }[];
     left: number;
     max: number;
@@ -89,7 +92,7 @@ export default function CreateCampaign({
     const suggested = nextHour(now.date, now.time);
     const form = useForm({
         idempotency_key: idempotencyKey,
-        segment: 'all' as Segment,
+        segment: initialSegment,
         title: '',
         body: '',
         card: cards.length > 0 ? String(cards[0].id) : MY_CARDS,
@@ -514,7 +517,7 @@ function AudienceCard({
     const { t } = useTranslation();
     const description = {
         all: t('Everyone following :business for offers.', { business }),
-        quiet_14d: t('Followers with no stamp here for 14 days or more.'),
+        going_quiet: t('Followers late for their usual visit.'),
         top_10: t('Your 10 followers with the most stamps here in 90 days.'),
     }[segment];
 
@@ -554,7 +557,7 @@ function AudienceCard({
 function audienceName(t: TranslateFn, segment: Segment): string {
     return {
         all: t('All followers'),
-        quiet_14d: t('Not seen in 14 days'),
+        going_quiet: t('Going quiet'),
         top_10: t('Top 10'),
     }[segment];
 }
