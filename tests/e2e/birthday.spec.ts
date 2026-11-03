@@ -20,7 +20,11 @@ test('sets a birthday on the profile, finds it again, then removes it', async ({
     await page.waitForURL((url) => !url.pathname.startsWith('/register'));
 
     await page.goto('/settings/profile');
-    const birthday = page.locator('[data-test="birthday"]');
+    // One group a screen reader names "Birthday, optional", its hint read with each select.
+    const birthday = page.getByRole('group', { name: 'Birthday Optional' });
+    await expect(birthday.locator('#birthday_day')).toHaveAccessibleDescription(
+        /treat on your birthday/,
+    );
     await birthday.locator('#birthday_day').click();
     await page.getByRole('option', { name: '14', exact: true }).click();
     await birthday.locator('[data-test="birthday-month"]').click();
