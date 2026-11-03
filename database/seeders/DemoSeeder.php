@@ -124,6 +124,8 @@ final class DemoSeeder extends Seeder
 
             // Each business's customers (CHW-44), from the stamps above, as after a deploy.
             Artisan::call('punchcard:customers:summarise');
+            // And their days' figures (CHW-45), as the hourly rollup would have written them.
+            Artisan::call('punchcard:stats:rollup', ['--from' => now()->subDays(self::SETUP_DAYS_AGO)->format('Y-m-d')]);
         } finally {
             $this->faker->seed();
         }

@@ -23,6 +23,17 @@ final class LocalMoment
     }
 
     /**
+     * A business's days, when no one site is picked (the dashboard, its daily figures, CHW-45): its first open site's
+     * time; with every site archived, its first site's. Read in the caller's tenant, or bypass().
+     */
+    public static function timezoneOfBusiness(int $businessId): string
+    {
+        $sites = fn () => Location::query()->where('business_id', $businessId)->orderBy('id');
+
+        return self::timezoneOf($sites()->open()->first(['id', 'timezone']) ?? $sites()->first(['id', 'timezone']));
+    }
+
+    /**
      * @param  CarbonInterface|null  $now  the moment "today" is told against: the clock, unless the caller reads at another moment
      * @return array{day: 'today'|'other', date: string, time: string}
      */
