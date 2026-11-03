@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Actions\Account\DeleteAccount;
+use App\Actions\Customers\CustomersOfBusiness;
 use App\Actions\Customers\SummariseCustomer;
 use App\Actions\Onboarding\SaveFirstLocation;
 use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRequest;
 use App\Enums\StampSource;
+use App\Jobs\SummariseBusinessCustomer;
 use App\Jobs\SummariseBusinessCustomers;
 use App\Models\Business;
 use App\Models\CustomerVisitDay;
@@ -146,25 +148,67 @@ it('summarises the business\'s customers again on the queue when its site\'s tim
         ->organizationId->toBe($this->tenants->orgA->id);
 });
 
-it('moves every customer\'s visits to their new day when the business is summarised again', function (): void {
+it('hands out one job per customer of the business when it is summarised again', function (): void {
+    $other = User::factory()->create();
+    ($this->stampAt)('2026-10-30 10:00:00');
+    $this->tenants->stamp($this->tenants->enroll($other, $this->tenants->cardA), $this->tenants->a1, ['source' => StampSource::Qr]);
+    // A2's customer is never A1's.
+    $sister = User::factory()->create();
+    $this->tenants->stamp($this->tenants->enroll($sister, $this->tenants->cardA), $this->tenants->a2, ['source' => StampSource::Qr]);
+    Queue::fake();
+
+    (new SummariseBusinessCustomers($this->tenants->a1->id, $this->tenants->orgA->id))->handle(app(CustomersOfBusiness::class));
+
+    expect(Queue::pushed(SummariseBusinessCustomer::class)->map(fn (SummariseBusinessCustomer $job): array => [$job->businessId, $job->organizationId, $job->userId])->all())
+        ->toEqualCanonicalizing([
+            [$this->tenants->a1->id, $this->tenants->orgA->id, $this->customer->id],
+            [$this->tenants->a1->id, $this->tenants->orgA->id, $other->id],
+        ]);
+});
+
+it('moves a customer\'s visits to their new day when they are summarised again', function (): void {
     // 21:30 UTC: 30 Oct in UTC, 31 Oct in Dubai.
     ($this->stampAt)('2026-10-30 21:30:00');
     ($this->summarise)();
     $this->context->bypass(fn () => $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'UTC'])->save());
 
-    (new SummariseBusinessCustomers($this->tenants->a1->id, $this->tenants->orgA->id))->handle(app(SummariseCustomer::class));
+    (new SummariseBusinessCustomer($this->tenants->a1->id, $this->tenants->orgA->id, $this->customer->id))->handle(app(SummariseCustomer::class));
 
     expect(array_column(($this->days)(), 2))->toBe(['2026-10-30']);
 });
 
-it('fills the days of who came in before when the table is created', function (): void {
+it('fills the days of who came in before once on a server, after the deploy', function (): void {
+    ($this->stampAt)('2026-10-30 10:00:00');
+    $forget = fn () => $this->context->bypass(fn () => CustomerVisitDay::query()->delete());
+
+    $this->artisan('punchcard:customers:summarise', ['--once' => true])->assertSuccessful();
+    expect(($this->days)())->toHaveCount(1);
+
+    $forget();
+    $this->artisan('punchcard:customers:summarise', ['--once' => true])->expectsOutput(__('Customers already summarised.'))->assertSuccessful();
+    expect(($this->days)())->toBe([]);
+
+    $this->artisan('punchcard:customers:summarise')->assertSuccessful();
+    expect(($this->days)())->toHaveCount(1);
+});
+
+it('fills them on the next deploy when only one business was summarised', function (): void {
+    ($this->stampAt)('2026-10-30 10:00:00');
+
+    $this->artisan('punchcard:customers:summarise', ['--business' => $this->tenants->a2->id])->assertSuccessful();
+    $this->artisan('punchcard:customers:summarise', ['--once' => true])->assertSuccessful();
+
+    expect(($this->days)())->toHaveCount(1);
+});
+
+it('leaves the filling to the deploy when the table is created', function (): void {
     ($this->stampAt)('2026-10-30 10:00:00');
     $migration = require database_path('migrations/2026_11_02_190931_create_customer_visit_days_table.php');
     $migration->down();
 
     $migration->up();
 
-    expect(array_column(($this->days)(), 2))->toBe(['2026-10-30']);
+    expect(($this->days)())->toBe([]);
 });
 
 it('writes only the days that changed', function (): void {

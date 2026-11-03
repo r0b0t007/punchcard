@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -11,7 +10,10 @@ use Illuminate\Support\Facades\Schema;
  * customer's summary (SummariseCustomer) after each stamp. Site data, like
  * the summary: in a franchise, A1's rows are only visits to A1. The
  * dashboard counts distinct customers and days over them, on an index,
- * instead of reading every stamp of the last 60 days.
+ * instead of reading every stamp of the last 60 days. Filled from the
+ * ledger by punchcard:customers:summarise --once, after the deploy
+ * (docs/runbooks/deploy.md), never here: a migration only changes the
+ * schema.
  */
 return new class extends Migration
 {
@@ -38,10 +40,6 @@ return new class extends Migration
             $table->index(['business_id', 'user_id']);
             $table->index('user_id');
         });
-
-        // Filled from the ledger before the release that reads it goes live (docs/runbooks/deploy.md: migrate runs
-        // first), so no dashboard starts empty. Nothing to do on a fresh database: it has no stamps.
-        Artisan::call('punchcard:customers:summarise');
     }
 
     public function down(): void

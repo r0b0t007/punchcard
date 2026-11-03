@@ -63,9 +63,9 @@ final readonly class SummariseCustomer
             $locations = Location::query()->whereKey($stamps->pluck('location_id')->unique()->values()->all())->get()->keyBy('id');
             // Each presence stamp's site, local day and moment, worked out once.
             $presence = $stamps->map(fn (StampEvent $stamp): array => [
-                (int) $stamp->location_id,
-                $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d'),
-                $stamp->created_at->copy()->utc()->format('Y-m-d H:i:s'),
+                'location_id' => (int) $stamp->location_id,
+                'day' => $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($stamp->location_id)))->format('Y-m-d'),
+                'at' => $stamp->created_at->copy()->utc()->format('Y-m-d H:i:s'),
             ])->values()->all();
             $row = BusinessCustomer::query()->where('business_id', $businessId)->where('user_id', $userId);
 
@@ -79,7 +79,7 @@ final readonly class SummariseCustomer
                 return;
             }
 
-            $days = collect(array_column($presence, 1))->unique()->sort()->values();
+            $days = collect(array_column($presence, 'day'))->unique()->sort()->values();
             $visits = $days->count();
             /** @var Carbon $first */
             $first = $stamps->min('created_at');
@@ -111,17 +111,17 @@ final readonly class SummariseCustomer
      * so otherwise a day once seen stays, whatever was taken back since, as
      * the dashboard has always counted visits.
      *
-     * @param  array<int, array{int, string, string}>  $presence  each presence stamp's site, local day and moment (UTC)
+     * @param  array<int, array{location_id: int, day: string, at: string}>  $presence  each presence stamp's site, local day and moment (UTC)
      */
     private function recordVisitDays(int $businessId, int $organizationId, int $userId, array $presence): void
     {
         $days = [];
 
-        foreach ($presence as [$locationId, $day, $at]) {
-            $key = $locationId.' '.$day;
+        foreach ($presence as $stamp) {
+            $key = $stamp['location_id'].' '.$stamp['day'];
 
-            if (! isset($days[$key]) || $at > $days[$key]['last_at']) {
-                $days[$key] = ['organization_id' => $organizationId, 'business_id' => $businessId, 'location_id' => $locationId, 'user_id' => $userId, 'visited_on' => $day, 'last_at' => $at];
+            if (! isset($days[$key]) || $stamp['at'] > $days[$key]['last_at']) {
+                $days[$key] = ['organization_id' => $organizationId, 'business_id' => $businessId, 'location_id' => $stamp['location_id'], 'user_id' => $userId, 'visited_on' => $stamp['day'], 'last_at' => $stamp['at']];
             }
         }
 
@@ -133,43 +133,13 @@ final readonly class SummariseCustomer
         // A day no longer found: the site's timezone changed since, and the visit moved to another day.
         $moved = $kept->reject(fn (CustomerVisitDay $day, string $key): bool => array_key_exists($key, $days))->modelKeys();
 
-        if ($moved !== []) {
-            CustomerVisitDay::query()->whereKey($moved)->delete();
+        // In chunks: years of visits would pass a database's bound parameters (999 on an old SQLite).
+        foreach (array_chunk($moved, 500) as $chunk) {
+            CustomerVisitDay::query()->whereKey($chunk)->delete();
         }
 
-        // In chunks: years of visits would pass a database's bound parameters (999 on an old SQLite).
         foreach (array_chunk(array_values($changed), 150) as $chunk) {
             CustomerVisitDay::query()->upsert($chunk, ['location_id', 'user_id', 'visited_on'], ['last_at']);
         }
-    }
-
-    /**
-     * Every customer of the business summarised again, one at a time: after
-     * a site's timezone changed, or for who came in before the summaries.
-     *
-     * @return int how many
-     */
-    public function everyoneAt(int $businessId, int $organizationId): int
-    {
-        $customers = $this->customersOf($businessId);
-
-        foreach ($customers as $userId) {
-            $this->handle($businessId, $organizationId, $userId);
-        }
-
-        return count($customers);
-    }
-
-    /**
-     * Who came in to the business, with a presence stamp there: the customers
-     * it has, by user id. In bypass().
-     *
-     * @return list<int>
-     */
-    public function customersOf(int $businessId): array
-    {
-        return array_values($this->context->bypass(fn (): array => CardEnrollment::query()
-            ->whereIn('id', StampEvent::query()->select('enrollment_id')->where('business_id', $businessId)->whereIn('source', StampSource::presenceValues()))
-            ->distinct()->orderBy('user_id')->pluck('user_id')->map(fn (mixed $id): int => (int) $id)->all()));
     }
 }

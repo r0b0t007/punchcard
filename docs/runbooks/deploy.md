@@ -172,10 +172,11 @@ php artisan event:cache
 php artisan storage:link
 ```
 
-and this one last, after Ploi's line that activates the release:
+and these last, after Ploi's line that activates the release:
 
 ```bash
 php artisan queue:restart
+php artisan punchcard:customers:summarise --once
 ```
 
 The two checks fail the deploy, before the new release is activated, on a missing, malformed or shared key
@@ -191,10 +192,12 @@ keep the old release working: add a column or table in one release, use it in th
 Run it once by hand with "Deploy now" in Ploi and watch the log. Turn on Ploi's notifications for failed deploys (the
 site's Notifications, by email): the GitHub workflow only proves the deploy was triggered and the site still answers.
 
-A table filled from the stamp ledger is filled by its own migration, before the release that reads it goes live: the
-dashboard's visit days (CHW-45) run `punchcard:customers:summarise`, which fills the customers list (CHW-44) too. Run
-that command again in `current/` after changing `config('punchcard.customers')`; a site's new timezone queues it for
-its business on its own.
+`punchcard:customers:summarise --once` fills the dashboard's visit days (CHW-45) and the customers list (CHW-44) from
+the stamp ledger, for who came in before them. It runs after `queue:restart`, so every stamp the old release's worker
+took is in the ledger it reads, and each customer in a short transaction of their own; once it has finished on a server
+it does nothing. Until it has, the dashboard counts only new visits. Run it without `--once` in `current/` after
+changing `config('punchcard.customers')`; the wizard's location step queues it for its business when a site's
+timezone changes.
 
 ## 8. Queue worker and scheduler
 
