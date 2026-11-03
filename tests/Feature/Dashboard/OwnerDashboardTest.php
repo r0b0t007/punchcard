@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Customers\SummariseCustomer;
 use App\Actions\Dashboard\DescribeDashboard;
+use App\Actions\Stats\RollUpDay;
 use App\Actions\Stats\RollUpEndedDays;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
@@ -353,7 +354,8 @@ it('gives the same figures from the days rolled up with a site in another timezo
     $this->context->bypass(fn () => $this->tenants->b1->forceFill(['created_at' => '2026-01-01 00:00:00'])->save());
     // UTC+4: 21:30 UTC on the 5th is the 6th there, and still the 5th for the business (UTC+1).
     $dubai = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->b1->id, 'timezone' => 'Asia/Dubai']));
-    foreach (['2026-10-05 21:30:00', '2026-10-05 22:30:00', '2026-10-08 23:30:00'] as $utc) {
+    // 21:00 UTC on the 10th: the 10th in UTC+1, rolled up; today once the business is in UTC+4.
+    foreach (['2026-10-05 21:30:00', '2026-10-05 22:30:00', '2026-10-08 23:30:00', '2026-10-10 21:00:00'] as $utc) {
         $customer = ($this->customer)($this->tenants->cardB);
         ($this->stampAt)($customer, $this->tenants->b1, $utc, ['location_id' => $dubai->id]);
         ($this->stampAt)($customer, $this->tenants->b1, $utc);
@@ -376,16 +378,37 @@ it('gives the same figures from the days rolled up with a site in another timezo
     expect($moved)->toEqual(($this->stats)($this->tenants->b1));
 });
 
-it('takes a rolled-up day\'s visits and rewards redeemed from its row, the site\'s with a site picked', function (): void {
+it('takes a rolled-up day\'s rewards redeemed from its row, the site\'s with a site picked, and its visits from the visit days', function (): void {
     $this->context->bypass(fn () => $this->tenants->b1->forceFill(['created_at' => '2026-01-01 00:00:00'])->save());
     $site = $this->tenants->locationOf($this->tenants->b1);
     app(RollUpEndedDays::class)->handle(CarbonImmutable::now(), $this->tenants->b1->id);
     $this->context->bypass(fn () => BusinessDailyStat::query()->where('business_id', $this->tenants->b1->id)->where('day', '2026-10-05')
-        ->update(['visits' => DB::raw('case when location_id is null then 9 else 7 end'), 'rewards_redeemed' => 4]));
+        ->update(['visits' => 9, 'rewards_redeemed' => DB::raw('case when location_id is null then 4 else 3 end')]));
     $this->context->set($this->context->bypass(fn () => $this->tenants->orgB->fresh()), $this->tenants->b1, orgAdmin: true);
     $stats = fn (?int $location): array => app(DescribeDashboard::class)->handle($this->tenants->b1, $location, CarbonImmutable::now());
 
-    expect($stats(null)['visitsPerDay'][23])->toBe(['date' => '2026-10-05', 'visits' => 9])
-        ->and($stats(null)['kpis']['rewardsRedeemed']['value'])->toBe(4)
-        ->and($stats($site->id)['visitsPerDay'][23])->toBe(['date' => '2026-10-05', 'visits' => 7]);
+    expect($stats(null)['kpis']['rewardsRedeemed']['value'])->toBe(4)
+        ->and($stats($site->id)['kpis']['rewardsRedeemed']['value'])->toBe(3)
+        // The chart adds up to the visits above it: both come from the visit days.
+        ->and($stats(null)['visitsPerDay'][23])->toBe(['date' => '2026-10-05', 'visits' => 0]);
+});
+
+it('counts the rewards redeemed in the same number of queries however the days rolled up are spread', function (): void {
+    $this->context->bypass(fn () => $this->tenants->b1->forceFill(['created_at' => '2026-01-01 00:00:00'])->save());
+    $queries = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        ($this->stats)($this->tenants->b1);
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+    $none = $queries();
+
+    // Every other day of both windows rolled up: thirty runs of days counted live.
+    foreach (range(1, 59, 2) as $back) {
+        app(RollUpDay::class)->handle($this->tenants->b1, CarbonImmutable::now()->subDays($back)->format('Y-m-d'));
+    }
+
+    expect($queries())->toBe($none);
 });

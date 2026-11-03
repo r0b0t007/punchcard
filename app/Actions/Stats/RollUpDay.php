@@ -46,8 +46,7 @@ final readonly class RollUpDay
         $this->context->bypass(function () use ($business, $day): void {
             $sites = Location::query()->where('business_id', $business->id)->orderBy('id')->get(['id', 'timezone', 'archived_at']);
             $open = $sites->whereNull('archived_at');
-            // With every site archived, the business keeps its days: its first site's.
-            $timezone = LocalMoment::timezoneOf($open->first() ?? $sites->first());
+            $timezone = LocalMoment::timezoneOfBusiness($business->id);
             $windows = $sites->mapWithKeys(fn (Location $site): array => [$site->id => $this->window(LocalMoment::timezoneOf($site), $day)])->all();
             $rows = [$this->row($business, null, $timezone, $day, $windows)];
 
@@ -112,8 +111,8 @@ final readonly class RollUpDay
     /** @return array{0: string, 1: string} the local day's start and end, as stored UTC times */
     private function window(string $timezone, string $day): array
     {
-        $from = CarbonImmutable::parse($day, $timezone)->startOfDay();
+        $midnight = CarbonImmutable::parse($day, $timezone);
 
-        return [$from->utc()->format('Y-m-d H:i:s'), $from->addDay()->utc()->format('Y-m-d H:i:s')];
+        return [LocalMoment::dayStart($timezone, $midnight)->format('Y-m-d H:i:s'), LocalMoment::dayEnd($timezone, $midnight)->format('Y-m-d H:i:s')];
     }
 }

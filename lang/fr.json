@@ -1084,6 +1084,7 @@
     "today at :time": "aujourd’hui à :time",
     "on :date at :time": "le :date à :time",
     ":count day rolled up.|:count days rolled up.": ":count jour consolidé.|:count jours consolidés.",
+    "The business must be its id, a number.": "Le commerce doit être indiqué par son identifiant, un nombre.",
     "The first day must be a date, as 2026-01-31.": "Le premier jour doit être une date, comme 2026-01-31.",
     "Customers already summarised.": "Clients déjà résumés.",
     ":count customer summarised.|:count customers summarised.": ":count client résumé.|:count clients résumés.",

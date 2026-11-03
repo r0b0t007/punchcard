@@ -64,11 +64,10 @@ final readonly class RollUpEndedDays
      */
     private function days(Business $business, CarbonImmutable $now, ?string $from): array
     {
-        $sites = Location::query()->where('business_id', $business->id)->open()->orderBy('id')->get(['id', 'timezone']);
-        // The business's time first (its first open site's, as RollUpDay counts it), then its other sites'.
-        $timezones = $sites->isEmpty()
-            ? collect([LocalMoment::timezoneOf(Location::query()->where('business_id', $business->id)->orderBy('id')->first(['id', 'timezone']))])
-            : $sites->map(fn (Location $site): string => LocalMoment::timezoneOf($site));
+        // The business's time first (as RollUpDay counts it), then its open sites'.
+        $timezones = Location::query()->where('business_id', $business->id)->open()->get(['id', 'timezone'])
+            ->map(fn (Location $site): string => LocalMoment::timezoneOf($site))
+            ->prepend(LocalMoment::timezoneOfBusiness($business->id));
         // A signed-out tap claimed later is stamped at the tap's time (ApplyTap): a day ends once its last one can be.
         $settled = $now->subMinutes((int) config('punchcard.taps.pending_minutes') + self::SETTLE_MINUTES);
         // Yesterday where the day began last: it has ended everywhere.

@@ -25,8 +25,15 @@ class StatsRollupCommand extends Command
         $business = $this->option('business');
         $from = $this->option('from');
 
-        if ($from !== null && CarbonImmutable::canBeCreatedFromFormat($from, 'Y-m-d') === false) {
+        // A real day, as written: 2026-02-31 would quietly become 3 March.
+        if ($from !== null && (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $from, $parts) !== 1 || ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]))) {
             $this->error(__('The first day must be a date, as 2026-01-31.'));
+
+            return self::INVALID;
+        }
+
+        if ($business !== null && ! ctype_digit((string) $business)) {
+            $this->error(__('The business must be its id, a number.'));
 
             return self::INVALID;
         }

@@ -1084,6 +1084,7 @@
     "today at :time": "اليوم على الساعة :time",
     "on :date at :time": "يوم :date على الساعة :time",
     ":count day rolled up.|:count days rolled up.": "لم يُجمَّع أي يوم.|جُمِّع يوم واحد.|جُمِّع يومان.|جُمِّع :count أيام.|جُمِّع :count يومًا.|جُمِّع :count يوم.",
+    "The business must be its id, a number.": "يجب تحديد النشاط التجاري بمعرّفه، وهو رقم.",
     "The first day must be a date, as 2026-01-31.": "يجب أن يكون اليوم الأول تاريخًا، مثل 2026-01-31.",
     "Customers already summarised.": "لُخِّص العملاء من قبل.",
     ":count customer summarised.|:count customers summarised.": "لم يُلخَّص أي عميل.|لُخِّص عميل واحد.|لُخِّص عميلان.|لُخِّص :count عملاء.|لُخِّص :count عميلًا.|لُخِّص :count عميل.",

@@ -81,13 +81,17 @@ it('rolls up every ended day from --from, again for days rolled up already', fun
         ->and(($this->days)())->toHaveCount(40);
 });
 
-it('rolls up history from the command, and refuses a day that is not a date', function (): void {
+it('rolls up history from the command, and refuses a day or a business that is not one', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-11 11:00:00', 'UTC'));
 
     $this->artisan('punchcard:stats:rollup', ['--business' => $this->business->id, '--from' => '2026-10-01'])
         ->expectsOutput(trans_choice(':count day rolled up.|:count days rolled up.', 10))->assertSuccessful();
-    $this->artisan('punchcard:stats:rollup', ['--from' => '1 Oct'])
-        ->expectsOutput(__('The first day must be a date, as 2026-01-31.'))->assertFailed();
+    foreach (['1 Oct', '2026-02-31', '2026-10-1'] as $notADay) {
+        $this->artisan('punchcard:stats:rollup', ['--from' => $notADay])
+            ->expectsOutput(__('The first day must be a date, as 2026-01-31.'))->assertFailed();
+    }
+    $this->artisan('punchcard:stats:rollup', ['--business' => 'abc'])
+        ->expectsOutput(__('The business must be its id, a number.'))->assertFailed();
 });
 
 it('rolls up the other businesses when one fails, and says which', function (): void {

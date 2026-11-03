@@ -129,6 +129,17 @@ it('keeps a visit to a site archived since in the business\'s day', function ():
         ->and(($this->rows)())->not->toHaveKey($closed->id);
 });
 
+it('keeps the business\'s day in its first open site\'s time', function (): void {
+    $dubai = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->a1->id, 'timezone' => 'Asia/Dubai']));
+    $this->context->bypass(fn () => $this->site->forceFill(['archived_at' => now()])->save());
+
+    ($this->rollUp)();
+
+    expect($this->context->bypass(fn (): ?string => BusinessDailyStat::query()->where('business_id', $this->tenants->a1->id)->whereNull('location_id')->value('timezone')))
+        ->toBe('Asia/Dubai')
+        ->and(($this->rows)())->toHaveKey($dubai->id);
+});
+
 it('never counts a sister franchise\'s day', function (): void {
     ($this->stampAt)(($this->customer)(), '2026-10-10 12:00:00', business: $this->tenants->a2);
 
