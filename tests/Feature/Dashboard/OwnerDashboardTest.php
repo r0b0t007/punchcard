@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Customers\SummariseCustomer;
 use App\Actions\Dashboard\DescribeDashboard;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
@@ -43,8 +44,14 @@ beforeEach(function (): void {
     $this->as = fn (User $user, string $tenant) => $this->actingAs($user)->withSession([SetTenant::SESSION_KEY => $tenant]);
     $this->owner = $this->tenants->admin($this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner), $this->tenants->orgB);
     $this->customer = fn (LoyaltyCard $card): CardEnrollment => $this->tenants->enroll(User::factory()->create(), $card);
-    // A stamp at a UTC time; Tenants::stamp() puts it at the business's location.
-    $this->stampAt = fn (CardEnrollment $enrollment, Business $business, string $utc, array $overrides = []): StampEvent => $this->tenants->stamp($enrollment, $business, ['created_at' => $utc, ...$overrides]);
+    // A stamp at a UTC time; Tenants::stamp() puts it at the business's location. Then the customer's summary and
+    // visit days, as the queued listener writes them after each stamp (SummariseCustomers).
+    $this->stampAt = function (CardEnrollment $enrollment, Business $business, string $utc, array $overrides = []): StampEvent {
+        $stamp = $this->tenants->stamp($enrollment, $business, ['created_at' => $utc, ...$overrides]);
+        app(SummariseCustomer::class)->handle($business->id, $business->organization_id, $enrollment->user_id);
+
+        return $stamp;
+    };
     $this->redeemedAt = fn (CardEnrollment $enrollment, Business $business, string $utc) => $this->context->bypass(fn () => $this->tenants->reward($enrollment)->forceFill([
         'status' => RewardStatus::Redeemed,
         'redeemed_at' => $utc,
@@ -232,6 +239,34 @@ it('narrows every figure to one location, and ignores a location that is not the
     $foreign = $this->tenants->locationOf($this->tenants->a1);
     $inB1()->get(route('dashboard', ['location' => $foreign->id]))
         ->assertInertia(fn ($page) => $page->where('stats.location', null)->where('stats.kpis.visits.value', 3));
+});
+
+it('counts a customer at two sites on one day as one visit to the business, and one at each site', function (): void {
+    $kasbah = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->b1->id, 'timezone' => 'Africa/Lagos']));
+    $customer = ($this->customer)($this->tenants->cardB);
+    ($this->stampAt)($customer, $this->tenants->b1, '2026-10-05 09:00:00');
+    ($this->stampAt)($customer, $this->tenants->b1, '2026-10-05 16:00:00', ['location_id' => $kasbah->id]);
+    $this->context->set($this->context->bypass(fn () => $this->tenants->orgB->fresh()), $this->tenants->b1, orgAdmin: true);
+    $visits = fn (?int $location): array => app(DescribeDashboard::class)->handle($this->tenants->b1, $location, CarbonImmutable::now())['kpis']['visits'];
+
+    expect($visits(null)['value'])->toBe(1)
+        ->and(($this->stats)($this->tenants->b1)['visitsPerDay'][23])->toBe(['date' => '2026-10-05', 'visits' => 1])
+        ->and($visits($kasbah->id)['value'])->toBe(1)
+        ->and($visits($this->tenants->locationOf($this->tenants->b1)->id)['value'])->toBe(1);
+});
+
+it('puts a visit on its site\'s day, even a late one at a site in another timezone', function (): void {
+    // The business's days are its first site's (UTC+1); Dubai is UTC+4. 21:30 UTC is 22:30 on 10 Oct for the
+    // business, and already 11 Oct in Dubai: tomorrow for the business, so not in today's figures (CHW-53).
+    $this->travelTo(CarbonImmutable::parse('2026-10-10 21:45:00', 'UTC'));
+    $dubai = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->b1->id, 'timezone' => 'Asia/Dubai']));
+    ($this->stampAt)(($this->customer)($this->tenants->cardB), $this->tenants->b1, '2026-10-10 21:30:00', ['location_id' => $dubai->id]);
+
+    expect(($this->stats)($this->tenants->b1)['kpis']['visits']['value'])->toBe(0);
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-11 09:00:00', 'UTC'));
+
+    expect(($this->stats)($this->tenants->b1)['visitsPerDay'][29])->toBe(['date' => '2026-10-11', 'visits' => 1]);
 });
 
 it('counts only the business it is asked for, even read at the organization level', function (): void {

@@ -1083,6 +1083,7 @@
     "At :business :when, by staff scanning your QR. Not you? Tell the staff.": "Chez :business :when, le personnel a scanné votre QR. Ce n’était pas vous ? Prévenez le personnel.",
     "today at :time": "aujourd’hui à :time",
     "on :date at :time": "le :date à :time",
+    "Customers already summarised.": "Clients déjà résumés.",
     ":count customer summarised.|:count customers summarised.": ":count client résumé.|:count clients résumés.",
     "Customers": "Clients",
     "Everyone who came in, and who has stopped coming.": "Toutes les personnes venues, et celles qui ne viennent plus.",

@@ -8,10 +8,9 @@ use App\Actions\Stamps\RecentStamps;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
-use App\Models\CardEnrollment;
+use App\Models\CustomerVisitDay;
 use App\Models\Location;
 use App\Models\Reward;
-use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\LocalMoment;
 use Carbon\CarbonImmutable;
@@ -21,10 +20,12 @@ use Carbon\CarbonImmutable;
  * locations: the last 30 local days (today included) against the 30 before.
  *
  * - A visit is a customer's presence stamps (StampSource::presenceValues:
- *   tap, QR, by hand) here on one local day. A customer is a person,
- *   whatever card they hold; system stamps and corrections are not visits.
- * - Days are the location's when one is picked, else the business's: the
- *   timezone of its first open location.
+ *   tap, QR, by hand) here on one local day: a day they came in
+ *   (CustomerVisitDay, CHW-45), in the time of the site they came to. A
+ *   customer is a person, whatever card they hold, and two sites on one day
+ *   make one visit; system stamps and corrections are not visits.
+ * - The windows are the location's days when one is picked, else the
+ *   business's: the timezone of its first open location.
  * - Active customers visited at least once; the return rate is the share of
  *   them who visited on 2 or more days; rewards redeemed counts those
  *   redeemed here.
@@ -37,11 +38,16 @@ use Carbon\CarbonImmutable;
  * sibling's customers (ADR 0006): rewards are filtered on where they were
  * redeemed, as an org admin's reward scope spans the organization.
  *
- * A fixed number of queries, however many stamps: the days are counted in
- * PHP from the ordered events against local midnights, with no date per row.
- * The window's presence stamps are plucked twice and read once more as a
- * subquery: the tenant guards allow neither toBase() nor a raw join, and
- * plucking skips loading thousands of models.
+ * A fixed number of queries, however many stamps: visits are read from the
+ * customers' visit days, one row per customer and one per day, never from
+ * the stamps themselves. Those are written on the queue after each stamp
+ * (SummariseCustomers), so a visit counts here once the queue has run it,
+ * while the latest stamps read the ledger at once; a job that failed every
+ * try is in failed_jobs, and punchcard:customers:summarise writes it again.
+ *
+ * A visit's day is the local day of the site it was made at; the windows
+ * are the business's days. Sites in two timezones (multi-location, CHW-53)
+ * can put a late visit at one on the business's next day.
  */
 final readonly class DescribeDashboard
 {
@@ -72,9 +78,11 @@ final readonly class DescribeDashboard
         $today = $now->setTimezone($timezone)->startOfDay();
         // Local midnights as stored UTC times: day $k runs from $midnights[$k] to $midnights[$k + 1]; days 0 to 29 are the previous window.
         $midnights = array_map(fn (int $day): string => $today->addDays($day)->utc()->format('Y-m-d H:i:s'), range(1 - 2 * self::DAYS, 1));
+        // The same days as dates, today last.
+        $days = array_map(fn (int $day): string => $today->addDays($day)->format('Y-m-d'), range(1 - 2 * self::DAYS, 0));
 
-        $visits = $this->visitsByCustomer($business, $location?->id, $midnights);
-        [$previous, $current] = [$this->window($visits, 0), $this->window($visits, self::DAYS)];
+        [$customers, $perDay] = $this->visits($business, $location?->id, $days);
+        [$previous, $current] = [$this->window($customers, 'previous'), $this->window($customers, 'current')];
         $rewards = $this->rewardsRedeemed($business, $location?->id, $midnights);
 
         return [
@@ -87,93 +95,70 @@ final readonly class DescribeDashboard
                 ],
                 'rewardsRedeemed' => ['value' => $rewards['current'], 'change' => $this->change($rewards['current'], $rewards['previous'])],
             ],
-            'visitsPerDay' => array_map(fn (int $day): array => [
-                'date' => $today->addDays($day - self::DAYS + 1)->format('Y-m-d'),
-                'visits' => $current['perDay'][$day] ?? 0,
-            ], range(0, self::DAYS - 1)),
+            'visitsPerDay' => array_map(fn (string $day): array => ['date' => $day, 'visits' => $perDay[$day] ?? 0], array_slice($days, self::DAYS)),
             'recentStamps' => $this->recentStamps->handle($business, $location?->id, $now),
-            'topCustomers' => $this->topCustomers($visits, $timezone),
+            'topCustomers' => $this->topCustomers($customers),
             'locations' => array_values($locations->map(fn (Location $open): array => ['id' => $open->id, 'name' => $open->name])->all()),
             'location' => $location?->id,
         ];
     }
 
     /**
-     * Each customer's visits over both windows: the latest presence stamp on
-     * each local day, by day index.
+     * Each customer's visit days in both windows, and the customers who came
+     * in on each day of the current one, from their visit days here
+     * (CHW-45, CustomerVisitDay): one row per customer, then one per day.
      *
-     * @param  list<string>  $midnights
-     * @return array<int, array<int, string>> by user id, then day index
+     * @param  list<string>  $days  the local days of both windows, oldest first
+     * @return array{0: array<int, array{previous: int, current: int, last: ?string, lastAt: ?string}>, 1: array<string, int>}
      */
-    private function visitsByCustomer(Business $business, ?int $locationId, array $midnights): array
+    private function visits(Business $business, ?int $locationId, array $days): array
     {
-        $presence = fn () => StampEvent::query()
+        $from = $days[self::DAYS];
+        $here = fn () => CustomerVisitDay::query()
             ->where('business_id', $business->id)
             ->when($locationId !== null, fn ($query) => $query->where('location_id', $locationId))
-            ->whereIn('source', StampSource::presenceValues())
-            ->where('created_at', '>=', $midnights[0])
-            ->where('created_at', '<', $midnights[count($midnights) - 1]);
-        // Plucked, not loaded as models (thousands of rows): the stored UTC time as text, under an alias so it is
-        // not cast to a date, compared with the midnights; then each stamp's card.
-        $stampedAt = $presence()->selectRaw('id, created_at as stamped_at')->orderBy('created_at')->orderBy('id')->pluck('stamped_at', 'id');
-        $enrollmentOf = $presence()->pluck('enrollment_id', 'id');
-        // The customers behind the cards: CardEnrollment's scope shows a franchisee exactly those who stamped here.
-        $customers = CardEnrollment::query()->whereIn('id', $presence()->select('enrollment_id'))->pluck('user_id', 'id');
+            ->where('visited_on', '>=', $days[0])
+            ->where('visited_on', '<=', $days[count($days) - 1]);
 
-        $visits = [];
-        $day = 0;
+        // A customer at two sites on one day made one visit to the business: days are counted distinct.
+        $customers = $here()
+            ->groupBy('user_id')
+            ->selectRaw('user_id, count(distinct case when visited_on < ? then visited_on end) as previous_days, count(distinct case when visited_on >= ? then visited_on end) as current_days, max(case when visited_on >= ? then visited_on end) as last_day, max(case when visited_on >= ? then last_at end) as latest_at', [$from, $from, $from, $from])
+            ->get()
+            ->mapWithKeys(fn (CustomerVisitDay $row): array => [(int) $row->user_id => [
+                'previous' => (int) $row->getAttribute('previous_days'),
+                'current' => (int) $row->getAttribute('current_days'),
+                'last' => is_string($row->getAttribute('last_day')) ? substr($row->getAttribute('last_day'), 0, 10) : null,
+                'lastAt' => is_string($row->getAttribute('latest_at')) ? $row->getAttribute('latest_at') : null,
+            ]])
+            ->all();
+        $perDay = $here()
+            ->where('visited_on', '>=', $from)
+            ->groupBy('visited_on')
+            ->selectRaw('visited_on as day, count(distinct user_id) as customers')
+            ->get()
+            ->mapWithKeys(fn (CustomerVisitDay $row): array => [substr((string) $row->getAttribute('day'), 0, 10) => (int) $row->getAttribute('customers')])
+            ->all();
 
-        foreach ($stampedAt as $id => $at) {
-            $at = (string) $at;
-            $userId = $customers->get($enrollmentOf->get($id));
-
-            while ($at >= $midnights[$day + 1]) {
-                $day++;
-            }
-
-            if ($userId !== null) {
-                $visits[(int) $userId][$day] = $at;
-            }
-        }
-
-        return $visits;
+        return [$customers, $perDay];
     }
 
     /**
-     * Active customers, visits, the return rate and visits per day in the
-     * window starting at day index $from.
+     * Active customers, visits and the return rate in one window.
      *
-     * @param  array<int, array<int, string>>  $visits
-     * @return array{active: int, visits: int, returnRate: int, perDay: array<int, int>}
+     * @param  array<int, array{previous: int, current: int, last: ?string, lastAt: ?string}>  $customers
+     * @param  'previous'|'current'  $window
+     * @return array{active: int, visits: int, returnRate: int}
      */
-    private function window(array $visits, int $from): array
+    private function window(array $customers, string $window): array
     {
-        $active = 0;
-        $returning = 0;
-        $total = 0;
-        $perDay = [];
-
-        foreach ($visits as $days) {
-            $inWindow = array_filter(array_keys($days), fn (int $day): bool => $day >= $from && $day < $from + self::DAYS);
-
-            if ($inWindow === []) {
-                continue;
-            }
-
-            $active++;
-            $returning += count($inWindow) >= 2 ? 1 : 0;
-            $total += count($inWindow);
-
-            foreach ($inWindow as $day) {
-                $perDay[$day - $from] = ($perDay[$day - $from] ?? 0) + 1;
-            }
-        }
+        $days = array_filter(array_column($customers, $window));
+        $active = count($days);
 
         return [
             'active' => $active,
-            'visits' => $total,
-            'returnRate' => $active === 0 ? 0 : (int) round($returning / $active * 100),
-            'perDay' => $perDay,
+            'visits' => array_sum($days),
+            'returnRate' => $active === 0 ? 0 : (int) round(count(array_filter($days, fn (int $visits): bool => $visits >= 2)) / $active * 100),
         ];
     }
 
@@ -202,33 +187,24 @@ final readonly class DescribeDashboard
     /**
      * The 10 customers with the most visits in the window, then the latest.
      *
-     * @param  array<int, array<int, string>>  $visits
+     * @param  array<int, array{previous: int, current: int, last: ?string, lastAt: ?string}>  $customers
      * @return list<array{id: int, name: string, visits: int, lastVisit: string}>
      */
-    private function topCustomers(array $visits, string $timezone): array
+    private function topCustomers(array $customers): array
     {
-        $ranked = [];
-
-        foreach ($visits as $userId => $days) {
-            $inWindow = array_filter($days, fn (int $day): bool => $day >= self::DAYS, ARRAY_FILTER_USE_KEY);
-
-            if ($inWindow !== []) {
-                $ranked[] = ['id' => $userId, 'visits' => count($inWindow), 'last' => max($inWindow)];
-            }
-        }
-
-        usort($ranked, fn (array $a, array $b): int => [$b['visits'], $b['last'], $a['id']] <=> [$a['visits'], $a['last'], $b['id']]);
-        $ranked = array_slice($ranked, 0, self::LISTED);
+        $ranked = array_filter($customers, fn (array $customer): bool => $customer['current'] > 0);
+        uksort($ranked, fn (int $a, int $b): int => [$ranked[$b]['current'], $ranked[$b]['lastAt'], $a] <=> [$ranked[$a]['current'], $ranked[$a]['lastAt'], $b]);
+        $ranked = array_slice($ranked, 0, self::LISTED, preserve_keys: true);
         // First name and initial (CHW-44): how a business sees its customers.
-        $names = User::query()->whereKey(array_column($ranked, 'id'))->get(['id', 'name'])
+        $names = User::query()->whereKey(array_keys($ranked))->get(['id', 'name'])
             ->mapWithKeys(fn (User $user): array => [$user->id => (string) $user->shortName()]);
 
-        return array_map(fn (array $customer): array => [
-            'id' => $customer['id'],
-            'name' => (string) $names->get($customer['id'], ''),
-            'visits' => $customer['visits'],
-            'lastVisit' => CarbonImmutable::parse($customer['last'], 'UTC')->setTimezone($timezone)->format('Y-m-d'),
-        ], $ranked);
+        return array_map(fn (int $id): array => [
+            'id' => $id,
+            'name' => (string) $names->get($id, ''),
+            'visits' => $ranked[$id]['current'],
+            'lastVisit' => (string) $ranked[$id]['last'],
+        ], array_keys($ranked));
     }
 
     /** The change in percent, or null when there was nothing to compare with. */
