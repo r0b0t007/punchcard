@@ -176,7 +176,6 @@
     "Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.": "المصادقة الثنائية مفعّلة الآن. امسح رمز QR أو أدخل مفتاح الإعداد في تطبيق المصادقة.",
     "Update password": "تحديث كلمة المرور",
     "Update the appearance settings for your account": "حدّث إعدادات المظهر لحسابك",
-    "Update your name and email address": "حدّث اسمك وبريدك الإلكتروني",
     "Verify Email Address": "تأكيد البريد الإلكتروني",
     "Verify authentication code": "التحقق من رمز المصادقة",
     "Verify your email address": "تحقّق من بريدك الإلكتروني",
@@ -1164,5 +1163,11 @@
     "Send them a nudge": "أرسل لهم تذكيرًا",
     "Nobody is going quiet": "لا أحد قلّت زياراته",
     "Customers late for their usual visit show here, so you can bring them back.": "يظهر هنا العملاء المتأخرون عن موعدهم المعتاد، لتعيدهم.",
-    "Followers late for their usual visit.": "متابعون تأخروا عن موعدهم المعتاد."
+    "Followers late for their usual visit.": "متابعون تأخروا عن موعدهم المعتاد.",
+    "Update your name, email address and birthday": "حدّث اسمك وبريدك الإلكتروني وعيد ميلادك",
+    "Optional": "اختياري",
+    "Month": "الشهر",
+    "The places where you collect stamps can give you a treat on your birthday. Never the year.": "يمكن للأماكن التي تجمع فيها الأختام أن تهديك شيئًا في عيد ميلادك. دون السنة أبدًا.",
+    "Remove my birthday": "إزالة عيد ميلادي",
+    "That date doesn’t exist. Choose another day.": "هذا التاريخ غير موجود. اختر يومًا آخر."
 }

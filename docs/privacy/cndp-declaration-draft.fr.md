@@ -33,7 +33,8 @@ et administrateurs des commerces et réseaux ; administrateurs de la plateforme.
 
 ## 4. Catégories de données
 
-- Identité et contact : nom, adresse e-mail, langue.
+- Identité et contact : nom, adresse e-mail, langue ; anniversaire facultatif (jour et mois, jamais l'année), donné par
+  le client dans ses réglages pour un cadeau d'anniversaire des commerces, et qu'il peut retirer à tout moment.
 - Connexion : mot de passe chiffré (ou connexion par lien e-mail), réglages de double authentification, clés d'accès
   (passkeys), sessions (adresse IP, navigateur), date de dernière activité.
 - Fidélité : cartes détenues, tampons (commerce, site, date, nombre, mode), récompenses (débloquées, remises).
@@ -44,8 +45,8 @@ et administrateurs des commerces et réseaux ; administrateurs de la plateforme.
   justificatif d'adresse du commerce, chiffrés, consultés par l'administrateur de la plateforme seulement, chaque
   consultation journalisée. **[À vérifier : la copie de la carte nationale peut relever de l'autorisation préalable
   plutôt que de la simple déclaration.]**
-- Aucune donnée sensible au sens de l'article 1 de la loi 09-08. Pas de date de naissance pour l'instant
-  **[à revoir si l'anniversaire est ajouté]**.
+- Aucune donnée sensible au sens de l'article 1 de la loi 09-08. Pas de date de naissance complète : l'anniversaire
+  facultatif ne comporte jamais l'année.
 
 ## 5. Origine des données
 

@@ -30,12 +30,14 @@ class ProfileController extends Controller
             'pendingEmail' => $request->user()->pendingEmail(),
             // A new address asks to confirm it's them first, unless they did lately (ProfileUpdateRequest).
             'recentlyConfirmed' => RecentConfirmation::holds($request->session()),
+            // Optional, day and month only (CHW-46): for the places' birthday treat.
+            'birthday' => $request->user()->birthday_month === null ? null : ['day' => $request->user()->birthday_day, 'month' => $request->user()->birthday_month],
             'status' => $request->session()->get('status'),
         ]);
     }
 
     /**
-     * The name at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
+     * The name and the birthday (CHW-46) at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
      * then the account keeps its address, so a mistyped one costs nothing. Over the limit for new addresses,
      * nothing is saved, the name neither.
      */
@@ -49,7 +51,11 @@ class ProfileController extends Controller
             return back()->withErrors(['email' => __('Too many address changes. Try again later.')]);
         }
 
-        $user->fill(['name' => $request->validated('name')])->save();
+        $user->forceFill([
+            'name' => $request->validated('name'),
+            'birthday_day' => $request->validated('birthday_day'),
+            'birthday_month' => $request->validated('birthday_month'),
+        ])->save();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $emailChange === RequestEmailChange::REQUESTED
             ? __('Check :email to confirm your new address.', ['email' => $email])
