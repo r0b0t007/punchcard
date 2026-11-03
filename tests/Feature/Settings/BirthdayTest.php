@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
-use Pest\Mixins\Expectation;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,7 +83,9 @@ it('says why a date that does not exist is refused, in the page\'s language', fu
 it('keeps a date that does not exist, or half of one, out of the database too', function (?int $day, ?int $month): void {
     // Each in its own savepoint: a failed statement aborts the transaction it is in, and every later one with it.
     expect(fn () => DB::transaction(fn () => DB::table('users')->where('id', $this->user->id)->update(['birthday_day' => $day, 'birthday_month' => $month])))
-        ->toThrow(fn (QueryException $refused): Expectation => expect($refused->getCode())->toBe('23514'));
+        ->toThrow(function (QueryException $refused): void {
+            expect($refused->getCode())->toBe('23514');
+        });
 })->with([
     '31 April' => [31, 4],
     'no such month' => [1, 13],
