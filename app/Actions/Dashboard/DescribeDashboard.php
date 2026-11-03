@@ -8,6 +8,7 @@ use App\Actions\Stamps\RecentStamps;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\BusinessDailyStat;
 use App\Models\CustomerVisitDay;
 use App\Models\Location;
 use App\Models\Reward;
@@ -45,6 +46,10 @@ use Carbon\CarbonImmutable;
  * while the latest stamps read the ledger at once; a job that failed every
  * try is in failed_jobs, and punchcard:customers:summarise writes it again.
  *
+ * The visits per day and the rewards redeemed of a day rolled up already
+ * (CHW-45, BusinessDailyStat) come from its row; today, and any day the
+ * rollup has not reached, are counted live.
+ *
  * A visit's day is the local day of the site it was made at; the windows
  * are the business's days. Sites in two timezones (multi-location, CHW-53)
  * can put a late visit at one on the business's next day.
@@ -81,9 +86,10 @@ final readonly class DescribeDashboard
         // The same days as dates, today last.
         $days = array_map(fn (int $day): string => $today->addDays($day)->format('Y-m-d'), range(1 - 2 * self::DAYS, 0));
 
-        [$customers, $perDay] = $this->visits($business, $location?->id, $days);
+        $rolled = $this->rolledUp($business, $location?->id, $timezone, $days);
+        [$customers, $perDay] = $this->visits($business, $location?->id, $days, array_keys($rolled));
         [$previous, $current] = [$this->window($customers, 'previous'), $this->window($customers, 'current')];
-        $rewards = $this->rewardsRedeemed($business, $location?->id, $midnights);
+        $rewards = $this->rewardsRedeemed($business, $location?->id, $midnights, $days, $rolled);
 
         return [
             'kpis' => [
@@ -95,7 +101,7 @@ final readonly class DescribeDashboard
                 ],
                 'rewardsRedeemed' => ['value' => $rewards['current'], 'change' => $this->change($rewards['current'], $rewards['previous'])],
             ],
-            'visitsPerDay' => array_map(fn (string $day): array => ['date' => $day, 'visits' => $perDay[$day] ?? 0], array_slice($days, self::DAYS)),
+            'visitsPerDay' => array_map(fn (string $day): array => ['date' => $day, 'visits' => $rolled[$day]['visits'] ?? $perDay[$day] ?? 0], array_slice($days, self::DAYS)),
             'recentStamps' => $this->recentStamps->handle($business, $location?->id, $now),
             'topCustomers' => $this->topCustomers($customers),
             'locations' => array_values($locations->map(fn (Location $open): array => ['id' => $open->id, 'name' => $open->name])->all()),
@@ -109,9 +115,10 @@ final readonly class DescribeDashboard
      * (CHW-45, CustomerVisitDay): one row per customer, then one per day.
      *
      * @param  list<string>  $days  the local days of both windows, oldest first
+     * @param  list<string>  $rolled  the days rolled up already: the visits per day leave them out
      * @return array{0: array<int, array{previous: int, current: int, last: ?string, lastAt: ?string}>, 1: array<string, int>}
      */
-    private function visits(Business $business, ?int $locationId, array $days): array
+    private function visits(Business $business, ?int $locationId, array $days, array $rolled): array
     {
         $from = $days[self::DAYS];
         $here = fn () => CustomerVisitDay::query()
@@ -134,6 +141,7 @@ final readonly class DescribeDashboard
             ->all();
         $perDay = $here()
             ->where('visited_on', '>=', $from)
+            ->whereNotIn('visited_on', $rolled)
             ->groupBy('visited_on')
             ->selectRaw('visited_on as day, count(distinct user_id) as customers')
             ->get()
@@ -163,12 +171,37 @@ final readonly class DescribeDashboard
     }
 
     /**
-     * Rewards redeemed here in each window, whoever's they are.
+     * The days of both windows rolled up already (CHW-45, BusinessDailyStat),
+     * here: the site's rows, or the whole business's. Only those rolled up in
+     * the days' time: after it changed, the others are counted live.
+     *
+     * @param  list<string>  $days
+     * @return array<string, array{visits: int, rewardsRedeemed: int}>
+     */
+    private function rolledUp(Business $business, ?int $locationId, string $timezone, array $days): array
+    {
+        return BusinessDailyStat::query()
+            ->where('business_id', $business->id)
+            ->when($locationId !== null, fn ($query) => $query->where('location_id', $locationId), fn ($query) => $query->whereNull('location_id'))
+            ->where('day', '>=', $days[0])
+            ->where('day', '<=', $days[count($days) - 1])
+            ->where('timezone', $timezone)
+            ->get(['day', 'visits', 'rewards_redeemed'])
+            ->mapWithKeys(fn (BusinessDailyStat $row): array => [$row->day->format('Y-m-d') => ['visits' => $row->visits, 'rewardsRedeemed' => $row->rewards_redeemed]])
+            ->all();
+    }
+
+    /**
+     * Rewards redeemed here in each window, whoever's they are: the days
+     * rolled up from their rows, each run of other days (today, at least)
+     * counted live.
      *
      * @param  list<string>  $midnights
+     * @param  list<string>  $days
+     * @param  array<string, array{visits: int, rewardsRedeemed: int}>  $rolled
      * @return array{previous: int, current: int}
      */
-    private function rewardsRedeemed(Business $business, ?int $locationId, array $midnights): array
+    private function rewardsRedeemed(Business $business, ?int $locationId, array $midnights, array $days, array $rolled): array
     {
         $redeemed = fn (string $from, string $until): int => Reward::query()
             ->where('status', RewardStatus::Redeemed)
@@ -177,10 +210,33 @@ final readonly class DescribeDashboard
             ->where('redeemed_at', '>=', $from)
             ->where('redeemed_at', '<', $until)
             ->count();
+        // Days $first to $last - 1: their rows, and one query per run of days with none.
+        $between = function (int $first, int $last) use ($redeemed, $midnights, $days, $rolled): int {
+            $count = 0;
+
+            for ($day = $first; $day < $last; $day++) {
+                if (isset($rolled[$days[$day]])) {
+                    $count += $rolled[$days[$day]]['rewardsRedeemed'];
+
+                    continue;
+                }
+
+                $until = $day;
+
+                while ($until < $last && ! isset($rolled[$days[$until]])) {
+                    $until++;
+                }
+
+                $count += $redeemed($midnights[$day], $midnights[$until]);
+                $day = $until - 1;
+            }
+
+            return $count;
+        };
 
         return [
-            'previous' => $redeemed($midnights[0], $midnights[self::DAYS]),
-            'current' => $redeemed($midnights[self::DAYS], $midnights[count($midnights) - 1]),
+            'previous' => $between(0, self::DAYS),
+            'current' => $between(self::DAYS, 2 * self::DAYS),
         ];
     }
 

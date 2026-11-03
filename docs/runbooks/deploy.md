@@ -199,6 +199,10 @@ it does nothing. Until it has, the dashboard counts only new visits. Run it with
 changing `config('punchcard.customers')`; the wizard's location step queues it for its business when a site's
 timezone changes.
 
+The scheduler rolls up each business's ended days hourly (CHW-45), a week back at most. For older days, or after the
+scheduler was down for more than a week, run `php artisan punchcard:stats:rollup --from=<first day, Y-m-d>` in
+`current/`. Until a day is rolled up, the dashboard counts it live.
+
 ## 8. Queue worker and scheduler
 
 - **Queue**: the site's Queue tab, a worker on connection `database`, queue `default`, 1 process, `--tries=3`. Ploi
