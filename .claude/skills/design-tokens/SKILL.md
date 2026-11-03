@@ -100,6 +100,7 @@ above: keep the two in step.
 | B9 campaigns: the composer (12a), the Campaigns page and its states (12c), the notification on a lock screen (12d) (CHW-42)                                                                                                                      | `Punchcard Campaigns Review.dc.html`                                  |
 | A reward staff redeemed with a scan: the push on a lock screen (14a) and My cards' notice until Got it (14b) (CHW-228)                                                                                                                           | `Punchcard Redeem Notice Review.dc.html`                              |
 | B4 customers: tabs with counts over the table (15a); B5 one customer, stamps by hand and taken back (card asked with 2+), notes (15c, delete asks first) (CHW-44)                                                                                | `Punchcard Customers Review.dc.html`                                  |
+| B3 going quiet: the panel under the figures (16a), nobody going quiet and one location picked (16b); B9 opened on Going quiet (16c) (CHW-45)                                                                                                     | `Punchcard Going Quiet Review.dc.html`                                |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.

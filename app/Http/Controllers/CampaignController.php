@@ -9,12 +9,14 @@ use App\Actions\Campaigns\CancelCampaign;
 use App\Actions\Campaigns\CreateCampaign;
 use App\Actions\Campaigns\DescribeCampaigns;
 use App\Actions\Campaigns\DescribeComposer;
+use App\Enums\CampaignSegment;
 use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,7 +28,8 @@ use Inertia\Response;
  * - GET /business/campaigns: its latest campaigns, and how many of the
  *   week's are left (DescribeCampaigns);
  * - GET /business/campaigns/create: the composer, with each audience's
- *   size and who would get it (DescribeComposer);
+ *   size and who would get it (DescribeComposer); ?segment= chooses one to
+ *   start with (the dashboard's nudge, CHW-45), else All;
  * - POST /business/campaigns: a notification to an audience of its
  *   followers, now or later (CreateCampaign), within its weekly limit;
  * - PATCH /business/campaigns/{campaign}/cancel: a scheduled one, until it
@@ -44,12 +47,14 @@ final class CampaignController extends Controller
         return Inertia::render('business/campaigns/index', $describeCampaigns->handle($business));
     }
 
-    public function create(TenantContext $context, DescribeComposer $describeComposer): Response
+    public function create(Request $request, TenantContext $context, DescribeComposer $describeComposer): Response
     {
         $business = $context->business() ?? abort(403);
         Gate::authorize('create', [Campaign::class, $business]);
+        // Anything else, or none: All.
+        $segment = CampaignSegment::tryFrom($request->string('segment')->toString()) ?? CampaignSegment::All;
 
-        return Inertia::render('business/campaigns/create', $describeComposer->handle($business));
+        return Inertia::render('business/campaigns/create', $describeComposer->handle($business, $segment));
     }
 
     public function store(StoreCampaignRequest $request, CreateCampaign $createCampaign): RedirectResponse

@@ -1041,7 +1041,6 @@
     "Send your followers a notification: an offer, a slow afternoon, something new.": "أرسل إشعارًا إلى متابعيك: عرض، أو مساء هادئ، أو شيء جديد.",
     "Who gets it": "من يتلقاها",
     "Everyone following :business for offers.": "كل من يتابع :business للعروض.",
-    "Followers with no stamp here for 14 days or more.": "متابعون بلا ختم هنا منذ 14 يومًا أو أكثر.",
     "Your 10 followers with the most stamps here in 90 days.": "متابعوك العشرة الأكثر أختامًا هنا خلال 90 يومًا.",
     ":reach of :followers have notifications on a phone.": ":reach من :followers فعّلوا الإشعارات على هاتف.",
     "None of them has notifications on a phone yet.": "لم يفعّل أي منهم الإشعارات على هاتف بعد.",
@@ -1156,5 +1155,14 @@
     "Too soon after their last stamp on this card: the next one can be given tomorrow from :time.": "الوقت مبكر بعد آخر ختم على هذه البطاقة: يمكن منح الختم التالي غدًا ابتداءً من :time.",
     "Too soon after their last stamp on this card: the next one can be given on :date from :time.": "الوقت مبكر بعد آخر ختم على هذه البطاقة: يمكن منح الختم التالي يوم :date ابتداءً من :time.",
     "Delete this note?": "حذف هذه الملاحظة؟",
-    "It goes for your whole team, and from the data :name can ask for. This can’t be undone.": "تختفي عن فريقك كله، ومن البيانات التي يمكن لـ :name طلبها. لا يمكن التراجع عن ذلك."
+    "It goes for your whole team, and from the data :name can ask for. This can’t be undone.": "تختفي عن فريقك كله، ومن البيانات التي يمكن لـ :name طلبها. لا يمكن التراجع عن ذلك.",
+    "Late for their usual visit, not lost yet.": "تأخروا عن موعدهم المعتاد، ولم ينقطعوا بعد.",
+    "At every location: late for their usual visit, not lost yet.": "في كل مواقعك: تأخروا عن موعدهم المعتاد، ولم ينقطعوا بعد.",
+    "See all": "عرض الكل",
+    "Usually every day|Usually every :count days": "عادةً كل يوم|عادةً كل يوم|عادةً كل يومين|عادةً كل :count أيام|عادةً كل :count يومًا|عادةً كل :count يوم",
+    "The nudge goes to those of them who follow you for offers.": "يصل التذكير إلى من يتابعك منهم للعروض.",
+    "Send them a nudge": "أرسل لهم تذكيرًا",
+    "Nobody is going quiet": "لا أحد قلّت زياراته",
+    "Customers late for their usual visit show here, so you can bring them back.": "يظهر هنا العملاء المتأخرون عن موعدهم المعتاد، لتعيدهم.",
+    "Followers late for their usual visit.": "متابعون تأخروا عن موعدهم المعتاد."
 }

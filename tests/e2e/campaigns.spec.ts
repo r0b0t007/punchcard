@@ -69,10 +69,10 @@ test('the owner composes a campaign and sees it on a lock screen; nobody to send
     // A radio group: the arrow keys move the choice, and the focus with it.
     await page.keyboard.press('ArrowLeft');
     await expect(
-        page.locator('[data-test="audience-quiet_14d"]'),
+        page.locator('[data-test="audience-going_quiet"]'),
     ).toHaveAttribute('aria-checked', 'true');
     await expect(
-        page.locator('[data-test="audience-quiet_14d"]'),
+        page.locator('[data-test="audience-going_quiet"]'),
     ).toBeFocused();
     await page.locator('#title').fill('Slow Tuesday?');
     await page.locator('#body').fill('Two stamps for every coffee until 4 pm.');
@@ -102,4 +102,31 @@ test('the owner composes a campaign and sees it on a lock screen; nobody to send
         body: await page.screenshot({ fullPage: true }),
         contentType: 'image/png',
     });
+});
+
+test('the owner sees who is going quiet on the dashboard and nudges them', async ({
+    page,
+}, testInfo) => {
+    await signIn(page, 'owner@cafe.demo.test');
+    await page.goto('/business');
+
+    // Who is going quiet moves with the days since the demo was seeded: not the names.
+    const panel = page.locator('[data-test="going-quiet"]');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('link', { name: 'See all' })).toHaveAttribute(
+        'href',
+        /\/business\/customers\?segment=quiet$/,
+    );
+    await testInfo.attach('going-quiet', {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+    });
+
+    await panel.locator('[data-test="going-quiet-nudge"]').click();
+    await expect(page).toHaveURL(
+        /\/business\/campaigns\/create\?segment=going_quiet$/,
+    );
+    await expect(
+        page.locator('[data-test="audience-going_quiet"]'),
+    ).toHaveAttribute('aria-checked', 'true');
 });

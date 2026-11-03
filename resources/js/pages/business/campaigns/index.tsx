@@ -19,7 +19,8 @@ import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
 import { cancel, create, index } from '@/routes/campaigns';
 
-type Segment = 'all' | 'quiet_14d' | 'top_10';
+/** quiet_14d: no longer offered, kept for the campaigns sent to it (CHW-45). */
+type Segment = 'all' | 'going_quiet' | 'top_10' | 'quiet_14d';
 type Status = 'scheduled' | 'sending' | 'sent' | 'canceled';
 
 type CampaignRow = {
@@ -207,8 +208,9 @@ function CancelCampaign({ campaign }: { campaign: CampaignRow }) {
 function audience(t: TranslateFn, segment: Segment): string {
     return {
         all: t('All followers'),
-        quiet_14d: t('Not seen in 14 days'),
+        going_quiet: t('Going quiet'),
         top_10: t('Top 10'),
+        quiet_14d: t('Not seen in 14 days'),
     }[segment];
 }
 

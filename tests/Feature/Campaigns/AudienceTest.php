@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Campaigns\CampaignAudience;
 use App\Actions\Campaigns\DescribeAudience;
+use App\Actions\Customers\SummariseCustomer;
 use App\Enums\CampaignSegment;
 use App\Enums\StampSource;
 use App\Models\Business;
@@ -87,6 +88,30 @@ it('reaches the followers not seen here in 14 days or more, by this business\'s 
     expect(($this->audience)($a1, CampaignSegment::Quiet))->toBe([$fourteen->id, $quietHereBusyThere->id, $correctedToday->id]);
 });
 
+it('reaches the followers going quiet here, by the Customers page\'s rule, and nobody else', function (): void {
+    $a1 = $this->tenants->a1;
+    // Their summaries, as the queued listener writes them after each stamp (SummariseCustomers).
+    $summarised = function (User $customer, Business ...$businesses): User {
+        foreach ($businesses as $business) {
+            app(SummariseCustomer::class)->handle($business->id, $business->organization_id, $customer->id);
+        }
+
+        return $customer;
+    };
+    // One visit 20 days ago: past the 14 days a first-time customer is given, short of the 60 that lose them.
+    $quiet = $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($a1, 20)]), $a1);
+    $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($a1, 20)], follows: false), $a1);
+    $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($a1, 3)]), $a1);
+    $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($a1, 61)]), $a1);
+    // Quiet only at the sister franchisee: not A1's to nudge.
+    $quietAtSister = $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($this->tenants->a2, 20), ($this->visit)($a1, 2)]), $a1, $this->tenants->a2);
+    $anonymised = $summarised(($this->customer)($this->tenants->cardA, [($this->visit)($a1, 20)]), $a1);
+    $anonymised->forceFill(['anonymised_at' => now()])->save();
+
+    expect(($this->audience)($a1, CampaignSegment::GoingQuiet))->toBe([$quiet->id])
+        ->and(($this->audience)($this->tenants->a2, CampaignSegment::GoingQuiet))->toBe([$quietAtSister->id]);
+});
+
 it('reaches the 10 followers with the most stamps here in 90 days, the latest first among equals', function (): void {
     $a1 = $this->tenants->a1;
     $regulars = collect(range(1, 9))->map(fn (int $n): User => ($this->customer)($this->tenants->cardA, [($this->visit)($a1, 3, 20 - $n)]));
@@ -112,8 +137,10 @@ it('counts the followers in each segment, and who among them will get it on a ph
 
     expect(app(DescribeAudience::class)->handle($a1))->toBe([
         'all' => ['followers' => 4, 'reach' => 3],
-        'quiet_14d' => ['followers' => 3, 'reach' => 2],
+        // Nobody summarised: nobody going quiet.
+        'going_quiet' => ['followers' => 0, 'reach' => 0],
         'top_10' => ['followers' => 3, 'reach' => 2],
+        'quiet_14d' => ['followers' => 3, 'reach' => 2],
     ]);
 
     // No VAPID key on the server: nobody can get one.

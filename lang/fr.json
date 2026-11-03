@@ -1041,7 +1041,6 @@
     "Send your followers a notification: an offer, a slow afternoon, something new.": "Envoyez une notification à vos abonnés : une offre, un après-midi calme, une nouveauté.",
     "Who gets it": "Qui la reçoit",
     "Everyone following :business for offers.": "Toutes les personnes qui suivent :business pour ses offres.",
-    "Followers with no stamp here for 14 days or more.": "Abonnés sans tampon ici depuis 14 jours ou plus.",
     "Your 10 followers with the most stamps here in 90 days.": "Vos 10 abonnés avec le plus de tampons ici en 90 jours.",
     ":reach of :followers have notifications on a phone.": ":reach sur :followers ont activé les notifications sur un téléphone.",
     "None of them has notifications on a phone yet.": "Aucun n’a encore activé les notifications sur un téléphone.",
@@ -1156,5 +1155,14 @@
     "Too soon after their last stamp on this card: the next one can be given tomorrow from :time.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné demain à partir de :time.",
     "Too soon after their last stamp on this card: the next one can be given on :date from :time.": "Trop tôt après son dernier tampon sur cette carte : le prochain peut être donné le :date à partir de :time.",
     "Delete this note?": "Supprimer cette note ?",
-    "It goes for your whole team, and from the data :name can ask for. This can’t be undone.": "Elle disparaît pour toute votre équipe, et des données que :name peut demander. C’est définitif."
+    "It goes for your whole team, and from the data :name can ask for. This can’t be undone.": "Elle disparaît pour toute votre équipe, et des données que :name peut demander. C’est définitif.",
+    "Late for their usual visit, not lost yet.": "En retard sur leur rythme habituel, pas encore perdus.",
+    "At every location: late for their usual visit, not lost yet.": "Dans tous vos sites : en retard sur leur rythme habituel, pas encore perdus.",
+    "See all": "Tout voir",
+    "Usually every day|Usually every :count days": "D’habitude tous les jours|D’habitude tous les :count jours",
+    "The nudge goes to those of them who follow you for offers.": "Le message part à ceux d’entre eux qui vous suivent pour vos offres.",
+    "Send them a nudge": "Leur faire signe",
+    "Nobody is going quiet": "Personne ne se fait rare",
+    "Customers late for their usual visit show here, so you can bring them back.": "Les clients en retard sur leur rythme habituel apparaissent ici, pour les faire revenir.",
+    "Followers late for their usual visit.": "Abonnés en retard sur leur rythme habituel."
 }

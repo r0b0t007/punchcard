@@ -35,6 +35,19 @@ export type DashboardStats = {
         /** Y-m-d, local. */
         lastVisit: string;
     }[];
+    /** Going quiet at the business now (CHW-45): how many, and the 5 with the most visits. */
+    goingQuiet: {
+        count: number;
+        customers: {
+            id: number;
+            name: string;
+            visits: number;
+            /** Null before their second visit. */
+            usualGapDays: number | null;
+            /** In the business's time. */
+            lastVisitDays: number;
+        }[];
+    };
     locations: { id: number; name: string }[];
     location: number | null;
 };

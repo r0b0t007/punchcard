@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\Dashboard;
 
 use App\Actions\Stamps\RecentStamps;
+use App\Enums\CustomerSegment;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\BusinessDailyStat;
 use App\Models\CustomerVisitDay;
 use App\Models\Location;
@@ -34,6 +36,10 @@ use Carbon\CarbonImmutable;
  *   (null when there was nothing before), in points for the return rate.
  * - The latest stamps here (every source, so corrections show) and the top
  *   10 customers by visits, then by their latest visit.
+ * - Who is going quiet (CHW-45): the Customers page's Going quiet tab
+ *   (CustomerSegment::Quiet), how many and the 5 with the most visits. A
+ *   customer of the business, not of one location: the same whichever is
+ *   picked.
  *
  * Only this business's events count, so a franchisee never sees its
  * sibling's customers (ADR 0006): rewards are filtered on where they were
@@ -61,6 +67,8 @@ final readonly class DescribeDashboard
 
     private const int LISTED = 10;
 
+    private const int GOING_QUIET_LISTED = 5;
+
     public function __construct(private RecentStamps $recentStamps) {}
 
     /**
@@ -70,6 +78,7 @@ final readonly class DescribeDashboard
      *     visitsPerDay: list<array{date: string, visits: int}>,
      *     recentStamps: list<array{id: int, customer: ?string, card: ?string, location: ?string, source: string, sourceLabel: string, qty: int, at: array{day: 'today'|'other', date: string, time: string}, secondsAgo: int}>,
      *     topCustomers: list<array{id: int, name: string, visits: int, lastVisit: string}>,
+     *     goingQuiet: array{count: int, customers: list<array{id: int, name: string, visits: int, usualGapDays: ?int, lastVisitDays: int}>},
      *     locations: list<array{id: int, name: string}>,
      *     location: ?int,
      * }
@@ -102,6 +111,7 @@ final readonly class DescribeDashboard
             'visitsPerDay' => array_map(fn (string $day): array => ['date' => $day, 'visits' => $perDay[$day] ?? 0], array_slice($days, self::DAYS)),
             'recentStamps' => $this->recentStamps->handle($business, $location?->id, $now),
             'topCustomers' => $this->topCustomers($customers),
+            'goingQuiet' => $this->goingQuiet($business, $now),
             'locations' => array_values($locations->map(fn (Location $open): array => ['id' => $open->id, 'name' => $open->name])->all()),
             'location' => $location?->id,
         ];
@@ -254,6 +264,34 @@ final readonly class DescribeDashboard
             'visits' => $ranked[$id]['current'],
             'lastVisit' => (string) $ranked[$id]['last'],
         ], array_keys($ranked));
+    }
+
+    /**
+     * Who is going quiet at the business now: how many, and the
+     * GOING_QUIET_LISTED with the most visits, then the latest visit. Each by
+     * first name and initial, their usual gap, and the days since their last
+     * visit in the business's time, as the Customers page counts them.
+     *
+     * @return array{count: int, customers: list<array{id: int, name: string, visits: int, usualGapDays: ?int, lastVisitDays: int}>}
+     */
+    private function goingQuiet(Business $business, CarbonImmutable $now): array
+    {
+        $quiet = fn () => BusinessCustomer::query()->where('business_id', $business->id)->inSegment(CustomerSegment::Quiet, $now);
+        $listed = $quiet()->orderByDesc('visits')->orderByDesc('last_visit_at')->orderByDesc('id')->limit(self::GOING_QUIET_LISTED)->get();
+        $names = User::query()->whereKey($listed->pluck('user_id')->all())->get(['id', 'name'])
+            ->mapWithKeys(fn (User $user): array => [$user->id => (string) $user->shortName()]);
+        $timezone = LocalMoment::timezoneOfBusiness($business->id);
+
+        return [
+            'count' => $quiet()->count(),
+            'customers' => array_values($listed->map(fn (BusinessCustomer $customer): array => [
+                'id' => $customer->id,
+                'name' => (string) $names->get($customer->user_id, ''),
+                'visits' => $customer->visits,
+                'usualGapDays' => $customer->usual_gap_days,
+                'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
+            ])->all()),
+        ];
     }
 
     /** The change in percent, or null when there was nothing to compare with. */

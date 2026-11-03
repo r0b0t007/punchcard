@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react';
+import GoingQuiet from '@/components/dashboard/going-quiet';
 import KpiTiles from '@/components/dashboard/kpi-tiles';
 import { RecentStamps, TopCustomers } from '@/components/dashboard/stamp-lists';
 import type { DashboardStats } from '@/components/dashboard/types';
@@ -18,7 +19,8 @@ const ALL = 'all';
 
 /**
  * B3 lite (CHW-33): the last 30 days at the business, or one of its
- * locations. The filter reloads only the figures.
+ * locations, and who is going quiet there (CHW-45). The filter reloads only
+ * the figures.
  */
 export default function OwnerDashboard({ stats }: { stats: DashboardStats }) {
     const { t } = useTranslation();
@@ -72,6 +74,11 @@ export default function OwnerDashboard({ stats }: { stats: DashboardStats }) {
             </div>
 
             <KpiTiles kpis={stats.kpis} />
+
+            <GoingQuiet
+                goingQuiet={stats.goingQuiet}
+                locationPicked={stats.location !== null}
+            />
 
             <Card>
                 <CardHeader>

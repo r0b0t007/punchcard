@@ -48,7 +48,8 @@ class StoreCampaignRequest extends FormRequest
     {
         return [
             'idempotency_key' => ['required', 'uuid'],
-            'segment' => ['required', Rule::enum(CampaignSegment::class)],
+            // Only those offered: Quiet stays for the campaigns made with it, never a new one (CHW-45).
+            'segment' => ['required', Rule::enum(CampaignSegment::class)->only(CampaignSegment::offered())],
             'title' => ['required', 'string', 'max:'.CampaignText::titleRoom((string) $this->business()?->name)],
             'body' => ['required', 'string', 'max:'.CampaignText::BODY],
             'when' => ['sometimes', 'in:now,later'],

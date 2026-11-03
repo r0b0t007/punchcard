@@ -73,6 +73,11 @@ final class DemoSeeder extends Seeder
     /** How long the businesses, cards, tags and accounts exist before the first stamp. */
     private const int SETUP_DAYS_AGO = 90;
 
+    /** How many of the café's customers stopped coming, and how long ago: going quiet on the dashboard (CHW-45). */
+    private const int CAFE_GOING_QUIET = 3;
+
+    private const int GOING_QUIET_DAYS = 20;
+
     /** Repeatable values; seeded only while run() works, then reseeded randomly (Faker seeds mt_rand, which fake() shares). */
     private readonly Generator $faker;
 
@@ -154,9 +159,11 @@ final class DemoSeeder extends Seeder
 
     /**
      * Café Hafa, signed up like any café. Each customer uses one to three of
-     * its stampers, served by the owner or the staff member.
+     * its stampers, served by the owner or the staff member. The last
+     * CAFE_GOING_QUIET (never the demo customer) stopped coming
+     * GOING_QUIET_DAYS ago.
      *
-     * @return array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>}
+     * @return array{0: LoyaltyCard, 1: list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>, 2?: int}>}
      */
     private function setUpCafe(User $customer): array
     {
@@ -178,7 +185,7 @@ final class DemoSeeder extends Seeder
 
         $members = [];
 
-        foreach ([$customer, ...$this->users($this->cafeCustomers - 1)] as $member) {
+        foreach ([$customer, ...$this->users($this->cafeCustomers - 1)] as $index => $member) {
             $visitedAt = [];
             $first = $this->faker->numberBetween(0, 2);
 
@@ -186,7 +193,8 @@ final class DemoSeeder extends Seeder
                 $visitedAt[] = [$business, $stampers[($first + $offset) % 3], $offset % 2 === 0 ? $owner : $staff];
             }
 
-            $members[] = [$member, $visitedAt];
+            $away = $index > 0 && $index >= $this->cafeCustomers - self::CAFE_GOING_QUIET ? self::GOING_QUIET_DAYS : 0;
+            $members[] = [$member, $visitedAt, $away];
         }
 
         return [$card, $members];
@@ -224,17 +232,20 @@ final class DemoSeeder extends Seeder
      * order across the whole program so tag counters rise with time, then
      * sets the counters and rewards those events give. A member stamps at
      * most once a day, from yesterday back (within the cooldown and daily
-     * cap); their first visits go once to every place listed for them, the
-     * rest anywhere among them.
+     * cap), or from as many days back as they have been away; their first
+     * visits go once to every place listed for them, the rest anywhere among
+     * them.
      *
-     * @param  list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>}>  $members  each member and the places they stamp: business, stamper, served by
+     * @param  list<array{0: User, 1: list<array{0: Business, 1: Stamper, 2: User}>, 2?: int}>  $members  each member, the places they stamp (business, stamper, served by), and the days since they last came
      */
     private function program(LoyaltyCard $card, array $members): void
     {
         $visits = [];
 
-        foreach ($members as [$member, $visitedAt]) {
-            $days = $this->faker->randomElements(range(1, 60), $this->faker->numberBetween(count($visitedAt), 25));
+        foreach ($members as $listed) {
+            [$member, $visitedAt] = $listed;
+            $away = $listed[2] ?? 0;
+            $days = $this->faker->randomElements(range(max(1, $away), 60), $this->faker->numberBetween(count($visitedAt), 25));
             rsort($days);
             $times = array_map(fn (mixed $day): CarbonInterface => Carbon::now()->subDays((int) $day)
                 ->setTime($this->faker->numberBetween(8, 21), $this->faker->numberBetween(0, 59)), $days);
