@@ -26,8 +26,9 @@ Common to every entry:
 - **Purpose**: let a person sign in and keep their cards across devices.
 - **Legal basis**: performance of the service the person asked for.
 - **People**: customers.
-- **Data**: name, email, language, password hash or none (sign-in by email link), two-factor settings, passkeys (name,
-  public key, last use), the date they confirmed being 16 or older, sessions (IP address, browser, last activity), date of
+- **Data**: name, email, language, birthday if given (day and month only, never the year; CHW-46), password hash or none
+  (sign-in by email link), two-factor settings, passkeys (name, public key, last use), the date they confirmed being 16
+  or older, sessions (IP address, browser, last activity), date of
   last activity, sign-in links (email, one day).
 - **Recipients**: punchcard staff (support, need to know).
 - **Retention**: until deleted by the person, or 24 months without activity (30 days' notice), then deleted or

@@ -1,6 +1,7 @@
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import BirthdayField from '@/components/birthday-field';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -23,6 +24,7 @@ export default function Profile({
     hasPassword,
     recentlyConfirmed,
     pendingEmail,
+    birthday,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
@@ -32,6 +34,8 @@ export default function Profile({
     recentlyConfirmed: boolean;
     /** A new address waiting to be confirmed from its own inbox. */
     pendingEmail: string | null;
+    /** Optional, day and month only (CHW-46). */
+    birthday: { day: number; month: number } | null;
 }) {
     const { auth } = usePage<PageProps>().props;
     const { t, tn } = useTranslation();
@@ -44,7 +48,9 @@ export default function Profile({
                 <Heading
                     variant="small"
                     title={t('Profile')}
-                    description={t('Update your name and email address')}
+                    description={t(
+                        'Update your name, email address and birthday',
+                    )}
                 />
 
                 <Form
@@ -161,6 +167,11 @@ export default function Profile({
                                         )}
                                     </div>
                                 )}
+
+                            <BirthdayField
+                                birthday={birthday}
+                                errors={errors}
+                            />
 
                             <div className="flex items-center gap-4">
                                 <Button

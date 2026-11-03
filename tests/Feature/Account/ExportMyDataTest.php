@@ -80,7 +80,7 @@ it('downloads a JSON file named for the day, as a file to save, never cached', f
 });
 
 it('holds the account, its consents and follows', function (): void {
-    $this->customer->forceFill(['marketing_opt_in_at' => now()->subDay(), 'adult_confirmed_at' => now()->subWeek()])->save();
+    $this->customer->forceFill(['marketing_opt_in_at' => now()->subDay(), 'adult_confirmed_at' => now()->subWeek(), 'birthday_day' => 29, 'birthday_month' => 2])->save();
     ConsentEvent::record($this->customer->id, ConsentEvent::KIND_PUNCHCARD_NEWS, true, ConsentEvent::SOURCE_SIGN_UP);
     $this->actingAs($this->customer)->patch(route('privacy.follow', $this->atB->id), ['follow' => true]);
 
@@ -88,7 +88,7 @@ it('holds the account, its consents and follows', function (): void {
 
     expect($data['account'])->toBe([
         'name' => 'Salma Tazi', 'email' => 'salma@example.com', 'email_verified_at' => $this->customer->email_verified_at?->toIso8601String(),
-        'pending_email' => null, 'locale' => 'fr', 'created_at' => '2026-10-18T10:00:00+00:00', 'last_active_at' => '2026-10-18T10:00:00+00:00', 'inactivity_warned_at' => null, 'inactivity_deletes_at' => null, 'adult_confirmed_at' => '2026-10-11T10:00:00+00:00',
+        'pending_email' => null, 'locale' => 'fr', 'birthday' => ['day' => 29, 'month' => 2], 'created_at' => '2026-10-18T10:00:00+00:00', 'last_active_at' => '2026-10-18T10:00:00+00:00', 'inactivity_warned_at' => null, 'inactivity_deletes_at' => null, 'adult_confirmed_at' => '2026-10-11T10:00:00+00:00',
         'two_factor_enabled' => false,
     ])
         ->and($data['consents']['punchcard_news'])->toBe(['on' => true, 'on_since' => '2026-10-17T10:00:00+00:00', 'off_since' => null])

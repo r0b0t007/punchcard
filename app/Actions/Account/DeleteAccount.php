@@ -188,6 +188,8 @@ final readonly class DeleteAccount
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
             'locale' => null,
+            'birthday_month' => null,
+            'birthday_day' => null,
             // Consent is the person's, as their follows are: news by email, and that they were 16 or older (CHW-23).
             'marketing_opt_in_at' => null,
             'marketing_opt_out_at' => null,

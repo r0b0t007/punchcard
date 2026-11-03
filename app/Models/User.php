@@ -45,13 +45,15 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $marketing_opt_in_at when they asked for news by email; null: not on (CHW-23)
  * @property Carbon|null $marketing_opt_out_at when they turned news off in the settings (CHW-58)
  * @property bool $push_rewards whether their phones with notifications on hear about a reward unlocked (CHW-41)
+ * @property int|null $birthday_month their birthday's month, 1 to 12, optional: never the year (CHW-46)
+ * @property int|null $birthday_day its day; set with the month or not at all
  * @property Carbon|null $last_active_at when the account was last used: signed in, a stamp proving they were there, a redemption (RecordActivity, CHW-58)
  * @property Carbon|null $inactivity_warned_at when it was warned it would go for lack of use; activity withdraws it (CHW-58)
  * @property Carbon|null $inactivity_deletes_at the day that warning promised: never deleted before it (CHW-58)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'locale'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'birthday_day', 'birthday_month'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasLocalePreference, MustVerifyEmail, PasskeyUser
 {
@@ -95,6 +97,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'marketing_opt_in_at' => 'datetime',
             'marketing_opt_out_at' => 'datetime',
             'push_rewards' => 'boolean',
+            'birthday_month' => 'integer',
+            'birthday_day' => 'integer',
             'last_active_at' => 'datetime',
             'inactivity_warned_at' => 'datetime',
             'inactivity_deletes_at' => 'datetime',
@@ -165,6 +169,16 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     public function pendingEmail(): ?string
     {
         return $this->pending_email_expires_at?->isFuture() === true ? $this->pending_email : null;
+    }
+
+    /**
+     * Their birthday, day and month, if they gave it (CHW-46): the profile page and their data export.
+     *
+     * @return array{day: int, month: int}|null
+     */
+    public function birthday(): ?array
+    {
+        return $this->birthday_day === null || $this->birthday_month === null ? null : ['day' => $this->birthday_day, 'month' => $this->birthday_month];
     }
 
     /** Signed up by email link, an account has none until it chooses one (CHW-23). */

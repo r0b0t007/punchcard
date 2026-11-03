@@ -15,6 +15,8 @@ and we act on its behalf.
 
 - **Your account**: your name, email, language, and how you sign in (password, or links by email, passkeys). To keep your
   cards across your devices.
+- **Your birthday, if you give it**: the day and the month, never the year. So the places where you collect stamps can
+  give you a treat on your birthday. You can remove it in your settings at any time.
 - **Your cards**: the stamps you collect (where, when) and your rewards. To run each program you joined.
 - **Each tap on a stamper**: when, where, the result, your IP address and browser, for 180 days. To make sure stamps are
   given in person and to stop fraud.

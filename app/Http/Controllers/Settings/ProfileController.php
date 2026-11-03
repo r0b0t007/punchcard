@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Actions\Account\DeleteAccount;
+use App\Actions\Account\UpdateProfile;
 use App\Actions\Auth\RequestEmailChange;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
@@ -30,16 +31,18 @@ class ProfileController extends Controller
             'pendingEmail' => $request->user()->pendingEmail(),
             // A new address asks to confirm it's them first, unless they did lately (ProfileUpdateRequest).
             'recentlyConfirmed' => RecentConfirmation::holds($request->session()),
+            // Optional, day and month only (CHW-46): for the places' birthday treat.
+            'birthday' => $request->user()->birthday(),
             'status' => $request->session()->get('status'),
         ]);
     }
 
     /**
-     * The name at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
+     * The name and the birthday (CHW-46) at once; a new address only once confirmed from its own inbox (RequestEmailChange, CHW-23): until
      * then the account keeps its address, so a mistyped one costs nothing. Over the limit for new addresses,
      * nothing is saved, the name neither.
      */
-    public function update(ProfileUpdateRequest $request, RequestEmailChange $requestEmailChange): RedirectResponse
+    public function update(ProfileUpdateRequest $request, RequestEmailChange $requestEmailChange, UpdateProfile $updateProfile): RedirectResponse
     {
         $user = $request->user();
         $email = (string) $request->validated('email');
@@ -49,7 +52,7 @@ class ProfileController extends Controller
             return back()->withErrors(['email' => __('Too many address changes. Try again later.')]);
         }
 
-        $user->fill(['name' => $request->validated('name')])->save();
+        $updateProfile->handle($user, $request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $emailChange === RequestEmailChange::REQUESTED
             ? __('Check :email to confirm your new address.', ['email' => $email])
