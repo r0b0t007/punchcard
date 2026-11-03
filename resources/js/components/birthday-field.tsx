@@ -1,5 +1,5 @@
 import { Cake } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Label } from '@/components/ui/label';
 import {
@@ -14,19 +14,25 @@ import { useTranslation } from '@/hooks/use-translation';
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 
-/** "March", "mars", "مارس": the month's name in the page's language. */
-function monthName(locale: string, month: number): string {
-    return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
+/** "March", "mars", "مارس": the months' names in the page's language. */
+function monthNames(locale: string): string[] {
+    const format = new Intl.DateTimeFormat(`${locale}-u-nu-latn`, {
         month: 'long',
         timeZone: 'UTC',
-    }).format(new Date(Date.UTC(2000, month - 1, 1)));
+    });
+
+    return MONTHS.map((month) =>
+        format.format(new Date(Date.UTC(2000, month - 1, 1))),
+    );
 }
 
 /**
  * The optional birthday on C12 Profile (CHW-46, design 17a): the day, then
  * the month by name, never the year. Posted with the profile form as
  * birthday_day and birthday_month; "Remove my birthday" empties both, for
- * Save to clear it. The server refuses a day the month never has.
+ * Save to clear it. The server refuses a day the month never has. The two
+ * selects are one group named "Birthday", described by the hint and the
+ * error.
  */
 export default function BirthdayField({
     birthday,
@@ -38,9 +44,18 @@ export default function BirthdayField({
     const { t, locale } = useTranslation();
     const [day, setDay] = useState(birthday ? String(birthday.day) : '');
     const [month, setMonth] = useState(birthday ? String(birthday.month) : '');
+    const names = useMemo(() => monthNames(locale), [locale]);
+    const id = useId();
+    const error = errors.birthday_day ?? errors.birthday_month;
+    const describedBy = error ? `${id}-hint ${id}-error` : `${id}-hint`;
 
     return (
-        <div className="grid gap-2" data-test="birthday">
+        <div
+            role="group"
+            aria-labelledby={`${id}-label ${id}-optional`}
+            className="grid gap-2"
+            data-test="birthday"
+        >
             <div className="flex items-center gap-2.5">
                 <span
                     aria-hidden="true"
@@ -49,8 +64,13 @@ export default function BirthdayField({
                     <Cake className="size-4" />
                 </span>
                 <div className="flex flex-col">
-                    <Label htmlFor="birthday_day">{t('Birthday')}</Label>
-                    <span className="text-xs text-muted-foreground">
+                    <Label id={`${id}-label`} htmlFor="birthday_day">
+                        {t('Birthday')}
+                    </Label>
+                    <span
+                        id={`${id}-optional`}
+                        className="text-xs text-muted-foreground"
+                    >
                         {t('Optional')}
                     </span>
                 </div>
@@ -66,6 +86,7 @@ export default function BirthdayField({
                         <SelectTrigger
                             id="birthday_day"
                             aria-label={t('Day')}
+                            aria-describedby={describedBy}
                             aria-invalid={
                                 errors.birthday_day ? true : undefined
                             }
@@ -90,6 +111,7 @@ export default function BirthdayField({
                     >
                         <SelectTrigger
                             aria-label={t('Month')}
+                            aria-describedby={describedBy}
                             aria-invalid={
                                 errors.birthday_month ? true : undefined
                             }
@@ -101,7 +123,7 @@ export default function BirthdayField({
                         <SelectContent>
                             {MONTHS.map((each) => (
                                 <SelectItem key={each} value={String(each)}>
-                                    {monthName(locale, each)}
+                                    {names[each - 1]}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -109,10 +131,11 @@ export default function BirthdayField({
                 </div>
             </div>
 
-            <InputError
-                message={errors.birthday_day ?? errors.birthday_month}
-            />
-            <p className="text-sm text-pretty text-muted-foreground">
+            <InputError id={`${id}-error`} message={error} />
+            <p
+                id={`${id}-hint`}
+                className="text-sm text-pretty text-muted-foreground"
+            >
                 {t(
                     'The places where you collect stamps can give you a treat on your birthday. Never the year.',
                 )}

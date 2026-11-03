@@ -94,7 +94,7 @@ final readonly class ExportMyData
                     'email_verified_at' => $this->date($user->email_verified_at),
                     'pending_email' => $user->pending_email,
                     'locale' => $user->locale,
-                    'birthday' => $user->birthday_month === null ? null : ['day' => $user->birthday_day, 'month' => $user->birthday_month],
+                    'birthday' => $user->birthday(),
                     'created_at' => $this->date($user->created_at),
                     'last_active_at' => $this->date($user->last_active_at),
                     'inactivity_warned_at' => $this->date($user->inactivity_warned_at),

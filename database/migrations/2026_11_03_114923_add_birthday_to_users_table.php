@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Schema;
  * the year, for a birthday treat from the places they collect stamps at.
  * Both or neither, and a day that month has in a leap year (29 February is
  * one). Postgres only, like the other CHECKs; ProfileUpdateRequest says the
- * same on every driver.
+ * same on every driver. "Both or neither" is its own clause: with one of the
+ * two null, the date clause is null, and a CHECK lets a null through.
  */
 return new class extends Migration
 {
@@ -24,14 +25,17 @@ return new class extends Migration
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(<<<'SQL'
                 alter table users add constraint users_birthday_check check (
-                    (birthday_month is null and birthday_day is null)
-                    or (
-                        birthday_month between 1 and 12
-                        and birthday_day between 1 and case
-                            when birthday_month = 2 then 29
-                            when birthday_month in (4, 6, 9, 11) then 30
-                            else 31
-                        end
+                    (birthday_month is null) = (birthday_day is null)
+                    and (
+                        birthday_month is null
+                        or (
+                            birthday_month between 1 and 12
+                            and birthday_day between 1 and case
+                                when birthday_month = 2 then 29
+                                when birthday_month in (4, 6, 9, 11) then 30
+                                else 31
+                            end
+                        )
                     )
                 )
                 SQL);

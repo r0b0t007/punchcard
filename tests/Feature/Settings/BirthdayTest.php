@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -45,8 +46,15 @@ it('removes it when both are cleared, and leaves it out when never given', funct
     ($this->save)(['birthday_day' => '', 'birthday_month' => ''])->assertSessionHasNoErrors();
     expect($this->user->refresh()->only(['birthday_day', 'birthday_month']))->toBe(['birthday_day' => null, 'birthday_month' => null]);
 
-    ($this->save)([])->assertSessionHasNoErrors();
     $this->actingAs($this->user)->get(route('profile.edit'))->assertInertia(fn (Assert $page): Assert => $page->where('birthday', null));
+});
+
+it('keeps it when a save sends neither field, as a page from before them does', function (): void {
+    $this->user->forceFill(['birthday_day' => 14, 'birthday_month' => 3])->save();
+
+    ($this->save)(['name' => 'Salma T.'])->assertSessionHasNoErrors();
+
+    expect($this->user->refresh()->only(['name', 'birthday_day', 'birthday_month']))->toBe(['name' => 'Salma T.', 'birthday_day' => 14, 'birthday_month' => 3]);
 });
 
 it('refuses a day that month never has, or one without the other, on that one field, and saves nothing', function (array $birthday, string $error): void {
@@ -72,7 +80,21 @@ it('says why a date that does not exist is refused, in the page\'s language', fu
         ->assertSessionHasErrors(['birthday_day' => 'Cette date n’existe pas. Choisissez un autre jour.']);
 });
 
-it('keeps a date that does not exist out of the database too', function (): void {
-    expect(fn () => DB::table('users')->where('id', $this->user->id)->update(['birthday_day' => 31, 'birthday_month' => 4]))->toThrow(Exception::class)
-        ->and(fn () => DB::table('users')->where('id', $this->user->id)->update(['birthday_day' => 14, 'birthday_month' => null]))->toThrow(Exception::class);
-})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'A Postgres CHECK.');
+it('keeps a date that does not exist, or half of one, out of the database too', function (?int $day, ?int $month): void {
+    // Each in its own savepoint: a failed statement aborts the transaction it is in, and every later one with it.
+    expect(fn () => DB::transaction(fn () => DB::table('users')->whereKey($this->user->id)->update(['birthday_day' => $day, 'birthday_month' => $month])))
+        ->toThrow(fn (QueryException $refused) => expect($refused->getCode())->toBe('23514'));
+})->with([
+    '31 April' => [31, 4],
+    'no such month' => [1, 13],
+    'a day alone' => [14, null],
+    'a month alone' => [null, 3],
+])->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'A Postgres CHECK.');
+
+it('lets a real date, 29 February too, and no birthday at all into the database', function (?int $day, ?int $month): void {
+    expect(DB::table('users')->whereKey($this->user->id)->update(['birthday_day' => $day, 'birthday_month' => $month]))->toBe(1);
+})->with([
+    '29 February' => [29, 2],
+    '31 December' => [31, 12],
+    'none' => [null, null],
+])->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'A Postgres CHECK.');

@@ -53,7 +53,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'locale'])]
+#[Fillable(['name', 'email', 'password', 'locale', 'birthday_day', 'birthday_month'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, HasLocalePreference, MustVerifyEmail, PasskeyUser
 {
@@ -169,6 +169,16 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     public function pendingEmail(): ?string
     {
         return $this->pending_email_expires_at?->isFuture() === true ? $this->pending_email : null;
+    }
+
+    /**
+     * Their birthday, day and month, if they gave it (CHW-46): the profile page and their data export.
+     *
+     * @return array{day: int, month: int}|null
+     */
+    public function birthday(): ?array
+    {
+        return $this->birthday_day === null || $this->birthday_month === null ? null : ['day' => $this->birthday_day, 'month' => $this->birthday_month];
     }
 
     /** Signed up by email link, an account has none until it chooses one (CHW-23). */
