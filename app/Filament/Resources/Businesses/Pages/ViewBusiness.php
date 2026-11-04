@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Businesses\Pages;
 
+use App\Filament\Resources\Businesses\Actions\AutomationsAccessActions;
 use App\Filament\Resources\Businesses\Actions\BusinessStatusActions;
 use App\Filament\Resources\Businesses\Actions\ImpersonateOwnerAction;
 use App\Filament\Resources\Businesses\Actions\RequestNewDocumentsAction;
@@ -16,8 +17,8 @@ use Livewire\Attributes\Locked;
 
 /**
  * One business (BusinessInfolist), with its status actions in the header,
- * asking for new verification documents (CHW-145), and signing in as its
- * owner (CHW-144).
+ * asking for new verification documents (CHW-145), allowing or stopping
+ * automations (CHW-46), and signing in as its owner (CHW-144).
  * What the page shows is loaded with the record, never a query per row.
  */
 class ViewBusiness extends ViewRecord
@@ -68,6 +69,6 @@ class ViewBusiness extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [...BusinessStatusActions::all(), RequestNewDocumentsAction::make(), ImpersonateOwnerAction::make()];
+        return [...BusinessStatusActions::all(), RequestNewDocumentsAction::make(), ...AutomationsAccessActions::all(), ImpersonateOwnerAction::make()];
     }
 }

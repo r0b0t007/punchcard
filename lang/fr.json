@@ -1169,5 +1169,11 @@
     "Month": "Mois",
     "The places where you collect stamps can give you a treat on your birthday. Never the year.": "Les lieux où vous collectez des tampons peuvent vous faire plaisir le jour de votre anniversaire. Jamais l’année.",
     "Remove my birthday": "Retirer mon anniversaire",
-    "That date doesn’t exist. Choose another day.": "Cette date n’existe pas. Choisissez un autre jour."
+    "That date doesn’t exist. Choose another day.": "Cette date n’existe pas. Choisissez un autre jour.",
+    "Allow automations": "Autoriser les automatisations",
+    "Stop automations": "Arrêter les automatisations",
+    "Its owner can turn on win-back, birthday and reward reminder messages. Kept in the audit log.": "Son propriétaire peut activer les messages de retour, d’anniversaire et de rappel de récompense. Conservé dans le journal d’audit.",
+    "Nothing more is sent. Its automations stay as the owner set them up. Kept in the audit log.": "Plus rien n’est envoyé. Ses automatisations restent telles que le propriétaire les a réglées. Conservé dans le journal d’audit.",
+    "Automations allowed for :business.": "Automatisations autorisées pour :business.",
+    "Automations stopped for :business.": "Automatisations arrêtées pour :business."
 }
