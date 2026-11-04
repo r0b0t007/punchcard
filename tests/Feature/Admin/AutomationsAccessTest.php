@@ -10,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
@@ -86,6 +87,17 @@ it('changes nothing, and records nothing, when it is already so', function (): v
 
     expect(($this->allowed)())->toBeTrue()
         ->and(array_column(($this->audits)(), 'action'))->toBe(['business.automations_allowed']);
+});
+
+it('reads the flag again under the lock, so a change made meanwhile is recorded once', function (): void {
+    $this->actingAs($this->admin);
+    expect(($this->allowed)())->toBeFalse();
+
+    // Another admin allows it meanwhile, after this request read it off.
+    DB::table('features')->where('name', 'automations')->where('scope', Feature::serializeScope($this->tenants->a2))->update(['value' => 'true']);
+    app(SetAutomationsAccess::class)->handle($this->tenants->a2, true);
+
+    expect(($this->audits)())->toBe([]);
 });
 
 it('is not offered for an archived business', function (): void {

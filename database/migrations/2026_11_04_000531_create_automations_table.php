@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Schema;
  * A business's automations (CHW-46, B11): site data, one row per trigger the
  * owner set up, on or off. days is the reward reminder's wait, stamps the
  * birthday's bonus; title and body are the owner's own message, or null for
- * ours (lang). Gone with the business.
+ * ours (lang). Never deleted, nor its trigger changed: its sends point at
+ * it, with its business and trigger (automation_sends). Gone with the
+ * business.
  */
 return new class extends Migration
 {
@@ -31,6 +33,8 @@ return new class extends Migration
                 ->references(['id', 'organization_id'])->on('businesses')
                 ->cascadeOnDelete();
             $table->unique(['business_id', 'trigger']);
+            // What a send points at: this automation, of its business, for its trigger.
+            $table->unique(['id', 'business_id', 'trigger']);
         });
 
         if (DB::getDriverName() === 'pgsql') {

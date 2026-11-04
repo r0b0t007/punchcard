@@ -6,6 +6,7 @@ namespace App\Actions\Account;
 
 use App\Enums\RewardStatus;
 use App\Models\AuditLog;
+use App\Models\AutomationSend;
 use App\Models\BusinessCustomer;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
@@ -177,6 +178,8 @@ final readonly class DeleteAccount
         CustomerNote::query()->where('user_id', $user->id)->delete();
         // The consent history is the person's: it goes with them (CHW-58).
         ConsentEvent::query()->where('user_id', $user->id)->delete();
+        // The automation messages they got (CHW-46): a birthday's, a quiet spell's, the person's.
+        AutomationSend::query()->where('user_id', $user->id)->delete();
 
         $user->forceFill([
             'name' => 'Deleted user',

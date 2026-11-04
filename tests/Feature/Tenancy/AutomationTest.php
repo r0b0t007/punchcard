@@ -6,8 +6,10 @@ use App\Enums\AutomationTrigger;
 use App\Enums\BusinessRole;
 use App\Models\Automation;
 use App\Models\AutomationSend;
+use App\Models\Business;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +76,49 @@ it('writes an automation only for the business worked in, one per trigger', func
         ->and(fn () => Automation::query()->create(['trigger' => AutomationTrigger::WinBack]))->toThrow(QueryException::class);
 });
 
+it('never lets the org admin write another organization\'s automation', function (): void {
+    $this->context->set($this->tenants->orgA, orgAdmin: true);
+
+    expect(fn () => Automation::query()->create(['business_id' => $this->tenants->b1->id, 'trigger' => AutomationTrigger::Birthday]))
+        ->toThrow(LogicException::class);
+});
+
+it('claims a send only against its own business\'s automation, for that trigger', function (string $other, string $trigger): void {
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+
+    expect(fn () => DB::transaction(fn () => AutomationSend::query()->create([
+        'automation_id' => $this->automations[$other]->id, 'user_id' => $this->user->id, 'trigger' => $trigger, 'occasion' => 'quiet:2026-12-01',
+    ])))->toThrow(QueryException::class);
+})->with([
+    'A2\'s automation' => ['a2', 'win_back'],
+    'B1\'s automation' => ['b1', 'win_back'],
+    'its own, for another trigger' => ['a1', 'birthday'],
+]);
+
+it('never deletes an automation, nor changes its trigger, even in bypass', function (): void {
+    $automation = $this->automations['a1'];
+
+    expect(fn () => $this->context->bypass(fn () => $automation->delete()))->toThrow(LogicException::class, 'turn it off')
+        ->and(fn () => $this->context->bypass(fn () => $automation->update(['trigger' => AutomationTrigger::Birthday])))->toThrow(LogicException::class, 'turn it off')
+        ->and($this->context->bypass(fn (): bool => $automation->refresh()->update(['active' => false, 'title' => 'On nous manque'])))->toBeTrue();
+});
+
+it('fills in a send\'s sent_at once, and never clears it, even past the model', function (): void {
+    $send = fn (): Builder => AutomationSend::query()->whereKey($this->sends['a1']->id);
+    $this->context->bypass(fn () => $send()->update(['sent_at' => now()]));
+
+    expect(fn () => $this->context->bypass(fn () => DB::transaction(fn () => $send()->update(['sent_at' => now()->addDay()]))))->toThrow(QueryException::class, 'sent_once')
+        ->and(fn () => $this->context->bypass(fn () => DB::transaction(fn () => $send()->update(['sent_at' => null]))))->toThrow(QueryException::class, 'sent_once');
+});
+
+it('deletes a send only with the customer, in bypass', function (): void {
+    $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
+
+    expect(fn () => $this->sends['a1']->delete())->toThrow(LogicException::class, 'as claimed');
+
+    expect($this->context->bypass(fn (): ?bool => $this->sends['a2']->delete()))->toBeTrue();
+});
+
 it('starts an automation off, waiting 7 days, with 1 birthday stamp and our message', function (): void {
     $automation = $this->context->bypass(fn (): Automation => Automation::query()->create(['business_id' => $this->tenants->a1->id, 'trigger' => AutomationTrigger::RewardReminder])->refresh());
 
@@ -90,8 +135,7 @@ it('sends once per occasion, and keeps a send as claimed but for its sent_at, ev
             'business_id' => $this->tenants->a1->id, 'automation_id' => $send->automation_id, 'user_id' => $this->user->id,
             'trigger' => AutomationTrigger::WinBack, 'occasion' => 'quiet:2026-11-04',
         ])))->toThrow(QueryException::class)
-        ->and(fn () => $this->context->bypass(fn () => $send->update(['occasion' => 'quiet:2026-12-01'])))->toThrow(LogicException::class, 'as claimed')
-        ->and(fn () => $this->context->bypass(fn () => $send->delete()))->toThrow(LogicException::class, 'as claimed');
+        ->and(fn () => $this->context->bypass(fn () => $send->update(['occasion' => 'quiet:2026-12-01'])))->toThrow(LogicException::class, 'as claimed');
 });
 
 it('goes with the customer\'s account', function (): void {
@@ -99,6 +143,20 @@ it('goes with the customer\'s account', function (): void {
 
     expect($this->context->bypass(fn (): int => AutomationSend::query()->count()))->toBe(0)
         ->and($this->context->bypass(fn (): int => Automation::query()->count()))->toBe(3);
+});
+
+it('goes with the business, its sends and automations at once', function (): void {
+    $business = $this->context->bypass(fn (): Business => Business::factory()->create());
+    $automation = $this->context->bypass(fn (): Automation => Automation::factory()->create(['business_id' => $business->id]));
+    $this->context->bypass(fn () => AutomationSend::query()->create([
+        'business_id' => $business->id, 'automation_id' => $automation->id, 'user_id' => $this->user->id, 'trigger' => AutomationTrigger::WinBack, 'occasion' => 'quiet:2026-11-04',
+    ]));
+
+    DB::table('businesses')->where('id', $business->id)->delete();
+
+    expect(DB::table('automations')->where('business_id', $business->id)->count())->toBe(0)
+        ->and(DB::table('automation_sends')->where('business_id', $business->id)->count())->toBe(0)
+        ->and(DB::table('automation_sends')->count())->toBe(3);
 });
 
 it('files each automation and send under its business\'s organization', function (): void {
@@ -111,7 +169,9 @@ it('files each automation and send under its business\'s organization', function
 
 it('keeps a trigger, a wait or a bonus it does not know out of the database too', function (array $values): void {
     // Each in its own savepoint: a failed statement aborts the transaction it is in.
-    expect(fn () => $this->context->bypass(fn () => DB::transaction(fn () => Automation::query()->whereKey($this->automations['a1']->id)->update($values))))
+    $row = ['organization_id' => $this->tenants->orgA->id, 'business_id' => $this->tenants->a2->id, 'trigger' => 'reward_reminder', 'created_at' => now(), 'updated_at' => now()];
+
+    expect(fn () => DB::transaction(fn () => DB::table('automations')->insert([...$row, ...$values])))
         ->toThrow(function (QueryException $refused): void {
             expect($refused->getCode())->toBe('23514');
         });
