@@ -14,6 +14,7 @@ use App\Support\Tenancy\TenantModel;
 use App\Support\Tenancy\TenantScope;
 use App\Support\Tenancy\VisibleToBusiness;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -75,6 +76,23 @@ class Follow extends Model implements TenantModel, VisibleToBusiness
         if (! app(TenantContext::class)->isBypassed()) {
             throw new LogicException('A follow changes only by its customer (SetFollow) or a deleted account, in TenantContext::bypass().');
         }
+    }
+
+    /**
+     * Who a business may send to (CHW-42, CHW-46): followers of its
+     * organization with notifications on (notify) who came in, with a
+     * presence stamp at this business (the franchise rule), never an
+     * anonymised account.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function listeningTo(Builder $query, Business $business): void
+    {
+        $query->where('organization_id', $business->organization_id)
+            ->where('notify', true)
+            ->whereIn('user_id', User::query()->select('id')->notAnonymised());
+        $this->constrainToBusiness($query, $business->id);
     }
 
     /**

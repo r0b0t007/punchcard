@@ -1175,5 +1175,11 @@
     "Its owner can turn on win-back, birthday and reward reminder messages. Kept in the audit log.": "Son propriétaire peut activer les messages de retour, d’anniversaire et de rappel de récompense. Conservé dans le journal d’audit.",
     "Nothing more is sent. Its automations stay as the owner set them up. Kept in the audit log.": "Plus rien n’est envoyé. Ses automatisations restent telles que le propriétaire les a réglées. Conservé dans le journal d’audit.",
     "Automations allowed for :business.": "Automatisations autorisées pour :business.",
-    "Automations stopped for :business.": "Automatisations arrêtées pour :business."
+    "Automations stopped for :business.": "Automatisations arrêtées pour :business.",
+    "We miss you at :business": "Vous nous manquez chez :business",
+    "Happy birthday from :business!": "Joyeux anniversaire de la part de :business !",
+    "Your reward is waiting at :business": "Votre récompense vous attend chez :business",
+    "Come back soon: your card is waiting.": "Revenez vite : votre carte vous attend.",
+    "A treat from us on your card.": "Une surprise de notre part sur votre carte.",
+    "Don't forget: :reward is yours.": "N'oubliez pas : :reward est à vous."
 }
