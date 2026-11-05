@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
@@ -315,7 +316,8 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Stable names for what the audit log points at (CHW-34), so a renamed
      * class never orphans its history. Not enforced: other morphs (spatie's
-     * role holders) keep their class names.
+     * role holders) keep their class names. Pennant files a flag's scope under
+     * the same names (CHW-46): "business|12", not the class.
      */
     private function nameAuditSubjects(): void
     {
@@ -323,6 +325,7 @@ class AppServiceProvider extends ServiceProvider
             'business' => Business::class,
             'nfc_tag' => NfcTag::class,
         ]);
+        Feature::useMorphMap();
     }
 
     /**

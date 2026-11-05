@@ -1169,5 +1169,11 @@
     "Month": "الشهر",
     "The places where you collect stamps can give you a treat on your birthday. Never the year.": "يمكن للأماكن التي تجمع فيها الأختام أن تهديك شيئًا في عيد ميلادك. دون السنة أبدًا.",
     "Remove my birthday": "إزالة عيد ميلادي",
-    "That date doesn’t exist. Choose another day.": "هذا التاريخ غير موجود. اختر يومًا آخر."
+    "That date doesn’t exist. Choose another day.": "هذا التاريخ غير موجود. اختر يومًا آخر.",
+    "Allow automations": "السماح بالرسائل التلقائية",
+    "Stop automations": "إيقاف الرسائل التلقائية",
+    "Its owner can turn on win-back, birthday and reward reminder messages. Kept in the audit log.": "يمكن لمالكه تشغيل رسائل الاسترجاع وعيد الميلاد وتذكير المكافأة. يُحفظ في سجل التدقيق.",
+    "Nothing more is sent. Its automations stay as the owner set them up. Kept in the audit log.": "لا يُرسل شيء بعد الآن. تبقى رسائله التلقائية كما أعدّها المالك. يُحفظ في سجل التدقيق.",
+    "Automations allowed for :business.": "سُمح بالرسائل التلقائية لـ :business.",
+    "Automations stopped for :business.": "أُوقفت الرسائل التلقائية لـ :business."
 }

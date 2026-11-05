@@ -6,10 +6,13 @@ use App\Actions\Account\DeleteAccount;
 use App\Actions\Stamps\WorksAt;
 use App\Actions\Tenancy\ArchiveOrganization;
 use App\Actions\Tenancy\RestoreArchived;
+use App\Enums\AutomationTrigger;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
 use App\Enums\TapRejection;
 use App\Enums\TapStatus;
+use App\Models\Automation;
+use App\Models\AutomationSend;
 use App\Models\BusinessMember;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
@@ -73,6 +76,10 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
     $this->tenants->stamp($enrollment, $this->tenants->a1);
     $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 1, 'lifetime_stamps' => 1])->save());
     $reward = $this->tenants->reward($enrollment);
+    $this->context->bypass(fn () => AutomationSend::factory()->create([
+        'user_id' => $user->id, 'occasion' => 'birthday:2026',
+        'automation_id' => Automation::factory()->create(['business_id' => $this->tenants->a1->id, 'trigger' => AutomationTrigger::Birthday])->id,
+    ]));
 
     ($this->deleteAccount)($user)->assertSessionHasNoErrors()->assertRedirect(route('home'));
 
@@ -93,6 +100,8 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
         ->and($anonymised->inactivity_warned_at)->toBeNull()
         // And its history (CHW-58).
         ->and(DB::table('consent_events')->where('user_id', $user->id)->count())->toBe(0)
+        // And the automation messages it got, a birthday's included (CHW-46).
+        ->and(DB::table('automation_sends')->where('user_id', $user->id)->count())->toBe(0)
         ->and($anonymised->adult_confirmed_at)->toBeNull()
         // Nor a new address waiting for it (CHW-23).
         ->and($anonymised->pending_email)->toBeNull()

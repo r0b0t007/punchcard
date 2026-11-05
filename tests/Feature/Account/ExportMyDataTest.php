@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\AutomationTrigger;
 use App\Enums\BusinessRole;
 use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Enums\TapStatus;
+use App\Models\Automation;
+use App\Models\AutomationSend;
 use App\Models\ConsentEvent;
 use App\Models\CounterScan;
 use App\Models\Follow;
@@ -252,6 +255,20 @@ it('holds member QR scans, sign-in links and staff invitations, never another pe
     expect($data['member_qr_scans'])->toBe([['at' => '2026-10-18T10:00:00+00:00', 'business' => 'A1', 'location' => 'A1 site', 'gave_stamp' => false]])
         ->and($data['sign_in_links'])->toBe([['purpose' => LoginLink::SIGN_IN, 'sent_at' => '2026-10-18T10:00:00+00:00', 'used_at' => null]])
         ->and($data['staff_invitations'])->toBe([['business' => 'A1', 'sent_at' => '2026-10-18T10:00:00+00:00', 'accepted_at' => null]]);
+});
+
+it('holds the automation messages businesses sent them, never another person\'s', function (): void {
+    $other = User::factory()->create();
+    $this->context->bypass(function () use ($other): void {
+        $birthday = Automation::factory()->create(['business_id' => $this->tenants->a1->id, 'trigger' => AutomationTrigger::Birthday]);
+        AutomationSend::factory()->create(['automation_id' => $birthday->id, 'user_id' => $this->customer->id, 'occasion' => 'birthday:2026'])->markSent(now()->addMinute());
+        AutomationSend::factory()->create(['automation_id' => $birthday->id, 'user_id' => $other->id, 'occasion' => 'birthday:2026']);
+    });
+
+    expect(($this->data)(($this->download)())['automation_messages'])->toBe([[
+        'business' => 'A1', 'kind' => 'birthday', 'occasion' => 'birthday:2026',
+        'claimed_at' => '2026-10-18T10:00:00+00:00', 'sent_at' => '2026-10-18T10:01:00+00:00',
+    ]]);
 });
 
 it('never counts a click whose confirmation has expired against the hourly limit', function (): void {
