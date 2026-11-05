@@ -36,10 +36,7 @@ beforeEach(function (): void {
 
     foreach (['a1' => $this->tenants->a1, 'a2' => $this->tenants->a2, 'b1' => $this->tenants->b1] as $key => $business) {
         $this->automations[$key] = $this->context->bypass(fn (): Automation => Automation::factory()->create(['business_id' => $business->id]));
-        $this->sends[$key] = $this->context->bypass(fn (): AutomationSend => AutomationSend::query()->create([
-            'business_id' => $business->id, 'automation_id' => $this->automations[$key]->id, 'user_id' => $this->user->id,
-            'trigger' => AutomationTrigger::WinBack, 'occasion' => 'quiet:2026-11-04',
-        ]));
+        $this->sends[$key] = $this->context->bypass(fn (): AutomationSend => AutomationSend::factory()->create(['automation_id' => $this->automations[$key]->id, 'user_id' => $this->user->id]));
     }
 
     $this->tenant = fn (string $tenant): array => match ($tenant) {
@@ -111,6 +108,25 @@ it('fills in a send\'s sent_at once, and never clears it, even past the model', 
         ->and(fn () => $this->context->bypass(fn () => DB::transaction(fn () => $send()->update(['sent_at' => null]))))->toThrow(QueryException::class, 'sent_once');
 });
 
+it('marks a send sent once, the model with it, and says so', function (): void {
+    $send = $this->sends['a1'];
+    $first = now()->startOfSecond();
+
+    expect($this->context->bypass(fn (): bool => $send->markSent($first)))->toBeTrue()
+        ->and($send->sent_at?->equalTo($first))->toBeTrue()
+        ->and($send->isDirty())->toBeFalse()
+        ->and($this->context->bypass(fn (): bool => $this->sends['a1']->markSent($first->addHour())))->toBeFalse()
+        ->and($send->refresh()->sent_at?->equalTo($first))->toBeTrue();
+});
+
+it('makes a send for its automation\'s business and trigger', function (): void {
+    $automation = $this->context->bypass(fn (): Automation => Automation::factory()->create(['business_id' => $this->tenants->a2->id, 'trigger' => AutomationTrigger::Birthday]));
+    $send = $this->context->bypass(fn (): AutomationSend => AutomationSend::factory()->create(['automation_id' => $automation->id]));
+
+    expect($send->only(['business_id', 'organization_id', 'trigger']))
+        ->toBe(['business_id' => $this->tenants->a2->id, 'organization_id' => $this->tenants->orgA->id, 'trigger' => AutomationTrigger::Birthday]);
+});
+
 it('deletes a send only with the customer, in bypass', function (): void {
     $this->context->set($this->tenants->orgA, $this->tenants->a1, businessRole: BusinessRole::Owner);
 
@@ -128,13 +144,11 @@ it('starts an automation off, waiting 7 days, with 1 birthday stamp and our mess
 it('sends once per occasion, and keeps a send as claimed but for its sent_at, even in bypass', function (): void {
     $send = $this->sends['a1'];
 
-    $this->context->bypass(fn () => AutomationSend::query()->whereKey($send->id)->whereNull('sent_at')->update(['sent_at' => now()]));
+    $this->context->bypass(fn (): bool => $send->markSent(now()));
 
     expect($send->refresh()->sent_at)->not->toBeNull()
-        ->and(fn () => $this->context->bypass(fn () => AutomationSend::query()->create([
-            'business_id' => $this->tenants->a1->id, 'automation_id' => $send->automation_id, 'user_id' => $this->user->id,
-            'trigger' => AutomationTrigger::WinBack, 'occasion' => 'quiet:2026-11-04',
-        ])))->toThrow(QueryException::class)
+        ->and(fn () => $this->context->bypass(fn () => AutomationSend::factory()->create(['automation_id' => $send->automation_id, 'user_id' => $this->user->id])))
+        ->toThrow(QueryException::class)
         ->and(fn () => $this->context->bypass(fn () => $send->update(['occasion' => 'quiet:2026-12-01'])))->toThrow(LogicException::class, 'as claimed');
 });
 
@@ -148,9 +162,7 @@ it('goes with the customer\'s account', function (): void {
 it('goes with the business, its sends and automations at once', function (): void {
     $business = $this->context->bypass(fn (): Business => Business::factory()->create());
     $automation = $this->context->bypass(fn (): Automation => Automation::factory()->create(['business_id' => $business->id]));
-    $this->context->bypass(fn () => AutomationSend::query()->create([
-        'business_id' => $business->id, 'automation_id' => $automation->id, 'user_id' => $this->user->id, 'trigger' => AutomationTrigger::WinBack, 'occasion' => 'quiet:2026-11-04',
-    ]));
+    $this->context->bypass(fn () => AutomationSend::factory()->create(['automation_id' => $automation->id, 'user_id' => $this->user->id]));
 
     DB::table('businesses')->where('id', $business->id)->delete();
 

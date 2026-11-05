@@ -78,7 +78,9 @@ Common to every entry:
 - **Legal basis**: consent, per program, off until turned on, dated; can be withdrawn on the card or in the settings.
 - **People**: customers following a program.
 - **Data**: the follow (program, on or off, since when), email, language; later the Wallet pass or push subscription
-  (T7).
+  (T7). The automation messages a business sent (win-back, birthday, reward reminder: which, for what occasion, when
+  claimed and sent; CHW-46), kept for the weekly cap and the business's counts, in the customer's data download,
+  deleted with the account.
 - **Recipients**: the organization (its admins; a franchisee only for its own customers); punchcard as processor;
   Resend, which sends the offers by email (a transfer to the United States, as in T8).
 - **Retention**: until withdrawn or the account ends.

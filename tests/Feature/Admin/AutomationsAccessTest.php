@@ -111,6 +111,17 @@ it('is not offered for an archived business', function (): void {
     ($this->page)(fn (Testable $page) => $page->assertActionHidden('allowAutomations')->assertActionHidden('stopAutomations'));
 });
 
+it('forgets a change that was rolled back', function (): void {
+    // The acting account is deleted meanwhile: the audit entry is refused after the flag was set.
+    $gone = User::factory()->create();
+    $this->actingAs($gone);
+    DB::table('users')->where('id', $gone->id)->delete();
+
+    expect(fn () => app(SetAutomationsAccess::class)->handle($this->tenants->a2, true))->toThrow(LogicException::class, 'no longer exists')
+        ->and(($this->allowed)())->toBeFalse()
+        ->and(DB::table('features')->where('name', 'automations')->where('scope', 'business|'.$this->tenants->a2->id)->value('value'))->toBe('false');
+});
+
 it('refuses an archived business, or one in an archived organization, and records nothing', function (string $archived): void {
     $this->actingAs($this->admin);
     $archived === 'business'

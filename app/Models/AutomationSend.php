@@ -10,8 +10,11 @@ use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use Carbon\CarbonInterface;
+use Database\Factories\AutomationSendFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -22,7 +25,8 @@ use LogicException;
  * own. Claimed before it is sent, once per occasion (a quiet spell, a
  * birthday's year, a reward), and kept: the weekly cap and the B11 counts
  * read it. Only sent_at changes, once, when a phone's push service accepted
- * it (a trigger holds that on both drivers); deleted only with the
+ * it (a trigger holds that on both drivers), through markSent(): sent_at is
+ * not fillable, so an update() would drop it. Deleted only with the
  * customer's account (DeleteAccount, in bypass()) or the business.
  *
  * @property int $id
@@ -42,6 +46,9 @@ class AutomationSend extends Model implements TenantModel
     use BelongsToBusiness;
     use GuardsTenantWrites;
 
+    /** @use HasFactory<AutomationSendFactory> */
+    use HasFactory;
+
     public const ?string UPDATED_AT = null;
 
     /**
@@ -56,6 +63,21 @@ class AutomationSend extends Model implements TenantModel
         if ($operation === 'delete' ? ! app(TenantContext::class)->isBypassed() : array_diff(array_keys($values), ['sent_at']) !== []) {
             throw new LogicException('An automation send is kept as claimed: only its sent_at is filled in.');
         }
+    }
+
+    /**
+     * Fills in when a phone's push service accepted it, once: false when it
+     * already was (a retry, another worker).
+     */
+    public function markSent(CarbonInterface $at): bool
+    {
+        if (static::query()->whereKey($this->id)->whereNull('sent_at')->update(['sent_at' => $at]) !== 1) {
+            return false;
+        }
+
+        $this->forceFill(['sent_at' => $at])->syncOriginalAttribute('sent_at');
+
+        return true;
     }
 
     /**

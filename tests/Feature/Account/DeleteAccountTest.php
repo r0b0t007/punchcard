@@ -76,8 +76,8 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
     $this->tenants->stamp($enrollment, $this->tenants->a1);
     $this->context->bypass(fn () => $enrollment->forceFill(['current_stamps' => 1, 'lifetime_stamps' => 1])->save());
     $reward = $this->tenants->reward($enrollment);
-    $this->context->bypass(fn () => AutomationSend::query()->create([
-        'business_id' => $this->tenants->a1->id, 'user_id' => $user->id, 'trigger' => AutomationTrigger::Birthday, 'occasion' => 'birthday:2026',
+    $this->context->bypass(fn () => AutomationSend::factory()->create([
+        'user_id' => $user->id, 'occasion' => 'birthday:2026',
         'automation_id' => Automation::factory()->create(['business_id' => $this->tenants->a1->id, 'trigger' => AutomationTrigger::Birthday])->id,
     ]));
 

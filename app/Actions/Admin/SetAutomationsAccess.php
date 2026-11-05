@@ -10,6 +10,7 @@ use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
+use Throwable;
 
 /**
  * The platform admin lets a business use automations, or stops it
@@ -21,6 +22,11 @@ use Laravel\Pennant\Feature;
  * Locked FOR NO KEY UPDATE, as the status changes (ChangesBusinessStatus):
  * a tap or a stamp referencing the business is not stalled. An archived
  * business, or one in an archived organization, is refused.
+ *
+ * Call it outside any transaction: Pennant's first read of a business inserts
+ * a row, and done in a transaction a concurrent first read would abort it on
+ * Postgres. The business's lock orders the callers of this Action only, so
+ * every change to the flag goes through it (billing too, CHW-52).
  */
 final readonly class SetAutomationsAccess
 {
@@ -35,6 +41,18 @@ final readonly class SetAutomationsAccess
         // the transaction, a concurrent first read cannot abort it on Postgres.
         Feature::for($business)->active(Automations::class);
 
+        try {
+            $this->change($business, $allowed);
+        } catch (Throwable $failed) {
+            // Rolled back: Pennant's memory must not keep what was undone.
+            Feature::flushCache();
+
+            throw $failed;
+        }
+    }
+
+    private function change(Business $business, bool $allowed): void
+    {
         $this->context->bypass(fn () => DB::transaction(function () use ($business, $allowed): void {
             $locked = Business::query()->lock('for no key update')->findOrFail($business->id);
 
