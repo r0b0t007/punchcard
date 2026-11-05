@@ -40,6 +40,8 @@ return new class extends Migration
             $table->unique(['automation_id', 'user_id', 'occasion']);
             $table->index(['business_id', 'user_id', 'created_at']);
             $table->index('user_id');
+            // The org-admin scope filters on organization_id.
+            $table->index(['organization_id', 'business_id']);
         });
 
         if (DB::getDriverName() === 'pgsql') {

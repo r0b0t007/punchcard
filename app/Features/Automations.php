@@ -10,6 +10,12 @@ namespace App\Features;
  * (SetAutomationsAccess), until plans and billing decide it (CHW-52).
  * Scoped to the business (Feature::for($business)), stored by Pennant:
  * nobody is on until stored so.
+ *
+ * Pennant stores what resolve() returns on a business's first read (an admin
+ * page view, the engine's run), and a stored value wins from then on. So a
+ * new default here reaches no business already read: billing sets the flag
+ * for each business from its plan (activate/deactivate), never through
+ * resolve() alone.
  */
 final class Automations
 {

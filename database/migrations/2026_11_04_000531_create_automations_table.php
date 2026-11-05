@@ -33,6 +33,8 @@ return new class extends Migration
                 ->references(['id', 'organization_id'])->on('businesses')
                 ->cascadeOnDelete();
             $table->unique(['business_id', 'trigger']);
+            // The org-admin scope filters on organization_id.
+            $table->index(['organization_id', 'business_id']);
             // What a send points at: this automation, of its business, for its trigger.
             $table->unique(['id', 'business_id', 'trigger']);
         });

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Admin\BusinessStatusRefused;
 use App\Actions\Admin\SetAutomationsAccess;
 use App\Enums\PlatformRole;
 use App\Features\Automations;
@@ -10,7 +11,9 @@ use App\Models\AuditLog;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
@@ -67,7 +70,9 @@ it('allows a business from its page, then stops it, each kept in the audit log',
         ->assertActionVisible('stopAutomations'));
 
     expect(($this->allowed)())->toBeTrue()
-        ->and(Feature::for($this->tenants->a1)->active(Automations::class))->toBeFalse();
+        ->and(Feature::for($this->tenants->a1)->active(Automations::class))->toBeFalse()
+        // Filed under the morph map's name, so a renamed class keeps its flag.
+        ->and(DB::table('features')->where('name', 'automations')->where('scope', 'business|'.$this->tenants->a2->id)->value('value'))->toBe('true');
 
     ($this->page)(fn (Testable $page) => $page->callAction('stopAutomations')->assertNotified('Automations stopped for A2.'));
 
@@ -105,6 +110,45 @@ it('is not offered for an archived business', function (): void {
 
     ($this->page)(fn (Testable $page) => $page->assertActionHidden('allowAutomations')->assertActionHidden('stopAutomations'));
 });
+
+it('refuses an archived business, or one in an archived organization, and records nothing', function (string $archived): void {
+    $this->actingAs($this->admin);
+    $archived === 'business'
+        ? DB::table('businesses')->where('id', $this->tenants->a2->id)->update(['archived_at' => now()])
+        : DB::table('organizations')->where('id', $this->tenants->orgA->id)->update(['archived_at' => now()]);
+
+    expect(fn () => app(SetAutomationsAccess::class)->handle($this->tenants->a2, true))->toThrow(BusinessStatusRefused::class, 'A2 is archived.');
+
+    Feature::flushCache();
+    expect(($this->allowed)())->toBeFalse()
+        ->and(($this->audits)())->toBe([]);
+})->with(['business', 'organization']);
+
+it('shows the refusal when the business is archived as the admin acts', function (): void {
+    // Archived inside the Action's own transaction, after the page offered it.
+    $archived = new stdClass;
+    $archived->done = false;
+    Event::listen(TransactionBeginning::class, function () use ($archived): void {
+        if (! $archived->done) {
+            $archived->done = true;
+            DB::table('businesses')->where('id', $this->tenants->a2->id)->update(['archived_at' => now()]);
+        }
+    });
+
+    ($this->page)(fn (Testable $page) => $page->callAction('allowAutomations')->assertNotified('A2 is archived.'));
+
+    Feature::flushCache();
+    expect(($this->allowed)())->toBeFalse();
+});
+
+it('locks the business no key update, so a tap or a stamp referencing it goes on', function (): void {
+    $this->actingAs($this->admin);
+    DB::enableQueryLog();
+
+    app(SetAutomationsAccess::class)->handle($this->tenants->a2, true);
+
+    expect(collect(DB::getQueryLog())->pluck('query')->contains(fn (string $sql): bool => str_contains($sql, 'from "businesses"') && str_contains($sql, 'for no key update')))->toBeTrue();
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
 
 it('is the platform admin\'s alone, in the admin panel', function (): void {
     $owner = User::factory()->create();
