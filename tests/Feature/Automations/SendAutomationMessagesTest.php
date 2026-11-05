@@ -178,6 +178,13 @@ it('never reminds of a reward used or expired since, someone else\'s, another or
 })->with(['used', 'expired', 'someone else\'s', 'another organization\'s', 'rewards ready off', 'account anonymised']);
 
 it('never sends what no longer holds when the queue gets to it', function (string $case): void {
+    // Past 22:00: claimed at 21:30 there, sent half an hour later, well within the hour.
+    $local = fn (string $at): CarbonImmutable => CarbonImmutable::parse('2026-11-04 '.$at, 'Africa/Casablanca')->utc();
+
+    if ($case === 'now past 22:00') {
+        Carbon::setTestNow($local('21:30'));
+    }
+
     $send = ($this->winBackClaimed)();
 
     match ($case) {
@@ -189,7 +196,7 @@ it('never sends what no longer holds when the queue gets to it', function (strin
         'came back' => $this->context->bypass(fn () => DB::table('business_customers')->where('user_id', $this->customer->id)->update(['quiet_at' => now()->addDays(20)])),
         'in another quiet spell' => $this->context->bypass(fn () => DB::table('business_customers')->where('user_id', $this->customer->id)->update(['quiet_at' => now()->subHour()])),
         'claimed over an hour ago' => Carbon::setTestNow(now()->addMinutes(61)),
-        'now past 22:00' => Carbon::setTestNow('2026-11-04 21:00:00'),
+        'now past 22:00' => Carbon::setTestNow($local('22:00')),
     };
 
     ($this->deliver)();

@@ -190,22 +190,23 @@ it('sends at most one message per customer per business a week, a reward reminde
     expect(array_column(($this->sends)(), 1))->toBe(['reward_reminder', 'win_back']);
 });
 
-it('sends only between 08:00 and 22:00 in the business\'s time', function (string $timezone, string $utc, bool $sends): void {
+it('sends only between 08:00 and 22:00 in the business\'s time', function (string $timezone, string $local, bool $sends): void {
     $this->context->bypass(fn () => DB::table('locations')->where('business_id', $this->tenants->a1->id)->update(['timezone' => $timezone]));
     ($this->automation)(AutomationTrigger::WinBack);
     ($this->customer)();
-    Carbon::setTestNow($utc);
+    // The moment it is there, by the same timezone data the run reads (Morocco's offset differs between versions).
+    Carbon::setTestNow(CarbonImmutable::parse($local, $timezone)->utc());
 
     expect(($this->run)()['claimed'])->toBe($sends ? 1 : 0);
 })->with([
-    'Casablanca 21:59' => ['Africa/Casablanca', '2026-11-04 20:59:00', true],
-    'Casablanca 22:00' => ['Africa/Casablanca', '2026-11-04 21:00:00', false],
-    'Casablanca 07:59' => ['Africa/Casablanca', '2026-11-05 06:59:00', false],
-    'Casablanca 08:00' => ['Africa/Casablanca', '2026-11-05 07:00:00', true],
-    'Dubai 21:59' => ['Asia/Dubai', '2026-11-04 17:59:00', true],
-    'Dubai 22:00' => ['Asia/Dubai', '2026-11-04 18:00:00', false],
-    'Dubai 07:59' => ['Asia/Dubai', '2026-11-05 03:59:00', false],
-    'Dubai 08:00' => ['Asia/Dubai', '2026-11-05 04:00:00', true],
+    'Casablanca 21:59' => ['Africa/Casablanca', '2026-11-04 21:59:00', true],
+    'Casablanca 22:00' => ['Africa/Casablanca', '2026-11-04 22:00:00', false],
+    'Casablanca 07:59' => ['Africa/Casablanca', '2026-11-05 07:59:00', false],
+    'Casablanca 08:00' => ['Africa/Casablanca', '2026-11-05 08:00:00', true],
+    'Dubai 21:59' => ['Asia/Dubai', '2026-11-04 21:59:00', true],
+    'Dubai 22:00' => ['Asia/Dubai', '2026-11-04 22:00:00', false],
+    'Dubai 07:59' => ['Asia/Dubai', '2026-11-05 07:59:00', false],
+    'Dubai 08:00' => ['Asia/Dubai', '2026-11-05 08:00:00', true],
 ]);
 
 it('sends nothing for a business not allowed automations, suspended, archived, or with the automation off', function (string $case): void {
