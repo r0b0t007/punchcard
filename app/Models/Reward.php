@@ -230,6 +230,19 @@ class Reward extends Model implements TenantModel, VisibleToBusiness
     }
 
     /**
+     * Rewards still to be used at a moment: available, not expired (what an
+     * automation reminds of, CHW-46).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function availableAt(Builder $query, CarbonInterface $at): void
+    {
+        $query->where('status', RewardStatus::Available)
+            ->where(fn (Builder $query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', $at));
+    }
+
+    /**
      * A customer's own rewards: on their own enrollments (CHW-26). Customers
      * have no tenant; this is how their reward screens see rewards, in
      * bypass().

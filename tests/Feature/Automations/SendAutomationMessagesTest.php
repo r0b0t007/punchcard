@@ -148,7 +148,7 @@ it('reminds of the reward by name, opening the card that holds it', function ():
     ]);
 });
 
-it('never reminds of a reward used or expired since, someone else\'s, another organization\'s, or with rewards ready turned off', function (string $case): void {
+it('never reminds of a reward used or expired since, someone else\'s, another organization\'s, with rewards ready turned off or to someone no longer following', function (string $case): void {
     $reward = ($this->rewardClaimed)();
     $send = $this->context->bypass(fn (): AutomationSend => AutomationSend::query()->sole());
     // Another customer's reward of A, and one of B: what a send's occasion must never reach.
@@ -170,12 +170,13 @@ it('never reminds of a reward used or expired since, someone else\'s, another or
         'another organization\'s' => $pointAt($ofB()),
         'rewards ready off' => $this->customer->forceFill(['push_rewards' => false])->save(),
         'account anonymised' => $this->customer->forceFill(['anonymised_at' => now()])->save(),
+        'unfollowed' => $this->context->bypass(fn () => DB::table('follows')->where('user_id', $this->customer->id)->update(['notify' => false])),
     };
 
     ($this->deliver)();
 
     Notification::assertNothingSent();
-})->with(['used', 'expired', 'someone else\'s', 'another organization\'s', 'rewards ready off', 'account anonymised']);
+})->with(['used', 'expired', 'someone else\'s', 'another organization\'s', 'rewards ready off', 'account anonymised', 'unfollowed']);
 
 it('never sends what no longer holds when the queue gets to it', function (string $case): void {
     // Past 22:00: claimed at 21:30 there, sent half an hour later, well within the hour.

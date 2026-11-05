@@ -26,8 +26,9 @@ use LogicException;
  * birthday's year, a reward), and kept: the weekly cap and the B11 counts
  * read it. Only sent_at changes, once, when a phone's push service accepted
  * it (a trigger holds that on both drivers), through markSent(): sent_at is
- * not fillable, so an update() would drop it. Deleted only with the
- * customer's account (DeleteAccount, in bypass()) or the business.
+ * not fillable, so an update() would drop it. Deleted only in bypass():
+ * with the customer's account (DeleteAccount) or the business, or let go
+ * when never sent (RunAutomations, AutomationWindow::RELEASE_MINUTES).
  *
  * @property int $id
  * @property int $organization_id
@@ -53,7 +54,8 @@ class AutomationSend extends Model implements TenantModel
 
     /**
      * Kept as claimed: only the moment it was sent is filled in, once (the
-     * trigger says when); deleted only with the customer, in bypass().
+     * trigger says when); deleted only in bypass(): with the customer, or
+     * let go when never sent.
      *
      * @param  'update'|'delete'  $operation
      * @param  array<string, mixed>  $values

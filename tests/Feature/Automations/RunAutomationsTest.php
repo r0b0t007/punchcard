@@ -81,7 +81,16 @@ beforeEach(function (): void {
                 ...($status === RewardStatus::Redeemed ? ['redeemed_at' => now(), 'redeemed_business_id' => $stamp->business_id] : [])]));
     };
 
-    $this->run = fn (): array => app(RunAutomations::class)->handle(CarbonImmutable::now());
+    // A run, then each message delivered (a phone accepted it), unless a test says it was not.
+    $this->run = function (bool $delivered = true): array {
+        $count = app(RunAutomations::class)->handle(CarbonImmutable::now());
+
+        if ($delivered) {
+            $this->context->bypass(fn () => AutomationSend::query()->whereNull('sent_at')->get()->each(fn (AutomationSend $send): bool => $send->markSent(now())));
+        }
+
+        return $count;
+    };
     $this->sends = fn (): array => $this->context->bypass(fn (): array => AutomationSend::query()->orderBy('id')->get()
         ->map(fn (AutomationSend $send): array => [$send->user_id, $send->trigger->value, $send->occasion])->all());
 });
@@ -141,7 +150,7 @@ it('never sends a win-back to someone not following, without a phone, anonymised
         ->and(($this->sends)())->toBe([]);
 });
 
-it('reminds of a reward unused here for the automation\'s days, once, never one used, expired, unlocked elsewhere or with rewards ready off', function (): void {
+it('reminds of a reward unused here for the automation\'s days, once, never one used, expired, unlocked elsewhere, with rewards ready off or to someone not following', function (): void {
     ($this->automation)(AutomationTrigger::RewardReminder, ['days' => 7]);
     $waiting = ($this->customer)(daysAgo: 3);
     $reward = ($this->reward)($waiting, daysAgo: 7);
@@ -151,6 +160,7 @@ it('reminds of a reward unused here for the automation\'s days, once, never one 
     $this->context->bypass(fn () => DB::table('rewards')->where('id', $expired->id)->update(['expires_at' => now()->subMinute()]));
     ($this->reward)(($this->customer)(daysAgo: 3), at: $this->tenants->a2);
     ($this->reward)(($this->customer)(daysAgo: 3, pushRewards: false));
+    ($this->reward)(($this->customer)(follows: false, daysAgo: 3));
 
     ($this->run)();
     Carbon::setTestNow(now()->addHour());
@@ -275,6 +285,54 @@ it('keeps organization B to its own customers, and A to its own, for a customer 
         ->map(fn (AutomationSend $send): array => [$send->business_id, $send->user_id])->all()))
         ->toEqualCanonicalizing([[$this->tenants->a1->id, $both->id], [$this->tenants->b1->id, $onlyB->id]]);
 });
+
+it('lets go of a message never delivered after two hours, and claims it again while it holds', function (): void {
+    ($this->automation)(AutomationTrigger::RewardReminder, ['days' => 7]);
+    ($this->reward)(($this->customer)(daysAgo: 3));
+    $claims = fn (): array => $this->context->bypass(fn (): array => AutomationSend::query()->orderBy('id')->pluck('id')->all());
+
+    // Claimed, never delivered (the queue was down, every phone refused it).
+    ($this->run)(delivered: false);
+    $first = $claims();
+
+    // An hour later it still holds the occasion; after two, it is let go and claimed again.
+    Carbon::setTestNow(now()->addHour());
+    ($this->run)(delivered: false);
+
+    expect($claims())->toBe($first);
+
+    Carbon::setTestNow(now()->addHour());
+    ($this->run)(delivered: false);
+
+    expect($claims())->toHaveCount(1)
+        ->and($claims())->not->toBe($first)
+        ->and(array_column(($this->sends)(), 1))->toBe(['reward_reminder']);
+});
+
+it('never lets go of a message delivered', function (): void {
+    ($this->automation)(AutomationTrigger::RewardReminder, ['days' => 7]);
+    ($this->reward)(($this->customer)(daysAgo: 3));
+    ($this->run)();
+    $sent = $this->context->bypass(fn (): array => AutomationSend::query()->pluck('id')->all());
+
+    Carbon::setTestNow(now()->addHours(3));
+    ($this->run)();
+
+    expect($this->context->bypass(fn (): array => AutomationSend::query()->pluck('id')->all()))->toBe($sent);
+});
+
+it('holds a claimed customer\'s row for key share only, so their own writes go on', function (): void {
+    ($this->automation)(AutomationTrigger::WinBack);
+    ($this->customer)();
+    DB::enableQueryLog();
+
+    ($this->run)(delivered: false);
+
+    $users = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, 'from "users"') && str_contains($sql, ' for '));
+
+    expect($users)->not->toBeEmpty()
+        ->and($users->every(fn (string $sql): bool => str_contains($sql, 'for key share')))->toBeTrue();
+})->skip(fn (): bool => DB::getDriverName() !== 'pgsql', 'Row locks compile on Postgres only');
 
 it('runs hourly, never twice at once', function (): void {
     $event = collect(app(Schedule::class)->events())->first(fn (ScheduledEvent $event): bool => $event->description === 'punchcard:automations');

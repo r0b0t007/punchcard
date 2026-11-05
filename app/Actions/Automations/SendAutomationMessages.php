@@ -6,7 +6,6 @@ namespace App\Actions\Automations;
 
 use App\Enums\AutomationTrigger;
 use App\Enums\CustomerSegment;
-use App\Enums\RewardStatus;
 use App\Models\Automation;
 use App\Models\AutomationSend;
 use App\Models\Business;
@@ -16,6 +15,7 @@ use App\Models\Follow;
 use App\Models\Reward;
 use App\Models\User;
 use App\Notifications\AutomationMessage;
+use App\Support\Automations\AutomationWindow;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Log;
 use LogicException;
@@ -27,12 +27,13 @@ use Throwable;
  * business's sends, each claimed by RunAutomations. Each is checked again
  * as it goes, so a queue running late never sends what no longer holds:
  *
- * - claimed within RunAutomations::LATE_MINUTES, never sent yet;
- * - the business still sends now (RunAutomations::sendsNow: allowed, open,
+ * - claimed within AutomationWindow::LATE_MINUTES, never sent yet;
+ * - the business still sends now (AutomationWindow::sendsNow: allowed, open,
  *   not suspended, its daytime), the automation still on;
  * - the customer's account still there; a win-back's customer still
- *   following and still in the same quiet spell; a reminder's customer
- *   still with "Rewards ready" on, the reward theirs and still available.
+ *   in the same quiet spell; both still following the business with
+ *   notifications on, a reminder's customer still with "Rewards ready" on
+ *   and the reward theirs and still available.
  *
  * Then the automation's text as it is now: ours, or the owner's. One failing
  * never stops the others; logged by id only. Each is marked sent once a
@@ -52,12 +53,12 @@ final readonly class SendAutomationMessages
         $this->context->bypass(function () use ($businessId, $sendIds): void {
             $business = Business::query()->findOrFail($businessId);
 
-            if (! RunAutomations::sendsNow($business, now())) {
+            if (! AutomationWindow::sendsNow($business, now())) {
                 return;
             }
 
             $sends = AutomationSend::query()->whereKey($sendIds)->where('business_id', $business->id)->whereNull('sent_at')
-                ->where('created_at', '>', now()->subMinutes(RunAutomations::LATE_MINUTES))->orderBy('id')->get();
+                ->where('created_at', '>', now()->subMinutes(AutomationWindow::LATE_MINUTES))->orderBy('id')->get();
             $automations = Automation::query()->where('business_id', $business->id)->where('active', true)->get()->keyBy('id');
             $users = User::query()->whereKey($sends->pluck('user_id')->unique()->all())->notAnonymised()->get()->keyBy('id');
 
@@ -89,12 +90,13 @@ final readonly class SendAutomationMessages
     {
         $reward = null;
 
-        if ($send->trigger === AutomationTrigger::WinBack && ! $this->stillQuiet($send, $business)) {
+        if (! Follow::query()->listeningTo($business)->where('user_id', $send->user_id)->exists()
+            || ($send->trigger === AutomationTrigger::WinBack && ! $this->stillQuiet($send, $business))) {
             return null;
         }
 
         if ($send->trigger === AutomationTrigger::RewardReminder) {
-            $reward = $user->push_rewards ? $this->rewardWaiting($send, $business) : null;
+            $reward = $user->push_rewards ? $this->rewardWaiting($send, $business, $user) : null;
 
             if (! $reward instanceof Reward) {
                 return null;
@@ -113,18 +115,17 @@ final readonly class SendAutomationMessages
         );
     }
 
-    /** Still following, and still in the quiet spell the send was claimed for. */
+    /** Still in the quiet spell the send was claimed for. */
     private function stillQuiet(AutomationSend $send, Business $business): bool
     {
         $quietAt = BusinessCustomer::query()->where('business_id', $business->id)->where('user_id', $send->user_id)
             ->inSegment(CustomerSegment::Quiet, now())->value('quiet_at');
 
-        return $quietAt !== null && 'quiet:'.$quietAt->toDateString() === $send->occasion
-            && Follow::query()->listeningTo($business)->where('user_id', $send->user_id)->exists();
+        return $quietAt !== null && 'quiet:'.$quietAt->toDateString() === $send->occasion;
     }
 
     /** The reward the send reminds of: the customer's own, of this organization, still available. */
-    private function rewardWaiting(AutomationSend $send, Business $business): ?Reward
+    private function rewardWaiting(AutomationSend $send, Business $business, User $user): ?Reward
     {
         if (preg_match('/^reward:(\d+)$/', $send->occasion, $match) !== 1) {
             return null;
@@ -133,9 +134,8 @@ final readonly class SendAutomationMessages
         return Reward::query()
             ->whereKey((int) $match[1])
             ->where('organization_id', $business->organization_id)
-            ->where('status', RewardStatus::Available)
-            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-            ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $send->user_id))
+            ->availableAt(now())
+            ->ownedBy($user)
             ->first();
     }
 

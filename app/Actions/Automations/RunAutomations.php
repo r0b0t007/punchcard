@@ -8,7 +8,6 @@ use App\Actions\Campaigns\DeliverCampaign;
 use App\Actions\Campaigns\DescribeAudience;
 use App\Enums\AutomationTrigger;
 use App\Enums\CustomerSegment;
-use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Features\Automations;
 use App\Jobs\PushAutomationMessages;
@@ -21,26 +20,25 @@ use App\Models\Follow;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
-use App\Support\LocalMoment;
-use App\Support\Tenancy\ArchivedSites;
+use App\Support\Automations\AutomationWindow;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Laravel\Pennant\Feature;
 use Throwable;
 
 /**
  * The scheduler's pass over automations (CHW-46), hourly. For each business
  * allowed automations (App\Features\Automations) with one turned on, open
- * and not suspended, between 08:00 and 22:00 in its own time:
+ * and not suspended, between 08:00 and 22:00 in its own time
+ * (AutomationWindow):
  *
  * - who each automation reaches now, with a phone:
- *   - reward reminder: a reward still available, unlocked here (its stamp
- *     was given here) at least the automation's days ago, to a customer
- *     with "Rewards ready" on; once per reward;
+ *   - reward reminder: a reward still available, unlocked here by a visit
+ *     at least the automation's days ago, to a customer following the
+ *     business with notifications on and "Rewards ready" on; once per
+ *     reward;
  *   - win-back: a follower who came in (Follow::listeningTo) and is going
  *     quiet here (BusinessCustomer, CustomerSegment::Quiet); once per quiet
  *     spell, which a visit ends;
@@ -50,7 +48,9 @@ use Throwable;
  * - each is claimed first (automation_sends, unique per automation, customer
  *   and occasion), so a run again never sends it twice, then queued in the
  *   business's tenant (PushAutomationMessages), in one transaction with its
- *   claims. As it goes, each is checked again (SendAutomationMessages).
+ *   claims. As it goes, each is checked again (SendAutomationMessages). One
+ *   never sent is let go after AutomationWindow::RELEASE_MINUTES, so a later
+ *   run claims it again if it still holds.
  *
  * Never an anonymised account. A business that fails is logged by id and
  * left to the next run; the others go on. Reads in bypass(), each kept to
@@ -59,13 +59,6 @@ use Throwable;
 final readonly class RunAutomations
 {
     public const int WEEK = 7;
-
-    public const int OPENS = 8;
-
-    public const int CLOSES = 22;
-
-    /** A claim not sent within this many minutes is not sent: its moment has passed. */
-    public const int LATE_MINUTES = 60;
 
     /** Automations in the order the weekly cap serves them. */
     private const array ORDER = [AutomationTrigger::RewardReminder, AutomationTrigger::WinBack];
@@ -82,12 +75,13 @@ final readonly class RunAutomations
 
         foreach ($businesses as $business) {
             try {
-                if (! $this->context->bypass(fn (): bool => self::sendsNow($business, $now))) {
+                if (! $this->context->bypass(fn (): bool => AutomationWindow::sendsNow($business, $now))) {
                     continue;
                 }
 
-                // The claims and their jobs commit together (the database queue): a dispatch failing leaves
-                // nothing claimed, so the next run sends it.
+                // The claims and their jobs commit together on the database queue (the app's, CLAUDE.md): a
+                // dispatch failing leaves nothing claimed, so the next run sends it. On the sync queue (local
+                // only) the jobs run inside, before the commit.
                 $claimed = DB::transaction(function () use ($business, $now): array {
                     $claimed = $this->context->bypass(fn (): array => $this->claim($business, $now));
                     $this->queue($business, $claimed);
@@ -109,27 +103,18 @@ final readonly class RunAutomations
     }
 
     /**
-     * Whether the business sends now: allowed automations, open and not
-     * suspended, between OPENS and CLOSES in its own time. Read by the run,
-     * and again as each message goes (SendAutomationMessages). Outside any
-     * transaction: Pennant's first read of a business inserts a row.
-     */
-    public static function sendsNow(Business $business, CarbonInterface $now): bool
-    {
-        $hour = $now->copy()->setTimezone(LocalMoment::timezoneOfBusiness($business->id))->hour;
-
-        return $hour >= self::OPENS && $hour < self::CLOSES
-            && ArchivedSites::isOpen($business->id, null, counter: true)
-            && Feature::for($business)->active(Automations::class);
-    }
-
-    /**
-     * Claims the business's messages due now.
+     * Claims the business's messages due now, after letting go of those
+     * claimed long ago and never sent (a queue too late, a push refused):
+     * their occasion is claimed again if it still holds, and they no longer
+     * count toward the cap.
      *
      * @return list<int> the sends claimed
      */
     private function claim(Business $business, CarbonImmutable $now): array
     {
+        AutomationSend::query()->where('business_id', $business->id)->whereNull('sent_at')
+            ->where('created_at', '<=', $now->subMinutes(AutomationWindow::RELEASE_MINUTES))->delete();
+
         $automations = Automation::query()->where('business_id', $business->id)->where('active', true)->get()->keyBy(fn (Automation $automation): string => $automation->trigger->value);
         // Who already had a message from this business this week: the cap.
         $served = array_flip(AutomationSend::query()->where('business_id', $business->id)
@@ -152,7 +137,7 @@ final readonly class RunAutomations
                     // A savepoint: a claim refused as a duplicate never aborts what holds it on Postgres. The
                     // customer's row is held first, as DeleteAccount takes it: an account anonymised meanwhile
                     // is never claimed, and one anonymised after loses this send with the rest.
-                    $send = DB::transaction(fn (): ?AutomationSend => User::query()->whereKey($userId)->notAnonymised()->sharedLock()->exists()
+                    $send = DB::transaction(fn (): ?AutomationSend => User::query()->whereKey($userId)->notAnonymised()->lock('for key share')->exists()
                         ? AutomationSend::query()->create([
                             'business_id' => $business->id, 'automation_id' => $automation->id, 'user_id' => $userId,
                             'trigger' => $trigger, 'occasion' => $occasion,
@@ -213,24 +198,26 @@ final readonly class RunAutomations
 
     /**
      * Rewards still available, unlocked here at least the automation's days
-     * ago, of customers with "Rewards ready" on: the oldest first.
+     * ago, of customers following the business with
+     * notifications on (Follow::listeningTo) and "Rewards ready" on: the
+     * oldest first.
      *
      * @return list<array{0: int, 1: string}> user id and occasion
      */
     private function rewardsWaiting(Automation $automation, Business $business, CarbonImmutable $now): array
     {
-        $rewards = Reward::query()
+        $rewardsHere = Reward::query()
             ->where('organization_id', $business->organization_id)
-            ->where('status', RewardStatus::Available)
+            ->availableAt($now)
             ->where('unlocked_at', '<=', $now->subDays($automation->days))
-            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', $now))
             // Unlocked by a visit here: a stamp given elsewhere for them (a referral) never makes them this business's.
-            ->whereIn('stamp_event_id', StampEvent::query()->select('id')->where('business_id', $business->id)->whereIn('source', StampSource::presenceValues()))
-            ->orderBy('unlocked_at')->orderBy('id')
-            ->get(['id', 'enrollment_id']);
-        $owners = CardEnrollment::query()->whereKey($rewards->pluck('enrollment_id')->unique()->all())
+            ->whereIn('stamp_event_id', StampEvent::query()->select('id')->where('business_id', $business->id)->whereIn('source', StampSource::presenceValues()));
+        // A subquery: a chain's waiting rewards would pass a database's bound parameters as a list.
+        $owners = CardEnrollment::query()->whereIn('id', (clone $rewardsHere)->select('enrollment_id'))
             ->whereIn('user_id', User::query()->select('id')->notAnonymised()->where('push_rewards', true))
+            ->whereIn('user_id', Follow::query()->listeningTo($business)->select('user_id'))
             ->pluck('user_id', 'id');
+        $rewards = $rewardsHere->orderBy('unlocked_at')->orderBy('id')->get(['id', 'enrollment_id']);
         $waiting = [];
 
         foreach ($rewards as $reward) {
