@@ -12,14 +12,13 @@ use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\StampEvent;
-use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 
 /**
  * Who a business's campaign goes to (CHW-42, B9): its organization's
  * followers (follows.notify) who came in, with a presence stamp at this
- * business (Follow::constrainToBusiness, the franchise rule of CHW-27), so
+ * business (Follow::listeningTo, the franchise rule of CHW-27), so
  * franchisee A1 never reaches who only visited A2. Never an anonymised
  * account. Then each segment:
  *
@@ -73,11 +72,7 @@ final readonly class CampaignAudience
         $presence = StampSource::presenceValues();
         $isPresence = 'source in ('.implode(', ', array_fill(0, count($presence), '?')).')';
 
-        $followers = Follow::query()
-            ->where('organization_id', $business->organization_id)
-            ->where('notify', true)
-            ->whereIn('user_id', User::query()->select('id')->notAnonymised());
-        (new Follow)->constrainToBusiness($followers, $business->id);
+        $followers = Follow::query()->listeningTo($business);
 
         $here = StampEvent::query()
             ->where('business_id', $business->id)

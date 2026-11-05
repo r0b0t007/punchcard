@@ -2,6 +2,7 @@
 
 use App\Actions\Account\AnonymiseInactiveAccounts;
 use App\Actions\Account\WarnInactiveAccounts;
+use App\Actions\Automations\RunAutomations;
 use App\Actions\Campaigns\DispatchDueCampaigns;
 use App\Actions\Stats\RollUpEndedDays;
 use App\Actions\Taps\ExpirePendingTaps;
@@ -30,6 +31,11 @@ Schedule::call(fn () => Log::info('Due campaigns queued.', app(DispatchDueCampai
 // yesterday within the hour after its midnight. Logs counts only.
 Schedule::call(fn () => Log::info('Business days rolled up.', ['days' => app(RollUpEndedDays::class)->handle(CarbonImmutable::now())]))
     ->name('punchcard:stats-rollup')->hourly()->withoutOverlapping()->onOneServer();
+
+// Each business's automations (CHW-46): hourly, so every timezone's 08:00 to 22:00 is served; each message is claimed
+// before it is queued, so a run again never sends it twice. Logs counts only.
+Schedule::call(fn () => Log::info('Automations run.', app(RunAutomations::class)->handle(CarbonImmutable::now())))
+    ->name('punchcard:automations')->hourly()->withoutOverlapping()->onOneServer();
 
 // The inactivity rule (CHW-58, docs/privacy/retention.md): email accounts a month before they reach 24 months unused,
 // then delete or anonymise those whose warning's day has come. Two entries, so one failing never stops the other. Logs
