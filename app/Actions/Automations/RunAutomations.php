@@ -21,8 +21,10 @@ use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Automations\AutomationWindow;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,17 +36,21 @@ use Throwable;
  * and not suspended, between 08:00 and 22:00 in its own time
  * (AutomationWindow):
  *
+ * - the birthday bonus first (GiveBirthdayStamps), whatever the messages;
  * - who each automation reaches now, with a phone:
  *   - reward reminder: a reward still available, unlocked here by a visit
  *     at least the automation's days ago, to a customer following the
  *     business with notifications on and "Rewards ready" on; once per
  *     reward;
+ *   - birthday: a follower who came in, whose birthday it is today and
+ *     whose bonus this business gave this year; once a year;
  *   - win-back: a follower who came in (Follow::listeningTo) and is going
  *     quiet here (BusinessCustomer, CustomerSegment::Quiet); once per quiet
  *     spell, which a visit ends;
  * - at most one message per customer per business in WEEK days, across
- *   every automation: a reward reminder first, then a win-back. A message
- *   held back by it is not recorded, so it is tried again later;
+ *   every automation: a reward reminder first, then a birthday, then a
+ *   win-back. A message held back by it is not recorded, so it is tried
+ *   again later (a birthday's, until its day ends);
  * - each is claimed first (automation_sends, unique per automation, customer
  *   and occasion), so a run again never sends it twice, then queued in the
  *   business's tenant (PushAutomationMessages), in one transaction with its
@@ -61,14 +67,14 @@ final readonly class RunAutomations
     public const int WEEK = 7;
 
     /** Automations in the order the weekly cap serves them. */
-    private const array ORDER = [AutomationTrigger::RewardReminder, AutomationTrigger::WinBack];
+    private const array ORDER = [AutomationTrigger::RewardReminder, AutomationTrigger::Birthday, AutomationTrigger::WinBack];
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private GiveBirthdayStamps $giveBirthdayStamps) {}
 
-    /** @return array{businesses: int, claimed: int} */
+    /** @return array{businesses: int, claimed: int, birthday_stamps: int} */
     public function handle(CarbonImmutable $now): array
     {
-        $count = ['businesses' => 0, 'claimed' => 0];
+        $count = ['businesses' => 0, 'claimed' => 0, 'birthday_stamps' => 0];
         $businesses = $this->context->bypass(fn () => Business::query()->with('organization')
             ->whereIn('id', Automation::query()->select('business_id')->where('active', true))
             ->orderBy('id')->get());
@@ -77,6 +83,14 @@ final readonly class RunAutomations
             try {
                 if (! $this->context->bypass(fn (): bool => AutomationWindow::sendsNow($business, $now))) {
                     continue;
+                }
+
+                // The birthday bonus first, each stamp its own transaction: its message is claimed below.
+                $birthday = $this->context->bypass(fn (): ?Automation => Automation::query()->where('business_id', $business->id)
+                    ->where('trigger', AutomationTrigger::Birthday)->where('active', true)->first());
+
+                if ($birthday instanceof Automation) {
+                    $count['birthday_stamps'] += $this->giveBirthdayStamps->handle($business, $birthday, $now);
                 }
 
                 // The claims and their jobs commit together on the database queue (the app's, CLAUDE.md): a
@@ -174,7 +188,7 @@ final readonly class RunAutomations
                 ->whereIn('user_id', Follow::query()->listeningTo($business)->select('user_id'))
                 ->orderBy('user_id')->get(['user_id', 'quiet_at'])
                 ->map(fn (BusinessCustomer $customer): array => [$customer->user_id, 'quiet:'.$customer->quiet_at->toDateString()])->all(),
-            AutomationTrigger::Birthday => [],
+            AutomationTrigger::Birthday => $this->birthdaysToday($business, $now),
         };
         $withPhone = array_flip(DescribeAudience::withPhone(array_values(array_unique(array_column($candidates, 0)))));
         $sent = [];
@@ -210,8 +224,10 @@ final readonly class RunAutomations
             ->where('organization_id', $business->organization_id)
             ->availableAt($now)
             ->where('unlocked_at', '<=', $now->subDays($automation->days))
-            // Unlocked by a visit here: a stamp given elsewhere for them (a referral) never makes them this business's.
-            ->whereIn('stamp_event_id', StampEvent::query()->select('id')->where('business_id', $business->id)->whereIn('source', StampSource::presenceValues()));
+            // Unlocked here by a visit, or by this business's birthday bonus: a stamp given elsewhere for them (a
+            // referral) never makes them this business's.
+            ->whereIn('stamp_event_id', StampEvent::query()->select('id')->where('business_id', $business->id)
+                ->whereIn('source', [...StampSource::presenceValues(), StampSource::Birthday->value]));
         // A subquery: a chain's waiting rewards would pass a database's bound parameters as a list.
         $owners = CardEnrollment::query()->whereIn('id', (clone $rewardsHere)->select('enrollment_id'))
             ->whereIn('user_id', User::query()->select('id')->notAnonymised()->where('push_rewards', true))
@@ -229,6 +245,27 @@ final readonly class RunAutomations
         }
 
         return $waiting;
+    }
+
+    /**
+     * Whose birthday it is today in the business's time, among the
+     * followers who came in (Follow::listeningTo), given this year's bonus
+     * here (GiveBirthdayStamps): the bonus is the business's that gave it.
+     *
+     * @return list<array{0: int, 1: string}> user id and occasion
+     */
+    private function birthdaysToday(Business $business, CarbonImmutable $now): array
+    {
+        $today = $now->setTimezone(LocalMoment::timezoneOfBusiness($business->id));
+
+        return User::query()->notAnonymised()->birthdayOn($today)
+            ->whereIn('id', Follow::query()->listeningTo($business)->select('user_id'))
+            ->whereIn('id', CardEnrollment::query()->select('user_id')->where('organization_id', $business->organization_id)
+                // This year's bonus given here: its key is "birthday:{card}:{year}".
+                ->whereHas('stampEvents', fn (Builder $events) => $events->where('source', StampSource::Birthday)->where('business_id', $business->id)
+                    ->where('idempotency_key', 'like', 'birthday:%:'.$today->year)))
+            ->orderBy('id')->pluck('id')
+            ->map(fn (int $userId): array => [$userId, 'birthday:'.$today->year])->pipe(fn ($birthdays): array => array_values($birthdays->all()));
     }
 
     /** @param list<int> $sendIds */

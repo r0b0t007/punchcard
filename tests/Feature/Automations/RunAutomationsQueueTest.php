@@ -81,7 +81,7 @@ it('claims nothing for a business whose messages could not be queued, and goes o
         }
     });
 
-    expect(($this->run)())->toBe(['businesses' => 1, 'claimed' => 1])
+    expect(($this->run)())->toBe(['businesses' => 1, 'claimed' => 1, 'birthday_stamps' => 0])
         ->and(($this->claimedBy)())->toBe([$this->tenants->a2->id])
         ->and(DB::table('jobs')->count())->toBe(1);
 

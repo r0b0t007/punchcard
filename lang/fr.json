@@ -1180,6 +1180,6 @@
     "Happy birthday from :business!": "Joyeux anniversaire de la part de :business !",
     "Your reward is waiting at :business": "Votre récompense vous attend chez :business",
     "Come back soon: your card is waiting.": "Revenez vite : votre carte vous attend.",
-    "A treat from us on your card.": "Une surprise de notre part sur votre carte.",
+    ":count stamp on your card, our treat.|:count stamps on your card, our treat.": ":count tampon offert sur votre carte.|:count tampons offerts sur votre carte.",
     "Don't forget: :reward is yours.": "N'oubliez pas : :reward est à vous."
 }

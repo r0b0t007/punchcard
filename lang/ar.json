@@ -1180,6 +1180,6 @@
     "Happy birthday from :business!": "عيد ميلاد سعيد من :business!",
     "Your reward is waiting at :business": "مكافأتك بانتظارك في :business",
     "Come back soon: your card is waiting.": "عُد قريبًا: بطاقتك بانتظارك.",
-    "A treat from us on your card.": "هدية منّا على بطاقتك.",
+    ":count stamp on your card, our treat.|:count stamps on your card, our treat.": "لا طابع على بطاقتك.|طابع واحد على بطاقتك، هدية منّا.|طابعان على بطاقتك، هدية منّا.|:count طوابع على بطاقتك، هدية منّا.|:count طابعًا على بطاقتك، هدية منّا.|:count طابع على بطاقتك، هدية منّا.",
     "Don't forget: :reward is yours.": "لا تنسَ: :reward لك."
 }
