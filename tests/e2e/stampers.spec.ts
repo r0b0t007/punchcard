@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { freshTap, signIn } from './helpers';
+import { freshTap } from './helpers';
+import { expect, test } from './owner';
 
 /**
  * The owner switching a stamper off and on again (CHW-36, B12), on a phone:
@@ -19,7 +19,6 @@ test('the owner switches a stamper off, a tap on it is refused, and switches it 
     page,
 }) => {
     test.setTimeout(60_000);
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business/stampers');
 
     const row = page

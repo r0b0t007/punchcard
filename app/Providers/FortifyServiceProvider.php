@@ -93,7 +93,8 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            // Never below 1: a missing setting (a config cached before it) is the default, not "no sign-ins".
+            return Limit::perMinute(max(1, config()->integer('punchcard.auth.login_per_minute', 5)))->by($throttleKey);
         });
 
         RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(10)->by(
