@@ -11,8 +11,11 @@ use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
+use Carbon\CarbonImmutable;
 use Database\Factories\StampEventFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -154,6 +157,21 @@ class StampEvent extends Model implements TenantModel
     public function staff(): BelongsTo
     {
         return $this->belongsTo(User::class, 'staff_id');
+    }
+
+    /**
+     * A business's birthday bonus given today, in its time (CHW-46,
+     * GiveBirthdayStamps): what the birthday message tells, as it is claimed
+     * and as it is sent.
+     *
+     * @param  Builder<self>  $query
+     * @param  CarbonImmutable  $today  now, in the business's time
+     */
+    #[Scope]
+    protected function birthdayBonusGivenToday(Builder $query, int $businessId, CarbonImmutable $today): void
+    {
+        $query->where('source', StampSource::Birthday)->where('business_id', $businessId)
+            ->where('created_at', '>=', $today->startOfDay()->utc());
     }
 
     /**

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\PlatformRole;
+use App\Support\Automations\Birthday;
 use App\Support\Locales;
+use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -218,6 +220,19 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     protected function newsAudience(Builder $query): void
     {
         $query->whereNotNull('marketing_opt_in_at')->whereNotNull('email_verified_at')->whereNull('anonymised_at');
+    }
+
+    /**
+     * Whose birthday a local day is (CHW-46, App\Support\Automations\Birthday):
+     * its month and day, and 29 February on 28 February of a year without one.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function birthdayOn(Builder $query, CarbonInterface $day): void
+    {
+        $query->where(fn (Builder $query) => $query->where('birthday_month', $day->month)->where('birthday_day', $day->day)
+            ->when(Birthday::isLeapDayStandIn($day), fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query->where('birthday_month', 2)->where('birthday_day', 29))));
     }
 
     /**

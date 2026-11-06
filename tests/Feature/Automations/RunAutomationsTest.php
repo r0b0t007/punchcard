@@ -104,7 +104,7 @@ it('sends a win-back to a follower going quiet here, once per quiet spell, queue
     $customer = ($this->customer)();
     $quietAt = $this->context->bypass(fn () => DB::table('business_customers')->where('user_id', $customer->id)->value('quiet_at'));
 
-    expect(($this->run)())->toBe(['businesses' => 1, 'claimed' => 1])
+    expect(($this->run)())->toBe(['businesses' => 1, 'claimed' => 1, 'birthday_stamps' => 0])
         ->and(($this->sends)())->toBe([[$customer->id, 'win_back', 'quiet:'.CarbonImmutable::parse($quietAt)->toDateString()]]);
 
     Queue::assertPushed(PushAutomationMessages::class, 1);
@@ -230,7 +230,7 @@ it('sends nothing for a business not allowed automations, suspended, archived, o
         'turned off' => null,
     };
 
-    expect(($this->run)())->toBe(['businesses' => 0, 'claimed' => 0])
+    expect(($this->run)())->toBe(['businesses' => 0, 'claimed' => 0, 'birthday_stamps' => 0])
         ->and(($this->sends)())->toBe([]);
 })->with(['not allowed', 'suspended', 'archived', 'turned off']);
 

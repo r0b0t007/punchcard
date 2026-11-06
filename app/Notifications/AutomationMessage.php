@@ -30,6 +30,7 @@ final class AutomationMessage extends Notification
         public readonly ?string $body,
         public readonly ?int $enrollmentId,
         public readonly ?string $reward = null,
+        public readonly ?int $stamps = null,
     ) {}
 
     /** @return list<class-string> */
@@ -66,7 +67,7 @@ final class AutomationMessage extends Notification
     {
         return match ($this->trigger) {
             AutomationTrigger::WinBack => __('Come back soon: your card is waiting.'),
-            AutomationTrigger::Birthday => __('A treat from us on your card.'),
+            AutomationTrigger::Birthday => trans_choice(':count stamp on your card, our treat.|:count stamps on your card, our treat.', $this->stamps ?? 1),
             AutomationTrigger::RewardReminder => __('Don\'t forget: :reward is yours.', ['reward' => (string) $this->reward]),
         };
     }

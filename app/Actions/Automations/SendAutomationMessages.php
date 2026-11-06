@@ -13,9 +13,13 @@ use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\Reward;
+use App\Models\StampEvent;
 use App\Models\User;
 use App\Notifications\AutomationMessage;
 use App\Support\Automations\AutomationWindow;
+use App\Support\Automations\Birthday;
+use App\Support\Automations\BirthdayKey;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Log;
 use LogicException;
@@ -33,7 +37,8 @@ use Throwable;
  * - the customer's account still there; a win-back's customer still
  *   in the same quiet spell; both still following the business with
  *   notifications on, a reminder's customer still with "Rewards ready" on
- *   and the reward theirs and still available.
+ *   and the reward theirs and still available, a birthday still today in
+ *   the business's time with this year's bonus given here.
  *
  * Then the automation's text as it is now: ours, or the owner's. One failing
  * never stops the others; logged by id only. Each is marked sent once a
@@ -95,6 +100,16 @@ final readonly class SendAutomationMessages
             return null;
         }
 
+        $bonus = null;
+
+        if ($send->trigger === AutomationTrigger::Birthday) {
+            $bonus = $this->birthdayBonusHere($send, $business, $user);
+
+            if (! $bonus instanceof StampEvent) {
+                return null;
+            }
+        }
+
         if ($send->trigger === AutomationTrigger::RewardReminder) {
             $reward = $user->push_rewards ? $this->rewardWaiting($send, $business, $user) : null;
 
@@ -110,8 +125,10 @@ final readonly class SendAutomationMessages
             $business->name,
             $automation->title,
             $automation->body,
-            $reward->enrollment_id ?? $this->cardHere($send->user_id, $business),
+            // The card holding the reward, or given the bonus; else the one last stamped here.
+            $reward->enrollment_id ?? $bonus->enrollment_id ?? $this->cardHere($send->user_id, $business),
             $reward?->reward_text,
+            $bonus?->qty,
         );
     }
 
@@ -137,6 +154,25 @@ final readonly class SendAutomationMessages
             ->availableAt(now())
             ->ownedBy($user)
             ->first();
+    }
+
+    /**
+     * The birthday bonus this business gave the customer today (on their
+     * first card given it: each got the same), if today is still their
+     * birthday in its time and the send is this year's; otherwise none.
+     */
+    private function birthdayBonusHere(AutomationSend $send, Business $business, User $user): ?StampEvent
+    {
+        $today = now()->toImmutable()->setTimezone(LocalMoment::timezoneOfBusiness($business->id));
+
+        if (! Birthday::isOn($user->birthday_month, $user->birthday_day, $today) || $send->occasion !== BirthdayKey::occasion($today->year)) {
+            return null;
+        }
+
+        return StampEvent::query()->birthdayBonusGivenToday($business->id, $today)
+            ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
+            ->orderBy('id')
+            ->first(['enrollment_id', 'qty']);
     }
 
     /** The customer's card of the organization they last stamped at this business, if any. */
