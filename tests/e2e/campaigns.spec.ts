@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test';
-import { signIn } from './helpers';
+import { expect, test } from './owner';
 
 /**
  * The Campaigns page (CHW-42, design 12c), on a phone: the owner reaches it
@@ -18,7 +17,6 @@ test.skip(
 test('the owner opens Campaigns from the sidebar and sees what was sent', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business');
     await page.getByRole('button', { name: 'Toggle sidebar' }).click();
     await page.getByRole('link', { name: 'Campaigns' }).click();
@@ -56,7 +54,6 @@ test('the owner opens Campaigns from the sidebar and sees what was sent', async 
 test('the owner composes a campaign and sees it on a lock screen; nobody to send to, Send waits', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business/campaigns');
     await page.locator('[data-test="new-campaign"]').click();
     await expect(page).toHaveURL(/\/business\/campaigns\/create$/);
@@ -107,7 +104,6 @@ test('the owner composes a campaign and sees it on a lock screen; nobody to send
 test('the owner sees who is going quiet on the dashboard and nudges them', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business');
 
     // Who is going quiet moves with the days since the demo was seeded: not the names.

@@ -63,12 +63,29 @@ export async function fillSignUp(page: Page): Promise<void> {
     await page.locator('[data-test="register-user-button"]').click();
 }
 
-/** Signs in a demo account (DemoSeeder: password "password"). Fortify allows five sign-ins a minute per account. */
+/**
+ * Signs in a demo account (DemoSeeder: password "password"). Fortify allows five sign-ins a minute per account
+ * (punchcard.auth.login_per_minute, raised in the CI e2e job): a spec working as the owner starts signed in
+ * instead (owner.ts), and only a test that signs out or ends the session signs in itself (CHW-369).
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
     await page.goto('/login');
     await page.locator('#email').fill(email);
     await page.locator('#password').fill('password');
+    const answer = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/login',
+    );
     await page.locator('[data-test="login-button"]').click();
+
+    // Refused by the sign-in limit: say so, rather than time out on the page it stays on.
+    if ((await answer).status() === 429) {
+        throw new Error(
+            `Signing in ${email} was rate-limited (429): too many sign-ins a minute for this account and address. Start signed in (owner.ts), or raise LOGIN_PER_MINUTE for this run.`,
+        );
+    }
+
     await page.waitForURL((url) => !url.pathname.startsWith('/login'));
 }
 

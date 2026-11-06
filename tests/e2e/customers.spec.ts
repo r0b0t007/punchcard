@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test';
-import { signIn } from './helpers';
+import { expect, test } from './owner';
 
 /**
  * The Customers page (CHW-44, B4, design 15a), on a phone: the owner reaches
@@ -18,7 +17,6 @@ test.skip(
 test('the owner opens Customers from the sidebar, switches tab and finds a customer', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business');
     await page.getByRole('button', { name: 'Toggle sidebar' }).click();
     await page.getByRole('link', { name: 'Customers' }).click();
@@ -79,7 +77,6 @@ test('the owner opens Customers from the sidebar, switches tab and finds a custo
 test('the owner adds a stamp by hand with a reason, and keeps a note', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     // The least recent visit on the first page: the demo's visits end yesterday, so no cooldown or daily limit in
     // the way (other specs stamp newer customers, who come first).
     await page.goto('/business/customers');
