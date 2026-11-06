@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Enums\AutomationTrigger;
-use App\Support\Campaigns\CampaignText;
+use App\Support\Automations\AutomationText;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
@@ -45,30 +45,12 @@ final class AutomationMessage extends Notification
         $owners = $this->title !== null || $this->body !== null;
 
         return (new WebPushMessage)
-            ->title($this->title === null ? $this->ourTitle() : CampaignText::notificationTitle($this->business, $this->title))
-            ->body($this->body ?? $this->ourBody())
+            ->title(AutomationText::title($this->trigger, $this->business, $this->title))
+            ->body(AutomationText::body($this->trigger, $this->body, $this->reward, $this->stamps))
             ->icon('/icons/icon-192.png')
             ->tag('automation-'.$this->trigger->value.'-'.$this->businessId)
             ->lang($locale)
             ->dir($owners ? 'auto' : ($locale === 'ar' ? 'rtl' : 'ltr'))
             ->data(['url' => $this->enrollmentId === null ? route('app.cards', [], false) : route('app.cards.show', $this->enrollmentId, false)]);
-    }
-
-    private function ourTitle(): string
-    {
-        return match ($this->trigger) {
-            AutomationTrigger::WinBack => __('We miss you at :business', ['business' => $this->business]),
-            AutomationTrigger::Birthday => __('Happy birthday from :business!', ['business' => $this->business]),
-            AutomationTrigger::RewardReminder => __('Your reward is waiting at :business', ['business' => $this->business]),
-        };
-    }
-
-    private function ourBody(): string
-    {
-        return match ($this->trigger) {
-            AutomationTrigger::WinBack => __('Come back soon: your card is waiting.'),
-            AutomationTrigger::Birthday => trans_choice(':count stamp on your card, our treat.|:count stamps on your card, our treat.', $this->stamps ?? 1),
-            AutomationTrigger::RewardReminder => __('Don\'t forget: :reward is yours.', ['reward' => (string) $this->reward]),
-        };
     }
 }

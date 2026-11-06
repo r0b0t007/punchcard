@@ -102,9 +102,10 @@ above: keep the two in step.
 | B4 customers: tabs with counts over the table (15a); B5 one customer, stamps by hand and taken back (card asked with 2+), notes (15c, delete asks first) (CHW-44)                                                                                | `Punchcard Customers Review.dc.html`                                  |
 | B3 going quiet: the panel under the figures (16a), nobody going quiet and one location picked (16b); B9 opened on Going quiet (16c) (CHW-45)                                                                                                     | `Punchcard Going Quiet Review.dc.html`                                |
 | C12 Profile: the optional birthday, day and month, set, empty and a date that doesn't exist (17a, CHW-46)                                                                                                                                        | `Punchcard Birthday Review.dc.html`                                   |
+| B11 automations: three cards, each with its switch, setting and message (18a); the message editor, a first visit and the toast (18c) (CHW-46)                                                                                                    | `Punchcard Automations Review.dc.html`                                |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.
 
-Not designed yet (design with their issue): C7, C8, C11, C14, B8, B10, B11, B14–B19, M1. Filament (A1–A4) stays
+Not designed yet (design with their issue): C7, C8, C11, C14, B8, B10, B14–B19, M1. Filament (A1–A4) stays
 stock.

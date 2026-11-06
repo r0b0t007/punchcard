@@ -18,4 +18,14 @@ enum AutomationTrigger: string
 
     /** The customer goes quiet here (BusinessCustomer, CustomerSegment::Quiet), once per quiet spell. */
     case WinBack = 'win_back';
+
+    /** Its name on B11, in the current locale. */
+    public function label(): string
+    {
+        return match ($this) {
+            self::RewardReminder => __('Reward reminder'),
+            self::Birthday => __('Birthday bonus'),
+            self::WinBack => __('Win-back'),
+        };
+    }
 }

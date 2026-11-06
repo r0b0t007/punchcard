@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\AutomationTrigger;
+use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CardController;
@@ -122,6 +124,10 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         Route::get('campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
         Route::post('campaigns', [CampaignController::class, 'store'])->middleware('throttle:campaign-send')->name('campaigns.store');
         Route::patch('campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->whereNumber('campaign')->name('campaigns.cancel');
+        // Automations (CHW-46, B11): messages that go out on their own, from whoever runs a business allowed them.
+        Route::get('automations', [AutomationController::class, 'index'])->name('automations.index');
+        Route::patch('automations/{trigger}', [AutomationController::class, 'update'])->whereIn('trigger', array_column(AutomationTrigger::cases(), 'value'))
+            ->middleware('throttle:automation-change')->name('automations.update');
     });
 });
 

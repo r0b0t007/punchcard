@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\Admin\SetAutomationsAccess;
 use App\Actions\Auth\SetPlatformAdmin;
 use App\Actions\Stampers\RegisterStamper;
 use App\Actions\Tenancy\CreateIndependentBusiness;
@@ -179,6 +180,9 @@ final class DemoSeeder extends Seeder
         $business = $this->createIndependentBusiness->handle($owner, 'Café Hafa', BusinessCategory::Cafe);
         $business->forceFill(['status' => BusinessStatus::Verified, 'verified_at' => now(), 'onboarded_at' => now()])->save();
         $business->members()->attach($staff, ['role' => BusinessRole::Staff->value]);
+        // Allowed automations (CHW-46, B11), as the platform admin does it (the flag's one writer, recorded): its owner
+        // sets them up, all off to start.
+        app(SetAutomationsAccess::class)->handle($business, true);
 
         $terrace = $this->location($business, 'Hafa terrace', 'Avenue Hafa, Tangier');
         $kasbah = $this->location($business, 'Hafa Kasbah', 'Rue de la Kasbah, Tangier');

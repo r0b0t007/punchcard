@@ -253,6 +253,9 @@ class AppServiceProvider extends ServiceProvider
         // Campaigns (CHW-42): the weekly limit is the business's (CampaignLimit); this only stops a stream of posts.
         RateLimiter::for('campaign-send', fn (Request $request): Limit => Limit::perHour(20)->by('campaign-send:'.$request->user()?->getAuthIdentifier()));
 
+        // B11's switches and messages (CHW-46): a person sets a few at a time; a script stops here.
+        RateLimiter::for('automation-change', fn (Request $request): Limit => Limit::perMinute(30)->by('automation-change:'.$request->user()?->getAuthIdentifier()));
+
         // Customers (CHW-44, B5): stamps by hand, taken back and notes, at an owner's pace, never a script's.
         RateLimiter::for('customer-change', fn (Request $request): Limit => Limit::perMinute(30)->by('customer-change:'.$request->user()?->getAuthIdentifier()));
 

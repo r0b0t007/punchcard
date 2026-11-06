@@ -7,6 +7,7 @@ import {
     Nfc,
     Stamp,
     Users,
+    Zap,
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -18,6 +19,7 @@ import {
     SidebarHeader,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as automations } from '@/routes/automations';
 import { index as campaigns } from '@/routes/campaigns';
 import { index as customers } from '@/routes/customers';
 import { index as cards } from '@/routes/cards';
@@ -52,6 +54,12 @@ const campaignsNavItem: NavItem = {
     icon: Megaphone,
 };
 
+const automationsNavItem: NavItem = {
+    title: 'Automations',
+    href: automations(),
+    icon: Zap,
+};
+
 const counterNavItem: NavItem = {
     title: 'Counter mode',
     href: counter(),
@@ -78,6 +86,7 @@ export function AppSidebar() {
         ...(nav.customers ? [customersNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
         ...(nav.campaigns ? [campaignsNavItem] : []),
+        ...(nav.automations ? [automationsNavItem] : []),
         ...(nav.stampers ? [stampersNavItem] : []),
         ...(nav.staff ? [staffNavItem] : []),
     ];
