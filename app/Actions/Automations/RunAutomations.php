@@ -21,11 +21,13 @@ use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Automations\AutomationWindow;
+use App\Support\Automations\BirthdayKey;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -85,19 +87,24 @@ final readonly class RunAutomations
                     continue;
                 }
 
-                // The birthday bonus first, each stamp its own transaction: its message is claimed below.
-                $birthday = $this->context->bypass(fn (): ?Automation => Automation::query()->where('business_id', $business->id)
-                    ->where('trigger', AutomationTrigger::Birthday)->where('active', true)->first());
+                // The business's day, and its automations turned on, read once for the run.
+                [$today, $automations] = $this->context->bypass(fn (): array => [
+                    $now->setTimezone(LocalMoment::timezoneOfBusiness($business->id)),
+                    Automation::query()->where('business_id', $business->id)->where('active', true)->get()
+                        ->keyBy(fn (Automation $automation): string => $automation->trigger->value),
+                ]);
+                $birthday = $automations->get(AutomationTrigger::Birthday->value);
 
+                // The birthday bonus first, each stamp its own transaction: its message is claimed below.
                 if ($birthday instanceof Automation) {
-                    $count['birthday_stamps'] += $this->giveBirthdayStamps->handle($business, $birthday, $now);
+                    $count['birthday_stamps'] += $this->giveBirthdayStamps->handle($business, $birthday, $today);
                 }
 
                 // The claims and their jobs commit together on the database queue (the app's, CLAUDE.md): a
                 // dispatch failing leaves nothing claimed, so the next run sends it. On the sync queue (local
                 // only) the jobs run inside, before the commit.
-                $claimed = DB::transaction(function () use ($business, $now): array {
-                    $claimed = $this->context->bypass(fn (): array => $this->claim($business, $now));
+                $claimed = DB::transaction(function () use ($business, $now, $today, $automations): array {
+                    $claimed = $this->context->bypass(fn (): array => $this->claim($business, $now, $today, $automations));
                     $this->queue($business, $claimed);
 
                     return $claimed;
@@ -122,14 +129,15 @@ final readonly class RunAutomations
      * their occasion is claimed again if it still holds, and they no longer
      * count toward the cap.
      *
+     * @param  CarbonImmutable  $today  now, in the business's time
+     * @param  Collection<string, Automation>  $automations  its automations turned on, by trigger
      * @return list<int> the sends claimed
      */
-    private function claim(Business $business, CarbonImmutable $now): array
+    private function claim(Business $business, CarbonImmutable $now, CarbonImmutable $today, Collection $automations): array
     {
         AutomationSend::query()->where('business_id', $business->id)->whereNull('sent_at')
             ->where('created_at', '<=', $now->subMinutes(AutomationWindow::RELEASE_MINUTES))->delete();
 
-        $automations = Automation::query()->where('business_id', $business->id)->where('active', true)->get()->keyBy(fn (Automation $automation): string => $automation->trigger->value);
         // Who already had a message from this business this week: the cap.
         $served = array_flip(AutomationSend::query()->where('business_id', $business->id)
             ->where('created_at', '>', $now->subDays(self::WEEK))->distinct()->pluck('user_id')->all());
@@ -142,7 +150,7 @@ final readonly class RunAutomations
                 continue;
             }
 
-            foreach ($this->due($automation, $business, $now) as $userId => $occasion) {
+            foreach ($this->due($automation, $business, $now, $today) as $userId => $occasion) {
                 if (isset($served[$userId])) {
                     continue;
                 }
@@ -179,7 +187,7 @@ final readonly class RunAutomations
      *
      * @return array<int, string> occasion by user id
      */
-    private function due(Automation $automation, Business $business, CarbonImmutable $now): array
+    private function due(Automation $automation, Business $business, CarbonImmutable $now, CarbonImmutable $today): array
     {
         $candidates = match ($automation->trigger) {
             AutomationTrigger::RewardReminder => $this->rewardsWaiting($automation, $business, $now),
@@ -188,7 +196,7 @@ final readonly class RunAutomations
                 ->whereIn('user_id', Follow::query()->listeningTo($business)->select('user_id'))
                 ->orderBy('user_id')->get(['user_id', 'quiet_at'])
                 ->map(fn (BusinessCustomer $customer): array => [$customer->user_id, 'quiet:'.$customer->quiet_at->toDateString()])->all(),
-            AutomationTrigger::Birthday => $this->birthdaysToday($business, $now),
+            AutomationTrigger::Birthday => $this->birthdaysToday($business, $today),
         };
         $withPhone = array_flip(DescribeAudience::withPhone(array_values(array_unique(array_column($candidates, 0)))));
         $sent = [];
@@ -250,22 +258,23 @@ final readonly class RunAutomations
     /**
      * Whose birthday it is today in the business's time, among the
      * followers who came in (Follow::listeningTo), given this year's bonus
-     * here (GiveBirthdayStamps): the bonus is the business's that gave it.
+     * here today (GiveBirthdayStamps): the bonus is the business's that gave
+     * it, and the message is for the day it was given.
      *
+     * @param  CarbonImmutable  $today  now, in the business's time
      * @return list<array{0: int, 1: string}> user id and occasion
      */
-    private function birthdaysToday(Business $business, CarbonImmutable $now): array
+    private function birthdaysToday(Business $business, CarbonImmutable $today): array
     {
-        $today = $now->setTimezone(LocalMoment::timezoneOfBusiness($business->id));
-
-        return User::query()->notAnonymised()->birthdayOn($today)
+        $userIds = User::query()->notAnonymised()->birthdayOn($today)
             ->whereIn('id', Follow::query()->listeningTo($business)->select('user_id'))
             ->whereIn('id', CardEnrollment::query()->select('user_id')->where('organization_id', $business->organization_id)
-                // This year's bonus given here: its key is "birthday:{card}:{year}".
                 ->whereHas('stampEvents', fn (Builder $events) => $events->where('source', StampSource::Birthday)->where('business_id', $business->id)
-                    ->where('idempotency_key', 'like', 'birthday:%:'.$today->year)))
-            ->orderBy('id')->pluck('id')
-            ->map(fn (int $userId): array => [$userId, 'birthday:'.$today->year])->pipe(fn ($birthdays): array => array_values($birthdays->all()));
+                    ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year))
+                    ->where('created_at', '>=', $today->startOfDay()->utc())))
+            ->orderBy('id')->pluck('id')->all();
+
+        return array_values(array_map(fn (int $userId): array => [$userId, 'birthday:'.$today->year], $userIds));
     }
 
     /** @param list<int> $sendIds */

@@ -7,6 +7,7 @@ namespace App\Actions\Automations;
 use App\Actions\Stamps\AddStamps;
 use App\Actions\Stamps\StampRejected;
 use App\Actions\Stamps\StampRequest;
+use App\Enums\StampRejection;
 use App\Enums\StampSource;
 use App\Models\Automation;
 use App\Models\Business;
@@ -15,11 +16,11 @@ use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\StampEvent;
 use App\Models\User;
-use App\Support\LocalMoment;
+use App\Support\Automations\BirthdayKey;
+use App\Support\Database\Outermost;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -32,27 +33,30 @@ use Throwable;
  * the treat, the message is RunAutomations'.
  *
  * Once a year per card, across the organization: each is a system stamp
- * keyed "birthday:{card}:{year}", the year of that birthday, and a card
- * with that key at any of its businesses is left out. Checked under the
- * card's lock, which AddStamps takes too, so two runs never both give it;
- * in a franchise the first business to reach it gives it. Credited to the
- * business's first open site, in the business's tenant (as a tap is, so
- * what follows, a reward unlocked and pushed, is queued there). One refused
- * (an account deleted meanwhile) is left out; one failing otherwise is
- * logged by id, and the others go on.
+ * keyed per card and year (BirthdayKey), the year of that birthday, and a
+ * card with that key at any of its businesses is left out: first in the
+ * query, then under the card's lock, which AddStamps takes too, so two runs
+ * never both give it; the database holds it as well
+ * (stamp_events_birthday_once). In a franchise the first business to reach
+ * a card gives it. Credited to the business's first open site, in the
+ * business's tenant (as a tap is, so what follows, a reward unlocked and
+ * pushed, is queued there), in a transaction run again if a deadlock aborts
+ * it (Outermost). An account deleted meanwhile is left out; any other
+ * refusal or failure is logged by card id, and the others go on.
  *
- * Called by RunAutomations, only while the business sends
- * (AutomationWindow::sendsNow).
+ * Called by RunAutomations, outside any transaction, only while the business
+ * sends (AutomationWindow::sendsNow).
  */
 final readonly class GiveBirthdayStamps
 {
     public function __construct(private AddStamps $addStamps, private TenantContext $context) {}
 
-    /** @return int the cards stamped */
-    public function handle(Business $business, Automation $automation, CarbonImmutable $now): int
+    /**
+     * @param  CarbonImmutable  $today  now, in the business's time
+     * @return int the cards stamped
+     */
+    public function handle(Business $business, Automation $automation, CarbonImmutable $today): int
     {
-        // Its sites are read in bypass(): outside a tenant, the business's time would be the app's.
-        $today = $this->context->bypass(fn (): CarbonImmutable => $now->setTimezone(LocalMoment::timezoneOfBusiness($business->id)));
         [$site, $enrollments] = $this->context->bypass(fn (): array => [
             Location::query()->where('business_id', $business->id)->open()->orderBy('id')->first(),
             CardEnrollment::query()
@@ -60,6 +64,9 @@ final readonly class GiveBirthdayStamps
                 ->whereIn('user_id', User::query()->select('id')->notAnonymised()->birthdayOn($today))
                 ->whereIn('user_id', BusinessCustomer::query()->select('user_id')->where('business_id', $business->id))
                 ->whereHas('card', fn (Builder $cards) => $cards->where('active', true)->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($business->id)))
+                // Given this year already, here or elsewhere: no lock needed to leave it out.
+                ->whereDoesntHave('stampEvents', fn (Builder $events) => $events->where('source', StampSource::Birthday)
+                    ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year)))
                 ->orderBy('id')
                 ->get(),
         ]);
@@ -75,7 +82,7 @@ final readonly class GiveBirthdayStamps
             $this->context->set($business->organization, $business);
 
             foreach ($enrollments as $enrollment) {
-                $stamped += $this->give($enrollment, $site, $automation, 'birthday:'.$enrollment->id.':'.$today->year) ? 1 : 0;
+                $stamped += $this->give($enrollment, $site, $automation, BirthdayKey::for($enrollment->id, $today->year)) ? 1 : 0;
             }
         } finally {
             $this->context->restore($previous);
@@ -88,7 +95,7 @@ final readonly class GiveBirthdayStamps
     private function give(CardEnrollment $enrollment, Location $site, Automation $automation, string $key): bool
     {
         try {
-            return DB::transaction(function () use ($enrollment, $site, $automation, $key): bool {
+            return Outermost::transaction('A birthday bonus', function () use ($enrollment, $site, $automation, $key): bool {
                 $given = $this->context->bypass(function () use ($enrollment, $key): bool {
                     CardEnrollment::query()->whereKey($enrollment->id)->lockForUpdate()->first(['id']);
 
@@ -98,7 +105,12 @@ final readonly class GiveBirthdayStamps
 
                 return ! $given && ! $this->addStamps->handle($enrollment, StampRequest::system(StampSource::Birthday, $site, $key, $automation->stamps))->replayed;
             });
-        } catch (StampRejected) {
+        } catch (StampRejected $refused) {
+            // An account deleted meanwhile is expected; anything else (a key taken by another stamp) must show.
+            if ($refused->rejection !== StampRejection::AccountDeleted) {
+                Log::warning('A birthday bonus was refused.', ['enrollment_id' => $enrollment->id, 'reason' => $refused->rejection->value]);
+            }
+
             return false;
         } catch (Throwable $failed) {
             Log::warning('A birthday bonus failed.', ['enrollment_id' => $enrollment->id, 'error' => $failed::class]);

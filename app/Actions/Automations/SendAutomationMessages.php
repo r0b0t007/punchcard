@@ -18,6 +18,7 @@ use App\Models\StampEvent;
 use App\Models\User;
 use App\Notifications\AutomationMessage;
 use App\Support\Automations\AutomationWindow;
+use App\Support\Automations\BirthdayKey;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Log;
@@ -155,9 +156,9 @@ final readonly class SendAutomationMessages
     }
 
     /**
-     * The birthday bonus this business gave the customer this year (on any
-     * one card: each got the same), if today is still their birthday in its
-     * time and the send is this year's; otherwise none.
+     * The birthday bonus this business gave the customer today (on any one
+     * card: each got the same), if today is still their birthday in its time
+     * and the send is this year's; otherwise none.
      */
     private function birthdayStampsHere(AutomationSend $send, Business $business, User $user): int
     {
@@ -168,7 +169,8 @@ final readonly class SendAutomationMessages
         }
 
         return (int) StampEvent::query()->where('business_id', $business->id)->where('source', StampSource::Birthday)
-            ->where('idempotency_key', 'like', 'birthday:%:'.$today->year)
+            ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year))
+            ->where('created_at', '>=', $today->startOfDay()->utc())
             ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
             ->max('qty');
     }

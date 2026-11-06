@@ -7,6 +7,7 @@ use App\Actions\Automations\SendAutomationMessages;
 use App\Actions\Customers\SummariseCustomer;
 use App\Enums\AutomationTrigger;
 use App\Enums\BusinessStatus;
+use App\Enums\StampRejection;
 use App\Enums\StampSource;
 use App\Features\Automations;
 use App\Jobs\PushAutomationMessages;
@@ -20,12 +21,15 @@ use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Notifications\AutomationMessage;
+use App\Support\Automations\BirthdayKey;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
@@ -408,4 +412,57 @@ it('reminds of a reward the bonus unlocked, as of one unlocked by a visit', func
     ($this->run)();
 
     expect(array_column(($this->sends)(), 2))->toBe(['birthday', 'reward_reminder']);
+});
+
+it('tells a bonus on the day it was given only, never on a birthday changed since', function (): void {
+    ($this->automation)();
+    // Not following on the day: the bonus, no message.
+    $customer = ($this->customer)(follows: false);
+    ($this->run)();
+
+    // The next day they follow, and say their birthday is today.
+    Carbon::setTestNow(now()->addDay());
+    $this->context->bypass(fn () => DB::table('follows')->where('user_id', $customer->id)->update(['notify' => true]));
+    $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11])->save();
+    ($this->run)();
+
+    expect(($this->bonuses)())->toHaveCount(1)
+        ->and(($this->sends)())->toBe([]);
+
+    // Claimed anyway (a run racing the change): the sender finds no bonus given today, and sends nothing.
+    Notification::fake();
+    $send = $this->context->bypass(fn (): AutomationSend => AutomationSend::factory()->create([
+        'automation_id' => Automation::query()->where('trigger', AutomationTrigger::Birthday)->value('id'), 'user_id' => $customer->id, 'occasion' => 'birthday:2026',
+    ]));
+    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    app(SendAutomationMessages::class)->handle([$send->id]);
+    $this->context->clear();
+
+    Notification::assertNothingSent();
+});
+
+it('shows a bonus refused for another reason than a deleted account', function (): void {
+    Log::spy();
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // A staff stamp at A1 already holds the bonus's key: AddStamps refuses it as a conflict.
+    $this->tenants->stamp($enrollment, $this->tenants->a1, ['idempotency_key' => BirthdayKey::for($enrollment->id, 2026)]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe(0);
+
+    Log::shouldHaveReceived('warning')->with('A birthday bonus was refused.', ['enrollment_id' => $enrollment->id, 'reason' => StampRejection::IdempotencyConflict->value]);
+});
+
+it('holds the bonus once per card in the database too, whatever the business', function (): void {
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    $key = BirthdayKey::for($enrollment->id, 2026);
+    $this->tenants->stamp($enrollment, $this->tenants->a1, ['source' => StampSource::Birthday, 'idempotency_key' => $key]);
+
+    // Each in its own savepoint: a refused statement aborts the transaction it is in.
+    expect(fn () => DB::transaction(fn () => $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => $key])))
+        ->toThrow(UniqueConstraintViolationException::class)
+        // Another stamp may share a key with it at another business: only birthday bonuses are held.
+        ->and(DB::transaction(fn (): StampEvent => $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Bonus, 'idempotency_key' => $key]))->exists)->toBeTrue();
 });
