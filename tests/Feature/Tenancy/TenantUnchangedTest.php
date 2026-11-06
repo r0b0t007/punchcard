@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Admin\StartImpersonation;
+use App\Enums\AutomationTrigger;
 use App\Enums\BusinessRole;
 use App\Enums\DocumentKind;
 use App\Enums\PlatformRole;
@@ -68,7 +69,7 @@ it('refuses every change sent from a page of another business, before reading it
     // out from an email's link: they act on no tenant's data).
     expect($guarded->map(fn (array $pair): string => $pair[0].' '.$pair[1]->getName())->sort()->values()->all())->toBe([
         'DELETE counter.disarm', 'DELETE customers.notes.destroy', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
-        'PATCH campaigns.cancel', 'PATCH cards.status', 'PATCH stampers.status',
+        'PATCH automations.update', 'PATCH campaigns.cancel', 'PATCH cards.status', 'PATCH stampers.status',
         'POST business.qr-stand.printed', 'POST campaigns.store', 'POST cards.banner', 'POST cards.store', 'POST counter.arm', 'POST counter.scans.redeem',
         'POST counter.scans.stamp', 'POST counter.scans.store', 'POST customers.corrections.store', 'POST customers.notes.store', 'POST customers.stamps.store',
         'POST staff.invitations.store', 'POST verification.store',
@@ -80,6 +81,7 @@ it('refuses every change sent from a page of another business, before reading it
         $parameters = array_map(fn (string $name): string => match ($name) {
             'kind' => DocumentKind::IdDocument->value,
             'scan' => (string) Str::ulid(),
+            'trigger' => AutomationTrigger::WinBack->value,
             default => '1',
         }, array_combine($route->parameterNames(), $route->parameterNames()));
 

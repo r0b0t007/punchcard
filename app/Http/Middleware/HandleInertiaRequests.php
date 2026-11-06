@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use App\Actions\Tenancy\DescribeTenants;
 use App\Actions\Tenancy\HasMemberships;
 use App\Actions\Tenancy\ResolveTenant;
+use App\Features\Automations;
+use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Models\User;
 use App\Support\Auth\Impersonation;
@@ -15,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Inertia;
 use Inertia\Middleware;
+use Laravel\Pennant\Feature;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -77,6 +80,8 @@ class HandleInertiaRequests extends Middleware
                 'campaigns' => $this->managesStaff($request),
                 // Customers (CHW-44, B4): the same people (BusinessCustomerPolicy::viewAny).
                 'customers' => $this->managesStaff($request),
+                // Automations (CHW-46, B11): the same people, while the business is allowed them (AutomationPolicy::viewAny).
+                'automations' => $this->managesStaff($request) && $this->allowedAutomations(),
             ],
             // The tenant switcher (CHW-147): where the user may work and where they work now; null for a customer.
             'tenants' => fn (): ?array => $this->tenants($request),
@@ -166,5 +171,16 @@ class HandleInertiaRequests extends Middleware
         $context = app(TenantContext::class);
 
         return $request->user() instanceof User && $context->businessId() !== null && $context->canManageMembers();
+    }
+
+    /**
+     * The business worked in is allowed automations (App\Features\Automations, AutomationPolicy). Read only for
+     * whoever runs it (managesStaff first): the business row and its flag, which Pennant keeps for the request.
+     */
+    private function allowedAutomations(): bool
+    {
+        $business = app(TenantContext::class)->business();
+
+        return $business instanceof Business && Feature::for($business)->active(Automations::class);
     }
 }
