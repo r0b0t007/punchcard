@@ -72,7 +72,20 @@ export async function signIn(page: Page, email: string): Promise<void> {
     await page.goto('/login');
     await page.locator('#email').fill(email);
     await page.locator('#password').fill('password');
+    const answer = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === '/login',
+    );
     await page.locator('[data-test="login-button"]').click();
+
+    // Refused by the sign-in limit: say so, rather than time out on the page it stays on.
+    if ((await answer).status() === 429) {
+        throw new Error(
+            `Signing in ${email} was rate-limited (429): too many sign-ins a minute for this account and address. Start signed in (owner.ts), or raise LOGIN_PER_MINUTE for this run.`,
+        );
+    }
+
     await page.waitForURL((url) => !url.pathname.startsWith('/login'));
 }
 

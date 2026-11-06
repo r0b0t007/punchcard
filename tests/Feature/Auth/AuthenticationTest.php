@@ -80,7 +80,7 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
+        RateLimiter::increment($this->throttleKey($user), amount: 5);
 
         $response = $this->post(route('login.store'), [
             'email' => $user->email,
@@ -97,10 +97,35 @@ class AuthenticationTest extends TestCase
         $attempt = fn () => $this->post(route('login.store'), ['email' => $user->email, 'password' => 'wrong-password']);
 
         // Five attempts so far, the default's limit: the sixth still goes through under a limit of 8.
-        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
+        RateLimiter::increment($this->throttleKey($user), amount: 5);
         $attempt()->assertSessionHasErrors('email');
 
-        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 2);
+        RateLimiter::increment($this->throttleKey($user), amount: 2);
         $attempt()->assertTooManyRequests();
+    }
+
+    public function test_a_blank_zero_or_mistyped_limit_is_the_default_never_none(): void
+    {
+        $read = function (string $value): mixed {
+            $_ENV['LOGIN_PER_MINUTE'] = $_SERVER['LOGIN_PER_MINUTE'] = $value;
+
+            try {
+                return (require config_path('punchcard.php'))['auth']['login_per_minute'];
+            } finally {
+                unset($_ENV['LOGIN_PER_MINUTE'], $_SERVER['LOGIN_PER_MINUTE']);
+            }
+        };
+
+        foreach (['', '0', '-3', '60/min'] as $value) {
+            $this->assertSame(5, $read($value), "LOGIN_PER_MINUTE={$value}");
+        }
+
+        $this->assertSame(60, $read('60'));
+    }
+
+    /** Fortify's login throttle key for a user signing in from the test's address, as its limiter hashes it. */
+    private function throttleKey(User $user): string
+    {
+        return md5('login'.implode('|', [$user->email, '127.0.0.1']));
     }
 }

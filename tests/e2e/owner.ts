@@ -11,9 +11,11 @@ export { expect } from '@playwright/test';
  * form in every test ran the suite into Fortify's limit of five sign-ins a
  * minute per account, and a 429 failed whichever test came next.
  *
- * Never for a test that signs out or ends the session: the session is the
- * worker's, and the tests after it would find it gone. Those sign in
- * themselves (signIn).
+ * The session is the worker's, one server-side session for every test it
+ * runs: what a test leaves in it, the next one finds. So never for a test
+ * that signs out or ends the session, nor one that changes what the session
+ * holds (switches business, confirms the password, opens a business): those
+ * sign in themselves (signIn).
  */
 export const test = base.extend<object, { ownerSession: string }>({
     storageState: ({ ownerSession }, use) => use(ownerSession),

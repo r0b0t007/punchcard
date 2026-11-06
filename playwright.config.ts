@@ -32,7 +32,9 @@ export default defineConfig({
               // --no-reload is what lets serve start them; PHP ignores the workers on Windows.
               command:
                   'php artisan serve --host=127.0.0.1 --port=8000 --no-reload',
-              env: { PHP_CLI_SERVER_WORKERS: '4' },
+              // Every spec signs in from this machine: room above the 5-a-minute sign-in limit meant for people
+              // (punchcard.auth.login_per_minute, CHW-369), here as in the CI job. A server you start keeps yours.
+              env: { PHP_CLI_SERVER_WORKERS: '4', LOGIN_PER_MINUTE: '60' },
               url: baseURL,
               reuseExistingServer: !process.env.CI,
               timeout: 120_000,
