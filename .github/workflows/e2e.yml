@@ -52,6 +52,9 @@ jobs:
           cp .env.example .env
           sed -i 's/^DB_CONNECTION=pgsql/DB_CONNECTION=sqlite/' .env
           sed -i 's/^MAIL_MAILER=smtp/MAIL_MAILER=log/' .env
+          # Every spec signs in from this one address; the specs share an owner session (tests/e2e/owner.ts), and the
+          # tests that sign in themselves must not run into the 5-a-minute limit meant for people (CHW-369).
+          echo "LOGIN_PER_MINUTE=60" >> .env
           touch database/database.sqlite
           php artisan key:generate
           php artisan migrate --force

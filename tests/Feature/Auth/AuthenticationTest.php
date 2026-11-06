@@ -89,4 +89,18 @@ class AuthenticationTest extends TestCase
 
         $response->assertTooManyRequests();
     }
+
+    public function test_the_rate_limit_follows_its_setting(): void
+    {
+        $user = User::factory()->create();
+        config(['punchcard.auth.login_per_minute' => 8]);
+        $attempt = fn () => $this->post(route('login.store'), ['email' => $user->email, 'password' => 'wrong-password']);
+
+        // Five attempts so far, the default's limit: the sixth still goes through under a limit of 8.
+        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 5);
+        $attempt()->assertSessionHasErrors('email');
+
+        RateLimiter::increment(md5('login'.implode('|', [$user->email, '127.0.0.1'])), amount: 2);
+        $attempt()->assertTooManyRequests();
+    }
 }

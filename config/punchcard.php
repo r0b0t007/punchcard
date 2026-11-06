@@ -13,6 +13,12 @@ declare(strict_types=1);
 */
 return [
 
+    'auth' => [
+        // Sign-in attempts a minute per account and address (Fortify's login limiter). Keep the default anywhere real;
+        // only the CI end-to-end job raises it, where every browser test signs in from one address (CHW-369).
+        'login_per_minute' => (int) env('LOGIN_PER_MINUTE', 5),
+    ],
+
     'tap' => [
         // Base URL written into every NFC stamper (SUN URL). Keep it short:
         // NTAG 424 DNA has limited NDEF space for the mirrored parameters.

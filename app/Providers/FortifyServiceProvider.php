@@ -93,7 +93,7 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            return Limit::perMinute((int) config('punchcard.auth.login_per_minute'))->by($throttleKey);
         });
 
         RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(10)->by(
