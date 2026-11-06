@@ -46,7 +46,9 @@ use Tests\Support\Tenants;
 | card across the organization: in a franchise, the first business to reach
 | them gives it. 29 February falls on 28 February of a year without one.
 | The message follows for a follower with a phone, after a reward reminder
-| in the weekly cap; the stamps never wait on it.
+| in the weekly cap; the stamps never wait on it. A birthday counts once it
+| has been on file 30 days, and a card gets one bonus in 365 days at most
+| (CHW-370): setting today as the birthday, or moving it, gains nothing.
 |
 */
 
@@ -65,11 +67,12 @@ beforeEach(function (): void {
         return $this->context->bypass(fn (): Automation => Automation::factory()->create(['business_id' => $business->id, 'trigger' => $trigger, ...$attributes]));
     };
 
-    // A customer of $at (a visit 20 days ago), born on 4 November unless told otherwise, following A with a phone.
-    $this->customer = function (?Business $at = null, ?array $birthday = [4, 11], bool $follows = true, ?LoyaltyCard $card = null): User {
+    // A customer of $at (a visit 20 days ago), born on 4 November unless told otherwise (given 60 days ago), following A with a phone.
+    $this->customer = function (?Business $at = null, ?array $birthday = [4, 11], bool $follows = true, ?LoyaltyCard $card = null, mixed $givenAt = null): User {
         $at ??= $this->tenants->a1;
         $card ??= $this->tenants->cardA;
-        $customer = User::factory()->create(['birthday_day' => $birthday[0] ?? null, 'birthday_month' => $birthday[1] ?? null, 'locale' => 'fr']);
+        $customer = User::factory()->create(['birthday_day' => $birthday[0] ?? null, 'birthday_month' => $birthday[1] ?? null, 'locale' => 'fr',
+            'birthday_set_at' => $birthday === null ? null : ($givenAt ?? now()->subDays(60))]);
         $enrollment = $this->tenants->enroll($customer, $card);
         $this->context->bypass(fn () => (new Follow)->forceFill(['organization_id' => $card->organization_id, 'user_id' => $customer->id, 'notify' => $follows])->save());
         $this->tenants->stamp($enrollment, $at, ['created_at' => now()->subDays(20)]);
@@ -251,7 +254,7 @@ it('sends the message with the bonus in the customer\'s language, and nothing on
 
     // Changed since the claim, within the hour: it is no longer their birthday.
     if ($body === null) {
-        $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11])->save();
+        $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11, 'birthday_set_at' => now()])->save();
     }
 
     $previous = $this->context->snapshot();
@@ -424,7 +427,7 @@ it('tells a bonus on the day it was given only, never on a birthday changed sinc
     // The next day they follow, and say their birthday is today.
     Carbon::setTestNow(now()->addDay());
     $this->context->bypass(fn () => DB::table('follows')->where('user_id', $customer->id)->update(['notify' => true]));
-    $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11])->save();
+    $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11, 'birthday_set_at' => now()])->save();
     ($this->run)();
 
     expect(($this->bonuses)())->toHaveCount(1)
@@ -528,4 +531,123 @@ it('sends the message on 28 February to someone born on the 29th, in a year with
     $this->context->clear();
 
     Notification::assertSentTo($customer, AutomationMessage::class);
+});
+
+it('gives it 30 days after the birthday was given, by local date, whatever the hour', function (string $givenAt, bool $gives): void {
+    ($this->automation)();
+    ($this->customer)(givenAt: CarbonImmutable::parse($givenAt, 'Africa/Casablanca')->utc());
+
+    expect(($this->run)()['birthday_stamps'])->toBe($gives ? 1 : 0)
+        ->and(($this->sends)())->toHaveCount($gives ? 1 : 0);
+})->with([
+    // 4 November: given on 5 October or before.
+    '5 October, in the morning' => ['2026-10-05 09:00:00', true],
+    '5 October, late' => ['2026-10-05 23:59:00', true],
+    // Still 5 October in UTC: the day is the business's.
+    '6 October, half past midnight' => ['2026-10-06 00:30:00', false],
+    'a week ago' => ['2026-10-28 12:00:00', false],
+    'today, the loophole' => ['2026-11-04 12:00:00', false],
+]);
+
+it('waits again after the birthday is changed, not after the same one is saved again', function (int $day, bool $gives): void {
+    ($this->automation)();
+    $customer = ($this->customer)(birthday: [$day, 11]);
+
+    $this->actingAs($customer)->patch(route('profile.update'), ['name' => $customer->name, 'email' => $customer->email, 'birthday_day' => 4, 'birthday_month' => 11])
+        ->assertSessionHasNoErrors();
+
+    expect(($this->run)()['birthday_stamps'])->toBe($gives ? 1 : 0);
+})->with([
+    'the same date again' => [4, true],
+    'moved to today' => [20, false],
+]);
+
+it('gives a card one bonus in 365 days, here or at another business, whatever year its key is', function (string $givenAt, bool $gives): void {
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // Last year's bonus at A2, on a birthday since moved.
+    $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025),
+        'created_at' => CarbonImmutable::parse($givenAt, 'Africa/Casablanca')->utc()]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe($gives ? 1 : 0);
+})->with([
+    '364 days ago' => ['2025-11-05 10:00:00', false],
+    '365 days ago' => ['2025-11-04 21:00:00', true],
+]);
+
+it('gives the same birthday again a year after a bonus from a franchise site hours behind, given late in its evening', function (): void {
+    // A1 is in Dubai, four hours ahead of A2 in Casablanca.
+    $this->context->bypass(fn () => DB::table('locations')->where('business_id', $this->tenants->a1->id)->update(['timezone' => 'Asia/Dubai']));
+    ($this->automation)();
+    Carbon::setTestNow(CarbonImmutable::parse('2026-11-04 12:00:00', 'Asia/Dubai')->utc());
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // Last year's, from A2 at 21:30 on the birthday in its time: already the 5th in Dubai.
+    $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025),
+        'created_at' => CarbonImmutable::parse('2025-11-04 21:30:00', 'Africa/Casablanca')->utc()]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe(1);
+});
+
+it('gives the same birthday again a year after a bonus from a franchise site six hours behind, given late in its evening', function (): void {
+    // A2 in New York, six hours behind A1 in Casablanca.
+    $this->context->bypass(fn () => DB::table('locations')->where('business_id', $this->tenants->a2->id)->update(['timezone' => 'America/New_York']));
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // Last year's, from A2 at 21:30 on the birthday in its time: 03:30 on the 5th in Casablanca.
+    $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025),
+        'created_at' => CarbonImmutable::parse('2025-11-04 21:30:00', 'America/New_York')->utc()]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe(1);
+});
+
+it('gives nothing for a birthday moved past the turn of the year, a month after the last bonus', function (): void {
+    ($this->automation)();
+    Carbon::setTestNow(CarbonImmutable::parse('2026-12-31 12:00:00', 'Africa/Casablanca')->utc());
+    $customer = ($this->customer)(birthday: [31, 12]);
+    $enrollment = ($this->enrollmentOf)($customer);
+    expect(($this->run)()['birthday_stamps'])->toBe(1);
+
+    // The next morning: 1 February instead, on file 30 days by then.
+    Carbon::setTestNow(CarbonImmutable::parse('2027-01-01 09:00:00', 'Africa/Casablanca')->utc());
+    $customer->forceFill(['birthday_day' => 1, 'birthday_month' => 2, 'birthday_set_at' => now()])->save();
+    Carbon::setTestNow(CarbonImmutable::parse('2027-02-01 12:00:00', 'Africa/Casablanca')->utc());
+    $this->tenants->stamp($enrollment, $this->tenants->a1, ['created_at' => now()->subDays(20)]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe(0)
+        ->and(array_column(($this->bonuses)(), 2))->toBe(['birthday:'.$enrollment->id.':2026']);
+});
+
+it('gives a 29 February birthday again on 28 February of the next year', function (): void {
+    ($this->automation)();
+    Carbon::setTestNow(CarbonImmutable::parse('2028-02-29 12:00:00', 'Africa/Casablanca')->utc());
+    $customer = ($this->customer)(birthday: [29, 2]);
+    $enrollment = ($this->enrollmentOf)($customer);
+    ($this->run)();
+
+    Carbon::setTestNow(CarbonImmutable::parse('2029-02-28 12:00:00', 'Africa/Casablanca')->utc());
+    $this->tenants->stamp($enrollment, $this->tenants->a1, ['created_at' => now()->subDays(20)]);
+    ($this->run)();
+
+    expect(array_column(($this->bonuses)(), 2))->toBe(['birthday:'.$enrollment->id.':2028', 'birthday:'.$enrollment->id.':2029']);
+});
+
+it('checks the 365 days again under the card lock, for a bonus given since the card was chosen', function (): void {
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // A2 gives last year's bonus (a moved birthday) just after A1 chose the card, before its lock.
+    $given = new stdClass;
+    $given->once = false;
+    DB::listen(function (QueryExecuted $query) use ($given, $enrollment): void {
+        if (! $given->once && str_contains($query->sql, '"birthday_month"') && str_contains($query->sql, 'from "card_enrollments"')) {
+            $given->once = true;
+            $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025), 'created_at' => now()->subMonths(2)]);
+        }
+    });
+
+    expect(($this->run)()['birthday_stamps'])->toBe(0)
+        ->and(($this->bonuses)())->toHaveCount(1);
 });

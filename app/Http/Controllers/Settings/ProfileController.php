@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Support\Auth\RecentConfirmation;
+use App\Support\Automations\Birthday;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,8 @@ class ProfileController extends Controller
             'recentlyConfirmed' => RecentConfirmation::holds($request->session()),
             // Optional, day and month only (CHW-46): for the places' birthday treat.
             'birthday' => $request->user()->birthday(),
+            // It counts this many days after it is given (CHW-370).
+            'birthdayWaitDays' => Birthday::ON_FILE_DAYS,
             'status' => $request->session()->get('status'),
         ]);
     }

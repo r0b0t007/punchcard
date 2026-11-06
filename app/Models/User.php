@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\PlatformRole;
 use App\Support\Automations\Birthday;
 use App\Support\Locales;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -49,6 +50,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property bool $push_rewards whether their phones with notifications on hear about a reward unlocked (CHW-41)
  * @property int|null $birthday_month their birthday's month, 1 to 12, optional: never the year (CHW-46)
  * @property int|null $birthday_day its day; set with the month or not at all
+ * @property Carbon|null $birthday_set_at when that birthday was given: it counts for a bonus 30 days on (CHW-370); set with it or not at all
  * @property Carbon|null $last_active_at when the account was last used: signed in, a stamp proving they were there, a redemption (RecordActivity, CHW-58)
  * @property Carbon|null $inactivity_warned_at when it was warned it would go for lack of use; activity withdraws it (CHW-58)
  * @property Carbon|null $inactivity_deletes_at the day that warning promised: never deleted before it (CHW-58)
@@ -101,6 +103,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
             'push_rewards' => 'boolean',
             'birthday_month' => 'integer',
             'birthday_day' => 'integer',
+            'birthday_set_at' => 'datetime',
             'last_active_at' => 'datetime',
             'inactivity_warned_at' => 'datetime',
             'inactivity_deletes_at' => 'datetime',
@@ -233,6 +236,18 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     {
         $query->where(fn (Builder $query) => $query->where('birthday_month', $day->month)->where('birthday_day', $day->day)
             ->when(Birthday::isLeapDayStandIn($day), fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query->where('birthday_month', 2)->where('birthday_day', 29))));
+    }
+
+    /**
+     * Whose birthday was given long enough before a local day to count on it (CHW-370, Birthday::givenTooLateFrom):
+     * ON_FILE_DAYS before or earlier, by local date. Set today, or changed since, it does not.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function birthdayOnFileFor(Builder $query, CarbonImmutable $day): void
+    {
+        $query->where('birthday_set_at', '<', Birthday::givenTooLateFrom($day));
     }
 
     /**

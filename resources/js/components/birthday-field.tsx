@@ -36,9 +36,12 @@ function monthNames(locale: string): string[] {
  */
 export default function BirthdayField({
     birthday,
+    waitDays,
     errors,
 }: {
     birthday: { day: number; month: number } | null;
+    /** Days after it is given that it counts (CHW-370). */
+    waitDays: number;
     errors: { birthday_day?: string; birthday_month?: string };
 }) {
     const { t, locale } = useTranslation();
@@ -137,7 +140,8 @@ export default function BirthdayField({
                 className="text-sm text-pretty text-muted-foreground"
             >
                 {t(
-                    'The places where you collect stamps can give you a treat on your birthday. Never the year.',
+                    'The places where you collect stamps can give you a treat on your birthday, :days days after you add or change it. Never the year.',
+                    { days: waitDays },
                 )}
             </p>
             {day !== '' || month !== '' ? (

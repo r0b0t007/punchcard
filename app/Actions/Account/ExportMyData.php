@@ -98,6 +98,7 @@ final readonly class ExportMyData
                     'pending_email' => $user->pending_email,
                     'locale' => $user->locale,
                     'birthday' => $user->birthday(),
+                    'birthday_set_at' => $this->date($user->birthday_set_at),
                     'created_at' => $this->date($user->created_at),
                     'last_active_at' => $this->date($user->last_active_at),
                     'inactivity_warned_at' => $this->date($user->inactivity_warned_at),
