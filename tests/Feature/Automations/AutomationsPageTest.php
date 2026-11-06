@@ -55,6 +55,7 @@ it('shows the owner the three automations as they start, with our message in the
             ])
             ->where('automations.1.trigger', 'birthday')->where('automations.1.ours.body', '1 tampon offert sur votre carte.')
             ->where('automations.2.trigger', 'win_back')->where('automations.2.ours.title', 'Vous nous manquez chez A1')
+            ->where('sentDays', 30)
             ->where('limits', ['days' => ['min' => 1, 'max' => 60], 'stamps' => ['min' => 1, 'max' => 3], 'title' => 35, 'body' => 120])
             ->where('nav.automations', true));
 });
@@ -76,7 +77,7 @@ it('counts the people each reached in 30 days, a phone having accepted it', func
 it('turns an automation on with its setting, then off, saying so', function (string $trigger, array $setting, string $field, int $value): void {
     ($this->as)($this->owner)->patch(route('automations.update', $trigger), ['active' => true, ...$setting, 'title' => '', 'body' => ''])
         ->assertRedirect(route('automations.index'))
-        ->assertInertiaFlash('toast.message', ($trigger === 'birthday' ? 'Bonus d’anniversaire' : 'Rappel de récompense').' est activé.');
+        ->assertInertiaFlash('toast.message', 'Automatisation activée : '.($trigger === 'birthday' ? 'Bonus d’anniversaire' : 'Rappel de récompense').'.');
 
     $saved = ($this->saved)(AutomationTrigger::from($trigger));
 
@@ -86,7 +87,7 @@ it('turns an automation on with its setting, then off, saying so', function (str
         ->and($saved?->body)->toBeNull();
 
     ($this->as)($this->owner)->patch(route('automations.update', $trigger), ['active' => false, ...$setting, 'title' => null, 'body' => null])
-        ->assertInertiaFlash('toast.message', ($trigger === 'birthday' ? 'Bonus d’anniversaire' : 'Rappel de récompense').' est désactivé.');
+        ->assertInertiaFlash('toast.message', 'Automatisation désactivée : '.($trigger === 'birthday' ? 'Bonus d’anniversaire' : 'Rappel de récompense').'.');
 
     expect(($this->saved)(AutomationTrigger::from($trigger))?->active)->toBeFalse();
 })->with([
@@ -96,7 +97,7 @@ it('turns an automation on with its setting, then off, saying so', function (str
 
 it('keeps the owner\'s own message, trimmed, and goes back to ours', function (): void {
     ($this->as)($this->owner)->patch(route('automations.update', 'win_back'), ['active' => true, 'title' => '  On vous attend ', 'body' => 'Deux tampons sur votre prochain café.'])
-        ->assertInertiaFlash('toast.message', 'Relance est activé.');
+        ->assertInertiaFlash('toast.message', 'Automatisation activée : Relance.');
 
     expect(($this->saved)(AutomationTrigger::WinBack)?->only(['title', 'body']))->toBe(['title' => 'On vous attend', 'body' => 'Deux tampons sur votre prochain café.']);
 

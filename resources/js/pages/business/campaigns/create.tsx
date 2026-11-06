@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Hourglass, Smartphone } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { Counter } from '@/components/campaigns/counter';
 import LockPreview from '@/components/campaigns/lock-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -30,7 +31,6 @@ import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import {
     addDays,
-    characters,
     clip,
     newIdempotencyKey,
     nextHour,
@@ -563,14 +563,6 @@ function audienceName(t: TranslateFn, segment: Segment): string {
 }
 
 /** "13 / 35", always left to right. */
-function Counter({ value, max }: { value: string; max: number }) {
-    return (
-        <span className="text-xs text-muted-foreground tabular-nums" dir="ltr">
-            {characters(value)} / {max}
-        </span>
-    );
-}
-
 function Notice({ children }: { children: React.ReactNode }) {
     return (
         <Alert variant="warning" data-test="campaign-notice">

@@ -1185,8 +1185,8 @@
     "Reward reminder": "Rappel de récompense",
     "Birthday bonus": "Bonus d’anniversaire",
     "Win-back": "Relance",
-    ":automation is on.": ":automation est activé.",
-    ":automation is off.": ":automation est désactivé.",
+    ":automation is on.": "Automatisation activée : :automation.",
+    ":automation is off.": "Automatisation désactivée : :automation.",
     "Saved.": "Enregistré.",
     "your reward": "votre récompense",
     "Automations": "Automatisations",
@@ -1199,7 +1199,7 @@
     "Our message, in each customer's language": "Notre message, dans la langue de chaque client",
     "Edit the message": "Modifier le message",
     "Not sent yet": "Pas encore envoyé",
-    ":count person in 30 days|:count people in 30 days": ":count personne en 30 jours|:count personnes en 30 jours",
+    ":count person in :days days|:count people in :days days": ":count personne en :days jours|:count personnes en :days jours",
     "When they go quiet": "Quand il devient discret",
     "Their usual gap × 2": "Son écart habituel × 2",
     "After it waits": "Après une attente de",
@@ -1207,5 +1207,6 @@
     ":count day|:count days": ":count jour|:count jours",
     "What a customer reads. Leave it to us and they get it in their language.": "Ce que lit un client. Laissez-nous l’écrire et il le reçoit dans sa langue.",
     "Your words are sent as written, not translated. Your business's name always comes first.": "Vos mots sont envoyés tels quels, sans traduction. Le nom de votre commerce vient toujours en premier.",
-    "Use our message instead": "Utiliser notre message"
+    "Use our message instead": "Utiliser notre message",
+    "That change was not saved.": "Cette modification n’a pas été enregistrée."
 }

@@ -12,7 +12,8 @@ namespace App\Features;
  * nobody is on until stored so.
  *
  * Pennant stores what resolve() returns on a business's first read (an admin
- * page view, the engine's run), and a stored value wins from then on. So a
+ * page view, the engine's run, any page its owner opens: the sidebar asks),
+ * and a stored value wins from then on. So a
  * new default here reaches no business already read: billing sets the flag
  * for each business from its plan, never through resolve() alone, and
  * through SetAutomationsAccess, the one writer: it locks the business and

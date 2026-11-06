@@ -1,7 +1,9 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { Cake, Gift, HeartHandshake, Minus, Moon, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Counter } from '@/components/campaigns/counter';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { StampDot } from '@/components/wordmark';
 import { useTranslation } from '@/hooks/use-translation';
-import { characters, clip, notificationTitle } from '@/lib/campaigns';
+import { clip, notificationTitle } from '@/lib/campaigns';
 import { cn, typedDir } from '@/lib/utils';
 import { index, update } from '@/routes/automations';
 
@@ -38,7 +40,7 @@ type Automation = {
     body: string | null;
     /** Ours, in the owner's language: the preview, and "Use our message instead". */
     ours: { title: string; body: string };
-    /** People it reached in the last 30 days. */
+    /** People it reached in the last sentDays days. */
     sent: number;
 };
 
@@ -66,10 +68,12 @@ export default function Automations({
     business,
     automations,
     limits,
+    sentDays,
 }: {
     business: string;
     automations: Automation[];
     limits: Limits;
+    sentDays: number;
 }) {
     const { t } = useTranslation();
     const [editing, setEditing] = useState<Automation | null>(null);
@@ -102,6 +106,7 @@ export default function Automations({
                             automation={automation}
                             business={business}
                             limits={limits}
+                            sentDays={sentDays}
                             onEdit={() => setEditing(automation)}
                         />
                     ))}
@@ -131,23 +136,75 @@ function saved(automation: Automation, changes: Partial<Automation>) {
     };
 }
 
+/** How long the stepper waits after the last tap before it saves: one save for 7 to 60 days, not 53. */
+const SETTING_SAVE_MS = 500;
+
 function AutomationCard({
-    automation,
+    automation: stored,
     business,
     limits,
+    sentDays,
     onEdit,
 }: {
     automation: Automation;
     business: string;
     limits: Limits;
+    sentDays: number;
     onEdit: () => void;
 }) {
     const { t } = useTranslation();
-    const Icon = ICONS[automation.trigger];
-    const save = (changes: Partial<Automation>) =>
-        router.patch(update(automation.trigger), saved(automation, changes), {
-            preserveScroll: true,
-        });
+    const Icon = ICONS[stored.trigger];
+    // What the owner changed and the server hasn't confirmed yet: shown at once, and sent whole with every save,
+    // so quick taps add up instead of each starting again from the page as it was.
+    const [changes, setChanges] = useState<Partial<Automation>>({});
+    const [saving, setSaving] = useState(false);
+    const latest = useRef({ stored, changes, version: 0 });
+    const timer = useRef<number | undefined>(undefined);
+    latest.current.stored = stored;
+    const automation = { ...stored, ...changes };
+
+    useEffect(() => () => window.clearTimeout(timer.current), []);
+
+    const send = () => {
+        window.clearTimeout(timer.current);
+        const sent = latest.current.version;
+
+        router.patch(
+            update(stored.trigger),
+            saved(latest.current.stored, latest.current.changes),
+            {
+                preserveScroll: true,
+                onStart: () => setSaving(true),
+                // Refused (a title too long since the business was renamed, the limit): say why, show it as stored.
+                onError: (errors) =>
+                    toast.error(
+                        Object.values(errors)[0] ??
+                            t('That change was not saved.'),
+                    ),
+                onFinish: () => {
+                    setSaving(false);
+
+                    // Nothing changed since: the page's props are the truth again.
+                    if (latest.current.version === sent) {
+                        latest.current.changes = {};
+                        setChanges({});
+                    }
+                },
+            },
+        );
+    };
+    const change = (next: Partial<Automation>, later = false) => {
+        latest.current.changes = { ...latest.current.changes, ...next };
+        latest.current.version++;
+        setChanges(latest.current.changes);
+        window.clearTimeout(timer.current);
+
+        if (later) {
+            timer.current = window.setTimeout(send, SETTING_SAVE_MS);
+        } else {
+            send();
+        }
+    };
     const descriptions: Record<Trigger, string> = {
         reward_reminder: t(
             "A customer has a reward waiting here and hasn't used it.",
@@ -177,7 +234,8 @@ function AutomationCard({
                         </div>
                         <Switch
                             checked={automation.active}
-                            onCheckedChange={(active) => save({ active })}
+                            disabled={saving}
+                            onCheckedChange={(active) => change({ active })}
                             aria-label={automation.name}
                             data-test={`automation-${automation.trigger}-switch`}
                         />
@@ -192,7 +250,7 @@ function AutomationCard({
                         <Setting
                             automation={automation}
                             limits={limits}
-                            onChange={save}
+                            onChange={(next) => change(next, true)}
                         />
 
                         <div className="flex flex-col gap-1.5">
@@ -230,9 +288,10 @@ function AutomationCard({
                             {automation.sent === 0
                                 ? t('Not sent yet')
                                 : t(
-                                      ':count person in 30 days|:count people in 30 days',
+                                      ':count person in :days days|:count people in :days days',
                                       {
                                           count: automation.sent,
+                                          days: sentDays,
                                       },
                                   )}
                         </span>
@@ -321,9 +380,13 @@ function NotificationPreview({ title, body }: { title: string; body: string }) {
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary">
                 <StampDot />
             </span>
-            <span className="flex min-w-0 flex-col gap-0.5" dir="auto">
-                <b className="text-sm font-semibold">{title}</b>
-                <span className="text-sm">{body}</span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+                <b className="text-sm font-semibold break-words">
+                    <bdi>{title}</bdi>
+                </b>
+                <span className="text-sm break-words">
+                    <bdi>{body}</bdi>
+                </span>
             </span>
         </div>
     );
@@ -350,6 +413,8 @@ function MessageEditor({
     if (automation !== null && opened !== automation.trigger) {
         setOpened(automation.trigger);
         setData({ title: automation.title ?? '', body: automation.body ?? '' });
+        // Errors from the message last saved belong to it, not to this one.
+        form.clearErrors();
     }
 
     if (automation === null && opened !== null) {
@@ -485,14 +550,6 @@ function MessageEditor({
                 </form>
             </DialogContent>
         </Dialog>
-    );
-}
-
-function Counter({ value, max }: { value: string; max: number }) {
-    return (
-        <span className="text-xs text-muted-foreground tabular-nums" dir="ltr">
-            {characters(value)} / {max}
-        </span>
     );
 }
 

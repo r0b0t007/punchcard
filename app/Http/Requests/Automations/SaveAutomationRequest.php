@@ -23,6 +23,9 @@ use Illuminate\Support\Facades\Gate;
  */
 class SaveAutomationRequest extends FormRequest
 {
+    /** The business worked in, read once for the authorization, the rules and the controller. */
+    private ?Business $business = null;
+
     public function authorize(): bool
     {
         $business = $this->business();
@@ -47,7 +50,7 @@ class SaveAutomationRequest extends FormRequest
 
     public function business(): ?Business
     {
-        return app(TenantContext::class)->business();
+        return $this->business ??= app(TenantContext::class)->business();
     }
 
     public function trigger(): AutomationTrigger

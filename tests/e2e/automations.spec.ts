@@ -78,3 +78,39 @@ test('the owner turns the win-back on and writes its own message, then goes back
         "Our message, in each customer's language",
     );
 });
+
+test('quick taps on the reminder wait add up, saved once', async ({ page }) => {
+    await page.goto('/business/automations');
+
+    const reminder = page.locator('[data-test="automation-reward_reminder"]');
+    const value = page.locator(
+        '[data-test="automation-reward_reminder-value"]',
+    );
+    const days = async () =>
+        Number.parseInt((await value.textContent()) ?? '', 10);
+    // Away from the limits (1 to 60), so three steps either way fit.
+    const before = await days();
+    const [step, back] =
+        before > 57 ? ['One fewer', 'One more'] : ['One more', 'One fewer'];
+    const after = before > 57 ? before - 3 : before + 3;
+
+    // Three taps before the first save goes: one save of all three, not three saves of the first.
+    for (let tap = 0; tap < 3; tap++) {
+        await reminder.getByRole('button', { name: step }).click();
+    }
+    await expect(value).toHaveText(`${after} days`);
+    await expect(page.getByText('Saved.')).toBeVisible({ timeout: 20_000 });
+
+    await page.reload();
+    await expect(value).toHaveText(`${after} days`, { timeout: 20_000 });
+
+    for (let tap = 0; tap < 3; tap++) {
+        await reminder.getByRole('button', { name: back }).click();
+    }
+    await expect(value).toHaveText(`${before} days`);
+    await expect(page.getByText('Saved.').first()).toBeVisible({
+        timeout: 20_000,
+    });
+    await page.reload();
+    await expect(value).toHaveText(`${before} days`, { timeout: 20_000 });
+});

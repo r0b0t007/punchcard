@@ -1199,7 +1199,7 @@
     "Our message, in each customer's language": "رسالتنا، بلغة كل عميل",
     "Edit the message": "تعديل الرسالة",
     "Not sent yet": "لم تُرسل بعد",
-    ":count person in 30 days|:count people in 30 days": "لا أحد خلال 30 يومًا|شخص واحد خلال 30 يومًا|شخصان خلال 30 يومًا|:count أشخاص خلال 30 يومًا|:count شخصًا خلال 30 يومًا|:count شخص خلال 30 يومًا",
+    ":count person in :days days|:count people in :days days": "لا أحد خلال :days يومًا|شخص واحد خلال :days يومًا|شخصان خلال :days يومًا|:count أشخاص خلال :days يومًا|:count شخصًا خلال :days يومًا|:count شخص خلال :days يومًا",
     "When they go quiet": "عندما يغيب",
     "Their usual gap × 2": "فترته المعتادة × 2",
     "After it waits": "بعد انتظار",
@@ -1207,5 +1207,6 @@
     ":count day|:count days": "لا أيام|يوم واحد|يومان|:count أيام|:count يومًا|:count يوم",
     "What a customer reads. Leave it to us and they get it in their language.": "ما يقرؤه العميل. اتركها لنا فتصله بلغته.",
     "Your words are sent as written, not translated. Your business's name always comes first.": "تُرسل كلماتك كما هي، دون ترجمة. اسم نشاطك يأتي دائمًا أولًا.",
-    "Use our message instead": "استعمال رسالتنا"
+    "Use our message instead": "استعمال رسالتنا",
+    "That change was not saved.": "لم يُحفظ هذا التغيير."
 }

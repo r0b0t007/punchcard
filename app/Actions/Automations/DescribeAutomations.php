@@ -60,6 +60,7 @@ final readonly class DescribeAutomations
                     'sent' => $automation->exists ? (int) $sent->get($automation->id, 0) : 0,
                 ];
             }, [AutomationTrigger::RewardReminder, AutomationTrigger::Birthday, AutomationTrigger::WinBack]),
+            'sentDays' => self::SENT_DAYS,
             'limits' => [
                 'days' => ['min' => SaveAutomation::DAYS_MIN, 'max' => SaveAutomation::DAYS_MAX],
                 'stamps' => ['min' => SaveAutomation::STAMPS_MIN, 'max' => SaveAutomation::STAMPS_MAX],
