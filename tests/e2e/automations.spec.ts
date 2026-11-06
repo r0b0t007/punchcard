@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test';
-import { signIn } from './helpers';
+import { expect, test } from './owner';
 
 /**
  * The Automations page (CHW-46, B11, design 18a), on a phone: Café Hafa's
@@ -18,7 +17,6 @@ test.skip(
 test('the owner turns the win-back on and writes its own message, then goes back to ours', async ({
     page,
 }, testInfo) => {
-    await signIn(page, 'owner@cafe.demo.test');
     await page.goto('/business');
     await page.getByRole('button', { name: 'Toggle sidebar' }).click();
     await page.getByRole('link', { name: 'Automations' }).click();
