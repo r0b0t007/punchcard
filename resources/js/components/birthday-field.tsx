@@ -137,7 +137,7 @@ export default function BirthdayField({
                 className="text-sm text-pretty text-muted-foreground"
             >
                 {t(
-                    'The places where you collect stamps can give you a treat on your birthday. Never the year.',
+                    'The places where you collect stamps can give you a treat on your birthday, 30 days after you add or change it. Never the year.',
                 )}
             </p>
             {day !== '' || month !== '' ? (
