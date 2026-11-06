@@ -1167,7 +1167,7 @@
     "Update your name, email address and birthday": "حدّث اسمك وبريدك الإلكتروني وعيد ميلادك",
     "Optional": "اختياري",
     "Month": "الشهر",
-    "The places where you collect stamps can give you a treat on your birthday, 30 days after you add or change it. Never the year.": "يمكن للأماكن التي تجمع فيها الأختام أن تهديك شيئًا في عيد ميلادك، بعد 30 يومًا من إضافته أو تغييره. دون السنة أبدًا.",
+    "The places where you collect stamps can give you a treat on your birthday, :days days after you add or change it. Never the year.": "يمكن للأماكن التي تجمع فيها الأختام أن تهديك شيئًا في عيد ميلادك، بعد :days يومًا من إضافته أو تغييره. دون السنة أبدًا.",
     "Remove my birthday": "إزالة عيد ميلادي",
     "That date doesn’t exist. Choose another day.": "هذا التاريخ غير موجود. اختر يومًا آخر.",
     "Allow automations": "السماح بالرسائل التلقائية",

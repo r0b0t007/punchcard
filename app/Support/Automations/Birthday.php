@@ -16,8 +16,10 @@ use Carbon\CarbonInterface;
  * And when a birthday earns a bonus (CHW-370): once it was given
  * ON_FILE_DAYS days before or earlier, by local date (set today, or moved to
  * today, it does not), and a card's bonuses BONUS_GAP_DAYS days apart at
- * least: the same birthday every year, 29 February to 28 February too,
- * never a birthday moved to collect another.
+ * least, each by the date it was given in its own site's time: the same
+ * birthday every year, 29 February to 28 February too, from any site of a
+ * franchise whatever its timezone, never a birthday moved to collect
+ * another.
  */
 final class Birthday
 {
@@ -34,17 +36,18 @@ final class Birthday
     }
 
     /**
-     * Where a card's bonus that is too recent for another on a local day starts: BONUS_GAP_DAYS - 1 days before, at
-     * the middle of the night between AutomationWindow::CLOSES and OPENS (03:00), never midnight. Bonuses are only
-     * given in the day, so in one timezone this is the local date; between a franchise's sites hours apart (up to
-     * five), last year's bonus given late in the evening at a site behind still falls before it, and a birthday
-     * moved by a day still after it.
+     * Whether a bonus given at a moment, at a site in a timezone, is too recent for another on a local day: its date
+     * there is less than BONUS_GAP_DAYS before the day's.
      */
-    public static function lastBonusWindowStart(CarbonImmutable $day): CarbonImmutable
+    public static function bonusTooRecent(CarbonInterface $givenAt, string $timezone, CarbonImmutable $day): bool
     {
-        $night = intdiv(AutomationWindow::CLOSES + AutomationWindow::OPENS + 24, 2) - 24;
+        return $givenAt->copy()->setTimezone($timezone)->toDateString() > $day->subDays(self::BONUS_GAP_DAYS)->toDateString();
+    }
 
-        return $day->startOfDay()->subDays(self::BONUS_GAP_DAYS - 1)->addHours($night)->utc();
+    /** Since when a card's bonuses may be too recent on a local day, whatever their sites' timezones: two days spare, in UTC. */
+    public static function recentBonusesSince(CarbonImmutable $day): CarbonImmutable
+    {
+        return $day->startOfDay()->subDays(self::BONUS_GAP_DAYS + 1)->utc();
     }
 
     /** Whether a birthday (month and day, either may be unset) falls on the day. */

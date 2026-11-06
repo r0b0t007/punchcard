@@ -21,7 +21,9 @@ return new class extends Migration
             $table->timestamp('birthday_set_at')->nullable();
         });
 
-        DB::table('users')->whereNotNull('birthday_month')->update(['birthday_set_at' => DB::raw('coalesce(updated_at, current_timestamp)')]);
+        DB::table('users')->whereNotNull('birthday_month')->whereNotNull('updated_at')->update(['birthday_set_at' => DB::raw('updated_at')]);
+        // Now in UTC, as the app stores times: the database session's timezone is not pinned.
+        DB::table('users')->whereNotNull('birthday_month')->whereNull('updated_at')->update(['birthday_set_at' => now()->utc()]);
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement('alter table users add constraint users_birthday_set_at_check check ((birthday_month is null) = (birthday_set_at is null))');

@@ -25,6 +25,7 @@ export default function Profile({
     recentlyConfirmed,
     pendingEmail,
     birthday,
+    birthdayWaitDays,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
@@ -36,6 +37,7 @@ export default function Profile({
     pendingEmail: string | null;
     /** Optional, day and month only (CHW-46). */
     birthday: { day: number; month: number } | null;
+    birthdayWaitDays: number;
 }) {
     const { auth } = usePage<PageProps>().props;
     const { t, tn } = useTranslation();
@@ -170,6 +172,7 @@ export default function Profile({
 
                             <BirthdayField
                                 birthday={birthday}
+                                waitDays={birthdayWaitDays}
                                 errors={errors}
                             />
 

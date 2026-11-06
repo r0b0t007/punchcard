@@ -36,13 +36,14 @@ use Throwable;
  * RunAutomations'.
  *
  * Once a year per card, across the organization, and 365 days apart at
- * least (Birthday::BONUS_GAP_DAYS, CHW-370), so a birthday moved past the
- * turn of the year collects nothing: each is a system stamp keyed per card
- * and year (BirthdayKey), the year of that birthday, and a card with that
- * key, or with a bonus less than 365 days ago, at any of its businesses is
- * left out: first in the query, then under the card's lock, which AddStamps
- * takes too, so two runs never both give it; the database holds the key as
- * well (stamp_events_birthday_once). In a franchise the first business to reach
+ * least by the date each was given in its site's time
+ * (Birthday::bonusTooRecent, CHW-370), so a birthday moved past the turn of
+ * the year collects nothing: each is a system stamp keyed per card and year
+ * (BirthdayKey), the year of that birthday. A card with that key at any of
+ * its businesses is left out in the query; under the card's lock, which
+ * AddStamps takes too, so two runs never both give it, so is one with a
+ * bonus too recent, read with its site's timezone; the database holds the
+ * key as well (stamp_events_birthday_once). In a franchise the first business to reach
  * a card gives it. Credited to the business's first open site, in the
  * business's tenant (as a tap is, so what follows, a reward unlocked and
  * pushed, is queued there), in a transaction run again if a deadlock aborts
@@ -69,8 +70,9 @@ final readonly class GiveBirthdayStamps
                 ->whereIn('user_id', User::query()->select('id')->notAnonymised()->birthdayOn($today)->birthdayOnFileFor($today))
                 ->whereIn('user_id', BusinessCustomer::query()->select('user_id')->where('business_id', $business->id))
                 ->whereHas('card', fn (Builder $cards) => $cards->where('active', true)->whereHas('businesses', fn (Builder $businesses) => $businesses->whereKey($business->id)))
-                // Given this year or in the last 365 days, here or elsewhere: no lock needed to leave it out.
-                ->whereDoesntHave('stampEvents', fn (Builder $events): Builder => $this->recentBonus($events, $today))
+                // Given this year already, here or elsewhere: no lock needed to leave it out. One too recent, under the lock.
+                ->whereDoesntHave('stampEvents', fn (Builder $events) => $events->where('source', StampSource::Birthday)
+                    ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year)))
                 ->orderBy('id')
                 ->get(),
         ]);
@@ -96,17 +98,19 @@ final readonly class GiveBirthdayStamps
     }
 
     /**
-     * A card's birthday bonus that keeps it from another today: this year's (by its key, whenever it was written), or
-     * one less than BONUS_GAP_DAYS before, a moved birthday's.
-     *
-     * @param  Builder<StampEvent>  $events
-     * @return Builder<StampEvent>
+     * Whether a card had a birthday bonus that keeps it from another today: this year's (its key, whenever it was
+     * written), or one given less than BONUS_GAP_DAYS before by its date in its own site's time, a moved birthday's.
      */
-    private function recentBonus(Builder $events, CarbonImmutable $today): Builder
+    private function hadBonusLately(int $enrollmentId, CarbonImmutable $today): bool
     {
-        return $events->where('source', StampSource::Birthday)->where(fn (Builder $bonuses) => $bonuses
-            ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year))
-            ->orWhere('created_at', '>=', Birthday::lastBonusWindowStart($today)));
+        $key = BirthdayKey::for($enrollmentId, $today->year);
+
+        return StampEvent::query()->where('enrollment_id', $enrollmentId)->where('source', StampSource::Birthday)
+            ->where(fn (Builder $bonuses) => $bonuses->where('idempotency_key', $key)->orWhere('created_at', '>=', Birthday::recentBonusesSince($today)))
+            ->with('location:id,timezone')
+            ->get(['id', 'idempotency_key', 'created_at', 'location_id'])
+            ->contains(fn (StampEvent $bonus): bool => $bonus->idempotency_key === $key
+                || Birthday::bonusTooRecent($bonus->created_at, $bonus->location->timezone, $today));
     }
 
     /** Whether the card got this year's bonus now: not when it had it already, or another lately, here or at another business. */
@@ -119,7 +123,7 @@ final readonly class GiveBirthdayStamps
                 $given = $this->context->bypass(function () use ($enrollment, $today): bool {
                     CardEnrollment::query()->whereKey($enrollment->id)->lockForUpdate()->first(['id']);
 
-                    return $this->recentBonus(StampEvent::query()->where('enrollment_id', $enrollment->id), $today)->exists();
+                    return $this->hadBonusLately($enrollment->id, $today);
                 });
 
                 return ! $given && ! $this->addStamps->handle($enrollment, StampRequest::system(StampSource::Birthday, $site, $key, $automation->stamps))->replayed;

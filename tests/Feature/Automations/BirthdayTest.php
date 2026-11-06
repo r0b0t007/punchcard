@@ -254,7 +254,7 @@ it('sends the message with the bonus in the customer\'s language, and nothing on
 
     // Changed since the claim, within the hour: it is no longer their birthday.
     if ($body === null) {
-        $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11])->save();
+        $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11, 'birthday_set_at' => now()])->save();
     }
 
     $previous = $this->context->snapshot();
@@ -427,7 +427,7 @@ it('tells a bonus on the day it was given only, never on a birthday changed sinc
     // The next day they follow, and say their birthday is today.
     Carbon::setTestNow(now()->addDay());
     $this->context->bypass(fn () => DB::table('follows')->where('user_id', $customer->id)->update(['notify' => true]));
-    $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11])->save();
+    $customer->forceFill(['birthday_day' => 5, 'birthday_month' => 11, 'birthday_set_at' => now()])->save();
     ($this->run)();
 
     expect(($this->bonuses)())->toHaveCount(1)
@@ -586,6 +586,19 @@ it('gives the same birthday again a year after a bonus from a franchise site hou
     // Last year's, from A2 at 21:30 on the birthday in its time: already the 5th in Dubai.
     $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025),
         'created_at' => CarbonImmutable::parse('2025-11-04 21:30:00', 'Africa/Casablanca')->utc()]);
+
+    expect(($this->run)()['birthday_stamps'])->toBe(1);
+});
+
+it('gives the same birthday again a year after a bonus from a franchise site six hours behind, given late in its evening', function (): void {
+    // A2 in New York, six hours behind A1 in Casablanca.
+    $this->context->bypass(fn () => DB::table('locations')->where('business_id', $this->tenants->a2->id)->update(['timezone' => 'America/New_York']));
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $enrollment = ($this->enrollmentOf)($customer);
+    // Last year's, from A2 at 21:30 on the birthday in its time: 03:30 on the 5th in Casablanca.
+    $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Birthday, 'idempotency_key' => BirthdayKey::for($enrollment->id, 2025),
+        'created_at' => CarbonImmutable::parse('2025-11-04 21:30:00', 'America/New_York')->utc()]);
 
     expect(($this->run)()['birthday_stamps'])->toBe(1);
 });

@@ -34,7 +34,7 @@ it('saves the day and the month with the profile, and shows them back', function
 
     expect($this->user->refresh()->only(['birthday_day', 'birthday_month']))->toBe(['birthday_day' => 14, 'birthday_month' => 3]);
     $this->actingAs($this->user)->get(route('profile.edit'))
-        ->assertInertia(fn (Assert $page): Assert => $page->where('birthday', ['day' => 14, 'month' => 3]));
+        ->assertInertia(fn (Assert $page): Assert => $page->where('birthday', ['day' => 14, 'month' => 3])->where('birthdayWaitDays', 30));
 });
 
 it('takes 29 February, a birthday every leap year', function (): void {

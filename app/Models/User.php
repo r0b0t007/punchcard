@@ -240,7 +240,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
 
     /**
      * Whose birthday was given long enough before a local day to count on it (CHW-370, Birthday::givenTooLateFrom):
-     * set today, or changed this month, it does not.
+     * ON_FILE_DAYS before or earlier, by local date. Set today, or changed since, it does not.
      *
      * @param  Builder<self>  $query
      */
