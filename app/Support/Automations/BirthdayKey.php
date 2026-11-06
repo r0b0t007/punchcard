@@ -18,6 +18,12 @@ final class BirthdayKey
         return 'birthday:'.$enrollmentId.':'.$year;
     }
 
+    /** The birthday message's occasion for the year: one per automation and customer (automation_sends). */
+    public static function occasion(int $year): string
+    {
+        return 'birthday:'.$year;
+    }
+
     /** A LIKE pattern matching every card's key for the year. */
     public static function ofYear(int $year): string
     {

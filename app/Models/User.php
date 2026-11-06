@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\PlatformRole;
+use App\Support\Automations\Birthday;
 use App\Support\Locales;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
@@ -222,8 +223,8 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     }
 
     /**
-     * Whose birthday a local day is (CHW-46): its month and day, and 29
-     * February on 28 February of a year without one.
+     * Whose birthday a local day is (CHW-46, App\Support\Automations\Birthday):
+     * its month and day, and 29 February on 28 February of a year without one.
      *
      * @param  Builder<self>  $query
      */
@@ -231,20 +232,7 @@ class User extends Authenticatable implements FilamentUser, HasLocalePreference,
     protected function birthdayOn(Builder $query, CarbonInterface $day): void
     {
         $query->where(fn (Builder $query) => $query->where('birthday_month', $day->month)->where('birthday_day', $day->day)
-            ->when($this->isLeapDayStandIn($day), fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query->where('birthday_month', 2)->where('birthday_day', 29))));
-    }
-
-    /** Whether a local day is their birthday, as birthdayOn() reads it. */
-    public function hasBirthdayOn(CarbonInterface $day): bool
-    {
-        return $this->birthday_month === $day->month
-            && ($this->birthday_day === $day->day || ($this->isLeapDayStandIn($day) && $this->birthday_day === 29));
-    }
-
-    /** 28 February of a year without a 29th: where a 29 February birthday falls. */
-    private function isLeapDayStandIn(CarbonInterface $day): bool
-    {
-        return $day->month === 2 && $day->day === 28 && ! $day->isLeapYear();
+            ->when(Birthday::isLeapDayStandIn($day), fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query->where('birthday_month', 2)->where('birthday_day', 29))));
     }
 
     /**

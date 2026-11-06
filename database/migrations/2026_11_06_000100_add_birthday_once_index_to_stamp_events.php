@@ -7,14 +7,22 @@ use Illuminate\Support\Facades\DB;
  * A birthday bonus once a year per card, held by the database too (CHW-46):
  * its key ("birthday:{card}:{year}", App\Support\Automations\BirthdayKey) is
  * unique per card whatever the business, where the stamp's own idempotency
- * key is unique per business only. A partial index: Postgres and SQLite both
- * take the same statement, and no other stamp is touched.
+ * key is unique per business only. A partial index: no other stamp is
+ * touched.
+ *
+ * Built concurrently on Postgres, outside a transaction: every tap writes to
+ * stamp_events, and a plain build would hold them until it ends.
  */
 return new class extends Migration
 {
+    /** @var bool */
+    public $withinTransaction = false;
+
     public function up(): void
     {
-        DB::statement("create unique index stamp_events_birthday_once on stamp_events (enrollment_id, idempotency_key) where source = 'birthday'");
+        $concurrently = DB::getDriverName() === 'pgsql' ? ' concurrently' : '';
+
+        DB::statement("create unique index{$concurrently} if not exists stamp_events_birthday_once on stamp_events (enrollment_id, idempotency_key) where source = 'birthday'");
     }
 
     public function down(): void

@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Pennant\Feature;
 use Tests\Support\Tenants;
 
@@ -465,4 +466,66 @@ it('holds the bonus once per card in the database too, whatever the business', f
         ->toThrow(UniqueConstraintViolationException::class)
         // Another stamp may share a key with it at another business: only birthday bonuses are held.
         ->and(DB::transaction(fn (): StampEvent => $this->tenants->stamp($enrollment, $this->tenants->a2, ['source' => StampSource::Bonus, 'idempotency_key' => $key]))->exists)->toBeTrue();
+});
+
+it('opens the card given the bonus, not the one last stamped here', function (): void {
+    Notification::fake();
+    ($this->automation)();
+    $customer = ($this->customer)();
+    $paused = ($this->enrollmentOf)($customer);
+    // Their card here, stamped yesterday, is paused since; the bonus goes on the other one.
+    $second = $this->context->bypass(function (): LoyaltyCard {
+        $card = LoyaltyCard::factory()->for($this->tenants->orgA)->create(['name' => 'Second card']);
+        $card->businesses()->attach($this->tenants->a1->id);
+
+        return $card;
+    });
+    $given = $this->tenants->enroll($customer, $second);
+    $this->context->bypass(fn () => DB::table('card_enrollments')->where('id', $paused->id)->update(['last_stamp_at' => now()->subDay()]));
+    $this->context->bypass(fn () => DB::table('loyalty_cards')->where('id', $this->tenants->cardA->id)->update(['active' => false]));
+
+    ($this->run)();
+    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    app(SendAutomationMessages::class)->handle($this->context->bypass(fn (): array => AutomationSend::query()->pluck('id')->all()));
+    $this->context->clear();
+
+    Notification::assertSentTo($customer, AutomationMessage::class, fn (AutomationMessage $message): bool => $message->enrollmentId === $given->id);
+});
+
+it('claims the business\'s other messages when the bonus fails', function (): void {
+    ($this->automation)();
+    ($this->automation)(AutomationTrigger::WinBack);
+    $customer = ($this->customer)(birthday: [1, 1]);
+    // The bonus's own query fails, once: it comes first, before the messages are claimed.
+    $failed = new stdClass;
+    $failed->once = false;
+    DB::listen(function (QueryExecuted $query) use ($failed): void {
+        if (! $failed->once && str_contains($query->sql, '"birthday_month"') && str_contains($query->sql, 'from "card_enrollments"')) {
+            $failed->once = true;
+
+            throw new RuntimeException('The database went away.');
+        }
+    });
+
+    expect(($this->run)())->toBe(['businesses' => 1, 'claimed' => 1, 'birthday_stamps' => 0])
+        ->and(($this->sends)())->toBe([[$this->tenants->a1->id, $customer->id, 'win_back', ($this->sends)()[0][3]]]);
+});
+
+it('finds today\'s birthdays by an index, not a scan of every account', function (): void {
+    expect(Schema::hasIndex('users', 'users_birthday_index'))->toBeTrue()
+        ->and(Schema::hasIndex('stamp_events', 'stamp_events_birthday_once'))->toBeTrue();
+});
+
+it('sends the message on 28 February to someone born on the 29th, in a year without one', function (): void {
+    Notification::fake();
+    ($this->automation)();
+    Carbon::setTestNow(CarbonImmutable::parse('2027-02-28 12:00:00', 'Africa/Casablanca')->utc());
+    $customer = ($this->customer)(birthday: [29, 2]);
+
+    ($this->run)();
+    $this->context->set($this->tenants->orgA, $this->tenants->a1);
+    app(SendAutomationMessages::class)->handle($this->context->bypass(fn (): array => AutomationSend::query()->pluck('id')->all()));
+    $this->context->clear();
+
+    Notification::assertSentTo($customer, AutomationMessage::class);
 });

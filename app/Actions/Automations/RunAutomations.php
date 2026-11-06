@@ -95,9 +95,14 @@ final readonly class RunAutomations
                 ]);
                 $birthday = $automations->get(AutomationTrigger::Birthday->value);
 
-                // The birthday bonus first, each stamp its own transaction: its message is claimed below.
+                // The birthday bonus first, each stamp its own transaction: its message is claimed below. Its
+                // own try: the business's other messages never wait on it.
                 if ($birthday instanceof Automation) {
-                    $count['birthday_stamps'] += $this->giveBirthdayStamps->handle($business, $birthday, $today);
+                    try {
+                        $count['birthday_stamps'] += $this->giveBirthdayStamps->handle($business, $birthday, $today);
+                    } catch (Throwable $failed) {
+                        Log::warning('The birthday bonus skipped a business.', ['business_id' => $business->id, 'error' => $failed::class]);
+                    }
                 }
 
                 // The claims and their jobs commit together on the database queue (the app's, CLAUDE.md): a
@@ -269,12 +274,10 @@ final readonly class RunAutomations
         $userIds = User::query()->notAnonymised()->birthdayOn($today)
             ->whereIn('id', Follow::query()->listeningTo($business)->select('user_id'))
             ->whereIn('id', CardEnrollment::query()->select('user_id')->where('organization_id', $business->organization_id)
-                ->whereHas('stampEvents', fn (Builder $events) => $events->where('source', StampSource::Birthday)->where('business_id', $business->id)
-                    ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year))
-                    ->where('created_at', '>=', $today->startOfDay()->utc())))
+                ->whereHas('stampEvents', fn (Builder $events) => $events->birthdayBonusGivenToday($business->id, $today)))
             ->orderBy('id')->pluck('id')->all();
 
-        return array_values(array_map(fn (int $userId): array => [$userId, 'birthday:'.$today->year], $userIds));
+        return array_values(array_map(fn (int $userId): array => [$userId, BirthdayKey::occasion($today->year)], $userIds));
     }
 
     /** @param list<int> $sendIds */

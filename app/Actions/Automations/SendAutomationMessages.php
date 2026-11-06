@@ -6,7 +6,6 @@ namespace App\Actions\Automations;
 
 use App\Enums\AutomationTrigger;
 use App\Enums\CustomerSegment;
-use App\Enums\StampSource;
 use App\Models\Automation;
 use App\Models\AutomationSend;
 use App\Models\Business;
@@ -18,6 +17,7 @@ use App\Models\StampEvent;
 use App\Models\User;
 use App\Notifications\AutomationMessage;
 use App\Support\Automations\AutomationWindow;
+use App\Support\Automations\Birthday;
 use App\Support\Automations\BirthdayKey;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
@@ -100,12 +100,12 @@ final readonly class SendAutomationMessages
             return null;
         }
 
-        $stamps = null;
+        $bonus = null;
 
         if ($send->trigger === AutomationTrigger::Birthday) {
-            $stamps = $this->birthdayStampsHere($send, $business, $user);
+            $bonus = $this->birthdayBonusHere($send, $business, $user);
 
-            if ($stamps === 0) {
+            if (! $bonus instanceof StampEvent) {
                 return null;
             }
         }
@@ -125,9 +125,10 @@ final readonly class SendAutomationMessages
             $business->name,
             $automation->title,
             $automation->body,
-            $reward->enrollment_id ?? $this->cardHere($send->user_id, $business),
+            // The card holding the reward, or given the bonus; else the one last stamped here.
+            $reward->enrollment_id ?? $bonus->enrollment_id ?? $this->cardHere($send->user_id, $business),
             $reward?->reward_text,
-            $stamps,
+            $bonus?->qty,
         );
     }
 
@@ -156,23 +157,22 @@ final readonly class SendAutomationMessages
     }
 
     /**
-     * The birthday bonus this business gave the customer today (on any one
-     * card: each got the same), if today is still their birthday in its time
-     * and the send is this year's; otherwise none.
+     * The birthday bonus this business gave the customer today (on their
+     * first card given it: each got the same), if today is still their
+     * birthday in its time and the send is this year's; otherwise none.
      */
-    private function birthdayStampsHere(AutomationSend $send, Business $business, User $user): int
+    private function birthdayBonusHere(AutomationSend $send, Business $business, User $user): ?StampEvent
     {
         $today = now()->toImmutable()->setTimezone(LocalMoment::timezoneOfBusiness($business->id));
 
-        if (! $user->hasBirthdayOn($today) || $send->occasion !== 'birthday:'.$today->year) {
-            return 0;
+        if (! Birthday::isOn($user->birthday_month, $user->birthday_day, $today) || $send->occasion !== BirthdayKey::occasion($today->year)) {
+            return null;
         }
 
-        return (int) StampEvent::query()->where('business_id', $business->id)->where('source', StampSource::Birthday)
-            ->where('idempotency_key', 'like', BirthdayKey::ofYear($today->year))
-            ->where('created_at', '>=', $today->startOfDay()->utc())
+        return StampEvent::query()->birthdayBonusGivenToday($business->id, $today)
             ->whereIn('enrollment_id', CardEnrollment::query()->select('id')->where('user_id', $user->id))
-            ->max('qty');
+            ->orderBy('id')
+            ->first(['enrollment_id', 'qty']);
     }
 
     /** The customer's card of the organization they last stamped at this business, if any. */
