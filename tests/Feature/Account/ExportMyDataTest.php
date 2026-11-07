@@ -9,6 +9,8 @@ use App\Enums\StampSource;
 use App\Enums\TapStatus;
 use App\Models\Automation;
 use App\Models\AutomationSend;
+use App\Models\Campaign;
+use App\Models\CampaignSend;
 use App\Models\ConsentEvent;
 use App\Models\CounterScan;
 use App\Models\Follow;
@@ -268,6 +270,21 @@ it('holds the automation messages businesses sent them, never another person\'s'
     expect(($this->data)(($this->download)())['automation_messages'])->toBe([[
         'business' => 'A1', 'kind' => 'birthday', 'occasion' => 'birthday:2026',
         'claimed_at' => '2026-10-18T10:00:00+00:00', 'sent_at' => '2026-10-18T10:01:00+00:00',
+    ]]);
+});
+
+it('holds the campaigns businesses sent them, when sent and first opened, never another person\'s', function (): void {
+    $other = User::factory()->create();
+    $this->context->bypass(function () use ($other): void {
+        $campaign = Campaign::factory()->for($this->tenants->a1)->create(['title' => 'Slow Tuesday?']);
+        $send = CampaignSend::factory()->create(['campaign_id' => $campaign->id, 'user_id' => $this->customer->id]);
+        $send->markSent(now()->addMinute());
+        $send->markOpened(now()->addMinutes(5));
+        CampaignSend::factory()->create(['campaign_id' => $campaign->id, 'user_id' => $other->id]);
+    });
+
+    expect(($this->data)(($this->download)())['campaign_messages'])->toBe([[
+        'business' => 'A1', 'title' => 'Slow Tuesday?', 'sent_at' => '2026-10-18T10:01:00+00:00', 'opened_at' => '2026-10-18T10:05:00+00:00',
     ]]);
 });
 

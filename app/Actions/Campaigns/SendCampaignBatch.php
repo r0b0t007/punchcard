@@ -6,7 +6,7 @@ namespace App\Actions\Campaigns;
 
 use App\Models\Business;
 use App\Models\Campaign;
-use App\Models\CardEnrollment;
+use App\Models\CampaignSend;
 use App\Models\User;
 use App\Notifications\CampaignMessage;
 use App\Support\Campaigns\CampaignText;
@@ -17,12 +17,14 @@ use Throwable;
 /**
  * One batch of a campaign's delivery (CHW-42), from its queued job
  * (PushCampaignBatch): each of these followers with a phone gets the
- * notification (CampaignMessage), opening their own enrollment of the card
- * chosen, or My cards. One failing never stops the others; logged by id
- * only. Each push a phone's push service accepts is counted as it goes
- * (CountCampaignPush), so a batch cut short keeps what it sent.
+ * notification (CampaignMessage). Each is claimed first (CHW-48,
+ * CampaignSend), once per campaign and follower, so a batch run again never
+ * pushes twice, and the campaign's results know who it went to. One failing
+ * never stops the others; logged by id only. Each push a phone's push
+ * service accepts is marked and counted as it goes (CountCampaignPush), so a
+ * batch cut short keeps what it sent.
  *
- * In bypass(): the reads are kept to the campaign's business and
+ * In bypass(): the reads and claims are kept to the campaign's business and
  * organization.
  */
 final readonly class SendCampaignBatch
@@ -35,16 +37,18 @@ final readonly class SendCampaignBatch
         $this->context->bypass(function () use ($campaignId, $userIds): void {
             $campaign = Campaign::query()->findOrFail($campaignId);
             $business = Business::query()->whereKey($campaign->business_id)->where('organization_id', $campaign->organization_id)->firstOrFail();
-            $enrollments = $campaign->card_id === null ? [] : CardEnrollment::query()
-                ->where('organization_id', $campaign->organization_id)
-                ->where('card_id', $campaign->card_id)
-                ->whereIn('user_id', $userIds)
-                ->pluck('id', 'user_id')->all();
             $title = CampaignText::notificationTitle($business->name, $campaign->title);
 
             foreach (User::query()->whereKey($userIds)->get() as $user) {
                 try {
-                    $user->notifyNow(new CampaignMessage($campaign->id, $title, $campaign->body, $enrollments[$user->id] ?? null));
+                    $send = CampaignSend::query()->createOrFirst(['campaign_id' => $campaign->id, 'user_id' => $user->id], ['business_id' => $campaign->business_id]);
+
+                    // Claimed already: this batch ran before, and pushed it then.
+                    if (! $send->wasRecentlyCreated) {
+                        continue;
+                    }
+
+                    $user->notifyNow(new CampaignMessage($campaign->id, $send->id, $title, $campaign->body));
                 } catch (Throwable) {
                     Log::warning('A campaign notification failed.', ['campaign' => $campaign->id, 'user' => $user->id]);
                 }

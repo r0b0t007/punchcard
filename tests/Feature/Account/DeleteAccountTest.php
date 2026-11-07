@@ -14,6 +14,8 @@ use App\Enums\TapStatus;
 use App\Models\Automation;
 use App\Models\AutomationSend;
 use App\Models\BusinessMember;
+use App\Models\Campaign;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\OrganizationMember;
@@ -81,6 +83,9 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
         'automation_id' => Automation::factory()->create(['business_id' => $this->tenants->a1->id, 'trigger' => AutomationTrigger::Birthday])->id,
     ]));
 
+    $campaign = $this->context->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create(['sent_count' => 1, 'open_count' => 1]));
+    $this->context->bypass(fn () => CampaignSend::factory()->create(['campaign_id' => $campaign->id, 'user_id' => $user->id]));
+
     ($this->deleteAccount)($user)->assertSessionHasNoErrors()->assertRedirect(route('home'));
 
     $this->assertGuest();
@@ -103,6 +108,9 @@ it('anonymises a customer with stamps and keeps the ledger, progress and rewards
         ->and(DB::table('consent_events')->where('user_id', $user->id)->count())->toBe(0)
         // And the automation messages it got, a birthday's included (CHW-46).
         ->and(DB::table('automation_sends')->where('user_id', $user->id)->count())->toBe(0)
+        // And the campaigns it got and opened (CHW-48); the campaign's counts stay.
+        ->and(DB::table('campaign_sends')->where('user_id', $user->id)->count())->toBe(0)
+        ->and(DB::table('campaigns')->where('id', $campaign->id)->first(['sent_count', 'open_count']))->toEqual((object) ['sent_count' => 1, 'open_count' => 1])
         ->and($anonymised->adult_confirmed_at)->toBeNull()
         // Nor a new address waiting for it (CHW-23).
         ->and($anonymised->pending_email)->toBeNull()

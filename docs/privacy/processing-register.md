@@ -80,7 +80,9 @@ Common to every entry:
 - **Data**: the follow (program, on or off, since when), email, language; later the Wallet pass or push subscription
   (T7). The automation messages a business sent (win-back, birthday, reward reminder: which, for what occasion, when
   claimed and sent; CHW-46), kept for the weekly cap and the business's counts, in the customer's data download,
-  deleted with the account.
+  deleted with the account. The campaigns a business sent them (which, when sent and when first opened; CHW-48), kept
+  for the campaign's results (opens, and visits in the 48 h after it), in the data download, deleted with the
+  account; the campaign's counts stay, without anyone in them.
 - **Recipients**: the organization (its admins; a franchisee only for its own customers); punchcard as processor;
   Resend, which sends the offers by email (a transfer to the United States, as in T8).
 - **Retention**: until withdrawn or the account ends.
