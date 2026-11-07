@@ -171,7 +171,7 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
 // alone (CustomerExportController checks the signature, whose link it is and that they still own the business).
 // Outside the tenant group: it opens whichever business the session has selected. Never cached.
 Route::get('business/exports/{business}/{export}', [CustomerExportController::class, 'download'])->whereNumber('business')->whereUlid('export')
-    ->middleware(['auth', NeverCache::class])->name('customers.export.download');
+    ->middleware(['auth', NeverCache::class, 'pwa:business'])->name('customers.export.download');
 
 // A verification document for the platform admin (CHW-145): the 5-minute signed link from its business's page in A1,
 // never cached; who may is BusinessDocumentPolicy::open.
