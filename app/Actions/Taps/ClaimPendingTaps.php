@@ -8,6 +8,7 @@ use App\Enums\TapRejection;
 use App\Enums\TapStatus;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Referrals\PendingReferral;
 use App\Support\Taps\TapSession;
 use Throwable;
 
@@ -31,7 +32,8 @@ final readonly class ClaimPendingTaps
 {
     public function __construct(private ApplyTap $applyTap) {}
 
-    public function handle(TapSession $session, User $user, ?Tap $received = null): ?Tap
+    /** @param PendingReferral|null $referral the invitation the browser holds (CHW-47), for a first card at a tapped business */
+    public function handle(TapSession $session, User $user, ?Tap $received = null, ?PendingReferral $referral = null): ?Tap
     {
         $shown = $session->shown();
         $best = $shown instanceof Tap && $this->gave($shown) > 0 && $shown->user_id === $user->id ? $shown : null;
@@ -39,7 +41,7 @@ final readonly class ClaimPendingTaps
 
         foreach ($session->pendingTaps() as $waiting) {
             try {
-                $tap = $this->applyTap->handle($waiting, $user);
+                $tap = $this->applyTap->handle($waiting, $user, $referral);
             } catch (TapBelongsToAnotherCustomer) {
                 $session->forgetPending($waiting->id);
                 $tap = null;

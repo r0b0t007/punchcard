@@ -23,7 +23,8 @@ class StampScanRequest extends FormRequest
     {
         return [
             'qty' => ['required', 'integer', 'between:1,'.self::MAX_QTY],
-            'key' => ['required', 'string', 'max:64'],
+            // Never a key only the system writes (a referral's, a birthday's, CHW-47): it would take theirs.
+            'key' => ['required', 'string', 'max:64', 'not_regex:/^(referral|birthday):/i'],
         ];
     }
 

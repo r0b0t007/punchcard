@@ -45,7 +45,7 @@ Idempotency: the NFC path is protected by the SUN counter (`unique(nfc_tag_id, c
 
 ## Referrals
 
-Enrollment has a `referral_code`. A new customer who signs up through it gets their first stamp as usual; the referrer gets `+1` (`source=referral`) only after the friend's first **verified** stamp at the business, capped per referrer per month (card setting). Self-referral (same user or device fingerprint) is ignored.
+Enrollment has a `referral_code` (CHW-47). A join page's link (`/j/{slug}?ref=CODE`) keeps it in the session for that business (`PendingReferral`), and the card the friend adds there or by a first tap is referred (`referred_by`, set at insert, `ReferrerFor`) when the card's referrals are on (`referrals_enabled`, off by default) and the friend is new to the organization. The friend's first stamp is earned as usual. The referrer gets `+1` (`source=referral`, `GiveReferralStamp`, queued after the friend's presence stamp) once the friend's email is verified and they have proved presence, once per friend (key `referral:{friend's enrollment}`, `stamp_events_referral_once`), within the card's `referral_monthly_cap` per calendar month (business time). No device fingerprinting (decided): the verified email is what makes a second account cost something.
 
 ## Tests every change needs
 

@@ -11,6 +11,7 @@ use App\Actions\Taps\TakeTap;
 use App\Http\Requests\ReceiveTapRequest;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Referrals\PendingReferral;
 use App\Support\Taps\TapSession;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ final class TapController extends Controller
 {
     public function receive(ReceiveTapRequest $request, TapSession $session, TakeTap $takeTap): RedirectResponse
     {
-        $tap = $takeTap->handle($request->sun('e'), $request->sun('c'), $request->user(), $request->ip(), $request->userAgent(), $session);
+        $tap = $takeTap->handle($request->sun('e'), $request->sun('c'), $request->user(), $request->ip(), $request->userAgent(), $session, PendingReferral::from($request->session()));
 
         // Only a signed-out customer signs in next; a signed-in one retries from the result page.
         if ($tap->isPending() && $request->user() === null) {
@@ -70,7 +71,7 @@ final class TapController extends Controller
 
     public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse
     {
-        if ($claimPendingTaps->handle($session, $request->user()) instanceof Tap) {
+        if ($claimPendingTaps->handle($session, $request->user(), referral: PendingReferral::from($request->session())) instanceof Tap) {
             return to_route('taps.result');
         }
 

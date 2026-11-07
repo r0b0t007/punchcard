@@ -49,6 +49,8 @@ use LogicException;
  * @property string|null $terms
  * @property int $cooldown_min
  * @property int|null $daily_cap
+ * @property bool $referrals_enabled refer-a-friend on (CHW-47): off until the owner turns it on
+ * @property int $referral_monthly_cap the most referral stamps a customer earns from it in a month, 1 to 10
  * @property bool $active
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -56,6 +58,7 @@ use LogicException;
 #[Fillable([
     'organization_id', 'name', 'stamps_required', 'mode', 'tiers', 'stamp_style', 'banner_path', 'reward_type',
     'reward_value', 'reward_text', 'colors', 'icon', 'terms', 'info', 'cooldown_min', 'daily_cap', 'active',
+    'referrals_enabled', 'referral_monthly_cap',
 ])]
 #[UseEloquentBuilder(TenantBuilder::class)]
 class LoyaltyCard extends Model implements TenantModel
@@ -68,6 +71,9 @@ class LoyaltyCard extends Model implements TenantModel
 
     /** @use HasFactory<LoyaltyCardFactory> */
     use HasFactory;
+
+    /** The database's defaults, in memory too before a refresh: referrals off, 3 a month (CHW-47). */
+    protected $attributes = ['referrals_enabled' => false, 'referral_monthly_cap' => 3];
 
     /**
      * A card's mode and tiers are fixed once customers hold it, also in
@@ -277,6 +283,8 @@ class LoyaltyCard extends Model implements TenantModel
             'cooldown_min' => 'integer',
             'daily_cap' => 'integer',
             'active' => 'boolean',
+            'referrals_enabled' => 'boolean',
+            'referral_monthly_cap' => 'integer',
         ];
     }
 }

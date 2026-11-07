@@ -24,14 +24,15 @@ final readonly class JoinCard
         private EnrollCustomer $enrollCustomer,
     ) {}
 
-    public function handle(Business $business, User $customer): ?CardEnrollment
+    /** @param string|null $referralCode the invitation they came with to this business (CHW-47) */
+    public function handle(Business $business, User $customer, ?string $referralCode = null): ?CardEnrollment
     {
         if (! $this->describeJoinPage->handle($business, $customer)['available']) {
             return null;
         }
 
         try {
-            return $this->enrollCustomer->handle($business, $customer);
+            return $this->enrollCustomer->handle($business, $customer, $referralCode);
         } catch (StampRejected $rejected) {
             return $rejected->rejection === StampRejection::AccountDeleted ? null : throw $rejected;
         }

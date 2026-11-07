@@ -7,6 +7,7 @@ namespace App\Actions\Taps;
 use App\Enums\TapRejection;
 use App\Models\Tap;
 use App\Models\User;
+use App\Support\Referrals\PendingReferral;
 use App\Support\Taps\TapSession;
 
 /**
@@ -37,6 +38,7 @@ final readonly class TakeTap
         ?string $ip,
         ?string $userAgent,
         TapSession $session,
+        ?PendingReferral $referral = null,
     ): Tap {
         $tap = $this->receiveTap->handle($e, $c, $user, $ip, $userAgent, $session->claimTokenHash());
         $session->show($tap);
@@ -46,7 +48,7 @@ final readonly class TakeTap
         }
 
         if ($user instanceof User) {
-            return $this->claimPendingTaps->handle($session, $user, $tap->isPending() ? null : $tap) ?? $tap;
+            return $this->claimPendingTaps->handle($session, $user, $tap->isPending() ? null : $tap, $referral) ?? $tap;
         }
 
         $waiting = $tap->rejection === TapRejection::Replay ? $session->newestWaiting() : null;

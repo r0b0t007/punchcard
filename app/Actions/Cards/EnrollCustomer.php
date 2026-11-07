@@ -31,6 +31,10 @@ use RuntimeException;
  * front, and again after the insert, which waits on DeleteAccount's lock on
  * the user, so a card made while the account was going is rolled back.
  *
+ * A friend's invitation (CHW-47): a new card, never one already held, is
+ * referred by whoever's code they came with, when it counts (ReferrerFor).
+ * The referrer is set as the card is made, and never changes.
+ *
  * @throws StampRejected
  */
 final readonly class EnrollCustomer
@@ -42,11 +46,12 @@ final readonly class EnrollCustomer
 
     private const int ATTEMPTS = 3;
 
-    public function __construct(private TenantContext $context, private ChooseCard $chooseCard) {}
+    public function __construct(private TenantContext $context, private ChooseCard $chooseCard, private ReferrerFor $referrerFor) {}
 
-    public function handle(Business $business, User $user): ?CardEnrollment
+    /** @param string|null $referralCode the invitation they came with to this business (PendingReferral), if any */
+    public function handle(Business $business, User $user, ?string $referralCode = null): ?CardEnrollment
     {
-        return $this->context->bypass(function () use ($business, $user): ?CardEnrollment {
+        return $this->context->bypass(function () use ($business, $user, $referralCode): ?CardEnrollment {
             $this->assertNotDeleted($user);
 
             // A running card the customer holds here comes first, so a tap never splits their progress;
@@ -62,6 +67,7 @@ final readonly class EnrollCustomer
             }
 
             $card = $here->card->id;
+            $referrer = $this->referrerFor->handle($card, $user, $referralCode);
 
             for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
                 $existing = CardEnrollment::query()->where('card_id', $card)->where('user_id', $user->id)->first();
@@ -71,8 +77,11 @@ final readonly class EnrollCustomer
                 }
 
                 try {
-                    return DB::transaction(function () use ($card, $user): CardEnrollment {
-                        $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card, 'user_id' => $user->id, 'referral_code' => $this->referralCode()]);
+                    return DB::transaction(function () use ($card, $user, $referrer): CardEnrollment {
+                        // A card of the organization made since (another join page, at once): no longer someone new.
+                        $referrer = $referrer instanceof CardEnrollment
+                            && CardEnrollment::query()->where('organization_id', $referrer->organization_id)->where('user_id', $user->id)->exists() ? null : $referrer;
+                        $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card, 'user_id' => $user->id, 'referral_code' => $this->referralCode(), 'referred_by' => $referrer?->id]);
                         $enrollment->save();
                         $this->assertNotDeleted($user);
 

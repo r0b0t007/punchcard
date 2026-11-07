@@ -26,6 +26,7 @@ use App\Models\Stamper;
 use App\Models\Tap;
 use App\Models\User;
 use App\Support\Database\Outermost;
+use App\Support\Referrals\PendingReferral;
 use App\Support\Tenancy\ArchivedSites;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -77,24 +78,25 @@ final readonly class ApplyTap
         private RedeemReward $redeemReward,
     ) {}
 
-    public function handle(Tap $tap, User $user): Tap
+    /** @param PendingReferral|null $referral the invitation the browser holds (CHW-47), for a first card at the tap's business */
+    public function handle(Tap $tap, User $user, ?PendingReferral $referral = null): Tap
     {
         $previous = $this->context->snapshot();
 
         try {
             // Run again if the database aborts it to break a deadlock (Outermost, CHW-310): rolled back whole, each run
             // from the caller's tenant, as apply() sets the tap's.
-            return Outermost::transaction('ApplyTap', function () use ($tap, $user, $previous): Tap {
+            return Outermost::transaction('ApplyTap', function () use ($tap, $user, $previous, $referral): Tap {
                 $this->context->restore($previous);
 
-                return $this->apply($tap->id, $user);
+                return $this->apply($tap->id, $user, $referral);
             });
         } finally {
             $this->context->restore($previous);
         }
     }
 
-    private function apply(int $tapId, User $user): Tap
+    private function apply(int $tapId, User $user, ?PendingReferral $referral): Tap
     {
         $tap = $this->context->bypass(fn (): Tap => Tap::query()->whereKey($tapId)->lockForUpdate()->firstOrFail());
 
@@ -182,8 +184,8 @@ final readonly class ApplyTap
         // The tap keeps the card it is judged on and that card's stamps, refused (AddStamps
         // says which, StampRejected::onCard) or not, for its result page.
         try {
-            $result = DB::transaction(function () use ($tap, $stamper, $business, $user, $qty, $armedBy): StampResult {
-                $enrollment = $this->enrollCustomer->handle($business, $user)
+            $result = DB::transaction(function () use ($tap, $stamper, $business, $user, $qty, $armedBy, $referral): StampResult {
+                $enrollment = $this->enrollCustomer->handle($business, $user, $referral?->for($business))
                     ?? throw new StampRejected(StampRejection::NotHonoured);
 
                 return $this->addStamps->handle($enrollment, StampRequest::nfc($stamper, (int) $tap->counter, $qty, $tap->created_at, $armedBy));

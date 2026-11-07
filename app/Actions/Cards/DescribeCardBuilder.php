@@ -72,6 +72,8 @@ final readonly class DescribeCardBuilder
             'terms' => '',
             'cooldown_min' => 20,
             'daily_cap' => 5,
+            'referrals_enabled' => false,
+            'referral_monthly_cap' => 3,
         ];
     }
 
@@ -96,6 +98,8 @@ final readonly class DescribeCardBuilder
             'terms' => $card->terms ?? '',
             'cooldown_min' => $card->cooldown_min,
             'daily_cap' => $card->daily_cap,
+            'referrals_enabled' => $card->referrals_enabled,
+            'referral_monthly_cap' => $card->referral_monthly_cap,
         ];
     }
 }
