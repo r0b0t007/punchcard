@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Cards;
 
+use App\Actions\Referrals\DescribeReferral;
 use App\Enums\CardMode;
 use App\Enums\RewardStatus;
 use App\Models\Business;
@@ -41,7 +42,7 @@ final readonly class DescribeMyCard
 {
     private const int HISTORY = 20;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private DescribeReferral $describeReferral) {}
 
     /**
      * @return array<string, mixed>
@@ -59,6 +60,8 @@ final readonly class DescribeMyCard
                 'bannerUrl' => $card->bannerUrl(),
                 'paused' => ! $card->active,
                 'tiers' => $this->tiers($card, $enrollment),
+                // "Invite a friend" (CHW-47, design 20a): their link and this month's stamps from it; none while off.
+                'referral' => $this->describeReferral->handle($enrollment, $card, $now),
 
                 'rewardsReady' => Reward::query()->where('enrollment_id', $enrollment->id)->where('status', RewardStatus::Available)->count(),
                 'terms' => $card->terms,

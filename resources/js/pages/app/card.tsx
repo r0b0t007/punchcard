@@ -15,6 +15,8 @@ import PushAsk from '@/components/push/push-ask';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
 import WalletPlaceholders from '@/components/tap/wallet-placeholders';
+import { ReferralPanel } from '@/components/referrals/referral-panel';
+import type { Referral } from '@/components/referrals/referral-panel';
 import { Badge } from '@/components/ui/badge';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -65,6 +67,8 @@ type Props = {
     mustVerify: boolean;
     /** Notifications for this customer (DescribePush). */
     push: PushSettings;
+    /** "Invite a friend" (CHW-47): none while the card's referrals are off. */
+    referral: Referral | null;
 };
 
 /**
@@ -90,6 +94,7 @@ export default function MyCard({
     canFollow,
     mustVerify,
     push,
+    referral,
 }: Props) {
     const { t, locale } = useTranslation();
     // SetFollow says why it refused (a closed café, an email to verify).
@@ -132,6 +137,13 @@ export default function MyCard({
                     <QrCode aria-hidden="true" className="size-5 shrink-0" />
                     {t('No NFC? Show my QR')}
                 </Link>
+
+                {referral ? (
+                    <ReferralPanel
+                        referral={referral}
+                        place={card.businessName}
+                    />
+                ) : null}
 
                 {paused ? (
                     <p className="rounded-card border p-4 text-sm text-muted-foreground">

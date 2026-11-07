@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useTranslation } from '@/hooks/use-translation';
@@ -42,6 +43,9 @@ type CardFields = {
     terms: string;
     cooldown_min: number;
     daily_cap: number | null;
+    /** Refer a friend (CHW-47): off until the owner turns it on. */
+    referrals_enabled: boolean;
+    referral_monthly_cap: number;
 };
 
 type Props = {
@@ -117,6 +121,8 @@ export default function CardsEdit({ card, fields, preview }: Props) {
         terms: fields.terms,
         cooldown_min: String(fields.cooldown_min),
         daily_cap: fields.daily_cap === null ? '' : String(fields.daily_cap),
+        referrals_enabled: fields.referrals_enabled,
+        referral_monthly_cap: String(fields.referral_monthly_cap),
     });
     const { data, setData, processing } = form;
     const errors = form.errors as Record<string, string | undefined>;
@@ -703,6 +709,63 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                             </p>
                             <InputError message={errors.daily_cap} />
                         </div>
+                    </section>
+
+                    <Separator />
+
+                    {/* Refer a friend (CHW-47, design 20c): off until turned on; on, the monthly limit. */}
+                    <section className="flex flex-col gap-4">
+                        <div className="flex items-start gap-3">
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <Label htmlFor="referrals_enabled">
+                                    {t('Refer a friend')}
+                                </Label>
+                                <p className="text-sm text-pretty text-muted-foreground">
+                                    {t(
+                                        'Customers can invite friends from their card. When a friend comes in for the first time, the customer gets +1 stamp.',
+                                    )}
+                                </p>
+                            </div>
+                            <Switch
+                                id="referrals_enabled"
+                                checked={data.referrals_enabled}
+                                onCheckedChange={(on) =>
+                                    setData('referrals_enabled', on)
+                                }
+                                data-test="referrals-switch"
+                            />
+                        </div>
+                        {data.referrals_enabled ? (
+                            <div className="grid gap-2">
+                                <Label htmlFor="referral_monthly_cap">
+                                    {t(
+                                        'Stamps a customer can earn this way each month',
+                                    )}
+                                </Label>
+                                <Input
+                                    id="referral_monthly_cap"
+                                    type="number"
+                                    inputMode="numeric"
+                                    required
+                                    min={1}
+                                    max={10}
+                                    className="w-32"
+                                    value={data.referral_monthly_cap}
+                                    onChange={(event) =>
+                                        setData(
+                                            'referral_monthly_cap',
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                    {t('1 to 10')}
+                                </p>
+                                <InputError
+                                    message={errors.referral_monthly_cap}
+                                />
+                            </div>
+                        ) : null}
                     </section>
 
                     <div className="flex flex-wrap gap-3">

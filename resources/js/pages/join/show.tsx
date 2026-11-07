@@ -1,4 +1,5 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Gift } from 'lucide-react';
 import TapScreen, {
     TapCafe,
     TapLoyaltyCard,
@@ -19,6 +20,8 @@ type Props = {
     card: TapCard | null;
     available: boolean;
     joined: boolean;
+    /** Came by a friend's link (CHW-47): said, never who. */
+    invited: boolean;
 };
 
 /**
@@ -26,7 +29,13 @@ type Props = {
  * to your cards. No stamp here: the first one comes with a tap at the
  * counter.
  */
-export default function JoinShow({ slug, card, available, joined }: Props) {
+export default function JoinShow({
+    slug,
+    card,
+    available,
+    joined,
+    invited,
+}: Props) {
     const { t } = useTranslation();
     const { auth } = usePage<{ auth: Partial<Auth> }>().props;
     const signedIn = auth.user !== undefined && auth.user !== null;
@@ -71,6 +80,15 @@ export default function JoinShow({ slug, card, available, joined }: Props) {
             <Head title={card?.businessName ?? t('Loyalty card')} />
             <TapScreen actions={actions}>
                 {card ? <TapCafe card={card} /> : null}
+                {invited && available ? (
+                    <p
+                        className="inline-flex items-center gap-2 self-start rounded-full bg-stamp/20 px-3.5 py-2 text-sm font-medium"
+                        data-test="join-invited"
+                    >
+                        <Gift aria-hidden="true" className="size-4" />
+                        {t('A friend invited you')}
+                    </p>
+                ) : null}
                 <h1 className="font-display text-4xl leading-tight font-bold text-balance">
                     {available
                         ? t('Collect stamps here')

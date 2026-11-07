@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Customers;
 
 use App\Actions\Counter\ScanLocations;
+use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
@@ -116,6 +117,8 @@ final readonly class DescribeCustomer
                 'usualGapDays' => $customer->usual_gap_days,
                 'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
+                // Friends who added a card through their invitation (CHW-47), and how many of them came in here.
+                ...$this->friendsInvited($business, $enrollmentIds),
             ],
             'cards' => array_values($cards->filter(fn (CardEnrollment $enrollment): bool => $enrollment->card !== null)
                 ->map(function (CardEnrollment $enrollment): array {
@@ -144,5 +147,25 @@ final readonly class DescribeCustomer
                 'at' => LocalMoment::of($note->created_at, $timezone, $now),
             ])->all()),
         ];
+    }
+
+    /**
+     * The friends a customer invited (CHW-47): the cards referred by theirs, and how many of those friends proved they
+     * came to this business. Counts only: who they are stays with the businesses they came to.
+     *
+     * @param  array<int, int|string>  $enrollmentIds
+     * @return array{friendsInvited: int, friendsCameIn: int}
+     */
+    private function friendsInvited(Business $business, array $enrollmentIds): array
+    {
+        return $this->context->bypass(function () use ($business, $enrollmentIds): array {
+            $friends = CardEnrollment::query()->where('organization_id', $business->organization_id)->whereIn('referred_by', $enrollmentIds);
+
+            return [
+                'friendsInvited' => (clone $friends)->count(),
+                'friendsCameIn' => StampEvent::query()->where('business_id', $business->id)->whereIn('source', StampSource::presenceValues())
+                    ->whereIn('enrollment_id', (clone $friends)->select('id'))->distinct()->count('enrollment_id'),
+            ];
+        });
     }
 }
