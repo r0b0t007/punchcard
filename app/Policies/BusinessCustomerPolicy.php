@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\BusinessRole;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\User;
@@ -22,5 +23,14 @@ final class BusinessCustomerPolicy
     public function view(User $user, BusinessCustomer $customer): bool
     {
         return $this->runs($customer->organization_id, $customer->business_id);
+    }
+
+    /**
+     * Their customers and stamps as CSV (CHW-49): the business's owner alone, working in it. Not its staff, nor the
+     * organization's admin: as few people as possible take customers out of the app (decided).
+     */
+    public function export(User $user, Business $business): bool
+    {
+        return $this->tenant()->businessId() === $business->id && $this->tenant()->businessRole() === BusinessRole::Owner;
     }
 }

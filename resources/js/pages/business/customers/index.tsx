@@ -1,9 +1,16 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Contact, Search } from 'lucide-react';
+import {
+    ChevronLeft,
+    ChevronRight,
+    Contact,
+    MailCheck,
+    Search,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import ExportDialog from '@/components/customers/export-dialog';
 import StatusChip from '@/components/customers/status-chip';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
@@ -38,7 +45,8 @@ const SEGMENTS: Segment[] = ['all', 'regulars', 'quiet', 'lost', 'new'];
 /**
  * The Customers page (CHW-44, B4, design 15a): everyone who came in to the
  * business, a tab per segment with its count, search by first name, 25 a
- * page. The owner's, never staff's.
+ * page. The owner's, never staff's. Its owner can export them as CSV
+ * (CHW-49, design 21): the page then says where the link goes.
  */
 export default function Customers({
     segment,
@@ -46,12 +54,23 @@ export default function Customers({
     counts,
     customers,
     page,
+    canExport,
+    exportSentTo,
+    exportMaxYears,
+    today,
 }: {
     segment: Segment;
     q: string | null;
     counts: Record<Segment, number>;
     customers: CustomerRow[];
     page: Page;
+    /** The business's owner, who may export (CHW-49). */
+    canExport: boolean;
+    /** Once an export is asked for: the owner's address, half hidden. */
+    exportSentTo: string | null;
+    exportMaxYears: number;
+    /** Today in the business's time (Y-m-d). */
+    today: string;
 }) {
     const { t } = useTranslation();
     const [search, setSearch] = useState(q ?? '');
@@ -78,12 +97,36 @@ export default function Customers({
         <>
             <Head title={t('Customers')} />
             <div className="flex max-w-5xl flex-col gap-5 p-4">
-                <Heading
-                    title={t('Customers')}
-                    description={t(
-                        'Everyone who came in, and who has stopped coming.',
-                    )}
-                />
+                <div className="flex items-start justify-between gap-4">
+                    <Heading
+                        title={t('Customers')}
+                        description={t(
+                            'Everyone who came in, and who has stopped coming.',
+                        )}
+                    />
+                    {canExport ? (
+                        <ExportDialog today={today} maxYears={exportMaxYears} />
+                    ) : null}
+                </div>
+
+                {exportSentTo ? (
+                    <p
+                        role="status"
+                        className="flex items-start gap-2 rounded-card border border-stamp/40 bg-stamp/15 px-3.5 py-2.5 text-sm"
+                        data-test="customers-export-sent"
+                    >
+                        <MailCheck
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 shrink-0"
+                        />
+                        <span>
+                            {t(
+                                "We're making your export. We'll email a link to :email in a few minutes.",
+                                { email: exportSentTo },
+                            )}
+                        </span>
+                    </p>
+                ) : null}
 
                 <div className="relative">
                     <Search

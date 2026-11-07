@@ -51,6 +51,16 @@ return [
             'report' => false,
         ],
 
+        // Exports of a business's customers and stamps (CHW-49): encrypted, kept a day, never served (no `serve`, no
+        // `url`); only their owner downloads one, through an audited route.
+        'exports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/exports'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

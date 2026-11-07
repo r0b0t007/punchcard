@@ -71,7 +71,7 @@ it('refuses every change sent from a page of another business, before reading it
         'DELETE counter.disarm', 'DELETE customers.notes.destroy', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
         'PATCH automations.update', 'PATCH campaigns.cancel', 'PATCH campaigns.ticket', 'PATCH cards.status', 'PATCH stampers.status',
         'POST business.qr-stand.printed', 'POST campaigns.store', 'POST cards.banner', 'POST cards.store', 'POST counter.arm', 'POST counter.scans.redeem',
-        'POST counter.scans.stamp', 'POST counter.scans.store', 'POST customers.corrections.store', 'POST customers.notes.store', 'POST customers.stamps.store',
+        'POST counter.scans.stamp', 'POST counter.scans.store', 'POST customers.corrections.store', 'POST customers.export', 'POST customers.notes.store', 'POST customers.stamps.store',
         'POST staff.invitations.store', 'POST verification.store',
         'PUT cards.update',
     ]);
