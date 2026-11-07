@@ -8,6 +8,7 @@ use App\Enums\StampSource;
 use App\Models\AutomationSend;
 use App\Models\Business;
 use App\Models\BusinessMember;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\CounterScan;
@@ -74,6 +75,7 @@ final readonly class ExportMyData
             $notes = CustomerNote::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'body', 'created_at']);
             $scans = CounterScan::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'location_id', 'scanned_at', 'stamp_event_id']);
             $automationSends = AutomationSend::query()->where('user_id', $user->id)->orderBy('id')->get(['business_id', 'trigger', 'occasion', 'created_at', 'sent_at']);
+            $campaignSends = CampaignSend::query()->where('user_id', $user->id)->with('campaign:id,title')->orderBy('id')->get(['business_id', 'campaign_id', 'sent_at', 'opened_at']);
             $invitations = StaffInvitation::query()->where('email', $user->email)->orderBy('id')->get(['business_id', 'created_at', 'accepted_at']);
             $businessRoles = BusinessMember::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'business_id', 'role', 'created_at']);
             $organizationRoles = OrganizationMember::query()->where('user_id', $user->id)->orderBy('id')->get(['organization_id', 'role', 'created_at']);
@@ -81,7 +83,7 @@ final readonly class ExportMyData
             $cards = LoyaltyCard::query()->whereKey($enrollments->pluck('card_id')->unique()->all())->pluck('name', 'id');
             $organizations = Organization::query()->whereKey(collect([$enrollments, $follows, $consents, $businessRoles, $organizationRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('organization_id')->all())->filter()->unique()->all())->pluck('name', 'id');
-            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $scans, $notes, $automationSends, $invitations, $businessRoles])
+            $businesses = Business::query()->whereKey(collect([$stamps->flatten(), $taps, $scans, $notes, $automationSends, $campaignSends, $invitations, $businessRoles])
                 ->flatMap(fn (Collection $rows): array => $rows->pluck('business_id')->all())
                 ->merge($rewards->flatten()->pluck('redeemed_business_id'))->filter()->unique()->all())->pluck('name', 'id');
             $locations = Location::query()->whereKey(collect([$stamps->flatten(), $taps, $scans])
@@ -186,6 +188,13 @@ final readonly class ExportMyData
                     'occasion' => $send->occasion,
                     'claimed_at' => $this->date($send->created_at),
                     'sent_at' => $this->date($send->sent_at),
+                ])->all(),
+                // Campaigns a business sent them: sent once a phone accepted it, opened at their first tap (CHW-48).
+                'campaign_messages' => $campaignSends->map(fn (CampaignSend $send): array => [
+                    'business' => $businesses->get($send->business_id),
+                    'title' => $send->campaign->title,
+                    'sent_at' => $this->date($send->sent_at),
+                    'opened_at' => $this->date($send->opened_at),
                 ])->all(),
                 'sign_in_links' => LoginLink::query()->where('email', $user->email)->orderBy('id')->get(['purpose', 'created_at', 'used_at'])
                     ->map(fn (LoginLink $link): array => [

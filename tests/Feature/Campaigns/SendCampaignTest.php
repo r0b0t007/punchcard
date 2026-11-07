@@ -13,6 +13,7 @@ use App\Jobs\PushCampaign;
 use App\Jobs\PushCampaignBatch;
 use App\Models\Business;
 use App\Models\Campaign;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\Follow;
 use App\Models\LoyaltyCard;
@@ -61,6 +62,8 @@ beforeEach(function (): void {
 
         return $customer;
     };
+    // Where a tap on the notification opens: its signed link, followed.
+    $this->opens = fn (CampaignMessage $message, User $to): string => (string) $this->get($message->toWebPush($to, $message)->toArray()['data']['url'])->headers->get('Location');
     $this->send = fn (array $input = [], ?User $as = null) => $this->actingAs($as ?? $this->owner)->post(route('campaigns.store'), [
         'idempotency_key' => (string) Str::uuid(), 'segment' => 'all', 'title' => 'Slow Tuesday?', 'body' => 'Two stamps for every coffee until 4 pm today.', 'card_id' => $this->tenants->cardA->id, ...$input,
     ]);
@@ -85,7 +88,7 @@ it('sends the business\'s followers with a phone a notification titled with its 
         return $push['title'] === 'A1 · Slow Tuesday?'
             && $push['body'] === 'Two stamps for every coffee until 4 pm today.'
             && $push['tag'] === 'campaign-'.$message->campaignId
-            && $push['data'] === ['url' => route('app.cards.show', $enrollment->id, false)];
+            && ($this->opens)($message, $reached) === url(route('app.cards.show', $enrollment->id, false));
     });
     Notification::assertNotSentTo($noPhone, CampaignMessage::class);
 });
@@ -128,18 +131,59 @@ it('hands the audience with a phone out in batches', function (): void {
     Notification::assertSentTo([$first, $second], CampaignMessage::class);
 });
 
-it('counts a follower once a push service accepted their notification, never a refused one', function (): void {
-    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create());
-    $message = new CampaignMessage($campaign->id, 'A1 · Slow Tuesday?', 'Two stamps.', null);
-    $report = fn (bool $accepted): MessageSentReport => new MessageSentReport(new Request('POST', 'https://fcm.googleapis.com/fcm/send/1'), null, $accepted);
+it('counts a follower once a push service accepted their notification, never a refused one, and marks their send sent', function (): void {
     $customer = User::factory()->create();
+    [$campaign, $send] = app(TenantContext::class)->bypass(function () use ($customer): array {
+        $campaign = Campaign::factory()->for($this->tenants->a1)->create();
 
-    event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(false), $report(true)]));
+        return [$campaign, CampaignSend::factory()->create(['campaign_id' => $campaign->id, 'user_id' => $customer->id])];
+    });
+    $message = new CampaignMessage($campaign->id, $send->id, 'A1 · Slow Tuesday?', 'Two stamps.');
+    $report = fn (bool $accepted): MessageSentReport => new MessageSentReport(new Request('POST', 'https://fcm.googleapis.com/fcm/send/1'), null, $accepted);
+
     event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(false)]));
     event(new NotificationSent($customer, $message, WebPushChannel::class, []));
+    expect(app(TenantContext::class)->bypass(fn (): bool => $send->refresh()->sent_at === null))->toBeTrue();
+
+    event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(false), $report(true)]));
+    // Their other phone, or the event again: the same follower, counted once.
+    event(new NotificationSent($customer, $message, WebPushChannel::class, [$report(true)]));
     event(new NotificationSent($customer, new RewardReady(1, 1, 'A1', 'A coffee'), WebPushChannel::class, [$report(true)]));
 
-    expect(app(TenantContext::class)->bypass(fn (): int => $campaign->refresh()->sent_count))->toBe(1);
+    expect(app(TenantContext::class)->bypass(fn (): int => $campaign->refresh()->sent_count))->toBe(1)
+        ->and(app(TenantContext::class)->bypass(fn (): bool => $send->refresh()->sent_at !== null))->toBeTrue();
+});
+
+it('lets a failed push\'s claim go, so the job tried again reaches them, and nobody else twice', function (): void {
+    $failed = ($this->follower)();
+    $reached = ($this->follower)();
+    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create());
+    Notification::shouldReceive('sendNow')->once()->andThrow(new RuntimeException('The push service timed out.'));
+    Notification::shouldReceive('sendNow')->once();
+
+    app(SendCampaignBatch::class)->handle($campaign->id, [$failed->id, $reached->id]);
+    expect(app(TenantContext::class)->bypass(fn (): array => CampaignSend::query()->pluck('user_id')->all()))->toBe([$reached->id]);
+
+    Notification::fake();
+    app(SendCampaignBatch::class)->handle($campaign->id, [$failed->id, $reached->id]);
+
+    Notification::assertSentToTimes($failed, CampaignMessage::class, 1);
+    Notification::assertNotSentTo($reached, CampaignMessage::class);
+});
+
+it('records who each campaign went to, and pushes a batch run again to nobody twice', function (): void {
+    $first = ($this->follower)();
+    $second = ($this->follower)();
+    ($this->send)()->assertSessionHasNoErrors();
+    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::query()->sole());
+
+    app(SendCampaignBatch::class)->handle($campaign->id, [$first->id, $second->id]);
+
+    Notification::assertSentToTimes($first, CampaignMessage::class, 1);
+    Notification::assertSentToTimes($second, CampaignMessage::class, 1);
+    expect(app(TenantContext::class)->bypass(fn (): array => CampaignSend::query()->orderBy('user_id')->get()
+        ->map(fn (CampaignSend $send): array => [$send->campaign_id, $send->business_id, $send->user_id])->all()))
+        ->toBe([[$campaign->id, $this->tenants->a1->id, $first->id], [$campaign->id, $this->tenants->a1->id, $second->id]]);
 });
 
 it('reaches its audience as it is when it goes: not who stopped following meanwhile', function (): void {
@@ -192,7 +236,7 @@ it('opens My cards for a follower without the card chosen', function (): void {
 
     ($this->send)(['card_id' => $otherCard->id])->assertSessionHasNoErrors();
 
-    Notification::assertSentTo($reached, CampaignMessage::class, fn (CampaignMessage $message): bool => $message->toWebPush($reached, $message)->toArray()['data'] === ['url' => route('app.cards', [], false)]);
+    Notification::assertSentTo($reached, CampaignMessage::class, fn (CampaignMessage $message): bool => ($this->opens)($message, $reached) === url(route('app.cards', [], false)));
 });
 
 it('opens My cards when no card is chosen', function (): void {
@@ -200,7 +244,7 @@ it('opens My cards when no card is chosen', function (): void {
 
     ($this->send)(['card_id' => null])->assertSessionHasNoErrors();
 
-    Notification::assertSentTo($reached, CampaignMessage::class, fn (CampaignMessage $message): bool => $message->toWebPush($reached, $message)->toArray()['data'] === ['url' => route('app.cards', [], false)]);
+    Notification::assertSentTo($reached, CampaignMessage::class, fn (CampaignMessage $message): bool => ($this->opens)($message, $reached) === url(route('app.cards', [], false)));
 });
 
 it('queues the delivery in the business\'s tenant, never in the request', function (): void {

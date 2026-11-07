@@ -4,6 +4,7 @@ use App\Enums\AutomationTrigger;
 use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\CampaignOpenController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterScanController;
@@ -140,6 +141,9 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
     });
     Route::post('j/{slug}', [JoinController::class, 'store'])->middleware(['auth', 'throttle:join'])->name('join.store');
 });
+
+// A tap on a campaign's notification (CHW-48): its signed link counts the open, then opens the card. Signed in or not.
+Route::get('o/{send}', CampaignOpenController::class)->whereNumber('send')->middleware([NeverCache::class, 'throttle:campaign-open'])->name('campaigns.opened');
 
 // An invitation to a business's staff (CHW-146), opened from the invited inbox, signed in or not. Never cached.
 Route::middleware(NeverCache::class)->group(function (): void {

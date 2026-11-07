@@ -292,6 +292,13 @@ class AppServiceProvider extends ServiceProvider
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
         // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
         // generous cap per client address all the same.
+        // A campaign notification's open link (CHW-48): every follower gets it at once, many behind one carrier address,
+        // signed out or not. A few taps a minute per link, and a generous cap per address against a scan.
+        RateLimiter::for('campaign-open', fn (Request $request): array => [
+            Limit::perMinute(10)->by('campaign-open:send:'.$request->route('send')),
+            Limit::perMinute(600)->by('campaign-open:address:'.ClientAddress::rateLimitKey($request->ip())),
+        ]);
+
         RateLimiter::for('join-page', fn (Request $request): array => [
             Limit::perMinute(60)->by('join-page:session:'.($request->hasSession() ? $request->session()->getId() : ClientAddress::rateLimitKey($request->ip()))),
             Limit::perMinute(600)->by('join-page:address:'.ClientAddress::rateLimitKey($request->ip())),

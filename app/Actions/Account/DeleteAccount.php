@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\AutomationSend;
 use App\Models\BusinessCustomer;
 use App\Models\BusinessMember;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\ConsentEvent;
 use App\Models\CustomerNote;
@@ -180,6 +181,8 @@ final readonly class DeleteAccount
         ConsentEvent::query()->where('user_id', $user->id)->delete();
         // The automation messages they got (CHW-46): a birthday's, a quiet spell's, the person's.
         AutomationSend::query()->where('user_id', $user->id)->delete();
+        // The campaigns they got and opened (CHW-48): the person's; the campaigns' counts stay.
+        CampaignSend::query()->where('user_id', $user->id)->delete();
 
         $user->forceFill([
             'name' => 'Deleted user',
