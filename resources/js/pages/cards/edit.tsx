@@ -20,6 +20,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useTranslation } from '@/hooks/use-translation';
 import { ESPRESSO, isWeakBrand } from '@/lib/color';
 import { typedDir } from '@/lib/utils';
+import { centimes } from '@/lib/money';
 import { create, edit, index, store, update } from '@/routes/cards';
 
 type CardMode = 'cyclic' | 'progressive';
@@ -73,15 +74,6 @@ const whole = (typed: string, fallback: number) => {
     const value = Number.parseInt(typed, 10);
 
     return Number.isNaN(value) ? fallback : value;
-};
-
-/** An amount typed in dirhams ("12", "12.5" or "12,50"), in centimes; anything else as typed, for the server to refuse. */
-const centimes = (typed: string) => {
-    const amount = typed.trim();
-
-    return /^\d+(?:[.,]\d{1,2})?$/.test(amount)
-        ? String(Math.round(Number(amount.replace(',', '.')) * 100))
-        : typed;
 };
 
 /** The reward value the server stores for what is typed: none for a free item, centimes for an amount, else the percent. */

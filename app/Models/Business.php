@@ -53,6 +53,7 @@ use LogicException;
  * @property Carbon|null $suspended_at
  * @property string|null $plan
  * @property Carbon|null $archived_at
+ * @property int|null $average_ticket what a visit is worth, in centimes, set by its owner on a campaign's results (CHW-48)
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Organization $organization
@@ -321,6 +322,7 @@ class Business extends Model implements TenantModel
             'qr_stand_opened_at' => 'datetime',
             'verified_at' => 'datetime',
             'suspended_at' => 'datetime',
+            'average_ticket' => 'integer',
             'archived_at' => 'datetime',
         ];
     }

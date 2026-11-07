@@ -14,13 +14,13 @@ import {
 } from '@/components/ui/dialog';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
+import { audienceName } from '@/lib/campaigns';
+import type { Segment } from '@/lib/campaigns';
 import { momentLabel } from '@/lib/local-moment';
 import type { LocalMoment } from '@/lib/local-moment';
 import { cn } from '@/lib/utils';
-import { cancel, create, index } from '@/routes/campaigns';
+import { cancel, create, index, show } from '@/routes/campaigns';
 
-/** quiet_14d: no longer offered, kept for the campaigns sent to it (CHW-45). */
-type Segment = 'all' | 'going_quiet' | 'top_10' | 'quiet_14d';
 type Status = 'scheduled' | 'sending' | 'sent' | 'canceled';
 
 type CampaignRow = {
@@ -114,7 +114,7 @@ export default function Campaigns({
 
 function CampaignItem({ campaign }: { campaign: CampaignRow }) {
     const { t, locale } = useTranslation();
-    const who = audience(t, campaign.segment);
+    const who = audienceName(t, campaign.segment);
     const when = moment(t, locale, campaign);
 
     return (
@@ -123,10 +123,20 @@ function CampaignItem({ campaign }: { campaign: CampaignRow }) {
             data-test="campaign-row"
         >
             <div className="flex min-w-0 flex-1 flex-col md:col-span-4">
-                {/* The owner's words, in their own direction, aligned with the page's. */}
-                <span className="truncate font-semibold">
-                    <bdi>{campaign.title}</bdi>
-                </span>
+                {/* The owner's words, in their own direction, aligned with the page's. A sent one opens its results (B10). */}
+                {campaign.status === 'sent' ? (
+                    <Link
+                        href={show(campaign.id)}
+                        className="truncate font-semibold underline-offset-4 hover:underline"
+                        data-test="campaign-results"
+                    >
+                        <bdi>{campaign.title}</bdi>
+                    </Link>
+                ) : (
+                    <span className="truncate font-semibold">
+                        <bdi>{campaign.title}</bdi>
+                    </span>
+                )}
                 <span className="text-muted-foreground md:hidden">
                     {who} · {when}
                 </span>
@@ -203,15 +213,6 @@ function CancelCampaign({ campaign }: { campaign: CampaignRow }) {
             </DialogContent>
         </Dialog>
     );
-}
-
-function audience(t: TranslateFn, segment: Segment): string {
-    return {
-        all: t('All followers'),
-        going_quiet: t('Going quiet'),
-        top_10: t('Top 10'),
-        quiet_14d: t('Not seen in 14 days'),
-    }[segment];
 }
 
 /** "Sent today 10:02", "Sent 28 Oct", "Sending", "Canceled", or when a scheduled one goes ("8 Nov, 09:00"). */

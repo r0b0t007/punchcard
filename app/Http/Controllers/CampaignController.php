@@ -7,8 +7,12 @@ namespace App\Http\Controllers;
 use App\Actions\Campaigns\CampaignRefused;
 use App\Actions\Campaigns\CancelCampaign;
 use App\Actions\Campaigns\CreateCampaign;
+use App\Actions\Campaigns\DescribeCampaignResult;
 use App\Actions\Campaigns\DescribeCampaigns;
 use App\Actions\Campaigns\DescribeComposer;
+use App\Actions\Campaigns\SetAverageTicket;
+use App\Enums\CampaignStatus;
+use App\Http\Requests\Campaigns\SetAverageTicketRequest;
 use App\Http\Requests\Campaigns\StoreCampaignRequest;
 use App\Models\Business;
 use App\Models\Campaign;
@@ -32,7 +36,11 @@ use Inertia\Response;
  * - POST /business/campaigns: a notification to an audience of its
  *   followers, now or later (CreateCampaign), within its weekly limit;
  * - PATCH /business/campaigns/{campaign}/cancel: a scheduled one, until it
- *   goes (CancelCampaign).
+ *   goes (CancelCampaign);
+ * - GET /business/campaigns/{campaign}: a sent one's results (CHW-48, B10,
+ *   DescribeCampaignResult); one not sent has none, a 404;
+ * - PATCH /business/campaigns/ticket: the business's average ticket, which
+ *   the results' estimated revenue reads (SetAverageTicket).
  *
  * {campaign} resolves in the tenant: another business's is a 404.
  */
@@ -72,6 +80,27 @@ final class CampaignController extends Controller
             : trans_choice('On its way to :count person.|On its way to :count people.', $campaign->audience_count)]);
 
         return to_route('campaigns.index');
+    }
+
+    public function show(int $campaign, TenantContext $context, DescribeCampaignResult $describeCampaignResult): Response
+    {
+        $business = $context->business() ?? abort(403);
+        $sent = Campaign::query()->whereKey($campaign)->where('business_id', $business->id)->first() ?? abort(404);
+        Gate::authorize('view', $sent);
+        abort_unless($sent->status === CampaignStatus::Sent, 404);
+
+        return Inertia::render('business/campaigns/show', $describeCampaignResult->handle($business, $sent));
+    }
+
+    public function ticket(SetAverageTicketRequest $request, SetAverageTicket $setAverageTicket): RedirectResponse
+    {
+        /** @var Business $business authorized by the request */
+        $business = $request->business();
+        $setAverageTicket->handle($business, $request->integer('average_ticket'));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Average ticket saved.')]);
+
+        return back();
     }
 
     public function cancel(int $campaign, CancelCampaign $cancelCampaign): RedirectResponse
