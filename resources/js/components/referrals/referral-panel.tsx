@@ -36,6 +36,10 @@ export function ReferralPanel({
         setCanShare(typeof navigator.share === 'function');
     }, []);
 
+    // Copying can fail (no permission, an older browser): the link is then shown, to copy by hand.
+    const [copyFailed, setCopyFailed] = useState(false);
+    const copyLink = async () => setCopyFailed(!(await copy(referral.url)));
+
     const share = async () => {
         try {
             await navigator.share({
@@ -43,8 +47,13 @@ export function ReferralPanel({
                 text: t('Collect stamps at :place with me.', { place }),
                 url: referral.url,
             });
-        } catch {
-            // Closed without sharing: nothing to say.
+        } catch (error) {
+            // Closed without sharing: nothing to say. Anything else: copy the link instead.
+            if (
+                !(error instanceof DOMException && error.name === 'AbortError')
+            ) {
+                await copyLink();
+            }
         }
     };
     const full = referral.thisMonth >= referral.cap;
@@ -85,7 +94,7 @@ export function ReferralPanel({
                 <Button
                     variant="secondary"
                     className="flex-1"
-                    onClick={() => void copy(referral.url)}
+                    onClick={() => void copyLink()}
                     data-test="copy-referral"
                 >
                     <Copy aria-hidden="true" />
@@ -94,6 +103,17 @@ export function ReferralPanel({
                         : t('Copy link')}
                 </Button>
             </div>
+            {copyFailed ? (
+                <p className="flex flex-col gap-1 text-sm" role="status">
+                    {t("Couldn't copy the link. Copy it here:")}
+                    <span
+                        className="rounded-md bg-card px-2 py-1 font-mono text-xs break-all select-all"
+                        data-test="referral-url"
+                    >
+                        {referral.url}
+                    </span>
+                </p>
+            ) : null}
             <div className="flex items-center gap-2 text-sm">
                 <span aria-hidden="true" className="flex gap-1">
                     {Array.from({ length: referral.cap }, (_, i) => (

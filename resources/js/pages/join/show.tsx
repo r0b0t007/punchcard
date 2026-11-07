@@ -80,7 +80,7 @@ export default function JoinShow({
             <Head title={card?.businessName ?? t('Loyalty card')} />
             <TapScreen actions={actions}>
                 {card ? <TapCafe card={card} /> : null}
-                {invited && available ? (
+                {invited ? (
                     <p
                         className="inline-flex items-center gap-2 self-start rounded-full bg-stamp/20 px-3.5 py-2 text-sm font-medium"
                         data-test="join-invited"

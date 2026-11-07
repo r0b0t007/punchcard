@@ -162,12 +162,14 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                     : String(fields.reward_value)));
 
     const save = (publish: boolean) => {
-        form.transform((typed) => ({
+        form.transform(({ referral_monthly_cap, ...typed }) => ({
             ...typed,
             reward_value: storedRewardValue(
                 typed.reward_type,
                 typed.reward_value,
             ),
+            // The limit is only asked while referrals are on: off, the stored one stays.
+            ...(typed.referrals_enabled ? { referral_monthly_cap } : {}),
             publish,
         }));
         form.submit(card ? update(card.id) : store(), { preserveScroll: true });

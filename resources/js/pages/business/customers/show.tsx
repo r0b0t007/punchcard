@@ -25,8 +25,7 @@ type Customer = {
     usualGapDays: number | null;
     lastVisitDays: number;
     rewardsRedeemed: number;
-    /** Friends who added a card through their invitation (CHW-47), and how many came in here. */
-    friendsInvited: number;
+    /** Friends they invited who came in here (CHW-47): this business's own customers only. */
     friendsCameIn: number;
 };
 
@@ -224,15 +223,8 @@ export default function CustomerPage({
                                 value={customer.rewardsRedeemed}
                             />
                             <Fact
-                                label={t('Friends invited')}
-                                value={customer.friendsInvited}
-                                note={
-                                    customer.friendsInvited > 0
-                                        ? t(':count came in here', {
-                                              count: customer.friendsCameIn,
-                                          })
-                                        : undefined
-                                }
+                                label={t('Friends they brought')}
+                                value={customer.friendsCameIn}
                             />
                         </dl>
 
@@ -260,24 +252,11 @@ export default function CustomerPage({
     );
 }
 
-function Fact({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: string | number;
-    note?: string;
-}) {
+function Fact({ label, value }: { label: string; value: string | number }) {
     return (
         <div className="flex flex-col">
             <dd className="order-1 font-display text-xl font-bold">{value}</dd>
             <dt className="order-2 text-xs text-muted-foreground">{label}</dt>
-            {note ? (
-                <dd className="order-3 text-xs text-muted-foreground">
-                    {note}
-                </dd>
-            ) : null}
         </div>
     );
 }

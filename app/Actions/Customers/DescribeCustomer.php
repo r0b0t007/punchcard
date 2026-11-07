@@ -44,7 +44,7 @@ final readonly class DescribeCustomer
 
     /**
      * @return array{
-     *     customer: array{id: int, name: string, status: string, visits: int, usualGapDays: int|null, lastVisitDays: int, rewardsRedeemed: int},
+     *     customer: array{id: int, name: string, status: string, visits: int, usualGapDays: int|null, lastVisitDays: int, rewardsRedeemed: int, friendsCameIn: int},
      *     cards: list<array{id: int, name: string, rewardText: string, stamps: int, toReward: int|null}>,
      *     history: list<array{key: string, kind: string, source: string|null, qty: int, card: string|null, location: string|null, by: string|null, reason: string|null, byScan: bool, at: array{day: string, date: string, time: string}}>,
      *     shown: int,
@@ -117,8 +117,7 @@ final readonly class DescribeCustomer
                 'usualGapDays' => $customer->usual_gap_days,
                 'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
-                // Friends who added a card through their invitation (CHW-47), and how many of them came in here.
-                ...$this->friendsInvited($business, $enrollmentIds),
+                'friendsCameIn' => $this->friendsCameIn($business, $enrollmentIds),
             ],
             'cards' => array_values($cards->filter(fn (CardEnrollment $enrollment): bool => $enrollment->card !== null)
                 ->map(function (CardEnrollment $enrollment): array {
@@ -150,22 +149,17 @@ final readonly class DescribeCustomer
     }
 
     /**
-     * The friends a customer invited (CHW-47): the cards referred by theirs, and how many of those friends proved they
-     * came to this business. Counts only: who they are stays with the businesses they came to.
+     * The friends a customer invited who came in to this business (CHW-47): cards referred by theirs, with a stamp
+     * proving a visit here. A count only, and of this business's own customers: a friend who only went to a sister
+     * franchisee, or never came, is not this business's to see.
      *
      * @param  array<int, int|string>  $enrollmentIds
-     * @return array{friendsInvited: int, friendsCameIn: int}
      */
-    private function friendsInvited(Business $business, array $enrollmentIds): array
+    private function friendsCameIn(Business $business, array $enrollmentIds): int
     {
-        return $this->context->bypass(function () use ($business, $enrollmentIds): array {
-            $friends = CardEnrollment::query()->where('organization_id', $business->organization_id)->whereIn('referred_by', $enrollmentIds);
-
-            return [
-                'friendsInvited' => (clone $friends)->count(),
-                'friendsCameIn' => StampEvent::query()->where('business_id', $business->id)->whereIn('source', StampSource::presenceValues())
-                    ->whereIn('enrollment_id', (clone $friends)->select('id'))->distinct()->count('enrollment_id'),
-            ];
-        });
+        return $this->context->bypass(fn (): int => StampEvent::query()->where('business_id', $business->id)
+            ->whereIn('source', StampSource::presenceValues())
+            ->whereIn('enrollment_id', CardEnrollment::query()->where('organization_id', $business->organization_id)->whereIn('referred_by', $enrollmentIds)->select('id'))
+            ->distinct()->count('enrollment_id'));
     }
 }
