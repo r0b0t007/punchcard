@@ -8,11 +8,12 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Whether a campaign recorded who it went to (CHW-48, B10): every campaign
  * from now on does (campaign_sends), so its results show, nobody reached
- * included. One already sent without a single recorded send was sent
- * before recording began: its results page says so instead of showing
- * zeros. Told once, here, rather than guessed from its sends on every
- * read: a campaign whose pushes all failed lets its claims go, and has
- * none either.
+ * included. One sent before recording began says so on its results page
+ * instead of showing zeros: one sent before the first send ever recorded,
+ * or, with none recorded yet (both parts deployed at once), any sent so
+ * far. Told once, here, rather than guessed from its sends on every read:
+ * one sent since whose pushes all failed lets its claims go, and has none
+ * either, yet recorded them.
  */
 return new class extends Migration
 {
@@ -22,7 +23,10 @@ return new class extends Migration
             $table->boolean('records_sends')->default(true);
         });
 
+        $recordingBegan = DB::table('campaign_sends')->min('created_at');
+
         DB::table('campaigns')->where('status', 'sent')
+            ->when($recordingBegan !== null, fn ($campaigns) => $campaigns->where('sent_at', '<', $recordingBegan))
             ->whereNotExists(fn ($sends) => $sends->select(DB::raw(1))->from('campaign_sends')->whereColumn('campaign_sends.campaign_id', 'campaigns.id'))
             ->update(['records_sends' => false]);
     }

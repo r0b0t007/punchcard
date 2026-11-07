@@ -10,6 +10,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Number;
 
 /**
  * The business's average ticket (CHW-48, B10), from whoever runs it: in
@@ -49,7 +50,8 @@ class SetAverageTicketRequest extends FormRequest
      */
     public function messages(): array
     {
-        $range = __('Your average ticket is between 1 and 10,000 dirhams.');
+        $dirhams = fn (int $centimes): string => (string) Number::format($centimes / 100, locale: app()->getLocale());
+        $range = __('Your average ticket is between :min and :max dirhams.', ['min' => $dirhams(self::MIN), 'max' => $dirhams(self::MAX)]);
 
         return ['average_ticket.required' => $range, 'average_ticket.integer' => $range, 'average_ticket.between' => $range];
     }

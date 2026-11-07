@@ -1233,6 +1233,6 @@
     "Sent to": "أُرسلت إلى",
     "follower with a phone|followers with a phone": "متابع لديه هاتف|متابع لديه هاتف|متابعان لديهما هاتف|متابعين لديهم هاتف|متابعًا لديهم هاتف|متابع لديهم هاتف",
     "Average ticket saved.": "تم حفظ متوسط الفاتورة.",
-    "Your average ticket is between 1 and 10,000 dirhams.": "متوسط فاتورتك بين 1 و10000 درهم.",
+    "Your average ticket is between :min and :max dirhams.": "متوسط فاتورتك بين :min و:max درهم.",
     "Too many changes. Try again in a minute.": "تغييرات كثيرة جدًا. أعد المحاولة بعد دقيقة."
 }

@@ -21,8 +21,10 @@ use Carbon\CarbonInterface;
  * how many phones accepted it, how many opened it, and the visits the
  * people it reached (CampaignSend::reached) made here in the WINDOW_HOURS
  * after it went, against the same hours BASELINE_DAYS before for the same
- * people. A visit is a day, in the business's time, with a stamp that
- * proves presence (StampSource::presenceValues), as on the dashboard. The
+ * people. A visit is a day, in the time of the site it was at, with a stamp
+ * that proves presence (StampSource::presenceValues), as on the dashboard.
+ * While still counting, the week before is cut to the same hours gone by,
+ * so a window half over is never weighed against a whole one. The
  * visits above that baseline, never fewer than none, times the business's
  * average ticket, are its estimated revenue; none while no ticket is set.
  * Still counting until its window ends. A campaign sent before recipients
@@ -86,8 +88,10 @@ final readonly class DescribeCampaignResult
 
         $until = $sentAt->addHours(self::WINDOW_HOURS);
         $baselineFrom = $sentAt->setTimezone($timezone)->subDays(self::BASELINE_DAYS)->utc();
+        // The hours gone by since it was sent, all 48 once they are.
+        $seen = now()->lessThan($until) ? (int) max(0, $sentAt->diffInSeconds(now())) : self::WINDOW_HOURS * 3600;
         $visits = $this->visits($campaign, $sentAt, $until, $timezone);
-        $baseline = $this->visits($campaign, $baselineFrom, $baselineFrom->addHours(self::WINDOW_HOURS), $timezone);
+        $baseline = $this->visits($campaign, $baselineFrom, $baselineFrom->addSeconds($seen), $timezone);
 
         return [
             'visits' => $visits,
@@ -98,7 +102,10 @@ final readonly class DescribeCampaignResult
         ];
     }
 
-    /** The days, in the business's time, its reached followers proved they were here, from one moment to (not including) another. */
+    /**
+     * The days its reached followers proved they were here, from one moment to (not including) another: each in its
+     * site's time, the business's for a stamp whose site is gone.
+     */
     private function visits(Campaign $campaign, CarbonInterface $from, CarbonInterface $to, string $timezone): int
     {
         // The tenant tables are never joined (TenancyBoundary): the enrollment's customer comes with it, two columns.
@@ -111,9 +118,9 @@ final readonly class DescribeCampaignResult
             ->whereIn('enrollment_id', CardEnrollment::query()->select('id')
                 ->where('organization_id', $campaign->organization_id)
                 ->whereIn('user_id', CampaignSend::query()->select('user_id')->where('campaign_id', $campaign->id)->reached()))
-            ->with('enrollment:id,user_id')
-            ->get(['enrollment_id', 'created_at'])
-            ->map(fn (StampEvent $stamp): string => $stamp->enrollment->user_id.'|'.$stamp->created_at->copy()->setTimezone($timezone)->format('Y-m-d'))
+            ->with(['enrollment:id,user_id', 'location:id,timezone'])
+            ->get(['enrollment_id', 'location_id', 'created_at'])
+            ->map(fn (StampEvent $stamp): string => $stamp->enrollment->user_id.'|'.$stamp->created_at->copy()->setTimezone($stamp->location->timezone ?? $timezone)->format('Y-m-d'))
             ->unique()->count();
     }
 }

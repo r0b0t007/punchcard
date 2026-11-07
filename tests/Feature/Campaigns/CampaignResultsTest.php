@@ -9,6 +9,7 @@ use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
+use App\Models\Location;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -138,6 +139,29 @@ it('has no revenue while no average ticket is set', function (): void {
     ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('ticket', null)->where('revenue', null));
 });
 
+it('weighs the hours gone by against the same hours a week before while counting, never a whole 48 h', function (): void {
+    $enrollment = ($this->recipient)();
+    Carbon::setTestNow($this->sentAt->addHours(3));
+    ($this->visit)($enrollment, '2026-11-04 11:00:00');
+    // The week before: within its first 3 hours, and after them.
+    ($this->visit)($enrollment, '2026-10-28 11:00:00');
+    ($this->visit)($enrollment, '2026-10-29 11:00:00');
+
+    ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('results.counting', true)
+        ->where('results.visits', 1)->where('results.baseline', 1)->where('results.extra', 0));
+});
+
+it('takes each visit\'s day in the time of the site it was at', function (): void {
+    $enrollment = ($this->recipient)();
+    $tokyo = $this->context->bypass(fn (): Location => Location::factory()->create(['business_id' => $this->tenants->a1->id, 'timezone' => 'Asia/Tokyo']));
+
+    // 23:30 on the 4th in Casablanca is the 5th in Tokyo, where the stamp was: the same day as the next one.
+    ($this->visit)($enrollment, '2026-11-04 23:30:00', ['location_id' => $tokyo->id]);
+    ($this->visit)($enrollment, '2026-11-05 10:00:00');
+
+    ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('results.visits', 1));
+});
+
 it('says it is still counting within the 48 h, and until when', function (): void {
     ($this->recipient)();
     Carbon::setTestNow($this->sentAt->addHours(47));
@@ -211,8 +235,10 @@ it('takes a ticket from 1 to 10,000 dirhams, in whole centimes', function (mixed
 ]);
 
 it('says what a ticket can be in dirhams, in the owner\'s language', function (): void {
-    $this->actingAs($this->owner)->patch(route('campaigns.ticket'), ['average_ticket' => 50])
-        ->assertSessionHasErrors(['average_ticket' => 'Votre ticket moyen est entre 1 et 10 000 dirhams.']);
+    $this->actingAs($this->owner)->patch(route('campaigns.ticket'), ['average_ticket' => 50])->assertSessionHasErrors('average_ticket');
+
+    // 10 000 as French writes it, with a thin space.
+    expect(session('errors')->first('average_ticket'))->toMatch('/^Votre ticket moyen est entre 1 et 10\s000 dirhams\.$/u');
 });
 
 it('says under the field when the ticket was changed too often', function (): void {

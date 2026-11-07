@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Hourglass, Info } from 'lucide-react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { useState } from 'react';
 import { NotificationPreview } from '@/components/campaigns/notification-preview';
 import InputError from '@/components/input-error';
@@ -181,19 +181,19 @@ function Figure({
     value,
     note,
     test,
-    stamp = false,
+    variant,
     children,
 }: {
     label: string;
     value?: ReactNode;
     note?: string;
     test: string;
-    /** The figure that stands out: the revenue. */
-    stamp?: boolean;
+    /** stamp: the figure that stands out, the revenue. */
+    variant?: ComponentProps<typeof Card>['variant'];
     children?: ReactNode;
 }) {
     return (
-        <Card variant={stamp ? 'stamp' : 'default'} data-test={test}>
+        <Card variant={variant} data-test={test}>
             <CardContent>
                 <div className="flex h-full flex-col gap-1">
                     <span className="text-sm text-muted-foreground">
@@ -234,7 +234,7 @@ function Revenue({
             <Figure
                 label={t('Estimated revenue')}
                 test="campaign-revenue"
-                stamp
+                variant="stamp"
             >
                 <TicketForm
                     ticket={ticket}
@@ -254,7 +254,7 @@ function Revenue({
                 { count: extra, ticket: formatDirhams(locale, ticket) },
             )}
             test="campaign-revenue"
-            stamp
+            variant="stamp"
         >
             <Button
                 variant="link"
