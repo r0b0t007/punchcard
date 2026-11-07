@@ -9,6 +9,7 @@ use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
+use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -52,7 +53,7 @@ beforeEach(function (): void {
         return $this->tenants->enroll($customer, $this->tenants->cardA);
     };
     // A stamp at a local moment in Casablanca (a QR stamp, which proves they were here, unless told otherwise).
-    $this->visit = fn (CardEnrollment $enrollment, string $local, array $overrides = [], ?Business $at = null): \App\Models\StampEvent => $this->tenants->stamp($enrollment, $at ?? $this->tenants->a1, [
+    $this->visit = fn (CardEnrollment $enrollment, string $local, array $overrides = [], ?Business $at = null): StampEvent => $this->tenants->stamp($enrollment, $at ?? $this->tenants->a1, [
         'created_at' => CarbonImmutable::parse($local, 'Africa/Casablanca')->utc(), ...$overrides,
     ]);
     $this->results = fn (?Campaign $campaign = null, ?User $as = null) => $this->actingAs($as ?? $this->owner)->get(route('campaigns.show', ($campaign ?? $this->campaign)->id));
