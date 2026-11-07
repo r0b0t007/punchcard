@@ -8,13 +8,13 @@ use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\CampaignSend;
+use App\Models\CardEnrollment;
 use App\Models\StampEvent;
 use App\Support\Campaigns\CampaignText;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Query\JoinClause;
 
 /**
  * A sent campaign's results (CHW-48, B10, design 19a): who it was sent to,
@@ -101,19 +101,19 @@ final readonly class DescribeCampaignResult
     /** The days, in the business's time, its reached followers proved they were here, from one moment to (not including) another. */
     private function visits(Campaign $campaign, CarbonInterface $from, CarbonInterface $to, string $timezone): int
     {
+        // The tenant tables are never joined (TenancyBoundary): the enrollment's customer comes with it, two columns.
         return StampEvent::query()
-            ->join('card_enrollments', function (JoinClause $enrollments) use ($campaign): void {
-                $enrollments->on('card_enrollments.id', '=', 'stamp_events.enrollment_id')
-                    ->where('card_enrollments.organization_id', $campaign->organization_id);
-            })
-            ->where('stamp_events.organization_id', $campaign->organization_id)
-            ->where('stamp_events.business_id', $campaign->business_id)
-            ->whereIn('stamp_events.source', StampSource::presenceValues())
-            ->where('stamp_events.created_at', '>=', $from)
-            ->where('stamp_events.created_at', '<', $to)
-            ->whereIn('card_enrollments.user_id', CampaignSend::query()->select('user_id')->where('campaign_id', $campaign->id)->reached())
-            ->get(['stamp_events.created_at', 'card_enrollments.user_id'])
-            ->map(fn (StampEvent $stamp): string => $stamp->getAttribute('user_id').'|'.$stamp->created_at->copy()->setTimezone($timezone)->format('Y-m-d'))
+            ->where('organization_id', $campaign->organization_id)
+            ->where('business_id', $campaign->business_id)
+            ->whereIn('source', StampSource::presenceValues())
+            ->where('created_at', '>=', $from)
+            ->where('created_at', '<', $to)
+            ->whereIn('enrollment_id', CardEnrollment::query()->select('id')
+                ->where('organization_id', $campaign->organization_id)
+                ->whereIn('user_id', CampaignSend::query()->select('user_id')->where('campaign_id', $campaign->id)->reached()))
+            ->with('enrollment:id,user_id')
+            ->get(['enrollment_id', 'created_at'])
+            ->map(fn (StampEvent $stamp): string => $stamp->enrollment->user_id.'|'.$stamp->created_at->copy()->setTimezone($timezone)->format('Y-m-d'))
             ->unique()->count();
     }
 }
