@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AutomationTrigger;
 use App\Models\Concerns\BelongsToBusiness;
+use App\Models\Concerns\FillsOnce;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -45,6 +46,7 @@ use LogicException;
 class AutomationSend extends Model implements TenantModel
 {
     use BelongsToBusiness;
+    use FillsOnce;
     use GuardsTenantWrites;
 
     /** @use HasFactory<AutomationSendFactory> */
@@ -73,13 +75,7 @@ class AutomationSend extends Model implements TenantModel
      */
     public function markSent(CarbonInterface $at): bool
     {
-        if (static::query()->whereKey($this->id)->whereNull('sent_at')->update(['sent_at' => $at]) !== 1) {
-            return false;
-        }
-
-        $this->forceFill(['sent_at' => $at])->syncOriginalAttribute('sent_at');
-
-        return true;
+        return $this->fillOnce('sent_at', $at);
     }
 
     /**

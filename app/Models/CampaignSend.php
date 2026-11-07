@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBusiness;
+use App\Models\Concerns\FillsOnce;
 use App\Models\Concerns\GuardsTenantWrites;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -12,7 +13,9 @@ use App\Support\Tenancy\TenantModel;
 use Carbon\CarbonInterface;
 use Database\Factories\CampaignSendFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +46,7 @@ use LogicException;
 class CampaignSend extends Model implements TenantModel
 {
     use BelongsToBusiness;
+    use FillsOnce;
     use GuardsTenantWrites;
 
     /** @use HasFactory<CampaignSendFactory> */
@@ -94,6 +98,17 @@ class CampaignSend extends Model implements TenantModel
     }
 
     /**
+     * Those a phone's push service accepted it for: the recipients B10 counts, never a claim still pushing.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function reached(Builder $query): void
+    {
+        $query->whereNotNull('sent_at');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -102,17 +117,5 @@ class CampaignSend extends Model implements TenantModel
             'sent_at' => 'datetime',
             'opened_at' => 'datetime',
         ];
-    }
-
-    /** @param 'sent_at'|'opened_at' $column */
-    private function fillOnce(string $column, CarbonInterface $at): bool
-    {
-        if (static::query()->whereKey($this->id)->whereNull($column)->update([$column => $at]) !== 1) {
-            return false;
-        }
-
-        $this->forceFill([$column => $at])->syncOriginalAttribute($column);
-
-        return true;
     }
 }

@@ -42,14 +42,17 @@ export type StaticRoute = {
 
 /**
  * The pages of My cards (C5, C6), which the service worker answers with
- * the cards kept on the phone when they can't load (CHW-35). Not My QR
- * (C10, CHW-28): its code comes from the server, so offline it has none,
+ * the cards kept on the phone when they can't load (CHW-35), and a
+ * campaign notification's open link (`/o/`, CHW-48), which opens a card:
+ * tapped offline, the cards kept on the phone, as before the link. Not My
+ * QR (C10, CHW-28): its code comes from the server, so offline it has none,
  * and the cards list in its place would leave staff nothing to scan.
  */
 export function hasOfflineFallback(url: URL, origin: string): boolean {
     return (
         url.origin === origin &&
-        /^\/app(\/|$)/.test(url.pathname) &&
+        (/^\/app(\/|$)/.test(url.pathname) ||
+            /^\/o\/\d+$/.test(url.pathname)) &&
         url.pathname !== '/app/qr'
     );
 }
@@ -120,7 +123,7 @@ export function loadInFull(url: URL): Response {
  * them its start-up.
  */
 export const NETWORK_ROUTES: StaticRoute[] = [
-    ...['/app', '/app/*'].map((urlPattern): StaticRoute => ({
+    ...['/app', '/app/*', '/o/*'].map((urlPattern): StaticRoute => ({
         condition: { requestMode: 'navigate', urlPattern },
         source: 'fetch-event',
     })),

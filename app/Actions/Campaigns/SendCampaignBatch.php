@@ -20,7 +20,8 @@ use Throwable;
  * notification (CampaignMessage). Each is claimed first (CHW-48,
  * CampaignSend), once per campaign and follower, so a batch run again never
  * pushes twice, and the campaign's results know who it went to. One failing
- * never stops the others; logged by id only. Each push a phone's push
+ * never stops the others: its claim is let go, so the job tried again
+ * (PushCampaignBatch) tries it again; logged by id only. Each push a phone's push
  * service accepts is marked and counted as it goes (CountCampaignPush), so a
  * batch cut short keeps what it sent.
  *
@@ -40,6 +41,8 @@ final readonly class SendCampaignBatch
             $title = CampaignText::notificationTitle($business->name, $campaign->title);
 
             foreach (User::query()->whereKey($userIds)->get() as $user) {
+                $send = null;
+
                 try {
                     $send = CampaignSend::query()->createOrFirst(['campaign_id' => $campaign->id, 'user_id' => $user->id], ['business_id' => $campaign->business_id]);
 
@@ -51,8 +54,17 @@ final readonly class SendCampaignBatch
                     $user->notifyNow(new CampaignMessage($campaign->id, $send->id, $title, $campaign->body));
                 } catch (Throwable) {
                     Log::warning('A campaign notification failed.', ['campaign' => $campaign->id, 'user' => $user->id]);
+                    $this->letGo($send);
                 }
             }
         });
+    }
+
+    /** A claim whose push failed, let go so a try again reaches them; one already accepted by a phone is kept. */
+    private function letGo(?CampaignSend $send): void
+    {
+        if ($send?->wasRecentlyCreated === true) {
+            CampaignSend::query()->whereKey($send->id)->whereNull('sent_at')->delete();
+        }
     }
 }

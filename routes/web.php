@@ -143,7 +143,7 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
 });
 
 // A tap on a campaign's notification (CHW-48): its signed link counts the open, then opens the card. Signed in or not.
-Route::get('o/{send}', CampaignOpenController::class)->whereNumber('send')->middleware([NeverCache::class, 'throttle:60,1'])->name('campaigns.opened');
+Route::get('o/{send}', CampaignOpenController::class)->whereNumber('send')->middleware([NeverCache::class, 'throttle:campaign-open'])->name('campaigns.opened');
 
 // An invitation to a business's staff (CHW-146), opened from the invited inbox, signed in or not. Never cached.
 Route::middleware(NeverCache::class)->group(function (): void {

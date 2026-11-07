@@ -80,6 +80,8 @@ describe('NETWORK_ROUTES', () => {
         expect(myCards.map((rule) => rule.condition)).toEqual([
             { requestMode: 'navigate', urlPattern: '/app' },
             { requestMode: 'navigate', urlPattern: '/app/*' },
+            // A campaign notification's open link, which opens a card (CHW-48).
+            { requestMode: 'navigate', urlPattern: '/o/*' },
         ]);
 
         // The rules apply in order: theirs before the one for every page.
@@ -96,6 +98,12 @@ describe('hasOfflineFallback', () => {
     it('covers My cards and a card', () => {
         expect(fallback('/app')).toBe(true);
         expect(fallback('/app/cards/7')).toBe(true);
+    });
+
+    it("covers a campaign notification's open link, which opens a card (CHW-48)", () => {
+        expect(fallback('/o/12?expires=1&signature=abc')).toBe(true);
+        expect(fallback('/o/12/more')).toBe(false);
+        expect(fallback('/o/')).toBe(false);
     });
 
     it('covers nothing else', () => {

@@ -8,11 +8,15 @@ use App\Models\Campaign;
 use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A tap on a campaign's notification (CHW-48, B10): their send is opened,
- * once, and the campaign's open count goes up only then, so tapping it
- * again never counts twice. Then where the notification opens, worked out
+ * once, and the campaign's open count goes up only then, in one
+ * transaction, so tapping it again never counts twice and a mark never goes
+ * uncounted. A tap proves the phone got it: a send its push service's
+ * answer never marked is marked sent and counted too, so opens never
+ * outnumber what was sent. Then where the notification opens, worked out
  * here, never taken from the link: their enrollment of the card chosen, or
  * My cards. The send is gone (the account deleted since): My cards, nothing
  * counted. In bypass(): the follower may be signed out, and the counts are
@@ -32,9 +36,15 @@ final readonly class RecordCampaignOpen
                 return route('app.cards', [], false);
             }
 
-            if ($send->markOpened(now())) {
-                Campaign::query()->whereKey($send->campaign_id)->increment('open_count');
-            }
+            DB::transaction(function () use ($send): void {
+                if ($send->markSent(now())) {
+                    Campaign::query()->whereKey($send->campaign_id)->increment('sent_count');
+                }
+
+                if ($send->markOpened(now())) {
+                    Campaign::query()->whereKey($send->campaign_id)->increment('open_count');
+                }
+            });
 
             $enrollment = $send->campaign->card_id === null ? null : CardEnrollment::query()
                 ->where('organization_id', $send->campaign->organization_id)

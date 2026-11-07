@@ -154,6 +154,23 @@ it('counts a follower once a push service accepted their notification, never a r
         ->and(app(TenantContext::class)->bypass(fn (): bool => $send->refresh()->sent_at !== null))->toBeTrue();
 });
 
+it('lets a failed push\'s claim go, so the job tried again reaches them, and nobody else twice', function (): void {
+    $failed = ($this->follower)();
+    $reached = ($this->follower)();
+    $campaign = app(TenantContext::class)->bypass(fn (): Campaign => Campaign::factory()->for($this->tenants->a1)->create());
+    Notification::shouldReceive('sendNow')->once()->andThrow(new RuntimeException('The push service timed out.'));
+    Notification::shouldReceive('sendNow')->once();
+
+    app(SendCampaignBatch::class)->handle($campaign->id, [$failed->id, $reached->id]);
+    expect(app(TenantContext::class)->bypass(fn (): array => CampaignSend::query()->pluck('user_id')->all()))->toBe([$reached->id]);
+
+    Notification::fake();
+    app(SendCampaignBatch::class)->handle($campaign->id, [$failed->id, $reached->id]);
+
+    Notification::assertSentToTimes($failed, CampaignMessage::class, 1);
+    Notification::assertNotSentTo($reached, CampaignMessage::class);
+});
+
 it('records who each campaign went to, and pushes a batch run again to nobody twice', function (): void {
     $first = ($this->follower)();
     $second = ($this->follower)();
