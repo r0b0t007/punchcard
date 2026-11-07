@@ -1234,5 +1234,20 @@
     "follower with a phone|followers with a phone": "abonné avec un téléphone|abonnés avec un téléphone",
     "Average ticket saved.": "Ticket moyen enregistré.",
     "Your average ticket is between :min and :max dirhams.": "Votre ticket moyen est entre :min et :max dirhams.",
-    "Too many changes. Try again in a minute.": "Trop de modifications. Réessayez dans une minute."
+    "Too many changes. Try again in a minute.": "Trop de modifications. Réessayez dans une minute.",
+    "Invite a friend": "Inviter un ami",
+    "When a friend you invite comes in for the first time, you get +1 stamp. Up to :count a month.": "Quand un ami que vous invitez vient pour la première fois, vous gagnez +1 tampon. Jusqu’à :count par mois.",
+    "Share": "Partager",
+    "Copy link": "Copier le lien",
+    "Link copied": "Lien copié",
+    "You've had this month's :count: more next month": "Vous avez eu les :count du mois : d’autres le mois prochain",
+    ":count of :cap this month": ":count sur :cap ce mois-ci",
+    "Collect stamps at :place with me.": "Collectionne des tampons chez :place avec moi.",
+    "Refer a friend": "Parrainage",
+    "Customers can invite friends from their card. When a friend comes in for the first time, the customer gets +1 stamp.": "Les clients peuvent inviter des amis depuis leur carte. Quand un ami vient pour la première fois, le client gagne +1 tampon.",
+    "Stamps a customer can earn this way each month": "Tampons qu’un client peut gagner ainsi chaque mois",
+    "1 to 10": "De 1 à 10",
+    "A friend invited you": "Un ami vous a invité",
+    "Friends they brought": "Amis parrainés venus ici",
+    "Couldn't copy the link. Copy it here:": "Impossible de copier le lien. Copiez-le ici :"
 }

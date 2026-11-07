@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Customers;
 
 use App\Actions\Counter\ScanLocations;
+use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
@@ -43,7 +44,7 @@ final readonly class DescribeCustomer
 
     /**
      * @return array{
-     *     customer: array{id: int, name: string, status: string, visits: int, usualGapDays: int|null, lastVisitDays: int, rewardsRedeemed: int},
+     *     customer: array{id: int, name: string, status: string, visits: int, usualGapDays: int|null, lastVisitDays: int, rewardsRedeemed: int, friendsCameIn: int},
      *     cards: list<array{id: int, name: string, rewardText: string, stamps: int, toReward: int|null}>,
      *     history: list<array{key: string, kind: string, source: string|null, qty: int, card: string|null, location: string|null, by: string|null, reason: string|null, byScan: bool, at: array{day: string, date: string, time: string}}>,
      *     shown: int,
@@ -116,6 +117,7 @@ final readonly class DescribeCustomer
                 'usualGapDays' => $customer->usual_gap_days,
                 'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
+                'friendsCameIn' => $this->friendsCameIn($business, $enrollmentIds),
             ],
             'cards' => array_values($cards->filter(fn (CardEnrollment $enrollment): bool => $enrollment->card !== null)
                 ->map(function (CardEnrollment $enrollment): array {
@@ -144,5 +146,20 @@ final readonly class DescribeCustomer
                 'at' => LocalMoment::of($note->created_at, $timezone, $now),
             ])->all()),
         ];
+    }
+
+    /**
+     * The friends a customer invited who came in to this business (CHW-47): cards referred by theirs, with a stamp
+     * proving a visit here. A count only, and of this business's own customers: a friend who only went to a sister
+     * franchisee, or never came, is not this business's to see.
+     *
+     * @param  array<int, int|string>  $enrollmentIds
+     */
+    private function friendsCameIn(Business $business, array $enrollmentIds): int
+    {
+        return $this->context->bypass(fn (): int => StampEvent::query()->where('business_id', $business->id)
+            ->whereIn('source', StampSource::presenceValues())
+            ->whereIn('enrollment_id', CardEnrollment::query()->where('organization_id', $business->organization_id)->whereIn('referred_by', $enrollmentIds)->select('id'))
+            ->distinct()->count('enrollment_id'));
     }
 }

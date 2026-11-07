@@ -90,7 +90,7 @@ it('shows the owner a customer: status, habits, card progress and what happened 
     $site = $this->tenants->locationOf($this->tenants->a1)->name;
 
     ($this->open)($customer)->assertOk()->assertInertia(fn (Assert $page): Assert => $page->component('business/customers/show')
-        ->where('customer', ['id' => $customer->id, 'name' => 'Salma T.', 'status' => 'active', 'visits' => 3, 'usualGapDays' => 4, 'lastVisitDays' => 4, 'rewardsRedeemed' => 1])
+        ->where('customer', ['id' => $customer->id, 'name' => 'Salma T.', 'status' => 'active', 'visits' => 3, 'usualGapDays' => 4, 'lastVisitDays' => 4, 'rewardsRedeemed' => 1, 'friendsCameIn' => 0])
         ->where('cards', [['id' => $this->enrollment->id, 'name' => $this->tenants->cardA->name, 'rewardText' => $this->tenants->cardA->reward_text, 'stamps' => 4, 'toReward' => $this->tenants->cardA->stamps_required - 4]])
         ->where('history', [
             ['key' => 'redeemed-'.$reward->id, 'kind' => 'redeemed', 'source' => null, 'qty' => 0, 'card' => $reward->reward_text, 'location' => $site, 'by' => 'Yasmine A.', 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-30', 'time' => '18:00']],

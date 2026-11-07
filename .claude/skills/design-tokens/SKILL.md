@@ -104,6 +104,7 @@ above: keep the two in step.
 | C12 Profile: the optional birthday, day and month, set, empty and a date that doesn't exist; it counts 30 days after it is added or changed (17a, CHW-46, CHW-370)                                                                               | `Punchcard Birthday Review.dc.html`                                   |
 | B11 automations: three cards, each with its switch, setting and message (18a); the message editor, a first visit and the toast (18c) (CHW-46)                                                                                                    | `Punchcard Automations Review.dc.html`                                |
 | B10 campaign results: four figures, then the visits compared (19a); no ticket yet, still counting, no more than the week before, sent before results, and B9 opening them (19c) (CHW-48)                                                         | `Punchcard Campaign Results Review.dc.html`                           |
+| C6 refer a friend: the invitation panel under the card (20a); B6 the card builder's switch and monthly limit, B5 friends invited, C1 a friend invited you (20c) (CHW-47)                                                                         | `Punchcard Referrals Review.dc.html`                                  |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.

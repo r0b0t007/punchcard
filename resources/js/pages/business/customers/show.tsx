@@ -25,6 +25,8 @@ type Customer = {
     usualGapDays: number | null;
     lastVisitDays: number;
     rewardsRedeemed: number;
+    /** Friends they invited who came in here (CHW-47): this business's own customers only. */
+    friendsCameIn: number;
 };
 
 type CardProgress = {
@@ -219,6 +221,10 @@ export default function CustomerPage({
                             <Fact
                                 label={t('Rewards redeemed')}
                                 value={customer.rewardsRedeemed}
+                            />
+                            <Fact
+                                label={t('Friends they brought')}
+                                value={customer.friendsCameIn}
                             />
                         </dl>
 

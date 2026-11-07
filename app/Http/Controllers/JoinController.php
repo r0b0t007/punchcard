@@ -44,7 +44,7 @@ final class JoinController extends Controller
 
         return Inertia::render('join/show', [
             'slug' => $business->slug,
-            ...$describe->handle($business, $customer instanceof User ? $customer : null),
+            ...$describe->handle($business, $customer instanceof User ? $customer : null, PendingReferral::from($request->session())?->for($business)),
         ]);
     }
 

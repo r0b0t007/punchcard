@@ -17,18 +17,20 @@ use App\Support\Tenancy\TenantContext;
  * there (CardChoice: a running card the signed-in customer holds, else the
  * card the business runs now), with their stamps. With no card running,
  * nothing is available to join yet, as a tap would be refused. Read across
- * tenants.
+ * tenants. Came by a friend's link (CHW-47, design 20c): invited when the
+ * code would count for that card and this customer (ReferrerFor), never
+ * saying who.
  */
 final readonly class DescribeJoinPage
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private ReferrerFor $referrerFor) {}
 
     /**
-     * @return array{card: ?array<string, mixed>, available: bool, joined: bool}
+     * @return array{card: ?array<string, mixed>, available: bool, joined: bool, invited: bool}
      */
-    public function handle(Business $business, ?User $customer): array
+    public function handle(Business $business, ?User $customer, ?string $referralCode = null): array
     {
-        return $this->context->bypass(function () use ($business, $customer): array {
+        return $this->context->bypass(function () use ($business, $customer, $referralCode): array {
             // The card a tap or joining would use (CardChoice): until it is active, nothing is available.
             $honoured = LoyaltyCard::query()->honouredBy($business->id)->get()->keyBy('id');
             $held = $customer instanceof User
@@ -38,13 +40,14 @@ final readonly class DescribeJoinPage
             $enrollment = $card instanceof LoyaltyCard ? $held->get($card->id) : null;
 
             if (! $card instanceof LoyaltyCard || ! $card->active) {
-                return ['card' => null, 'available' => false, 'joined' => false];
+                return ['card' => null, 'available' => false, 'joined' => false, 'invited' => false];
             }
 
             return [
                 'card' => CustomerCard::of($business, $card, stamps: $enrollment->current_stamps ?? 0),
                 'available' => true,
                 'joined' => $enrollment instanceof CardEnrollment,
+                'invited' => ! $enrollment instanceof CardEnrollment && $this->referrerFor->wouldCount($card->id, $customer, $referralCode),
             ];
         });
     }

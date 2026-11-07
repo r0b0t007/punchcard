@@ -1234,5 +1234,20 @@
     "follower with a phone|followers with a phone": "متابع لديه هاتف|متابع لديه هاتف|متابعان لديهما هاتف|متابعين لديهم هاتف|متابعًا لديهم هاتف|متابع لديهم هاتف",
     "Average ticket saved.": "تم حفظ متوسط الفاتورة.",
     "Your average ticket is between :min and :max dirhams.": "متوسط فاتورتك بين :min و:max درهم.",
-    "Too many changes. Try again in a minute.": "تغييرات كثيرة جدًا. أعد المحاولة بعد دقيقة."
+    "Too many changes. Try again in a minute.": "تغييرات كثيرة جدًا. أعد المحاولة بعد دقيقة.",
+    "Invite a friend": "ادعُ صديقًا",
+    "When a friend you invite comes in for the first time, you get +1 stamp. Up to :count a month.": "عندما يأتي صديق دعوته لأول مرة، تحصل على ختم إضافي. حتى :count في الشهر.",
+    "Share": "مشاركة",
+    "Copy link": "نسخ الرابط",
+    "Link copied": "تم نسخ الرابط",
+    "You've had this month's :count: more next month": "حصلت على :count هذا الشهر: المزيد الشهر القادم",
+    ":count of :cap this month": ":count من :cap هذا الشهر",
+    "Collect stamps at :place with me.": "اجمع الأختام في :place معي.",
+    "Refer a friend": "ادعُ صديقًا",
+    "Customers can invite friends from their card. When a friend comes in for the first time, the customer gets +1 stamp.": "يمكن للعملاء دعوة أصدقائهم من بطاقتهم. عندما يأتي صديق لأول مرة، يحصل العميل على ختم إضافي.",
+    "Stamps a customer can earn this way each month": "الأختام التي يمكن للعميل كسبها بهذه الطريقة شهريًا",
+    "1 to 10": "من 1 إلى 10",
+    "A friend invited you": "دعاك صديق",
+    "Friends they brought": "أصدقاء جاء بهم",
+    "Couldn't copy the link. Copy it here:": "تعذّر نسخ الرابط. انسخه من هنا:"
 }
