@@ -42,6 +42,18 @@ class SetAverageTicketRequest extends FormRequest
         ];
     }
 
+    /**
+     * In dirhams, as the owner typed it, never the centimes sent.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        $range = __('Your average ticket is between 1 and 10,000 dirhams.');
+
+        return ['average_ticket.required' => $range, 'average_ticket.integer' => $range, 'average_ticket.between' => $range];
+    }
+
     public function business(): ?Business
     {
         return $this->business ??= app(TenantContext::class)->business();

@@ -8,13 +8,13 @@ use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\Campaign;
 use App\Models\CampaignSend;
-use App\Models\CardEnrollment;
 use App\Models\StampEvent;
 use App\Support\Campaigns\CampaignText;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Query\JoinClause;
 
 /**
  * A sent campaign's results (CHW-48, B10, design 19a): who it was sent to,
@@ -26,7 +26,11 @@ use Carbon\CarbonInterface;
  * visits above that baseline, never fewer than none, times the business's
  * average ticket, are its estimated revenue; none while no ticket is set.
  * Still counting until its window ends. A campaign sent before recipients
- * were recorded has nothing to compare: what it was sent to only.
+ * were recorded (records_sends) has nothing to compare: what it was sent to
+ * only. Days and the week before are the business's (its first open site's
+ * time, LocalMoment::timezoneOfBusiness): 7 days back on its calendar, so a
+ * clock change between them never moves the window. The notification is
+ * shown with the business's name today.
  *
  * Read in bypass(), each read kept to the campaign's business and
  * organization: a franchisee's results are its own, the follower's other
@@ -50,7 +54,7 @@ final readonly class DescribeCampaignResult
      */
     public function handle(Business $business, Campaign $campaign): array
     {
-        $timezone = LocalMoment::timezoneOf($business->firstLocation()->first());
+        $timezone = LocalMoment::timezoneOfBusiness($business->id);
         $sentAt = $campaign->sent_at ?? $campaign->send_at;
         $results = $this->context->bypass(fn (): ?array => $this->results($campaign, $sentAt->toImmutable(), $timezone));
         $extra = $results['extra'] ?? 0;
@@ -76,12 +80,12 @@ final readonly class DescribeCampaignResult
     /** @return array{visits: int, baseline: int, extra: int, counting: bool, until: array{day: 'today'|'other', date: string, time: string}}|null */
     private function results(Campaign $campaign, CarbonImmutable $sentAt, string $timezone): ?array
     {
-        if (! CampaignSend::query()->where('campaign_id', $campaign->id)->exists()) {
+        if (! $campaign->records_sends) {
             return null;
         }
 
         $until = $sentAt->addHours(self::WINDOW_HOURS);
-        $baselineFrom = $sentAt->subDays(self::BASELINE_DAYS);
+        $baselineFrom = $sentAt->setTimezone($timezone)->subDays(self::BASELINE_DAYS)->utc();
         $visits = $this->visits($campaign, $sentAt, $until, $timezone);
         $baseline = $this->visits($campaign, $baselineFrom, $baselineFrom->addHours(self::WINDOW_HOURS), $timezone);
 
@@ -97,20 +101,19 @@ final readonly class DescribeCampaignResult
     /** The days, in the business's time, its reached followers proved they were here, from one moment to (not including) another. */
     private function visits(Campaign $campaign, CarbonInterface $from, CarbonInterface $to, string $timezone): int
     {
-        $stamps = StampEvent::query()
-            ->where('organization_id', $campaign->organization_id)
-            ->where('business_id', $campaign->business_id)
-            ->whereIn('source', StampSource::presenceValues())
-            ->where('created_at', '>=', $from)
-            ->where('created_at', '<', $to)
-            ->whereIn('enrollment_id', CardEnrollment::query()->select('id')
-                ->where('organization_id', $campaign->organization_id)
-                ->whereIn('user_id', CampaignSend::query()->select('user_id')->where('campaign_id', $campaign->id)->reached()))
-            ->get(['enrollment_id', 'created_at']);
-
-        $users = CardEnrollment::query()->whereKey($stamps->pluck('enrollment_id')->unique()->all())->pluck('user_id', 'id');
-
-        return $stamps->map(fn (StampEvent $stamp): string => $users[$stamp->enrollment_id].'|'.$stamp->created_at->copy()->setTimezone($timezone)->format('Y-m-d'))
+        return StampEvent::query()
+            ->join('card_enrollments', function (JoinClause $enrollments) use ($campaign): void {
+                $enrollments->on('card_enrollments.id', '=', 'stamp_events.enrollment_id')
+                    ->where('card_enrollments.organization_id', $campaign->organization_id);
+            })
+            ->where('stamp_events.organization_id', $campaign->organization_id)
+            ->where('stamp_events.business_id', $campaign->business_id)
+            ->whereIn('stamp_events.source', StampSource::presenceValues())
+            ->where('stamp_events.created_at', '>=', $from)
+            ->where('stamp_events.created_at', '<', $to)
+            ->whereIn('card_enrollments.user_id', CampaignSend::query()->select('user_id')->where('campaign_id', $campaign->id)->reached())
+            ->get(['stamp_events.created_at', 'card_enrollments.user_id'])
+            ->map(fn (StampEvent $stamp): string => $stamp->getAttribute('user_id').'|'.$stamp->created_at->copy()->setTimezone($timezone)->format('Y-m-d'))
             ->unique()->count();
     }
 }

@@ -1232,5 +1232,7 @@
     "Sent before results were recorded: what it was sent to is all there is.": "Envoyée avant que les résultats soient enregistrés : seul son envoi est connu.",
     "Sent to": "Envoyée à",
     "follower with a phone|followers with a phone": "abonné avec un téléphone|abonnés avec un téléphone",
-    "Average ticket saved.": "Ticket moyen enregistré."
+    "Average ticket saved.": "Ticket moyen enregistré.",
+    "Your average ticket is between 1 and 10,000 dirhams.": "Votre ticket moyen est entre 1 et 10 000 dirhams.",
+    "Too many changes. Try again in a minute.": "Trop de modifications. Réessayez dans une minute."
 }

@@ -414,6 +414,9 @@ final class DemoSeeder extends Seeder
 
             if ($daysAgo === 2) {
                 $this->campaignSends($campaign, $people);
+            } else {
+                // Sent before who it went to was recorded.
+                $campaign->forceFill(['records_sends' => false])->save();
             }
         }
 
@@ -436,17 +439,18 @@ final class DemoSeeder extends Seeder
             ->whereIn('id', StampEvent::query()->select('enrollment_id')->where('business_id', $campaign->business_id))
             ->orderBy('id')->pluck('user_id')->unique()->take($people)->values();
         $sentAt = $campaign->sent_at ?? now();
+        $opened = 0;
 
         foreach ($customers as $i => $userId) {
             $send = CampaignSend::query()->create(['business_id' => $campaign->business_id, 'campaign_id' => $campaign->id, 'user_id' => $userId]);
             $send->markSent($sentAt->copy()->addSeconds(5));
 
-            if ($i % 3 === 0) {
-                $send->markOpened($sentAt->copy()->addMinutes(20 + $i));
+            if ($i % 3 === 0 && $send->markOpened($sentAt->copy()->addMinutes(20 + $i))) {
+                $opened++;
             }
         }
 
-        $campaign->forceFill(['sent_count' => $customers->count(), 'open_count' => intdiv($customers->count() + 2, 3)])->save();
+        $campaign->forceFill(['sent_count' => $customers->count(), 'open_count' => $opened])->save();
     }
 
     /**

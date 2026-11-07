@@ -42,6 +42,7 @@ use LogicException;
  * @property int $audience_count who could get it when it was created: followers in the segment with a phone
  * @property int $sent_count
  * @property int $open_count results (B10, CHW-48); 0 until then
+ * @property bool $records_sends whether who it went to is recorded (campaign_sends, CHW-48): false only for those sent before
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -117,6 +118,7 @@ class Campaign extends Model implements TenantModel
             'send_at' => 'datetime',
             'queued_at' => 'datetime',
             'sent_at' => 'datetime',
+            'records_sends' => 'boolean',
         ];
     }
 }

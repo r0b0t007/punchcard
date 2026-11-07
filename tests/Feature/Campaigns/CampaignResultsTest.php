@@ -148,9 +148,27 @@ it('says it is still counting within the 48 h, and until when', function (): voi
 
 it('shows only what a campaign sent before results were recorded went to', function (): void {
     $this->context->bypass(fn () => $this->tenants->a1->forceFill(['average_ticket' => 3500])->save());
+    $this->context->bypass(fn () => $this->campaign->forceFill(['records_sends' => false])->save());
 
     ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('results', null)->where('revenue', null)
         ->where('campaign.audience', 5));
+});
+
+it('shows a campaign that reached nobody as such, never as one sent before results', function (): void {
+    // Every push failed: their claims were let go, and nothing is left of who it went to.
+    ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('results.visits', 0)->where('results.baseline', 0)->where('results.extra', 0));
+});
+
+it('takes the week before 7 days back on the business\'s calendar, across a clock change', function (): void {
+    // Sent 10:00 on 10 February 2027 in Casablanca (UTC+0 from 7 February); the week before was UTC+1.
+    $this->sentAt = CarbonImmutable::parse('2027-02-10 10:00:00', 'Africa/Casablanca')->utc();
+    Carbon::setTestNow($this->sentAt->addDays(3));
+    $this->context->bypass(fn () => $this->campaign->forceFill(['send_at' => $this->sentAt, 'sent_at' => $this->sentAt])->save());
+    $enrollment = ($this->recipient)();
+
+    ($this->visit)($enrollment, '2027-02-03 10:30:00');
+
+    ($this->results)()->assertInertia(fn (Assert $page): Assert => $page->where('results.baseline', 1));
 });
 
 it('has no results for a campaign not sent', function (CampaignStatus $status): void {
@@ -191,6 +209,21 @@ it('takes a ticket from 1 to 10,000 dirhams, in whole centimes', function (mixed
     'a fraction of a centime' => [3550.5],
     'none' => [null],
 ]);
+
+it('says what a ticket can be in dirhams, in the owner\'s language', function (): void {
+    $this->actingAs($this->owner)->patch(route('campaigns.ticket'), ['average_ticket' => 50])
+        ->assertSessionHasErrors(['average_ticket' => 'Votre ticket moyen est entre 1 et 10 000 dirhams.']);
+});
+
+it('says under the field when the ticket was changed too often', function (): void {
+    foreach (range(1, 30) as $save) {
+        $this->actingAs($this->owner)->patch(route('campaigns.ticket'), ['average_ticket' => 3500])->assertSessionHasNoErrors();
+    }
+
+    $this->actingAs($this->owner)->patch(route('campaigns.ticket'), ['average_ticket' => 3600])
+        ->assertSessionHasErrors(['average_ticket' => 'Trop de modifications. Réessayez dans une minute.']);
+    expect($this->context->bypass(fn (): ?int => $this->tenants->a1->refresh()->average_ticket))->toBe(3500);
+});
 
 it('refuses the ticket from staff', function (): void {
     $staff = $this->tenants->member(User::factory()->create(), $this->tenants->a1, BusinessRole::Staff);

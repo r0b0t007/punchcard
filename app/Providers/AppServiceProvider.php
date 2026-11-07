@@ -289,12 +289,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('data-export', fn (Request $request): Limit => Limit::perHour(5)->by('data-export:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): RedirectResponse => to_route('privacy.edit')->with('status', 'export-limited')));
 
+        // The average ticket on a campaign's results (CHW-48): an owner's edit, never a script's; said under the field.
+        RateLimiter::for('campaign-ticket', fn (Request $request): Limit => Limit::perMinute(30)->by('campaign-ticket:'.$request->user()?->getAuthIdentifier())
+            ->response(fn (): RedirectResponse => back()->withErrors(['average_ticket' => __('Too many changes. Try again in a minute.')])));
+
         // The public join page (CHW-31): plenty for a queue at the counter, not for walking every slug.
         // Per browser session, so customers sharing a carrier's address (CGNAT) don't share a limit, with a
         // generous cap per client address all the same.
-        // The average ticket on a campaign's results (CHW-48): an owner's edit, never a script's.
-        RateLimiter::for('campaign-ticket', fn (Request $request): Limit => Limit::perMinute(30)->by('campaign-ticket:'.$request->user()?->getAuthIdentifier()));
-
         // A campaign notification's open link (CHW-48): every follower gets it at once, many behind one carrier address,
         // signed out or not. A few taps a minute per link, and a generous cap per address against a scan.
         RateLimiter::for('campaign-open', fn (Request $request): array => [

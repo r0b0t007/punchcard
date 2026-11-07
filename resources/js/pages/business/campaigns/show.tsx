@@ -20,7 +20,7 @@ import { index, ticket as saveTicket } from '@/routes/campaigns';
 type Campaign = {
     id: number;
     title: string;
-    /** As the phone showed it: the business's name, then the title. */
+    /** As the phone shows it, with the business's name today, then the title. */
     notification: string;
     body: string;
     segment: Segment;
@@ -236,7 +236,11 @@ function Revenue({
                 test="campaign-revenue"
                 stamp
             >
-                <TicketForm ticket={ticket} onSaved={() => setEditing(false)} />
+                <TicketForm
+                    ticket={ticket}
+                    onSaved={() => setEditing(false)}
+                    onCancel={editing ? () => setEditing(false) : undefined}
+                />
             </Figure>
         );
     }
@@ -268,9 +272,12 @@ function Revenue({
 function TicketForm({
     ticket,
     onSaved,
+    onCancel,
 }: {
     ticket: number | null;
     onSaved: () => void;
+    /** Back to the revenue, when one is shown. */
+    onCancel?: () => void;
 }) {
     const { t } = useTranslation();
     const form = useForm({
@@ -315,6 +322,16 @@ function TicketForm({
                 >
                     {t('Save')}
                 </Button>
+                {onCancel ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onCancel}
+                        data-test="cancel-ticket"
+                    >
+                        {t('Cancel')}
+                    </Button>
+                ) : null}
             </div>
             <InputError message={form.errors.average_ticket} />
         </form>
