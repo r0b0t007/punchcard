@@ -108,6 +108,8 @@ final readonly class SaveCard
             'terms' => isset($fields['terms']) ? trim((string) $fields['terms']) : null,
             'cooldown_min' => (int) $fields['cooldown_min'],
             'daily_cap' => isset($fields['daily_cap']) ? (int) $fields['daily_cap'] : null,
+            ...(array_key_exists('referrals_enabled', $fields) ? ['referrals_enabled' => (bool) $fields['referrals_enabled']] : []),
+            ...(array_key_exists('referral_monthly_cap', $fields) ? ['referral_monthly_cap' => (int) $fields['referral_monthly_cap']] : []),
         ];
     }
 

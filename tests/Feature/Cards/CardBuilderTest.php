@@ -423,3 +423,22 @@ it('saves a held progressive card whose stored tiers are out of order, never set
 
     expect(($this->card)($card->id))->name->toBe('Renamed')->tiers->toBe(array_reverse($tiers));
 });
+
+it('starts a card with referrals off and 3 a month, and saves what the owner sets (CHW-47)', function (): void {
+    ($this->inB1)()->post(route('cards.store'), ($this->fields)())->assertSessionHasNoErrors();
+    $card = ($this->newest)();
+    expect([$card->referrals_enabled, $card->referral_monthly_cap])->toBe([false, 3]);
+
+    ($this->inB1)()->put(route('cards.update', $card->id), ($this->fields)(['referrals_enabled' => true, 'referral_monthly_cap' => 5]))->assertSessionHasNoErrors();
+    $card = ($this->card)($card->id);
+    expect([$card->referrals_enabled, $card->referral_monthly_cap])->toBe([true, 5]);
+
+    // A page from before referrals sends neither: the card keeps them.
+    ($this->inB1)()->put(route('cards.update', $card->id), ($this->fields)())->assertSessionHasNoErrors();
+    $card = ($this->card)($card->id);
+    expect([$card->referrals_enabled, $card->referral_monthly_cap])->toBe([true, 5]);
+});
+
+it('takes a referral cap of 1 to 10 a month (CHW-47)', function (mixed $cap): void {
+    ($this->inB1)()->post(route('cards.store'), ($this->fields)(['referral_monthly_cap' => $cap]))->assertSessionHasErrors('referral_monthly_cap');
+})->with([0, 11, 'three']);

@@ -77,6 +77,9 @@ class CardRequest extends FormRequest
             'terms' => ['nullable', 'string', 'max:2000'],
             'cooldown_min' => ['required', 'integer', 'between:0,1440'],
             'daily_cap' => ['nullable', 'integer', 'between:1,100'],
+            // Refer-a-friend (CHW-47): a page from before it sends neither, and the card keeps what it has.
+            'referrals_enabled' => ['sometimes', 'boolean'],
+            'referral_monthly_cap' => ['sometimes', 'integer', 'between:1,10'],
             'publish' => ['sometimes', 'boolean'],
         ];
     }

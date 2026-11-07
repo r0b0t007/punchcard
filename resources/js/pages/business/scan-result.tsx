@@ -24,6 +24,7 @@ import { useSecondsLeft } from '@/lib/seconds';
 import { cn } from '@/lib/utils';
 import { scan as scanner } from '@/routes/counter';
 import { redeem, stamp } from '@/routes/counter/scans';
+import { newIdempotencyKey } from '@/lib/campaigns';
 
 type ScanCard = {
     name: string;
@@ -807,8 +808,7 @@ function RedeemedView({
     );
 }
 
+/** A UUID, as the server takes (StampScanRequest), outside a secure context too. */
 function newKey(): string {
-    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return newIdempotencyKey();
 }

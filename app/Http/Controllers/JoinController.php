@@ -9,6 +9,7 @@ use App\Actions\Cards\FindJoinableBusiness;
 use App\Actions\Cards\JoinCard;
 use App\Models\Business;
 use App\Models\User;
+use App\Support\Referrals\PendingReferral;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,7 +19,9 @@ use Inertia\Response;
  * The join page (CHW-31), the QR stand's link. Never cached (NeverCache).
  *
  * - GET /j/{slug} (throttled): the business's card. Viewing it changes
- *   nothing, so a glance never decides where a later sign-in lands.
+ *   nothing, so a glance never decides where a later sign-in lands; but a
+ *   friend's invitation (?ref=CODE, CHW-47) is kept for this business
+ *   (PendingReferral), for the card added here or by a first tap.
  * - GET /j/{slug}/register and /j/{slug}/login (signed out): the page's
  *   "Continue with email" and "I already have an account": come back here
  *   after signing in (url.intended), unless a tap waits to be claimed,
@@ -34,6 +37,10 @@ final class JoinController extends Controller
     {
         $business = $this->business($find, $slug);
         $customer = $request->user();
+
+        if ($request->filled('ref')) {
+            PendingReferral::remember($request->session(), $business, $request->query('ref'));
+        }
 
         return Inertia::render('join/show', [
             'slug' => $business->slug,
@@ -61,7 +68,8 @@ final class JoinController extends Controller
         /** @var User $customer */
         $customer = $request->user();
         $business = $this->business($find, $slug);
-        $joinCard->handle($business, $customer);
+        $joinCard->handle($business, $customer, PendingReferral::from($request->session())?->for($business));
+        PendingReferral::forgetFor($request->session(), $business->id);
 
         return to_route('join.show', $business->slug);
     }

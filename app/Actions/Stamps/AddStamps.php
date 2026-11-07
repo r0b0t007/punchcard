@@ -99,6 +99,8 @@ final readonly class AddStamps
                 $request->businessId,
                 array_map(fn (Reward $reward): int => $reward->id, $result->rewards),
                 byOwnTap: $request->source === StampSource::Nfc,
+                presence: $request->provesPresence(),
+                referred: $result->enrollment->referred_by !== null,
             );
         }
 

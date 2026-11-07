@@ -24,6 +24,8 @@ final readonly class EnrollmentChanged implements ShouldDispatchAfterCommit
      * @param  list<int>  $redeemedRewardIds  the rewards this change redeemed
      * @param  bool  $byOwnTap  the customer's own NFC tap made it: its screen (C3) already says what it unlocked
      * @param  bool  $byScan  staff redeemed with a scan of the customer's QR: the customer is told (CHW-228)
+     * @param  bool  $presence  the stamp written proves they were there (a tap, a scan, by hand): a referral's moment (CHW-47)
+     * @param  bool  $referred  the card came from a friend's invitation (CHW-47): only then is the referrer's stamp looked at
      */
     public function __construct(
         public int $enrollmentId,
@@ -33,5 +35,7 @@ final readonly class EnrollmentChanged implements ShouldDispatchAfterCommit
         public array $redeemedRewardIds = [],
         public bool $byOwnTap = false,
         public bool $byScan = false,
+        public bool $presence = false,
+        public bool $referred = false,
     ) {}
 }

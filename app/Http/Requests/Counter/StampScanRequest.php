@@ -23,7 +23,9 @@ class StampScanRequest extends FormRequest
     {
         return [
             'qty' => ['required', 'integer', 'between:1,'.self::MAX_QTY],
-            'key' => ['required', 'string', 'max:64'],
+            // A UUID, as a stamp by hand's (StampCustomerRequest): never one of the keys only the system writes
+            // (a referral's, a birthday's, CHW-47), which share the business's keys.
+            'key' => ['required', 'uuid'],
         ];
     }
 

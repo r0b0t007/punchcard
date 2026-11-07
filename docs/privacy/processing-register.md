@@ -42,7 +42,9 @@ Common to every entry:
 - **People**: customers who joined a program.
 - **Data**: the cards held (stamps, completed cards, date joined, referral code), each stamp (business, site, date, number,
   how it was given: tap, scanned QR, by staff, correction or bonus, the staff's reason on manual stamps), rewards (what,
-  unlocked, redeemed where and when).
+  unlocked, redeemed where and when). On a card with referrals on (CHW-47): whose invitation a card came from, the
+  referral stamps it earned its referrer, and the invitation's code kept in the browser session until a card is added at
+  that business (by join or tap), or the session ends; no device is fingerprinted. In the data download. A deleted account's referral code goes with it; the cards it referred keep only that they were referred.
 - **Recipients**: the organization's admins (all program members); a franchisee's owners and staff only for customers who
   stamped with that franchisee in person; staff at any site of the program see a customer's progress only while the
   customer is at the counter.
