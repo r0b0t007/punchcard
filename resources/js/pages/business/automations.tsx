@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Counter } from '@/components/campaigns/counter';
+import { NotificationPreview } from '@/components/campaigns/notification-preview';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +22,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { StampDot } from '@/components/wordmark';
 import { useTranslation } from '@/hooks/use-translation';
 import { clip, notificationTitle } from '@/lib/campaigns';
 import { cn, typedDir } from '@/lib/utils';
@@ -369,25 +369,6 @@ function Setting({
                     <Plus aria-hidden="true" />
                 </Button>
             </div>
-        </div>
-    );
-}
-
-/** The message as a customer's phone shows it: the punchcard tile, the title and the message. */
-function NotificationPreview({ title, body }: { title: string; body: string }) {
-    return (
-        <div className="flex items-start gap-2.5 rounded-xl bg-secondary p-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-                <StampDot />
-            </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-                <b className="text-sm font-semibold break-words">
-                    <bdi>{title}</bdi>
-                </b>
-                <span className="text-sm break-words">
-                    <bdi>{body}</bdi>
-                </span>
-            </span>
         </div>
     );
 }

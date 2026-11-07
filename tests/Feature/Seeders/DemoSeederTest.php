@@ -9,6 +9,8 @@ use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
+use App\Models\Campaign;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
@@ -235,6 +237,22 @@ describe('the demo', function (): void {
                 ->and($quiet->pluck('user_id'))->not->toContain($customer->id)
                 // 20 days back, at any hour of the day: at least 19 days ago, whenever the suite runs.
                 ->and($quiet->every(fn (BusinessCustomer $away): bool => $away->last_visit_at->lessThanOrEqualTo(now()->subDays(19))))->toBeTrue();
+        });
+    });
+
+    it('has this week\'s campaign with its results, and the week before\'s sent before them (CHW-48)', function (): void {
+        $this->context->bypass(function (): void {
+            $cafe = Business::query()->where('name', 'Café Hafa')->sole();
+            $thisWeek = Campaign::query()->where('business_id', $cafe->id)->where('title', 'Slow Tuesday?')->sole();
+            $weekBefore = Campaign::query()->where('business_id', $cafe->id)->where('title', 'Rainy day tea')->sole();
+            $sends = CampaignSend::query()->where('campaign_id', $thisWeek->id)->get();
+            $customers = CardEnrollment::query()->whereIn('id', StampEvent::query()->select('enrollment_id')->where('business_id', $cafe->id))->pluck('user_id');
+
+            expect($sends)->toHaveCount(6)
+                ->and($sends->every(fn (CampaignSend $send): bool => $send->sent_at !== null && $customers->contains($send->user_id)))->toBeTrue()
+                ->and([$thisWeek->sent_count, $thisWeek->open_count])->toBe([6, $sends->whereNotNull('opened_at')->count()])
+                ->and($thisWeek->open_count)->toBe(2)
+                ->and(CampaignSend::query()->where('campaign_id', $weekBefore->id)->exists())->toBeFalse();
         });
     });
 });

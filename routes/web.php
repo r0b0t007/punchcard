@@ -125,6 +125,9 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         Route::get('campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
         Route::post('campaigns', [CampaignController::class, 'store'])->middleware('throttle:campaign-send')->name('campaigns.store');
         Route::patch('campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->whereNumber('campaign')->name('campaigns.cancel');
+        // A sent campaign's results, and what a visit is worth for their estimated revenue (CHW-48, B10).
+        Route::get('campaigns/{campaign}', [CampaignController::class, 'show'])->whereNumber('campaign')->name('campaigns.show');
+        Route::patch('campaigns/ticket', [CampaignController::class, 'ticket'])->middleware('throttle:campaign-ticket')->name('campaigns.ticket');
         // Automations (CHW-46, B11): messages that go out on their own, from whoever runs a business allowed them.
         Route::get('automations', [AutomationController::class, 'index'])->name('automations.index');
         Route::patch('automations/{trigger}', [AutomationController::class, 'update'])->whereIn('trigger', array_column(AutomationTrigger::cases(), 'value'))

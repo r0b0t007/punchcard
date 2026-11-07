@@ -32,6 +32,12 @@ final class CampaignPolicy
         return $this->runs($business->organization_id, $business->id);
     }
 
+    /** What a visit is worth, for the results' estimated revenue (CHW-48, B10). */
+    public function setTicket(User $user, Business $business): bool
+    {
+        return $this->runs($business->organization_id, $business->id);
+    }
+
     /** A scheduled one, until it goes (CancelCampaign). */
     public function cancel(User $user, Campaign $campaign): bool
     {

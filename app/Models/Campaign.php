@@ -42,6 +42,7 @@ use LogicException;
  * @property int $audience_count who could get it when it was created: followers in the segment with a phone
  * @property int $sent_count
  * @property int $open_count results (B10, CHW-48); 0 until then
+ * @property bool $records_sends whether who it went to is recorded (campaign_sends, CHW-48): false only for those sent before
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -60,7 +61,7 @@ class Campaign extends Model implements TenantModel
     public const array SENT_AS = ['title', 'body', 'card_id', 'segment', 'created_by', 'idempotency_key'];
 
     /** @var array<string, mixed> The database defaults, also in memory before a refresh. */
-    protected $attributes = ['status' => 'scheduled', 'audience_count' => 0, 'sent_count' => 0, 'open_count' => 0];
+    protected $attributes = ['status' => 'scheduled', 'audience_count' => 0, 'sent_count' => 0, 'open_count' => 0, 'records_sends' => true];
 
     /**
      * Created scheduled and unsent by the owner of an open business; any other status, and what was sent, are its delivery's.
@@ -117,6 +118,7 @@ class Campaign extends Model implements TenantModel
             'send_at' => 'datetime',
             'queued_at' => 'datetime',
             'sent_at' => 'datetime',
+            'records_sends' => 'boolean',
         ];
     }
 }

@@ -21,6 +21,7 @@ use App\Enums\RewardType;
 use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\Campaign;
+use App\Models\CampaignSend;
 use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
@@ -384,7 +385,10 @@ final class DemoSeeder extends Seeder
 
     /**
      * Café Hafa's campaigns (CHW-42), for its Campaigns page: two sent, one
-     * this week and one the week before, and one scheduled weeks ahead.
+     * this week and one the week before, and one scheduled weeks ahead. This
+     * week's has its results (CHW-48, B10): who it went to, phones that
+     * accepted it, a few who opened it; the week before's was sent before
+     * results were recorded.
      */
     private function campaigns(): void
     {
@@ -394,7 +398,7 @@ final class DemoSeeder extends Seeder
             ['Slow Tuesday?', 'Two stamps for every coffee until 4 pm today. See you soon!', CampaignSegment::Quiet, 2, 6],
             ['Rainy day tea', 'Mint tea on the house with any pastry, while it rains.', CampaignSegment::Top, 9, 10],
         ] as [$title, $body, $segment, $daysAgo, $people]) {
-            (new Campaign)->forceFill([
+            $campaign = (new Campaign)->forceFill([
                 'business_id' => $business->id,
                 'idempotency_key' => $this->faker->uuid(),
                 'title' => $title,
@@ -405,7 +409,15 @@ final class DemoSeeder extends Seeder
                 'sent_at' => now()->subDays($daysAgo)->setTime(10, 2, 30),
                 'audience_count' => $people,
                 'sent_count' => $people,
-            ])->save();
+            ]);
+            $campaign->save();
+
+            if ($daysAgo === 2) {
+                $this->campaignSends($campaign, $people);
+            } else {
+                // Sent before who it went to was recorded.
+                $campaign->forceFill(['records_sends' => false])->save();
+            }
         }
 
         (new Campaign)->forceFill([
@@ -418,6 +430,27 @@ final class DemoSeeder extends Seeder
             'send_at' => now()->addDays(25)->setTime(9, 0),
             'audience_count' => 12,
         ])->save();
+    }
+
+    /** Who a sent campaign went to (CHW-48): customers who came in to its business, each accepted by a phone, a third opened. */
+    private function campaignSends(Campaign $campaign, int $people): void
+    {
+        $customers = CardEnrollment::query()
+            ->whereIn('id', StampEvent::query()->select('enrollment_id')->where('business_id', $campaign->business_id))
+            ->orderBy('id')->pluck('user_id')->unique()->take($people)->values();
+        $sentAt = $campaign->sent_at ?? now();
+        $opened = 0;
+
+        foreach ($customers as $i => $userId) {
+            $send = CampaignSend::query()->create(['business_id' => $campaign->business_id, 'campaign_id' => $campaign->id, 'user_id' => $userId]);
+            $send->markSent($sentAt->copy()->addSeconds(5));
+
+            if ($i % 3 === 0 && $send->markOpened($sentAt->copy()->addMinutes(20 + $i))) {
+                $opened++;
+            }
+        }
+
+        $campaign->forceFill(['sent_count' => $customers->count(), 'open_count' => $opened])->save();
     }
 
     /**

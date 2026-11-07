@@ -1,3 +1,5 @@
+import type { TranslateFn } from '@/hooks/use-translation';
+
 /**
  * A campaign's words (CHW-42, design 12d), as CampaignText counts them on
  * the server: the notification's title is the business's name, then the
@@ -69,4 +71,17 @@ export function newIdempotencyKey(): string {
     );
 
     return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+}
+
+/** quiet_14d: no longer offered, kept for the campaigns sent to it (CHW-45). */
+export type Segment = 'all' | 'going_quiet' | 'top_10' | 'quiet_14d';
+
+/** Who a campaign went, or goes, to (B9, B10). */
+export function audienceName(t: TranslateFn, segment: Segment): string {
+    return {
+        all: t('All followers'),
+        going_quiet: t('Going quiet'),
+        top_10: t('Top 10'),
+        quiet_14d: t('Not seen in 14 days'),
+    }[segment];
 }
