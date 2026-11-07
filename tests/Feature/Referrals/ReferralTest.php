@@ -292,10 +292,39 @@ it('pays nothing, quietly, once the referrer\'s account is gone, and never takes
     Log::shouldNotHaveReceived('warning');
 });
 
-it('keeps keys only the system writes away from a staff scan', function (string $key, bool $refused): void {
+it('takes only a UUID as a staff scan\'s key, never one only the system writes', function (string $key, bool $refused): void {
     expect(Validator::make(['qty' => 1, 'key' => $key], (new StampScanRequest)->rules())->fails())->toBe($refused);
 })->with([
     'a referral\'s' => ['referral:12', true],
-    'a birthday\'s' => ['BIRTHDAY:3:2026', true],
+    'a birthday\'s' => ['birthday:3:2026', true],
+    'anything else' => ['key-1', true],
     'the counter\'s own' => ['0d3c5b8e-6f0a-4d7e-9a3b-2b1f8c9d0e11', false],
 ]);
+
+it('never counts an alias of the referrer\'s own address as a friend', function (string $referrer, string $friend, bool $counts): void {
+    $this->referrer->forceFill(['email' => $referrer])->save();
+    $this->friend->forceFill(['email' => $friend])->save();
+
+    expect(($this->referred)(($this->joins)()) !== null)->toBe($counts);
+})->with([
+    'a +tag' => ['salma@gmail.com', 'salma+1@gmail.com', false],
+    'Gmail dots and case' => ['salma.tazi@gmail.com', 'SalmaTazi@googlemail.com', false],
+    'a +tag elsewhere' => ['salma@example.ma', 'salma+cafe@example.ma', false],
+    'dots elsewhere are another inbox' => ['salma.tazi@example.ma', 'salmatazi@example.ma', true],
+    'someone else' => ['salma@gmail.com', 'yasmine@gmail.com', true],
+]);
+
+it('credits the referrer where they come, never a sister site they never visited', function (): void {
+    $this->tenants->stamp($this->invite, $this->tenants->a1, ['created_at' => now()->subWeek()]);
+    $friend = ($this->friendCard)();
+    $this->tenants->stamp($friend, $this->tenants->a2);
+
+    expect(($this->give)($friend, $this->tenants->a2->id))->toBeTrue()
+        ->and(($this->referralStamps)())->toBe([[$this->invite->id, $this->tenants->a1->id, 1, 'referral:'.$friend->id]]);
+});
+
+it('forgets the invitation once the card is added at its business', function (): void {
+    ($this->joins)();
+
+    expect(PendingReferral::from(app('session.store')))->toBeNull();
+});

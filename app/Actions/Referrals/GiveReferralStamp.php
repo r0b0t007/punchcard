@@ -12,6 +12,7 @@ use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\Location;
+use App\Models\LoyaltyCard;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\Database\Outermost;
@@ -24,7 +25,8 @@ use Throwable;
 /**
  * The referrer's stamp (CHW-47): +1 on their card once the friend they
  * invited, their email verified, proves they came in (a tap, a scan, a
- * stamp by hand: never a bonus), at the business where the friend did: a
+ * stamp by hand: never a bonus), credited where the referrer comes (their
+ * latest visit's business, else the friend's): a
  * second account of the referrer's own needs a real inbox for each stamp,
  * where no device is fingerprinted (decided). A friend not verified yet is
  * paid for at their first visit after. Once per friend whatever
@@ -55,14 +57,19 @@ final readonly class GiveReferralStamp
     /** @return bool whether the referrer got their stamp now */
     public function handle(int $friendEnrollmentId, int $businessId): bool
     {
-        [$friend, $business, $site] = $this->context->bypass(fn (): array => [
-            CardEnrollment::query()->with('card:id,organization_id,referrals_enabled,referral_monthly_cap')->find($friendEnrollmentId),
-            Business::query()->with('organization')->find($businessId),
-            Location::query()->where('business_id', $businessId)->open()->orderBy('id')->first(),
-        ]);
+        if ($this->counted($friendEnrollmentId)) {
+            return false;
+        }
 
-        if (! $friend instanceof CardEnrollment || $friend->referred_by === null || ! $friend->card->referrals_enabled
-            || ! $business instanceof Business || ! $site instanceof Location || $this->counted($friend)) {
+        $friend = $this->context->bypass(fn (): ?CardEnrollment => CardEnrollment::query()->with('card:id,referrals_enabled')->find($friendEnrollmentId));
+
+        if (! $friend instanceof CardEnrollment || $friend->referred_by === null || ! $friend->card->referrals_enabled) {
+            return false;
+        }
+
+        [$business, $site] = $this->whereToCredit((int) $friend->referred_by, $businessId);
+
+        if (! $business instanceof Business || ! $site instanceof Location) {
             return false;
         }
 
@@ -71,7 +78,7 @@ final readonly class GiveReferralStamp
         try {
             $this->context->set($business->organization, $business);
 
-            return Outermost::transaction('A referral stamp', fn (): bool => $this->give($friend, $business, $site));
+            return Outermost::transaction('A referral stamp', fn (): bool => $this->give($friend, $site));
         } catch (StampRejected $refused) {
             if ($refused->rejection !== StampRejection::AccountDeleted) {
                 Log::warning('A referral stamp was refused.', ['enrollment_id' => $friend->id, 'reason' => $refused->rejection->value]);
@@ -87,30 +94,57 @@ final readonly class GiveReferralStamp
         }
     }
 
-    /** Whether the friend was counted already (any business): seen without a lock, checked again under it. */
-    private function counted(CardEnrollment $friend): bool
+    /** Whether the friend was counted already (any business): one query, before anything else; checked again under the lock. */
+    private function counted(int $friendEnrollmentId): bool
     {
-        return $this->context->bypass(fn (): bool => StampEvent::query()->where('source', StampSource::Referral)->where('idempotency_key', self::key($friend->id))->exists());
+        return $this->context->bypass(fn (): bool => StampEvent::query()->where('source', StampSource::Referral)->where('idempotency_key', self::key($friendEnrollmentId))->exists());
     }
 
-    private function give(CardEnrollment $friend, Business $business, Location $site): bool
+    /**
+     * Where the referrer's stamp is credited: the business they last proved they came to, so a franchise site never
+     * carries a stamp, or a reward, of a customer who never came there; the friend's, for a referrer with no visit
+     * yet, or whose business has no open site any more. Its first open site.
+     *
+     * @return array{0: Business|null, 1: Location|null}
+     */
+    private function whereToCredit(int $referrerEnrollmentId, int $friendBusinessId): array
+    {
+        return $this->context->bypass(function () use ($referrerEnrollmentId, $friendBusinessId): array {
+            $theirs = StampEvent::query()->where('enrollment_id', $referrerEnrollmentId)->whereIn('source', StampSource::presenceValues())
+                ->latest('created_at')->latest('id')->value('business_id');
+
+            foreach (array_unique(array_filter([is_numeric($theirs) ? (int) $theirs : null, $friendBusinessId])) as $businessId) {
+                $site = Location::query()->where('business_id', $businessId)->open()->orderBy('id')->first();
+
+                if ($site instanceof Location) {
+                    return [Business::query()->with('organization')->whereKey($businessId)->first(), $site];
+                }
+            }
+
+            return [null, null];
+        });
+    }
+
+    private function give(CardEnrollment $friend, Location $site): bool
     {
         $key = self::key($friend->id);
-        $referrer = $this->context->bypass(function () use ($friend, $business, $key): ?CardEnrollment {
+        $referrer = $this->context->bypass(function () use ($friend, $site, $key): ?CardEnrollment {
             $referrer = CardEnrollment::query()->whereKey($friend->referred_by)->lockForUpdate()->first();
 
             if (! $referrer instanceof CardEnrollment) {
                 return null;
             }
 
+            // Read under the lock: an owner lowering the cap, or turning referrals off, is seen.
+            $card = LoyaltyCard::query()->whereKey($referrer->card_id)->first(['id', 'referrals_enabled', 'referral_monthly_cap']);
             $given = StampEvent::query()->where('source', StampSource::Referral)->where('idempotency_key', $key)->exists();
             $verified = User::query()->whereKey($friend->user_id)->whereNotNull('email_verified_at')->exists();
             $presence = StampEvent::query()->where('enrollment_id', $friend->id)->whereIn('source', StampSource::presenceValues())->exists();
-            $monthStart = CarbonImmutable::now(LocalMoment::timezoneOfBusiness($business->id))->startOfMonth()->utc();
+            $monthStart = CarbonImmutable::now(LocalMoment::timezoneOf($site))->startOfMonth()->utc();
             $thisMonth = StampEvent::query()->where('enrollment_id', $referrer->id)->where('source', StampSource::Referral)
                 ->where('created_at', '>=', $monthStart)->count();
 
-            return ! $given && $verified && $presence && $thisMonth < $friend->card->referral_monthly_cap ? $referrer : null;
+            return $card instanceof LoyaltyCard && $card->referrals_enabled && ! $given && $verified && $presence && $thisMonth < $card->referral_monthly_cap ? $referrer : null;
         });
 
         return $referrer instanceof CardEnrollment

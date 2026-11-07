@@ -13,8 +13,9 @@ use Illuminate\Contracts\Session\Session;
  * (by its id: a slug can change).
  * It survives signing up and signing in (the session id changes, its data
  * stays), so the card added on the join page, or by a first tap there, is
- * the one it names. A new link replaces it. Only ever a code: who referred,
- * and whether it counts, is ReferrerFor's to say when the card is added.
+ * the one it names. A new link replaces it, and the card added at that
+ * business forgets it (forgetFor). Only ever a code: who referred, and
+ * whether it counts, is ReferrerFor's to say when the card is added.
  */
 final readonly class PendingReferral
 {
@@ -42,6 +43,14 @@ final readonly class PendingReferral
         return is_array($held) && is_int($held['business'] ?? null) && is_string($held['code'] ?? null)
             ? new self($held['business'], $held['code'])
             : null;
+    }
+
+    /** Forgets the invitation once the business it was for has been dealt with: a card added there, by join or tap. */
+    public static function forgetFor(Session $session, ?int $businessId): void
+    {
+        if ($businessId !== null && self::from($session)?->businessId === $businessId) {
+            $session->forget(self::KEY);
+        }
     }
 
     /** The code, when it was given for this business. */

@@ -67,7 +67,6 @@ final readonly class EnrollCustomer
             }
 
             $card = $here->card->id;
-            $referrer = $this->referrerFor->handle($card, $user, $referralCode);
 
             for ($attempt = 0; $attempt < self::ATTEMPTS; $attempt++) {
                 $existing = CardEnrollment::query()->where('card_id', $card)->where('user_id', $user->id)->first();
@@ -77,10 +76,8 @@ final readonly class EnrollCustomer
                 }
 
                 try {
-                    return DB::transaction(function () use ($card, $user, $referrer): CardEnrollment {
-                        // A card of the organization made since (another join page, at once): no longer someone new.
-                        $referrer = $referrer instanceof CardEnrollment
-                            && CardEnrollment::query()->where('organization_id', $referrer->organization_id)->where('user_id', $user->id)->exists() ? null : $referrer;
+                    return DB::transaction(function () use ($card, $user, $referralCode): CardEnrollment {
+                        $referrer = $this->referrerFor->handle($card, $user, $referralCode);
                         $enrollment = (new CardEnrollment)->forceFill(['card_id' => $card, 'user_id' => $user->id, 'referral_code' => $this->referralCode(), 'referred_by' => $referrer?->id]);
                         $enrollment->save();
                         $this->assertNotDeleted($user);

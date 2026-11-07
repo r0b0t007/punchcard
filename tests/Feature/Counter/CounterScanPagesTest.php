@@ -148,13 +148,13 @@ it('stamps with the scan and says how it went', function (): void {
     ($this->scanAs)($this->staff);
     $scan = ($this->onlyScan)();
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => 'key-1'])
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => '11111111-1111-4111-8111-111111111111'])
         ->assertRedirect(route('counter.scans.show', $scan))
         ->assertInertiaFlash('stampResult', ['state' => 'done', 'qty' => 2, 'rewards' => 0]);
 
     expect($this->context->bypass(fn (): int => (int) CardEnrollment::query()->where('user_id', $this->customer->id)->sole()->current_stamps))->toBe(2);
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-2'])
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '22222222-2222-4222-8222-222222222222'])
         ->assertInertiaFlash('stampResult', ['state' => 'used']);
 });
 
@@ -168,7 +168,7 @@ it('says when the next stamp can be given, in the site\'s time, a day or more ah
     $scan = ($this->onlyScan)();
     $next = now()->addMinutes($cooldown)->setTimezone('Africa/Casablanca');
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-1'])
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '11111111-1111-4111-8111-111111111111'])
         ->assertInertiaFlash('stampResult', ['state' => 'cooldown', 'availableAt' => ['day' => $day, 'date' => $next->format('Y-m-d'), 'time' => $next->format('H:i')]]);
 })->with([
     'twenty minutes' => [20, 'today'],
@@ -181,10 +181,10 @@ it('stamps 1 to 10, with the device\'s key, and only with the staff member\'s ow
     $scan = ($this->onlyScan)();
     $colleague = $this->tenants->member(User::factory()->create(), $this->tenants->a1);
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 11, 'key' => 'key-1'])->assertSessionHasErrors('qty');
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 11, 'key' => '11111111-1111-4111-8111-111111111111'])->assertSessionHasErrors('qty');
     ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1])->assertSessionHasErrors('key');
-    ($this->as)($colleague)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-1'])->assertForbidden();
-    ($this->as)($this->tenants->member(User::factory()->create(), $this->tenants->b1), $this->tenants->b1)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-1'])->assertNotFound();
+    ($this->as)($colleague)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '11111111-1111-4111-8111-111111111111'])->assertForbidden();
+    ($this->as)($this->tenants->member(User::factory()->create(), $this->tenants->b1), $this->tenants->b1)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '11111111-1111-4111-8111-111111111111'])->assertNotFound();
 });
 
 it('redeems the scanned customer\'s reward, and finds no one else\'s', function (): void {
@@ -244,7 +244,7 @@ it('shows no customer on a scan that ran out unused, and the answer of one that 
     $this->travel(5)->minutes();
     ($this->scanAs)($this->staff);
     $used = $this->context->bypass(fn (): CounterScan => CounterScan::query()->latest('scanned_at')->firstOrFail());
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $used), ['qty' => 1, 'key' => 'key-1']);
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $used), ['qty' => 1, 'key' => '11111111-1111-4111-8111-111111111111']);
     $this->travel(CounterScan::SECONDS + 1)->seconds();
 
     ($this->as)($this->staff)->get(route('counter.scans.show', $used))->assertOk()
@@ -280,7 +280,7 @@ it('gives the same answer to a retry, stamping or redeeming once', function (): 
     $scan = ($this->onlyScan)();
 
     foreach (range(1, 2) as $attempt) {
-        ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => 'key-1'])
+        ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => '11111111-1111-4111-8111-111111111111'])
             ->assertInertiaFlash('stampResult', ['state' => 'done', 'qty' => 2, 'rewards' => 0]);
         ($this->as)($this->staff)->post(route('counter.scans.redeem', [$scan, $reward->id]))
             ->assertInertiaFlash('redeemed.reward', $reward->reward_text);
@@ -295,13 +295,13 @@ it('says when today\'s limit or a paused card refuses the stamp, and still redee
     ($this->scanAs)($this->staff);
     $scan = ($this->onlyScan)();
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => 'key-1'])
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 2, 'key' => '11111111-1111-4111-8111-111111111111'])
         ->assertInertiaFlash('stampResult.state', 'cap');
 
     $reward = $this->tenants->reward($this->context->bypass(fn (): CardEnrollment => CardEnrollment::query()->firstOrCreate(['card_id' => $this->tenants->cardA->id, 'user_id' => $this->customer->id])));
     $this->context->bypass(fn () => $this->tenants->cardA->forceFill(['active' => false])->save());
 
-    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-2'])
+    ($this->as)($this->staff)->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '22222222-2222-4222-8222-222222222222'])
         ->assertInertiaFlash('stampResult.state', 'paused');
     ($this->as)($this->staff)->get(route('counter.scans.show', $scan))
         ->assertInertia(fn (Assert $page): Assert => $page->where('card.paused', true)->has('rewards', 1));

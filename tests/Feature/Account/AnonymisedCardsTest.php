@@ -262,7 +262,7 @@ it('tells staff on the scanner that the account was deleted', function (): void 
     ($this->delete)();
     $as = fn () => $this->actingAs($this->staff)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->a1->id]);
 
-    $as()->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => 'key-1'])
+    $as()->post(route('counter.scans.stamp', $scan), ['qty' => 1, 'key' => '11111111-1111-4111-8111-111111111111'])
         ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'This customer\'s account was deleted: nothing was added.']);
     $as()->post(route('counter.scans.redeem', [$scan, $reward->id]))
         ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'This customer\'s account was deleted: nothing was redeemed.']);

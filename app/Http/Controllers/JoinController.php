@@ -69,6 +69,7 @@ final class JoinController extends Controller
         $customer = $request->user();
         $business = $this->business($find, $slug);
         $joinCard->handle($business, $customer, PendingReferral::from($request->session())?->for($business));
+        PendingReferral::forgetFor($request->session(), $business->id);
 
         return to_route('join.show', $business->slug);
     }

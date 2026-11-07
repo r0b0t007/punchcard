@@ -39,6 +39,10 @@ final class TapController extends Controller
     {
         $tap = $takeTap->handle($request->sun('e'), $request->sun('c'), $request->user(), $request->ip(), $request->userAgent(), $session, PendingReferral::from($request->session()));
 
+        if (! $tap->isPending()) {
+            PendingReferral::forgetFor($request->session(), $tap->business_id);
+        }
+
         // Only a signed-out customer signs in next; a signed-in one retries from the result page.
         if ($tap->isPending() && $request->user() === null) {
             redirect()->setIntendedUrl(route('taps.claim'));
@@ -71,7 +75,10 @@ final class TapController extends Controller
 
     public function claim(Request $request, TapSession $session, ClaimPendingTaps $claimPendingTaps): Response|RedirectResponse
     {
-        if ($claimPendingTaps->handle($session, $request->user(), referral: PendingReferral::from($request->session())) instanceof Tap) {
+        $claimed = $claimPendingTaps->handle($session, $request->user(), referral: PendingReferral::from($request->session()));
+        PendingReferral::forgetFor($request->session(), $claimed?->business_id);
+
+        if ($claimed instanceof Tap) {
             return to_route('taps.result');
         }
 
