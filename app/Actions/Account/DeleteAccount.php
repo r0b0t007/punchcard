@@ -15,6 +15,7 @@ use App\Models\ConsentEvent;
 use App\Models\CustomerNote;
 use App\Models\Follow;
 use App\Models\Organization;
+use App\Models\OrganizationCustomer;
 use App\Models\OrganizationMember;
 use App\Models\Reward;
 use App\Models\Stamper;
@@ -175,6 +176,8 @@ final readonly class DeleteAccount
         Follow::query()->where('user_id', $user->id)->delete();
         // Nobody to list as a business's customer any more (CHW-44); their stamps stay in the ledger.
         BusinessCustomer::query()->where('user_id', $user->id)->delete();
+        // Nor of a franchise's sites, for its head office (CHW-365).
+        OrganizationCustomer::query()->where('user_id', $user->id)->delete();
         // What a business's team wrote about them goes too (CHW-44); their own notes on others stay, unsigned.
         CustomerNote::query()->where('user_id', $user->id)->delete();
         // The consent history is the person's: it goes with them (CHW-58).

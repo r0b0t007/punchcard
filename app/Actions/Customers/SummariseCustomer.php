@@ -9,11 +9,13 @@ use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\CustomerVisitDay;
 use App\Models\Location;
+use App\Models\OrganizationCustomer;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -33,6 +35,11 @@ use Illuminate\Support\Facades\DB;
  *   who comes monthly or less goes from active to lost.
  * - Each day they came in to each site is kept too (CHW-45,
  *   CustomerVisitDay), for the dashboard, whatever happened since.
+ * - Their row across the organization's sites is rewritten too (CHW-365,
+ *   OrganizationCustomer, for a franchise's head office): a day at two
+ *   sites is one visit, and they go quiet and are lost only when they stop
+ *   coming to every site. From their rows at each business and their days
+ *   there; none once they are no business's customer.
  * - No visit here, everything given here taken back (a stamp by hand for the
  *   wrong customer, corrected), or an anonymised account: no row.
  * - Under the customer's row lock, so two summaries of them, or one and
@@ -75,32 +82,79 @@ final readonly class SummariseCustomer
 
             if ($here->sum('qty') <= 0 || ! $user instanceof User || $user->isAnonymised()) {
                 $row->delete();
+            } else {
+                /** @var Carbon $first */
+                $first = $stamps->min('created_at');
+                /** @var Carbon $last */
+                $last = $stamps->max('created_at');
 
-                return;
+                BusinessCustomer::query()->updateOrCreate(['business_id' => $businessId, 'user_id' => $userId], [
+                    'organization_id' => $organizationId,
+                    'first_visit_at' => $first,
+                    // Only a redemption sets where a reward was redeemed.
+                    'rewards_redeemed' => Reward::query()->whereIn('enrollment_id', $theirs)->where('redeemed_business_id', $businessId)->count(),
+                    ...$this->visits(array_column($presence, 'day'), $last),
+                ]);
             }
 
-            $days = collect(array_column($presence, 'day'))->unique()->sort()->values();
-            $visits = $days->count();
-            /** @var Carbon $first */
-            $first = $stamps->min('created_at');
-            /** @var Carbon $last */
-            $last = $stamps->max('created_at');
-            $gap = $visits > 1 ? Carbon::parse((string) $days->first())->diffInDays(Carbon::parse((string) $days->last())) / ($visits - 1) : null;
-            $quietDays = max((int) config('punchcard.customers.quiet_min_days'), $gap === null ? 0 : (int) ceil(2 * $gap));
-            $lostAt = $last->copy()->addDays((int) config('punchcard.customers.lost_days'));
-
-            BusinessCustomer::query()->updateOrCreate(['business_id' => $businessId, 'user_id' => $userId], [
-                'organization_id' => $organizationId,
-                'visits' => $visits,
-                'first_visit_at' => $first,
-                'last_visit_at' => $last,
-                'usual_gap_days' => $gap === null ? null : (int) round($gap),
-                'quiet_at' => $last->copy()->addDays($quietDays)->min($lostAt),
-                'lost_at' => $lostAt,
-                // Only a redemption sets where a reward was redeemed.
-                'rewards_redeemed' => Reward::query()->whereIn('enrollment_id', $theirs)->where('redeemed_business_id', $businessId)->count(),
-            ]);
+            $this->summariseNetwork($organizationId, $userId, $user);
         }), attempts: 3);
+    }
+
+    /**
+     * Their row across the organization's sites (CHW-365): from their rows at each business, and the days they came
+     * in there (one visit a day, wherever). None once they are no business's customer, or their account is gone.
+     */
+    private function summariseNetwork(int $organizationId, int $userId, ?User $user): void
+    {
+        $atBusinesses = BusinessCustomer::query()->where('organization_id', $organizationId)->where('user_id', $userId)
+            ->get(['business_id', 'visits', 'first_visit_at', 'last_visit_at', 'rewards_redeemed']);
+        $row = OrganizationCustomer::query()->where('organization_id', $organizationId)->where('user_id', $userId);
+
+        if ($atBusinesses->isEmpty() || ! $user instanceof User || $user->isAnonymised()) {
+            $row->delete();
+
+            return;
+        }
+
+        $days = CustomerVisitDay::query()->where('organization_id', $organizationId)->where('user_id', $userId)
+            ->whereIn('business_id', $atBusinesses->pluck('business_id')->all())->get(['visited_on'])
+            ->map(fn (CustomerVisitDay $day): string => $day->visited_on->toDateString())->all();
+        /** @var CarbonInterface $first */
+        $first = $atBusinesses->min('first_visit_at');
+        /** @var CarbonInterface $last */
+        $last = $atBusinesses->max('last_visit_at');
+
+        OrganizationCustomer::query()->updateOrCreate(['organization_id' => $organizationId, 'user_id' => $userId], [
+            'first_visit_at' => $first,
+            'rewards_redeemed' => (int) $atBusinesses->sum('rewards_redeemed'),
+            ...$this->visits($days, $last),
+        ]);
+    }
+
+    /**
+     * How many days they came in, their usual gap, and when they go quiet and are lost if they don't come back
+     * (docs/spec.md "Derived metrics"): quiet after twice their usual gap, never sooner than quiet_min_days, never
+     * later than lost; lost lost_days after their last visit.
+     *
+     * @param  array<array-key, string>  $days  the local day (Y-m-d) of each visit, in any order, repeats allowed
+     * @return array{visits: int, last_visit_at: CarbonInterface, usual_gap_days: int|null, quiet_at: CarbonInterface, lost_at: CarbonInterface}
+     */
+    private function visits(array $days, CarbonInterface $last): array
+    {
+        $days = collect($days)->unique()->sort()->values();
+        $visits = $days->count();
+        $gap = $visits > 1 ? Carbon::parse((string) $days->first())->diffInDays(Carbon::parse((string) $days->last())) / ($visits - 1) : null;
+        $quietDays = max((int) config('punchcard.customers.quiet_min_days'), $gap === null ? 0 : (int) ceil(2 * $gap));
+        $lostAt = $last->copy()->addDays((int) config('punchcard.customers.lost_days'));
+
+        return [
+            'visits' => $visits,
+            'last_visit_at' => $last,
+            'usual_gap_days' => $gap === null ? null : (int) round($gap),
+            'quiet_at' => $last->copy()->addDays($quietDays)->min($lostAt),
+            'lost_at' => $lostAt,
+        ];
     }
 
     /**

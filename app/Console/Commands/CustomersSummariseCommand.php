@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Cache;
 #[Description('Summarise businesses\' customers from their stamps')]
 class CustomersSummariseCommand extends Command
 {
-    /** Set when a full run finished: the visit days (CHW-45) are filled from the ledger. */
-    public const string DONE = 'punchcard:customers:summarised:visit-days';
+    /** Set when a full run finished: the visit days (CHW-45) and the network rows (CHW-365) are filled from the ledger. */
+    public const string DONE = 'punchcard:customers:summarised:network';
 
     public function handle(SummariseCustomer $summariseCustomer, CustomersOfBusiness $customersOfBusiness, TenantContext $context): int
     {
