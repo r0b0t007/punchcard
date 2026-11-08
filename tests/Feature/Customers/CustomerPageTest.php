@@ -93,14 +93,28 @@ it('shows the owner a customer: status, habits, card progress and what happened 
         ->where('customer', ['id' => $customer->id, 'name' => 'Salma T.', 'status' => 'active', 'visits' => 3, 'usualGapDays' => 4, 'lastVisitDays' => 4, 'rewardsRedeemed' => 1, 'friendsCameIn' => 0])
         ->where('cards', [['id' => $this->enrollment->id, 'name' => $this->tenants->cardA->name, 'rewardText' => $this->tenants->cardA->reward_text, 'stamps' => 4, 'toReward' => $this->tenants->cardA->stamps_required - 4]])
         ->where('history', [
-            ['key' => 'redeemed-'.$reward->id, 'kind' => 'redeemed', 'source' => null, 'qty' => 0, 'card' => $reward->reward_text, 'location' => $site, 'by' => 'Yasmine A.', 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-30', 'time' => '18:00']],
-            ['key' => 'stamp-'.$takenBack->id, 'kind' => 'stamp', 'source' => 'correction', 'qty' => -1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'by' => 'Yasmine A.', 'reason' => 'Given twice', 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '10:01']],
-            ['key' => 'stamp-'.$byHand->id, 'kind' => 'stamp', 'source' => 'manual', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'by' => 'Yasmine A.', 'reason' => 'Card forgotten', 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '10:00']],
-            ['key' => 'stamp-'.$scan->id, 'kind' => 'stamp', 'source' => 'qr', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'by' => 'Yasmine A.', 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-25', 'time' => '10:00']],
-            ['key' => 'stamp-'.$tap->id, 'kind' => 'stamp', 'source' => 'nfc', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'by' => null, 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-20', 'time' => '10:00']],
+            ['key' => 'redeemed-'.$reward->id, 'kind' => 'redeemed', 'source' => null, 'qty' => 0, 'card' => $reward->reward_text, 'location' => $site, 'business' => null, 'by' => 'Yasmine A.', 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-30', 'time' => '18:00']],
+            ['key' => 'stamp-'.$takenBack->id, 'kind' => 'stamp', 'source' => 'correction', 'qty' => -1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'business' => null, 'by' => 'Yasmine A.', 'reason' => 'Given twice', 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '10:01']],
+            ['key' => 'stamp-'.$byHand->id, 'kind' => 'stamp', 'source' => 'manual', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'business' => null, 'by' => 'Yasmine A.', 'reason' => 'Card forgotten', 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-28', 'time' => '10:00']],
+            ['key' => 'stamp-'.$scan->id, 'kind' => 'stamp', 'source' => 'qr', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'business' => null, 'by' => 'Yasmine A.', 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-25', 'time' => '10:00']],
+            ['key' => 'stamp-'.$tap->id, 'kind' => 'stamp', 'source' => 'nfc', 'qty' => 1, 'card' => $this->tenants->cardA->name, 'location' => $site, 'business' => null, 'by' => null, 'reason' => null, 'byScan' => false, 'at' => ['day' => 'other', 'date' => '2026-10-20', 'time' => '10:00']],
         ])
         ->where('shown', DescribeCustomer::SHOWN)
         ->where('more', false));
+});
+
+it('tells a franchisee its head office reads its notes, and an independent business that no one else does', function (): void {
+    ($this->stampAt)('2026-10-20 06:00:00');
+
+    ($this->open)(($this->summarised)())->assertOk()->assertInertia(fn (Assert $page): Assert => $page->where('notesSeenByHeadOffice', true));
+
+    $owner = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
+    $enrollment = $this->tenants->enroll($this->user, $this->tenants->cardB);
+    $this->tenants->stamp($enrollment, $this->tenants->b1, ['created_at' => Carbon::parse('2026-10-20 06:00:00')]);
+    $customer = ($this->summarised)($this->tenants->b1);
+
+    $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])->get(route('customers.show', $customer->id))
+        ->assertOk()->assertInertia(fn (Assert $page): Assert => $page->where('notesSeenByHeadOffice', false));
 });
 
 it('lists a redemption above the stamp it followed in the same second, as a scan does', function (): void {

@@ -1282,5 +1282,10 @@
     "This export has expired": "انتهت صلاحية هذا التصدير",
     "This export isn't available to you": "هذا التصدير غير متاح لك",
     "Export links work for 24 hours. Ask for a new one from the Customers page.": "تعمل روابط التصدير 24 ساعة. اطلب واحدًا جديدًا من صفحة العملاء.",
-    "Only the owner who asked for it can download it, signed in to their own account.": "لا ينزّله إلا المالك الذي طلبه، مسجّلًا في حسابه."
+    "Only the owner who asked for it can download it, signed in to their own account.": "لا ينزّله إلا المالك الذي طلبه، مسجّلًا في حسابه.",
+    "Everyone who came in to any of your businesses, and who has stopped coming anywhere.": "كل من زار أحد محلاتك، ومن توقف عن المجيء إلى أي منها.",
+    "Stamps and notes belong to each business: you see them here, and each business’s team changes them.": "الأختام والملاحظات تخص كل محل: تراها هنا، ويغيّرها فريق كل محل.",
+    "At every business, newest first": "في كل المحلات، الأحدث أولًا",
+    "Written by each business’s team. Read only here; :name never sees them.": "يكتبها فريق كل محل. للقراءة فقط هنا، ولا يراها :name.",
+    "For your team and your head office. :name never sees them; they can ask for them like any data about them.": "لفريقك وللمقر الرئيسي. لا يراها :name، ويمكنه طلبها مثل أي بيانات تخصه."
 }

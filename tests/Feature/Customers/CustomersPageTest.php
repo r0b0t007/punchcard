@@ -145,12 +145,12 @@ it('refuses a tab it does not know', function (): void {
     ($this->open)(['segment' => 'everyone'])->assertSessionHasErrors('segment');
 });
 
-it('keeps the customers from staff, and from an organization admin outside a business', function (): void {
+it('keeps the customers from staff, and shows an organization admin outside a business the network\'s (CHW-365)', function (): void {
     ($this->open)([], $this->tenants->member(User::factory()->create(), $this->tenants->a1))->assertForbidden();
 
     $admin = $this->tenants->admin(User::factory()->create(), $this->tenants->orgA);
     $this->actingAs($admin)->withSession([SetTenant::SESSION_KEY => 'organization:'.$this->tenants->orgA->id])
-        ->get(route('customers.index'))->assertForbidden();
+        ->get(route('customers.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page->where('level', 'network'));
 });
 
 it('names the dashboard\'s top customers by first name and initial', function (): void {

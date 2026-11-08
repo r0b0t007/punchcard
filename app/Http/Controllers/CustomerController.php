@@ -6,23 +6,27 @@ namespace App\Http\Controllers;
 
 use App\Actions\Customers\DeleteNote;
 use App\Actions\Customers\DescribeCustomer;
+use App\Actions\Customers\DescribeNetworkCustomer;
 use App\Actions\Customers\ListCustomers;
+use App\Actions\Customers\ListNetworkCustomers;
 use App\Actions\Customers\StampCustomer;
 use App\Actions\Customers\WriteNote;
 use App\Actions\Stamps\StampRejected;
 use App\Enums\StampRejection;
-use App\Http\Requests\Customers\CustomerRequest;
 use App\Http\Requests\Customers\CustomersRequest;
 use App\Http\Requests\Customers\DeleteNoteRequest;
 use App\Http\Requests\Customers\ExportCustomersRequest;
+use App\Http\Requests\Customers\ShowCustomerRequest;
 use App\Http\Requests\Customers\StampCustomerRequest;
 use App\Http\Requests\Customers\StoreNoteRequest;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\CustomerNote;
+use App\Models\Organization;
 use App\Models\User;
 use App\Support\LocalMoment;
+use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -36,6 +40,9 @@ use Inertia\Response;
  * - GET /business/customers: the list (B4), by tab, first name and page;
  * - GET /business/customers/{customer}: one of them (B5), their history at
  *   the business and the team's notes. Another business's is a 404.
+ * - The same two pages for a franchise's head office, working across the
+ *   network (CHW-365): everyone who came in to any of its sites, each once,
+ *   read only (ListNetworkCustomers, DescribeNetworkCustomer).
  * - POST …/stamps and …/corrections (throttled): stamps added by hand, or
  *   taken back, with a reason (StampCustomer, as the owner); a refusal is an
  *   error on the field to change.
@@ -43,12 +50,26 @@ use Inertia\Response;
  */
 final class CustomerController extends Controller
 {
-    public function index(CustomersRequest $request, ListCustomers $listCustomers): Response
+    public function index(CustomersRequest $request, ListCustomers $listCustomers, ListNetworkCustomers $listNetworkCustomers): Response
     {
-        /** @var Business $business authorized by the request */
         $business = $request->business();
 
+        if (! $business instanceof Business) {
+            /** @var Organization $organization authorized by the request */
+            $organization = app(TenantContext::class)->organization();
+
+            return Inertia::render('business/customers/index', [
+                ...$listNetworkCustomers->handle($organization, $request->tab(), $request->search(), $request->page(), CarbonImmutable::now()),
+                'level' => 'network',
+                'canExport' => false,
+                'exportSentTo' => null,
+                'exportMaxYears' => ExportCustomersRequest::MAX_YEARS,
+                'today' => CarbonImmutable::now(LocalMoment::timezoneOfOrganization($organization->id))->format('Y-m-d'),
+            ]);
+        }
+
         return Inertia::render('business/customers/index', [
+            'level' => 'business',
             ...$listCustomers->handle($business, $request->tab(), $request->search(), $request->page(), CarbonImmutable::now()),
             // Exporting them as CSV (CHW-49): the owner's alone; once asked, where the link goes (half hidden).
             'canExport' => Gate::allows('export', [BusinessCustomer::class, $business]),
@@ -58,12 +79,25 @@ final class CustomerController extends Controller
         ]);
     }
 
-    public function show(CustomerRequest $request, DescribeCustomer $describeCustomer): Response
+    public function show(ShowCustomerRequest $request, DescribeCustomer $describeCustomer, DescribeNetworkCustomer $describeNetworkCustomer): Response
     {
+        if ($request->atNetwork()) {
+            /** @var Organization $organization the customer's, found in it */
+            $organization = app(TenantContext::class)->organization();
+
+            return Inertia::render('business/customers/show', [
+                ...$describeNetworkCustomer->handle($organization, $request->networkCustomer(), $request->shown(), CarbonImmutable::now()),
+                'level' => 'network',
+                'maxQty' => StampCustomerRequest::MAX_QTY,
+                'noteMax' => CustomerNote::MAX_LENGTH,
+            ]);
+        }
+
         /** @var Business $business the customer's, found in it */
         $business = $request->business();
 
         return Inertia::render('business/customers/show', [
+            'level' => 'business',
             ...$describeCustomer->handle($business, $request->customer(), $request->shown(), CarbonImmutable::now()),
             'maxQty' => StampCustomerRequest::MAX_QTY,
             'noteMax' => CustomerNote::MAX_LENGTH,

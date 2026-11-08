@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\Business;
 use App\Models\Location;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -31,6 +32,19 @@ final class LocalMoment
         $sites = fn () => Location::query()->where('business_id', $businessId)->orderBy('id');
 
         return self::timezoneOf($sites()->open()->first(['id', 'timezone']) ?? $sites()->first(['id', 'timezone']));
+    }
+
+    /**
+     * An organization's days, across its sites (a franchise's head office, CHW-365): its first open business's
+     * (timezoneOfBusiness); with every business closed, its first one's; the app's without one. Read in the caller's
+     * tenant, or bypass().
+     */
+    public static function timezoneOfOrganization(int $organizationId): string
+    {
+        $businesses = fn () => Business::query()->where('organization_id', $organizationId)->orderBy('id');
+        $business = $businesses()->unarchived()->value('id') ?? $businesses()->value('id');
+
+        return $business === null ? (string) config('app.timezone') : self::timezoneOfBusiness((int) $business);
     }
 
     /**

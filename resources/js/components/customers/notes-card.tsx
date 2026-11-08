@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import BusinessTag from '@/components/customers/business-tag';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslation } from '@/hooks/use-translation';
@@ -24,6 +25,8 @@ export type CustomerNote = {
     body: string;
     /** Who wrote it, by first name and initial; null once their account is gone. */
     by: string | null;
+    /** The business whose team wrote it, across a franchise's sites (CHW-365); absent inside one business. */
+    business?: string | null;
     at: LocalMoment;
 };
 
@@ -31,15 +34,22 @@ export type CustomerNote = {
  * The team's notes on a customer (CHW-44, B5, design 15c), newest first:
  * write one, or delete one with the bin, after a confirmation (it is gone
  * for good). The customer never sees them here; their data export has them.
+ * For a franchise's head office (CHW-365, design 23) every site's notes, read
+ * only: each names its business, with no form and no bin. Inside a franchisee,
+ * the line says its head office reads them too (design 23c).
  */
 export default function NotesCard({
     customer,
     notes,
     maxLength,
+    readOnly = false,
+    seenByHeadOffice = false,
 }: {
     customer: { id: number; name: string };
     notes: CustomerNote[];
     maxLength: number;
+    readOnly?: boolean;
+    seenByHeadOffice?: boolean;
 }) {
     const { t, tn, locale } = useTranslation();
     const form = useForm({ body: '' });
@@ -64,36 +74,48 @@ export default function NotesCard({
                 </h2>
             </div>
             <p className="text-xs text-muted-foreground">
-                {tn(
-                    'For your team only. :name never sees them; they can ask for them like any data about them.',
-                    { name: <bdi>{customer.name}</bdi> },
-                )}
+                {readOnly
+                    ? tn(
+                          'Written by each business’s team. Read only here; :name never sees them.',
+                          { name: <bdi>{customer.name}</bdi> },
+                      )
+                    : seenByHeadOffice
+                      ? tn(
+                            'For your team and your head office. :name never sees them; they can ask for them like any data about them.',
+                            { name: <bdi>{customer.name}</bdi> },
+                        )
+                      : tn(
+                            'For your team only. :name never sees them; they can ask for them like any data about them.',
+                            { name: <bdi>{customer.name}</bdi> },
+                        )}
             </p>
-            <form onSubmit={submit} className="flex flex-col gap-2">
-                <Textarea
-                    aria-label={t('Write a note…')}
-                    placeholder={t('Write a note…')}
-                    value={form.data.body}
-                    onChange={(event) =>
-                        form.setData('body', event.target.value)
-                    }
-                    maxLength={maxLength}
-                    required
-                    data-test="customer-note-body"
-                />
-                <InputError message={form.errors.body} />
-                <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    className="self-end"
-                    disabled={form.processing}
-                    data-test="customer-note-save"
-                >
-                    {form.processing && <Spinner />}
-                    {t('Save note')}
-                </Button>
-            </form>
+            {readOnly ? null : (
+                <form onSubmit={submit} className="flex flex-col gap-2">
+                    <Textarea
+                        aria-label={t('Write a note…')}
+                        placeholder={t('Write a note…')}
+                        value={form.data.body}
+                        onChange={(event) =>
+                            form.setData('body', event.target.value)
+                        }
+                        maxLength={maxLength}
+                        required
+                        data-test="customer-note-body"
+                    />
+                    <InputError message={form.errors.body} />
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        className="self-end"
+                        disabled={form.processing}
+                        data-test="customer-note-save"
+                    >
+                        {form.processing && <Spinner />}
+                        {t('Save note')}
+                    </Button>
+                </form>
+            )}
             {notes.length > 0 ? (
                 <ul className="divide-y border-t">
                     {notes.map((note) => (
@@ -120,8 +142,13 @@ export default function NotesCard({
                                             t(':date at :time', { date, time }),
                                     })}
                                 </p>
+                                {note.business ? (
+                                    <BusinessTag name={note.business} />
+                                ) : null}
                             </div>
-                            <DeleteNote customer={customer} note={note} />
+                            {readOnly ? null : (
+                                <DeleteNote customer={customer} note={note} />
+                            )}
                         </li>
                     ))}
                 </ul>

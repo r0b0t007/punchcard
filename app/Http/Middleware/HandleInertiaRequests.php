@@ -78,8 +78,9 @@ class HandleInertiaRequests extends Middleware
                 'stampers' => $this->managesStaff($request),
                 // Campaigns (CHW-42, B9): the same people (CampaignPolicy::viewAny).
                 'campaigns' => $this->managesStaff($request),
-                // Customers (CHW-44, B4): the same people (BusinessCustomerPolicy::viewAny).
-                'customers' => $this->managesStaff($request),
+                // Customers (CHW-44, B4): the same people (BusinessCustomerPolicy::viewAny); a franchise's head office
+                // across its sites too (CHW-365, OrganizationCustomerPolicy::viewAny).
+                'customers' => $this->managesStaff($request) || $this->seesNetworkCustomers($request),
                 // Automations (CHW-46, B11): the same people, while the business is allowed them (AutomationPolicy::viewAny).
                 'automations' => $this->managesStaff($request) && $this->allowedAutomations(),
             ],
@@ -159,6 +160,19 @@ class HandleInertiaRequests extends Middleware
     private function worksInBusiness(Request $request): bool
     {
         return $request->user() instanceof User && app(TenantContext::class)->businessId() !== null;
+    }
+
+    /**
+     * The org admin working across the organization, so sees its customers across its sites (CHW-365). The same
+     * rule as OrganizationCustomerPolicy::viewAny (its org admin, at network level), read from the tenant so no page
+     * pays a query: change one, change the other.
+     */
+    private function seesNetworkCustomers(Request $request): bool
+    {
+        $context = app(TenantContext::class);
+
+        return $request->user() instanceof User && $context->businessId() === null && $context->organizationId() !== null
+            && $context->isOrgAdmin();
     }
 
     /**

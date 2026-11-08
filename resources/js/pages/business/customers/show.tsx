@@ -1,7 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronLeft, Gift, Hand, Plus, Stamp, Undo2 } from 'lucide-react';
+import { ChevronLeft, Eye, Gift, Hand, Plus, Stamp, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import BusinessTag from '@/components/customers/business-tag';
+import Sites from '@/components/customers/sites';
 import NotesCard from '@/components/customers/notes-card';
 import type { CustomerNote } from '@/components/customers/notes-card';
 import StampDialog from '@/components/customers/stamp-dialog';
@@ -27,6 +29,8 @@ type Customer = {
     rewardsRedeemed: number;
     /** Friends they invited who came in here (CHW-47): this business's own customers only. */
     friendsCameIn: number;
+    /** The businesses they are a customer of, across a franchise's sites (CHW-365). */
+    sites?: string[];
 };
 
 type CardProgress = {
@@ -47,6 +51,8 @@ type HistoryEvent = {
     /** A stamp's card, or the reward redeemed. */
     card: string | null;
     location: string | null;
+    /** Its business, across a franchise's sites (CHW-365); null inside one business. */
+    business: string | null;
     /** The staff member, by first name and initial: who scanned, stamped by hand, corrected or redeemed. */
     by: string | null;
     reason: string | null;
@@ -58,9 +64,12 @@ type HistoryEvent = {
  * One customer (CHW-44, B5, design 15c): their status, what they usually
  * do, their progress on each card, and what happened at this business,
  * newest first, more on asking. Stamps added by hand or taken back, with a
- * reason, and the team's notes. The owner's, never staff's.
+ * reason, and the team's notes. The owner's, never staff's. For a
+ * franchise's head office (CHW-365, design 23), the same person across its
+ * sites, read only: every site's history and notes, each naming its business.
  */
 export default function CustomerPage({
+    level,
     customer,
     cards,
     history,
@@ -72,7 +81,10 @@ export default function CustomerPage({
     maxQty,
     notes,
     noteMax,
+    notesSeenByHeadOffice = false,
 }: {
+    /** Inside one business, or across a franchise's sites for its head office (CHW-365). */
+    level: 'business' | 'network';
     customer: Customer;
     cards: CardProgress[];
     history: HistoryEvent[];
@@ -87,8 +99,11 @@ export default function CustomerPage({
     maxQty: number;
     notes: CustomerNote[];
     noteMax: number;
+    /** Inside a franchisee: its head office reads these notes too, across its sites (CHW-365, design 23c). */
+    notesSeenByHeadOffice?: boolean;
 }) {
     const { t } = useTranslation();
+    const network = level === 'network';
     const canAdd = cards.length > 0 && locations.length > 0;
     const canTakeBack = cards.length > 0 && correctionLocations.length > 0;
     const dialog = (takesBack: boolean) => (
@@ -145,7 +160,12 @@ export default function CustomerPage({
                             <h1 className="font-display text-title leading-none font-bold">
                                 <bdi>{customer.name}</bdi>
                             </h1>
-                            <StatusChip status={customer.status} />
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusChip status={customer.status} />
+                                {customer.sites && customer.sites.length > 0 ? (
+                                    <Sites names={customer.sites} />
+                                ) : null}
+                            </div>
                         </div>
                     </div>
                     {canAdd || canTakeBack ? (
@@ -157,13 +177,30 @@ export default function CustomerPage({
                     ) : null}
                 </div>
 
+                {network ? (
+                    <p
+                        className="flex items-start gap-2 rounded-card bg-muted px-3 py-2.5 text-sm text-muted-foreground"
+                        data-test="customer-read-only"
+                    >
+                        <Eye
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 shrink-0"
+                        />
+                        {t(
+                            'Stamps and notes belong to each business: you see them here, and each business’s team changes them.',
+                        )}
+                    </p>
+                ) : null}
+
                 <div className="grid items-start gap-5 md:grid-cols-3">
                     <section
                         aria-labelledby="history"
                         className="flex flex-col gap-1 rounded-card border bg-card px-4 py-3.5 md:col-span-2"
                     >
                         <h2 id="history" className="font-semibold">
-                            {t('At this business, newest first')}
+                            {network
+                                ? t('At every business, newest first')
+                                : t('At this business, newest first')}
                         </h2>
                         {history.length === 0 ? (
                             <p className="py-3 text-sm text-muted-foreground">
@@ -244,6 +281,8 @@ export default function CustomerPage({
                             customer={customer}
                             notes={notes}
                             maxLength={noteMax}
+                            readOnly={network}
+                            seenByHeadOffice={notesSeenByHeadOffice}
                         />
                     </div>
                 </div>
@@ -340,6 +379,7 @@ function HistoryItem({ event }: { event: HistoryEvent }) {
                 <p className="text-xs text-muted-foreground">
                     {when} · {how(tn, event)}
                 </p>
+                {event.business ? <BusinessTag name={event.business} /> : null}
                 {event.reason ? (
                     <p className="mt-1 w-fit rounded-md bg-muted px-2.5 py-1 text-sm">
                         <bdi>{event.reason}</bdi>

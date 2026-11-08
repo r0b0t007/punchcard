@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ExportDialog from '@/components/customers/export-dialog';
 import StatusChip from '@/components/customers/status-chip';
+import Sites from '@/components/customers/sites';
 import { useTranslation } from '@/hooks/use-translation';
 import type { TranslateFn } from '@/hooks/use-translation';
 import { initials, lastVisit } from '@/lib/customers';
@@ -30,6 +31,8 @@ type CustomerRow = {
     lastVisitDays: number;
     rewardsRedeemed: number;
     status: CustomerStatus;
+    /** The businesses they are a customer of, across a franchise's sites (CHW-365). */
+    sites?: string[];
 };
 
 type Page = {
@@ -46,9 +49,12 @@ const SEGMENTS: Segment[] = ['all', 'regulars', 'quiet', 'lost', 'new'];
  * The Customers page (CHW-44, B4, design 15a): everyone who came in to the
  * business, a tab per segment with its count, search by first name, 25 a
  * page. The owner's, never staff's. Its owner can export them as CSV
- * (CHW-49, design 21): the page then says where the link goes.
+ * (CHW-49, design 21): the page then says where the link goes. For a
+ * franchise's head office (CHW-365, design 23), everyone who came in to any
+ * of its sites, each once, with the businesses they visit.
  */
 export default function Customers({
+    level,
     segment,
     q,
     counts,
@@ -59,6 +65,8 @@ export default function Customers({
     exportMaxYears,
     today,
 }: {
+    /** Inside one business, or across a franchise's sites for its head office (CHW-365). */
+    level: 'business' | 'network';
     segment: Segment;
     q: string | null;
     counts: Record<Segment, number>;
@@ -100,9 +108,15 @@ export default function Customers({
                 <div className="flex items-start justify-between gap-4">
                     <Heading
                         title={t('Customers')}
-                        description={t(
-                            'Everyone who came in, and who has stopped coming.',
-                        )}
+                        description={
+                            level === 'network'
+                                ? t(
+                                      'Everyone who came in to any of your businesses, and who has stopped coming anywhere.',
+                                  )
+                                : t(
+                                      'Everyone who came in, and who has stopped coming.',
+                                  )
+                        }
                     />
                     {canExport ? (
                         <ExportDialog today={today} maxYears={exportMaxYears} />
@@ -273,6 +287,9 @@ function CustomerItem({ customer }: { customer: CustomerRow }) {
                         <span className="truncate font-semibold">
                             <bdi>{customer.name}</bdi>
                         </span>
+                        {customer.sites && customer.sites.length > 0 ? (
+                            <Sites names={customer.sites} />
+                        ) : null}
                         <span className="text-xs text-muted-foreground md:hidden">
                             {t(':count visit|:count visits', {
                                 count: customer.visits,
