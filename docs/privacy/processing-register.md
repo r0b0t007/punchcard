@@ -51,7 +51,11 @@ Common to every entry:
   business on days they pick (first name and initial, visits, status, whether they follow for offers; never an email or
   a birthday) and the stamps given there (date, site, card, how, the staff member's first name and initial): made on
   request, logged in the audit log with the download, kept encrypted on the platform for 24 hours, then deleted. What the
-  owner does with the file afterwards is the business's responsibility.
+  owner does with the file afterwards is the business's responsibility. A franchise's head office (its org admins)
+  sees each member across its sites (CHW-365): visits, status and rewards redeemed added up from the stamps above, never
+  shown to a franchisee. Like each business's own summary of its customers, it is worked out from the stamps and
+  rewards (which the data download holds), so it is not in the download itself, and it goes with a deleted or
+  anonymised account.
 - **Retention**: while the account exists. On deletion or anonymisation the stamps and rewards stay, without the person's
   identity, so the businesses' counts don't change.
 

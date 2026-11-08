@@ -4,22 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\CustomerSegment;
-use App\Enums\CustomerStatus;
 use App\Models\Concerns\BelongsToBusiness;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Models\Concerns\SummarisesVisits;
 use App\Support\Tenancy\TenantBuilder;
-use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantModel;
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use LogicException;
 
 /**
  * A customer of a business (CHW-44, B4, B5): someone who came in, with a
@@ -50,6 +44,7 @@ class BusinessCustomer extends Model implements TenantModel
         assertTenantInsert as assertSiteDataInsert;
     }
     use GuardsTenantWrites;
+    use SummarisesVisits;
 
     /** @param  array<string, mixed>  $values */
     public function assertTenantInsert(array $values): void
@@ -67,58 +62,11 @@ class BusinessCustomer extends Model implements TenantModel
         $this->assertSummarising();
     }
 
-    /** Lost first, then going quiet, else active, at that moment. */
-    public function status(CarbonInterface $now): CustomerStatus
-    {
-        return match (true) {
-            $this->lost_at->lessThanOrEqualTo($now) => CustomerStatus::Lost,
-            $this->quiet_at->lessThanOrEqualTo($now) => CustomerStatus::Quiet,
-            default => CustomerStatus::Active,
-        };
-    }
-
     /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    /**
-     * The customers in a tab at that moment.
-     *
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function inSegment(Builder $query, CustomerSegment $segment, CarbonInterface $now): void
-    {
-        match ($segment) {
-            CustomerSegment::All => null,
-            CustomerSegment::Regulars => $query->where('visits', '>=', (int) config('punchcard.customers.regular_visits'))->where('quiet_at', '>', $now),
-            CustomerSegment::Quiet => $query->where('quiet_at', '<=', $now)->where('lost_at', '>', $now),
-            CustomerSegment::Lost => $query->where('lost_at', '<=', $now),
-            CustomerSegment::New => $query->where('first_visit_at', '>', $now->copy()->subDays((int) config('punchcard.customers.new_days'))),
-        };
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'first_visit_at' => 'datetime',
-            'last_visit_at' => 'datetime',
-            'quiet_at' => 'datetime',
-            'lost_at' => 'datetime',
-        ];
-    }
-
-    private function assertSummarising(): void
-    {
-        if (! app(TenantContext::class)->isBypassed()) {
-            throw new LogicException('A business\'s customers are summarised from the ledger only, by SummariseCustomer in TenantContext::bypass().');
-        }
     }
 }
