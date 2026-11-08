@@ -9,6 +9,7 @@ import {
     isWeakBrand,
     readableForeground,
     stampColor,
+    suggestedShade,
     SURFACE,
 } from '@/lib/color';
 
@@ -127,6 +128,28 @@ describe('cardInks', () => {
             foreground: '#FBF6EE',
             stamp: '#F2A541',
         });
+    });
+});
+
+describe('suggestedShade', () => {
+    it('offers a nearby shade that cream or ink reads on, only for a weak colour', () => {
+        for (const weak of ['#808080', '#9A7564', '#A07A68', '#E0482B']) {
+            const shade = suggestedShade(weak);
+
+            expect(shade).toMatch(/^#[0-9A-F]{6}$/);
+            expect(isWeakBrand(shade as string)).toBe(false);
+            expect(shade).not.toBe(weak.toUpperCase());
+        }
+
+        expect(suggestedShade('#3B2A20')).toBeNull();
+        expect(suggestedShade('#0F766E')).toBeNull();
+        expect(suggestedShade('teal')).toBeNull();
+    });
+
+    it('stays close to the colour picked', () => {
+        // One 5% step toward white is enough for this brown (design 24), and for grey.
+        expect(suggestedShade('#9A7564')).toBe('#9F7C6C');
+        expect(suggestedShade('#808080')).toBe('#868686');
     });
 });
 

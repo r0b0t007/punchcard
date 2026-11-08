@@ -103,6 +103,59 @@ export function isWeakBrand(brand: string): boolean {
     );
 }
 
+/**
+ * The nearest shade of a weak brand colour that cream or ink text reads on
+ * (B17, design 24): the colour mixed with black or white in 5% steps, the
+ * first that passes; null when the colour already reads.
+ */
+export function suggestedShade(brand: string): string | null {
+    if (!isHex(brand) || !isWeakBrand(brand)) {
+        return null;
+    }
+
+    for (let step = 1; step <= 20; step++) {
+        for (const toward of ['#000000', '#FFFFFF']) {
+            const shade = mix(brand, toward, step / 20);
+
+            if (!isWeakBrand(shade)) {
+                return shade;
+            }
+        }
+    }
+
+    return ESPRESSO;
+}
+
+/** Two hex colours mixed channel by channel, `amount` of the second: #RRGGBB, upper case. */
+function mix(from: string, to: string, amount: number): string {
+    const [a, b] = [channels(from), channels(to)];
+
+    return (
+        '#' +
+        a
+            .map((channel, i) =>
+                Math.round(channel + (b[i] - channel) * amount)
+                    .toString(16)
+                    .padStart(2, '0'),
+            )
+            .join('')
+            .toUpperCase()
+    );
+}
+
+function channels(hex: string): number[] {
+    const value = hex.replace('#', '');
+    const full =
+        value.length === 3
+            ? value
+                  .split('')
+                  .map((c) => c + c)
+                  .join('')
+            : value;
+
+    return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+}
+
 export function isHex(value: string): boolean {
     return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
 }

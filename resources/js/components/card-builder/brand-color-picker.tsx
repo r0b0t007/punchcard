@@ -9,15 +9,18 @@ import { cn } from '@/lib/utils';
 /**
  * The card's colour (B6): the organization's (null, "Default"), one of the
  * 8 swatches, or a custom hex. The colour only paints the card (ADR 0007).
+ * The brand page (B17) picks the organization's own, so has no "Default".
  */
 export default function BrandColorPicker({
     value,
     organizationColor,
     onChange,
+    withDefault = true,
 }: {
     value: string | null;
     organizationColor: string | null;
     onChange: (value: string | null) => void;
+    withDefault?: boolean;
 }) {
     const { t } = useTranslation();
     const isSwatch = (hex: string | null) =>
@@ -27,11 +30,15 @@ export default function BrandColorPicker({
         value !== null && !isSwatch(value) ? value : '',
     );
     const options = [
-        {
-            label: t('Default'),
-            hex: organizationColor ?? ESPRESSO,
-            value: null,
-        },
+        ...(withDefault
+            ? [
+                  {
+                      label: t('Default'),
+                      hex: organizationColor ?? ESPRESSO,
+                      value: null as string | null,
+                  },
+              ]
+            : []),
         ...BRAND_SWATCHES.map((swatch) => ({
             label: t(swatch.label),
             hex: swatch.hex,
@@ -71,7 +78,11 @@ export default function BrandColorPicker({
                     <input
                         type="color"
                         aria-label={t('Pick a colour')}
-                        value={(value ?? options[0].hex).toLowerCase()}
+                        value={(
+                            value ??
+                            organizationColor ??
+                            ESPRESSO
+                        ).toLowerCase()}
                         onChange={(event) => {
                             const hex = event.target.value.toUpperCase();
                             setCustom(hex);

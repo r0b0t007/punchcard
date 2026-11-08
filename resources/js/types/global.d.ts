@@ -18,6 +18,7 @@ declare module '@inertiajs/core' {
             /** The sidebar's pages the user may open: cards (CHW-32), staff (CHW-146), counter mode (CHW-29), stampers (CHW-36), campaigns (CHW-42), customers (CHW-44), automations (CHW-46). */
             nav: {
                 cards: boolean;
+                brand: boolean;
                 staff: boolean;
                 counter: boolean;
                 stampers: boolean;

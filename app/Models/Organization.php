@@ -9,6 +9,7 @@ use App\Enums\BusinessRole;
 use App\Enums\BusinessStatus;
 use App\Enums\OrganizationType;
 use App\Models\Concerns\GuardsTenantWrites;
+use App\Support\Branding\Contrast;
 use App\Support\Tenancy\SingleBusinessAccounts;
 use App\Support\Tenancy\TenantBuilder;
 use App\Support\Tenancy\TenantContext;
@@ -167,6 +168,21 @@ class Organization extends Model implements TenantModel
     public function logoUrl(): ?string
     {
         return $this->logo_path === null ? null : Storage::disk('public')->url($this->logo_path);
+    }
+
+    /** The cover's public URL (UpdateCover, B17); null without one. */
+    public function coverUrl(): ?string
+    {
+        return $this->cover_path === null ? null : Storage::disk('public')->url($this->cover_path);
+    }
+
+    /**
+     * The text colour that reads on the brand colour, 4.5:1 or more (ADR 0007,
+     * Contrast::readableForeground); null with no brand colour.
+     */
+    public function brandForeground(): ?string
+    {
+        return $this->brand_color !== null && Contrast::isHex($this->brand_color) ? Contrast::readableForeground($this->brand_color) : null;
     }
 
     /**
