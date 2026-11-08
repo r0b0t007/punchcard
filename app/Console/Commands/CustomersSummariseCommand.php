@@ -14,8 +14,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Summarises every business's customers from the ledger (CHW-44), and the
- * days they came in (CHW-45): for who came in before them, again after
+ * Summarises every business's customers from the ledger (CHW-44), the
+ * days they came in (CHW-45), and each customer across a franchise's sites
+ * (CHW-365, rewritten with each of their businesses): for who came in
+ * before them, again after
  * changing config('punchcard.customers'), or for one business. A business
  * at a time, so memory stays one business's customers; each customer in
  * their own short transaction. Safe to run again: each customer is
@@ -24,6 +26,8 @@ use Illuminate\Support\Facades\Cache;
  * --once is the deploy script's (docs/runbooks/deploy.md): it runs after
  * queue:restart, so every stamp the old release's worker took is in the
  * ledger it reads, and it does nothing once it has finished on a server.
+ * Its key (DONE) changes when a new summary needs filling, so the next
+ * deploy re-summarises every customer once: CHW-365's network rows.
  */
 #[Signature('punchcard:customers:summarise {--business= : Only this business id} {--once : Only if it never finished here}')]
 #[Description('Summarise businesses\' customers from their stamps')]

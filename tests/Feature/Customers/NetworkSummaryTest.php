@@ -96,9 +96,9 @@ it('keeps them while they are a customer of one site, and drops them after every
     expect(($this->network)())->toBeNull();
 });
 
-it('adds up the rewards redeemed at each site', function (): void {
+it('counts the rewards redeemed at each site, one where they never stamped too', function (): void {
+    // Every stamp at A1; one reward redeemed there, one at A2 (redeeming writes no stamp: never A2's customer).
     ($this->stampAt)('2026-10-01 10:00:00', $this->tenants->a1);
-    ($this->stampAt)('2026-10-02 10:00:00', $this->tenants->a2);
 
     foreach ([$this->tenants->a1, $this->tenants->a2] as $milestone => $business) {
         $this->context->bypass(fn () => Reward::factory()->for($this->enrollment, 'enrollment')->create(['milestone' => $milestone + 1])->forceFill([
@@ -108,7 +108,8 @@ it('adds up the rewards redeemed at each site', function (): void {
         app(SummariseCustomer::class)->handle($business->id, $this->tenants->orgA->id, $this->customer->id);
     }
 
-    expect(($this->network)()->rewards_redeemed)->toBe(2);
+    expect(($this->network)()->rewards_redeemed)->toBe(2)
+        ->and($this->context->bypass(fn () => BusinessCustomer::query()->where('business_id', $this->tenants->a2->id)->count()))->toBe(0);
 });
 
 it('keeps no row for an anonymised account, nor a deleted one', function (string $how): void {
