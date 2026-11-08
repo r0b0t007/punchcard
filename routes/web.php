@@ -9,6 +9,7 @@ use App\Http\Controllers\CardController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterScanController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerExportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\FinishSignUpController;
@@ -115,6 +116,8 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         Route::post('verification/{kind}', [VerificationController::class, 'store'])->middleware('throttle:verification-upload')->name('verification.store');
         // Customers (CHW-44, B4, B5): who came in, from whoever runs the business: stamps by hand or taken back, and notes.
         Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+        // Their customers and stamps as CSV (CHW-49): the owner's, made on the queue and emailed as a link.
+        Route::post('customers/export', [CustomerExportController::class, 'store'])->name('customers.export');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
         Route::post('customers/{customer}/stamps', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.stamps.store');
         Route::post('customers/{customer}/corrections', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.corrections.store');
@@ -163,6 +166,12 @@ Route::middleware([NeverCache::class, 'pwa:customer'])->group(function (): void 
     Route::get('t/result', [TapController::class, 'show'])->block(10, 10)->name('taps.result');
     Route::inertia('t/busy', 'tap/refused', ['reason' => 'busy'])->name('taps.busy');
 });
+
+// An export of a business's customers and stamps (CHW-49): the mailed link, signed for a day, for the owner who asked
+// alone (CustomerExportController checks the signature, whose link it is and that they still own the business).
+// Outside the tenant group: it opens whichever business the session has selected. Never cached.
+Route::get('business/exports/{business}/{export}', [CustomerExportController::class, 'download'])->whereNumber('business')->whereUlid('export')
+    ->middleware(['auth', NeverCache::class, 'pwa:business'])->name('customers.export.download');
 
 // A verification document for the platform admin (CHW-145): the 5-minute signed link from its business's page in A1,
 // never cached; who may is BusinessDocumentPolicy::open.

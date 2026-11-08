@@ -4,6 +4,7 @@ use App\Actions\Account\AnonymiseInactiveAccounts;
 use App\Actions\Account\WarnInactiveAccounts;
 use App\Actions\Automations\RunAutomations;
 use App\Actions\Campaigns\DispatchDueCampaigns;
+use App\Actions\Customers\DeleteExpiredExports;
 use App\Actions\Stats\RollUpEndedDays;
 use App\Actions\Taps\ExpirePendingTaps;
 use App\Actions\Verification\DeleteExpiredDocuments;
@@ -44,6 +45,10 @@ Schedule::call(fn () => Log::info('Inactivity warnings sent.', ['warned' => app(
     ->name('punchcard:inactive-accounts-warn')->dailyAt('03:30')->withoutOverlapping()->onOneServer();
 Schedule::call(fn () => Log::info('Inactive accounts swept.', ['gone' => app(AnonymiseInactiveAccounts::class)->handle(now())]))
     ->name('punchcard:inactive-accounts-sweep')->dailyAt('03:45')->withoutOverlapping()->onOneServer();
+
+// Exports of customers and stamps (CHW-49): deleted a day after they were made, hourly. Logs counts only.
+Schedule::call(fn () => Log::info('Customer exports swept.', app(DeleteExpiredExports::class)->handle(CarbonImmutable::now())))
+    ->name('punchcard:exports-sweep')->hourly()->withoutOverlapping()->onOneServer();
 
 // Verification documents (CHW-145, docs/privacy/retention.md): deleted 3 months after the platform decides, or 12 months
 // after they were sent while still waiting (CHW-58), and files with no row once a day old. Logs counts only.

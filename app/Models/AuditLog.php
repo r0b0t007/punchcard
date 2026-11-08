@@ -14,10 +14,12 @@ use Illuminate\Support\Carbon;
 
 /**
  * One thing the platform admin did (CHW-34): verify, suspend or reinstate a
- * business, register, move, re-key or retire a tag. Platform data: read and
+ * business, register, move, re-key or retire a tag; or an owner did that
+ * the platform keeps account of (a stamper switched on or off; customers
+ * exported and downloaded, CHW-49). Platform data: read and
  * written in TenantContext::bypass(), by App\Actions\Admin\RecordAudit only,
  * and never changed or deleted (database triggers). actor_label is "admin
- * #id" or "console" for a command, never an email: an admin with entries is
+ * #id", "user #id" or "console" for a command, never an email: an admin with entries is
  * anonymised rather than deleted (DeleteAccount), so actor_id stays valid.
  *
  * @property int $id

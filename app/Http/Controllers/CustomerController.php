@@ -14,15 +14,18 @@ use App\Enums\StampRejection;
 use App\Http\Requests\Customers\CustomerRequest;
 use App\Http\Requests\Customers\CustomersRequest;
 use App\Http\Requests\Customers\DeleteNoteRequest;
+use App\Http\Requests\Customers\ExportCustomersRequest;
 use App\Http\Requests\Customers\StampCustomerRequest;
 use App\Http\Requests\Customers\StoreNoteRequest;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\CustomerNote;
 use App\Models\User;
 use App\Support\LocalMoment;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,7 +48,14 @@ final class CustomerController extends Controller
         /** @var Business $business authorized by the request */
         $business = $request->business();
 
-        return Inertia::render('business/customers/index', $listCustomers->handle($business, $request->tab(), $request->search(), $request->page(), CarbonImmutable::now()));
+        return Inertia::render('business/customers/index', [
+            ...$listCustomers->handle($business, $request->tab(), $request->search(), $request->page(), CarbonImmutable::now()),
+            // Exporting them as CSV (CHW-49): the owner's alone; once asked, where the link goes (half hidden).
+            'canExport' => Gate::allows('export', [BusinessCustomer::class, $business]),
+            'exportSentTo' => $request->session()->get('customer-export'),
+            'exportMaxYears' => ExportCustomersRequest::MAX_YEARS,
+            'today' => CarbonImmutable::now(LocalMoment::timezoneOfBusiness($business->id))->format('Y-m-d'),
+        ]);
     }
 
     public function show(CustomerRequest $request, DescribeCustomer $describeCustomer): Response

@@ -105,6 +105,7 @@ above: keep the two in step.
 | B11 automations: three cards, each with its switch, setting and message (18a); the message editor, a first visit and the toast (18c) (CHW-46)                                                                                                    | `Punchcard Automations Review.dc.html`                                |
 | B10 campaign results: four figures, then the visits compared (19a); no ticket yet, still counting, no more than the week before, sent before results, and B9 opening them (19c) (CHW-48)                                                         | `Punchcard Campaign Results Review.dc.html`                           |
 | C6 refer a friend: the invitation panel under the card (20a); B6 the card builder's switch and monthly limit, B5 friends invited, C1 a friend invited you (20c) (CHW-47)                                                                         | `Punchcard Referrals Review.dc.html`                                  |
+| B4 export: the Export button and its dialog, the status once sent, the email, and a link no longer open (21) (CHW-49)                                                                                                                            | `Punchcard Export Review.dc.html`                                     |
 
 The inactivity email was drawn outside that project, on a Design canvas built on the punchcard design system
 (https://claude.ai/artifact/EaM9vH2mtDEt1KzPgYfyMT), when the project could not be opened from this account.
