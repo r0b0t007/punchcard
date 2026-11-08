@@ -44,8 +44,9 @@ final class ExportCustomers implements ShouldQueue
             return;
         }
 
-        $made = $buildCustomerExport->handle($this->businessId, $this->from, $this->to, $owner->preferredLocale() ?? (string) config('app.locale'), CarbonImmutable::now());
-        $owner->notify(new CustomerExportReadyMail($this->businessId, $this->businessName(), $made['export'], $this->from, $this->to, $made['customers'], $made['stamps']));
+        $now = CarbonImmutable::now();
+        $made = $buildCustomerExport->handle($this->businessId, $this->from, $this->to, $owner->preferredLocale() ?? (string) config('app.locale'), $now);
+        $owner->notify(new CustomerExportReadyMail($this->businessId, $this->businessName(), $made['export'], $this->from, $this->to, $made['customers'], $made['stamps'], $now));
     }
 
     public function failed(?Throwable $exception): void

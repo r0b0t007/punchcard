@@ -117,7 +117,7 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         // Customers (CHW-44, B4, B5): who came in, from whoever runs the business: stamps by hand or taken back, and notes.
         Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
         // Their customers and stamps as CSV (CHW-49): the owner's, made on the queue and emailed as a link.
-        Route::post('customers/export', [CustomerExportController::class, 'store'])->middleware('throttle:customer-export')->name('customers.export');
+        Route::post('customers/export', [CustomerExportController::class, 'store'])->name('customers.export');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
         Route::post('customers/{customer}/stamps', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.stamps.store');
         Route::post('customers/{customer}/corrections', [CustomerController::class, 'stamp'])->whereNumber('customer')->middleware('throttle:customer-change')->name('customers.corrections.store');

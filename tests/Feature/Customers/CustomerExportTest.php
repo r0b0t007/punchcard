@@ -6,6 +6,7 @@ use App\Actions\Customers\BuildCustomerExport;
 use App\Actions\Customers\DeleteExpiredExports;
 use App\Actions\Customers\SummariseCustomer;
 use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
 use App\Enums\StampSource;
 use App\Http\Middleware\SetTenant;
 use App\Jobs\ExportCustomers;
@@ -48,7 +49,7 @@ beforeEach(function (): void {
     $this->owner = $this->tenants->member(User::factory()->create(['name' => 'Yasmine Alaoui', 'locale' => 'en']), $this->tenants->a1, BusinessRole::Owner);
     $this->as = fn (User $user, string $tenant) => $this->actingAs($user)->withSession([SetTenant::SESSION_KEY => $tenant]);
     $this->ask = fn (array $dates = ['from' => '2026-10-01', 'to' => '2026-11-07'], ?User $user = null, ?string $tenant = null) => ($this->as)($user ?? $this->owner, $tenant ?? 'business:'.$this->tenants->a1->id)
-        ->post(route('customers.export'), $dates);
+        ->from(route('customers.index', ['status' => 'quiet', 'search' => 'sal']))->post(route('customers.export'), $dates);
 
     // A customer who came to A1 (and maybe A2), with their visits summarised there.
     $this->visitor = function (string $name, array $at = ['2026-10-15 10:00:00'], ?Business $business = null): CardEnrollment {
@@ -91,10 +92,10 @@ afterEach(function (): void {
     Carbon::setTestNow();
 });
 
-it('queues the owner\'s export, records it, and says where the link goes', function (): void {
+it('queues the owner\'s export, records it, and says where the link goes, back where they were', function (): void {
     Queue::fake();
 
-    ($this->ask)()->assertRedirect(route('customers.index'))->assertSessionHas('customer-export', MailedLink::maskedEmail($this->owner->email));
+    ($this->ask)()->assertRedirect(route('customers.index', ['status' => 'quiet', 'search' => 'sal']))->assertSessionHas('customer-export', MailedLink::maskedEmail($this->owner->email));
 
     Queue::assertPushed(ExportCustomers::class, fn (ExportCustomers $job): bool => $job->businessId === $this->tenants->a1->id && $job->ownerId === $this->owner->id
         && $job->from === '2026-10-01' && $job->to === '2026-11-07');
@@ -135,8 +136,12 @@ it('takes days up to today, at most 3 years apart, in order', function (array $d
     'not a day' => [['from' => 'last week', 'to' => '2026-11-07'], 'from'],
 ]);
 
-it('limits exports to a few an hour', function (): void {
+it('limits exports to a few an hour, counting only those asked for', function (): void {
     Queue::fake();
+
+    foreach (range(1, 3) as $ignored) {
+        ($this->ask)(['from' => '2026-11-01', 'to' => '2026-10-01'])->assertSessionHasErrors('to');
+    }
 
     foreach (range(1, 3) as $ignored) {
         ($this->ask)()->assertSessionHasNoErrors();
@@ -195,19 +200,22 @@ it('keeps an anonymised customer\'s and staff member\'s stamps, without a name',
     expect($customers[1][1])->toBe('')->and($stamps)->toHaveCount(2);
 });
 
-it('keeps the file encrypted, and mails the owner a link that works a day', function (): void {
+it('keeps the file encrypted, and mails the owner a link that works a day from when it was made', function (): void {
     Notification::fake();
     ($this->visitor)('Salma Tazi');
+    $made = now()->getTimestamp();
 
     (new ExportCustomers($this->tenants->a1->id, $this->owner->id, '2026-10-01', '2026-11-07'))->handle(app(BuildCustomerExport::class));
 
     $files = Storage::disk(BuildCustomerExport::DISK)->allFiles();
     expect($files)->toHaveCount(1)
         ->and(str_starts_with((string) Storage::disk(BuildCustomerExport::DISK)->get($files[0]), 'PK'))->toBeFalse();
-    Notification::assertSentTo($this->owner, CustomerExportReadyMail::class, function (CustomerExportReadyMail $mail): bool {
+    // The mail goes out later (a busy queue): its link still ends a day after the export was made, as the file does.
+    $this->travel(3)->hours();
+    Notification::assertSentTo($this->owner, CustomerExportReadyMail::class, function (CustomerExportReadyMail $mail) use ($made): bool {
         parse_str((string) parse_url($mail->link($this->owner), PHP_URL_QUERY), $query);
 
-        return $mail->customers === 1 && $mail->stamps === 1 && (int) $query['expires'] === now()->addDay()->getTimestamp()
+        return $mail->customers === 1 && $mail->stamps === 1 && (int) $query['expires'] === $made + 86400
             && (int) $query['for'] === $this->owner->id;
     });
 });
@@ -216,7 +224,7 @@ describe('the download', function (): void {
     beforeEach(function (): void {
         ($this->visitor)('Salma Tazi');
         $this->export = ($this->build)()['export'];
-        $this->mail = new CustomerExportReadyMail($this->tenants->a1->id, 'A1', $this->export, '2026-10-01', '2026-11-07', 1, 1);
+        $this->mail = new CustomerExportReadyMail($this->tenants->a1->id, 'A1', $this->export, '2026-10-01', '2026-11-07', 1, 1, CarbonImmutable::now());
         $this->path = fn (): string => parse_url($this->mail->link($this->owner), PHP_URL_PATH).'?'.parse_url($this->mail->link($this->owner), PHP_URL_QUERY);
     });
 
@@ -230,17 +238,20 @@ describe('the download', function (): void {
         expect($entry->action)->toBe('customers.export_downloaded')->and($entry->context)->toBe(['export' => $this->export]);
     });
 
-    it('is not for anyone else, nor an owner no longer', function (string $who): void {
+    it('is not for anyone else, nor an owner no longer, nor a business suspended or closed', function (string $who): void {
         $user = $who === 'another account' ? User::factory()->create() : $this->owner;
 
-        if ($who === 'no longer owner') {
-            $this->context->bypass(fn () => BusinessMember::query()->where('user_id', $this->owner->id)->update(['role' => BusinessRole::Staff]));
-        }
+        match ($who) {
+            'no longer owner' => $this->context->bypass(fn () => BusinessMember::query()->where('user_id', $this->owner->id)->update(['role' => BusinessRole::Staff])),
+            'suspended' => $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => BusinessStatus::Suspended])->save()),
+            'closed' => $this->context->bypass(fn () => $this->tenants->a1->forceFill(['archived_at' => now()])->save()),
+            default => null,
+        };
 
         $this->actingAs($user)->get(($this->path)())->assertForbidden()
             ->assertInertia(fn (Assert $page): Assert => $page->component('auth/export-unavailable')->where('reason', 'not-yours'));
         expect($this->context->bypass(fn () => AuditLog::query()->count()))->toBe(0);
-    })->with(['another account', 'no longer owner']);
+    })->with(['another account', 'no longer owner', 'suspended', 'closed']);
 
     it('says a link a day old, or a file gone, has expired', function (string $case): void {
         $path = ($this->path)();
@@ -248,6 +259,7 @@ describe('the download', function (): void {
 
         $this->actingAs($this->owner)->get($path)->assertStatus(410)
             ->assertInertia(fn (Assert $page): Assert => $page->component('auth/export-unavailable')->where('reason', 'expired'));
+        expect($this->context->bypass(fn () => AuditLog::query()->count()))->toBe(0);
     })->with(['a day later', 'the file gone']);
 
     it('refuses a link changed by hand, and asks to sign in first', function (): void {

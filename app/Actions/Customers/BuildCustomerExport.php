@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Customers;
 
+use App\Enums\CustomerStatus;
 use App\Enums\StampSource;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
@@ -16,9 +17,11 @@ use App\Models\User;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Traits\Localizable;
 use RuntimeException;
 use ZipArchive;
 
@@ -32,15 +35,21 @@ use ZipArchive;
  * labels in the owner's language. UTF-8 with a BOM, for spreadsheets to read Arabic; a cell a spreadsheet would run
  * as a formula (=, +, -, @, a tab or a return first) starts with a quote.
  *
- * The two files go in a zip, encrypted (Crypt, APP_KEY) on the `exports` disk, never served (DownloadCustomerExport
- * reads it back), and deleted after a day (DeleteExpiredExports).
+ * Rows are read a chunk at a time, with the names, follows and cards for that chunk in a few queries, and written to
+ * temporary files, so a busy business's years fit in the job's time and memory. The two files go in a zip, encrypted
+ * (Crypt, APP_KEY) on the `exports` disk, never served (DownloadCustomerExport reads it back), and deleted after a day
+ * (DeleteExpiredExports).
  */
 final readonly class BuildCustomerExport
 {
+    use Localizable;
+
     public const string DISK = 'exports';
 
     /** A cell starting with one of these is a formula to a spreadsheet. */
     private const array FORMULA = ['=', '+', '-', '@', "\t", "\r"];
+
+    private const int CHUNK = 1000;
 
     public function __construct(private TenantContext $context) {}
 
@@ -55,154 +64,186 @@ final readonly class BuildCustomerExport
      */
     public function handle(int $businessId, string $from, string $to, string $locale, CarbonImmutable $now): array
     {
-        return $this->context->bypass(function () use ($businessId, $from, $to, $locale, $now): array {
+        return $this->withLocale($locale, fn (): array => $this->context->bypass(function () use ($businessId, $from, $to, $now): array {
             $timezone = LocalMoment::timezoneOfBusiness($businessId);
             $start = LocalMoment::dayStart($timezone, CarbonImmutable::parse($from, $timezone));
             $end = LocalMoment::dayEnd($timezone, CarbonImmutable::parse($to, $timezone));
-
-            [$customers, $customerCount] = $this->customers($businessId, $start, $end, $timezone, $locale, $now);
-            [$stamps, $stampCount] = $this->stamps($businessId, $start, $end, $locale);
-
             $export = (string) Str::ulid();
-            $zip = tempnam(sys_get_temp_dir(), 'pcx');
+            $temporary = [];
 
             try {
+                $temporary[] = $customersCsv = $this->temporary();
+                $temporary[] = $stampsCsv = $this->temporary();
+                $temporary[] = $zip = $this->temporary();
+
+                $customers = $this->customers($customersCsv, $businessId, $start, $end, $timezone, $now);
+                $stamps = $this->stamps($stampsCsv, $businessId, $start, $end);
+
                 $archive = new ZipArchive;
 
-                if ($zip === false || $archive->open($zip, ZipArchive::OVERWRITE) !== true) {
+                if ($archive->open($zip, ZipArchive::OVERWRITE) !== true) {
                     throw new RuntimeException('The export could not be zipped.');
                 }
 
-                $archive->addFromString('customers.csv', $customers);
-                $archive->addFromString('stamps.csv', $stamps);
-                $archive->close();
+                $archive->addFile($customersCsv, 'customers.csv');
+                $archive->addFile($stampsCsv, 'stamps.csv');
+
+                if (! $archive->close()) {
+                    throw new RuntimeException('The export could not be zipped.');
+                }
 
                 Storage::disk(self::DISK)->put(self::path($businessId, $export), Crypt::encryptString((string) file_get_contents($zip)));
             } finally {
-                if (is_string($zip) && is_file($zip)) {
-                    unlink($zip);
+                foreach ($temporary as $path) {
+                    if (is_file($path)) {
+                        unlink($path);
+                    }
                 }
             }
 
-            return ['export' => $export, 'customers' => $customerCount, 'stamps' => $stampCount];
-        });
+            return ['export' => $export, 'customers' => $customers, 'stamps' => $stamps];
+        }));
     }
 
     /**
-     * The business's customers with a visit (a presence stamp) here in the range.
-     *
-     * @return array{0: string, 1: int}
+     * The business's customers with a visit (a presence stamp) here in the range; how many.
      */
-    private function customers(int $businessId, CarbonImmutable $start, CarbonImmutable $end, string $timezone, string $locale, CarbonImmutable $now): array
+    private function customers(string $path, int $businessId, CarbonImmutable $start, CarbonImmutable $end, string $timezone, CarbonImmutable $now): int
     {
-        $csv = $this->open([__('Reference', [], $locale), __('Name', [], $locale), __('Visits', [], $locale), __('First visit', [], $locale),
-            __('Last visit', [], $locale), __('Usual gap (days)', [], $locale), __('Status', [], $locale), __('Rewards redeemed', [], $locale),
-            __('Follows for offers', [], $locale)]);
+        $csv = $this->open($path, [__('Reference'), __('Name'), __('Visits'), __('First visit'), __('Last visit'), __('Usual gap (days)'),
+            __('Status'), __('Rewards redeemed'), __('Follows for offers')]);
         $organizationId = (int) Business::query()->whereKey($businessId)->value('organization_id');
         $visitors = CardEnrollment::query()->select('user_id')->whereIn('id', StampEvent::query()->select('enrollment_id')
             ->where('business_id', $businessId)->whereIn('source', StampSource::presenceValues())
             ->where('created_at', '>=', $start)->where('created_at', '<', $end));
         $count = 0;
 
-        foreach (BusinessCustomer::query()->where('business_id', $businessId)->whereIn('user_id', $visitors)->orderBy('id')->lazyById(500) as $customer) {
-            $user = User::query()->whereKey($customer->user_id)->first(['id', 'name', 'anonymised_at']);
-            $follows = Follow::query()->where('organization_id', $organizationId)->where('user_id', $customer->user_id)->where('notify', true)->exists();
+        foreach (BusinessCustomer::query()->where('business_id', $businessId)->whereIn('user_id', $visitors)->lazyById(self::CHUNK)->chunk(self::CHUNK) as $chunk) {
+            $userIds = $chunk->pluck('user_id')->all();
+            $names = $this->names($userIds);
+            $followers = Follow::query()->where('organization_id', $organizationId)->whereIn('user_id', $userIds)->where('notify', true)
+                ->pluck('user_id')->flip();
 
-            $this->row($csv, [
-                $customer->id,
-                $user instanceof User && ! $user->isAnonymised() ? (string) $user->shortName() : '',
-                $customer->visits,
-                $customer->first_visit_at->setTimezone($timezone)->format('Y-m-d'),
-                $customer->last_visit_at->setTimezone($timezone)->format('Y-m-d'),
-                $customer->usual_gap_days ?? '',
-                __(match ($customer->status($now)->value) {
-                    'lost' => 'Lost',
-                    'quiet' => 'Going quiet',
-                    default => 'Active',
-                }, [], $locale),
-                $customer->rewards_redeemed,
-                $follows ? __('Yes', [], $locale) : __('No', [], $locale),
-            ]);
-            $count++;
+            foreach ($chunk as $customer) {
+                $this->row($csv, [
+                    $customer->id,
+                    $names[$customer->user_id] ?? '',
+                    $customer->visits,
+                    $customer->first_visit_at->setTimezone($timezone)->format('Y-m-d'),
+                    $customer->last_visit_at->setTimezone($timezone)->format('Y-m-d'),
+                    $customer->usual_gap_days ?? '',
+                    match ($customer->status($now)) {
+                        CustomerStatus::Lost => __('Lost'),
+                        CustomerStatus::Quiet => __('Going quiet'),
+                        CustomerStatus::Active => __('Active'),
+                    },
+                    $customer->rewards_redeemed,
+                    $followers->has($customer->user_id) ? __('Yes') : __('No'),
+                ]);
+                $count++;
+            }
         }
 
-        return [$this->close($csv), $count];
+        fclose($csv);
+
+        return $count;
     }
 
     /**
-     * Every stamp given here in the range, oldest first, in its site's time.
-     *
-     * @return array{0: string, 1: int}
+     * Every stamp given here in the range, oldest first, in its site's time; how many.
      */
-    private function stamps(int $businessId, CarbonImmutable $start, CarbonImmutable $end, string $locale): array
+    private function stamps(string $path, int $businessId, CarbonImmutable $start, CarbonImmutable $end): int
     {
-        $csv = $this->open([__('Date', [], $locale), __('Time', [], $locale), __('Site', [], $locale), __('Card', [], $locale),
-            __('Customer reference', [], $locale), __('How', [], $locale), __('Stamps', [], $locale), __('Reason', [], $locale),
-            __('Stamped by', [], $locale)]);
+        $csv = $this->open($path, [__('Date'), __('Time'), __('Site'), __('Card'), __('Customer reference'), __('How'), __('Stamps'),
+            __('Reason'), __('Stamped by')]);
         $sites = Location::query()->where('business_id', $businessId)->get(['id', 'name', 'timezone'])->keyBy('id');
-        $references = [];
-        $cards = [];
+        /** @var array<int, array{reference: int|null, card: string}> $enrollments */
+        $enrollments = [];
+        /** @var array<int, string> $cardNames */
+        $cardNames = [];
+        /** @var array<int, string> $staff */
         $staff = [];
         $count = 0;
 
-        foreach (StampEvent::query()->where('business_id', $businessId)->where('created_at', '>=', $start)->where('created_at', '<', $end)->lazyById(1000) as $stamp) {
-            if (! array_key_exists($stamp->enrollment_id, $references)) {
-                $enrollment = CardEnrollment::query()->whereKey($stamp->enrollment_id)->first(['id', 'user_id', 'card_id']);
-                $references[$stamp->enrollment_id] = $enrollment instanceof CardEnrollment
-                    ? BusinessCustomer::query()->where('business_id', $businessId)->where('user_id', $enrollment->user_id)->value('id')
-                    : null;
-                $cardId = $enrollment?->card_id;
-                $cards[$stamp->enrollment_id] = $cardId === null ? '' : ($cards['card:'.$cardId] ??= (string) LoyaltyCard::query()->whereKey($cardId)->value('name'));
+        foreach (StampEvent::query()->where('business_id', $businessId)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+            ->lazyById(self::CHUNK)->chunk(self::CHUNK) as $chunk) {
+            $newEnrollments = CardEnrollment::query()->whereKey($chunk->pluck('enrollment_id')->unique()->diff(array_keys($enrollments))->values())
+                ->get(['id', 'user_id', 'card_id']);
+            $references = BusinessCustomer::query()->where('business_id', $businessId)->whereIn('user_id', $newEnrollments->pluck('user_id')->unique())
+                ->pluck('id', 'user_id');
+            $cardNames += LoyaltyCard::query()->whereKey($newEnrollments->pluck('card_id')->unique()->diff(array_keys($cardNames))->values())
+                ->pluck('name', 'id')->map(fn (mixed $name): string => (string) $name)->all();
+
+            foreach ($newEnrollments as $enrollment) {
+                $enrollments[$enrollment->id] = ['reference' => $references->get($enrollment->user_id), 'card' => $cardNames[$enrollment->card_id] ?? ''];
             }
 
-            if ($stamp->staff_id !== null && ! array_key_exists($stamp->staff_id, $staff)) {
-                $person = User::query()->whereKey($stamp->staff_id)->first(['id', 'name', 'anonymised_at']);
-                $staff[$stamp->staff_id] = $person instanceof User && ! $person->isAnonymised() ? (string) $person->shortName() : '';
+            $staff += $this->names($chunk->pluck('staff_id')->filter()->unique()->diff(array_keys($staff))->values()->all());
+
+            foreach ($chunk as $stamp) {
+                $site = $sites->get($stamp->location_id);
+                $at = $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($site instanceof Location ? $site : null));
+                $enrollment = $enrollments[$stamp->enrollment_id] ?? ['reference' => null, 'card' => ''];
+
+                $this->row($csv, [
+                    $at->format('Y-m-d'),
+                    $at->format('H:i'),
+                    $site instanceof Location ? $site->name : '',
+                    $enrollment['card'],
+                    $enrollment['reference'] ?? '',
+                    $stamp->source->getLabel(),
+                    $stamp->qty,
+                    $stamp->reason ?? '',
+                    $stamp->staff_id === null ? '' : ($staff[$stamp->staff_id] ?? ''),
+                ]);
+                $count++;
             }
-
-            $site = $sites->get($stamp->location_id);
-            $at = $stamp->created_at->copy()->setTimezone(LocalMoment::timezoneOf($site instanceof Location ? $site : null));
-
-            $this->row($csv, [
-                $at->format('Y-m-d'),
-                $at->format('H:i'),
-                $site instanceof Location ? $site->name : '',
-                $cards[$stamp->enrollment_id],
-                $references[$stamp->enrollment_id] ?? '',
-                __($this->how($stamp->source), [], $locale),
-                $stamp->qty,
-                $stamp->reason ?? '',
-                $stamp->staff_id === null ? '' : $staff[$stamp->staff_id],
-            ]);
-            $count++;
         }
 
-        return [$this->close($csv), $count];
-    }
+        fclose($csv);
 
-    /** How a stamp was given, as B5 says it. */
-    private function how(StampSource $source): string
-    {
-        return match ($source) {
-            StampSource::Nfc => 'Tap',
-            StampSource::Qr => 'QR scan',
-            StampSource::Manual => 'By hand',
-            StampSource::Bonus => 'Bonus',
-            StampSource::Birthday => 'Birthday',
-            StampSource::Referral => 'Referral',
-            StampSource::Correction => 'Correction',
-        };
+        return $count;
     }
 
     /**
-     * A CSV in memory, its byte order mark and headers written.
+     * People as B4 and B5 name them (first name and initial), blank once anonymised; by id.
+     *
+     * @param  list<int>|array<int, int>  $userIds
+     * @return array<int, string>
+     */
+    private function names(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        /** @var Collection<int, User> $users */
+        $users = User::query()->whereKey($userIds)->get(['id', 'name', 'anonymised_at']);
+
+        return $users->mapWithKeys(fn (User $user): array => [$user->id => $user->isAnonymised() ? '' : (string) $user->shortName()])->all();
+    }
+
+    /** A temporary file, deleted by handle() whatever happens. */
+    private function temporary(): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pcx');
+
+        if ($path === false) {
+            throw new RuntimeException('The export could not be written.');
+        }
+
+        return $path;
+    }
+
+    /**
+     * A CSV file opened for writing, its byte order mark and headers written.
      *
      * @param  list<string>  $headers
      * @return resource
      */
-    private function open(array $headers)
+    private function open(string $path, array $headers)
     {
-        $csv = fopen('php://temp', 'w+b');
+        $csv = fopen($path, 'wb');
 
         if ($csv === false) {
             throw new RuntimeException('The export could not be written.');
@@ -233,15 +274,5 @@ final readonly class BuildCustomerExport
         $value = (string) $value;
 
         return $value !== '' && in_array($value[0], self::FORMULA, true) ? "'".$value : $value;
-    }
-
-    /** @param resource $csv */
-    private function close($csv): string
-    {
-        rewind($csv);
-        $contents = (string) stream_get_contents($csv);
-        fclose($csv);
-
-        return $contents;
     }
 }

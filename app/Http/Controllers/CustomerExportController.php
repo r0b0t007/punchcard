@@ -8,10 +8,12 @@ use App\Actions\Customers\DownloadCustomerExport;
 use App\Actions\Customers\RequestCustomerExport;
 use App\Http\Requests\Customers\ExportCustomersRequest;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\User;
 use App\Support\Auth\MailedLink;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,10 +22,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Exporting a business's customers and stamps (CHW-49, design 21):
  *
  * - POST /business/customers/export (its owner, throttled): made on the queue and emailed (RequestCustomerExport);
- *   back to B4, which says where the link goes.
- * - GET /business/exports/{business}/{export} (signed in, never cached): the mailed link, signed for a day, for the
- *   owner who asked alone, still an owner. Another account, or an owner no longer, is told it isn't theirs; an
- *   expired link or a file gone is told to ask again. The zip is never sniffed, run or sent a referrer.
+ *   back to B4 where they were, which says where the link goes.
+ * - GET /business/exports/{business}/{export} (signed in, never cached): the mailed link, signed for a day from when
+ *   the export was made, for the owner who asked alone, still an owner of a business still operating
+ *   (BusinessCustomerPolicy::downloadExport). Anyone else is told it isn't theirs; an expired link or a file gone is
+ *   told to ask again. The zip is never sniffed, run or sent a referrer.
  */
 final class CustomerExportController extends Controller
 {
@@ -36,7 +39,7 @@ final class CustomerExportController extends Controller
 
         $requestCustomerExport->handle($business, $owner, $request->from(), $request->to());
 
-        return to_route('customers.index')->with('customer-export', MailedLink::maskedEmail($owner->email));
+        return back()->with('customer-export', MailedLink::maskedEmail($owner->email));
     }
 
     public function download(Request $request, int $business, string $export, DownloadCustomerExport $download): Response
@@ -47,17 +50,19 @@ final class CustomerExportController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        if ($request->query->getInt('for') !== $user->id || ! $download->owns($user, $business)) {
+        if (Gate::forUser($user)->denies('downloadExport', [BusinessCustomer::class, $business, $request->query->getInt('for')])) {
             return $this->unavailable($request, 'not-yours', Response::HTTP_FORBIDDEN);
         }
 
-        if (! URL::signatureHasNotExpired($request) || ! $download->exists($business, $export)) {
+        $zip = URL::signatureHasNotExpired($request) ? $download->handle($user, $business, $export) : null;
+
+        if ($zip === null) {
             return $this->unavailable($request, 'expired', Response::HTTP_GONE);
         }
 
         $name = 'punchcard-export-'.$request->query('from', '').'-'.$request->query('to', '').'.zip';
 
-        return response($download->handle($user, $business, $export), 200, [
+        return response($zip, 200, [
             'Content-Type' => 'application/zip',
             'Content-Disposition' => 'attachment; filename="'.preg_replace('/[^A-Za-z0-9.-]/', '', $name).'"',
             'X-Content-Type-Options' => 'nosniff',

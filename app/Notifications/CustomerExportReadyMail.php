@@ -33,6 +33,7 @@ final class CustomerExportReadyMail extends Notification implements ShouldQueue
         public readonly string $to,
         public readonly int $customers,
         public readonly int $stamps,
+        public readonly CarbonImmutable $madeAt,
     ) {}
 
     /** @return list<string> */
@@ -44,7 +45,7 @@ final class CustomerExportReadyMail extends Notification implements ShouldQueue
     /** The download link: for this owner alone, until a day after the export was made. */
     public function link(User $owner): string
     {
-        return MailedLink::signed('customers.export.download', now()->addHours(self::LINK_HOURS), [
+        return MailedLink::signed('customers.export.download', $this->madeAt->addHours(self::LINK_HOURS), [
             'business' => $this->businessId, 'export' => $this->export, 'for' => $owner->id, 'from' => $this->from, 'to' => $this->to,
         ]);
     }

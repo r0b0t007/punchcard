@@ -289,10 +289,6 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('data-export', fn (Request $request): Limit => Limit::perHour(5)->by('data-export:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): RedirectResponse => to_route('privacy.edit')->with('status', 'export-limited')));
 
-        // Exporting customers and stamps (CHW-49): a few an hour per owner; B4 says so.
-        RateLimiter::for('customer-export', fn (Request $request): Limit => Limit::perHour(3)->by('customer-export:'.$request->user()?->getAuthIdentifier())
-            ->response(fn (): RedirectResponse => back()->withErrors(['from' => __('Too many exports asked for. Try again in an hour.')])));
-
         // The average ticket on a campaign's results (CHW-48): an owner's edit, never a script's; said under the field.
         RateLimiter::for('campaign-ticket', fn (Request $request): Limit => Limit::perMinute(30)->by('campaign-ticket:'.$request->user()?->getAuthIdentifier())
             ->response(fn (): RedirectResponse => back()->withErrors(['average_ticket' => __('Too many changes. Try again in a minute.')])));
