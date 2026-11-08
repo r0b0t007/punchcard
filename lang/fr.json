@@ -1282,5 +1282,9 @@
     "This export has expired": "Cet export a expiré",
     "This export isn't available to you": "Cet export ne vous est pas destiné",
     "Export links work for 24 hours. Ask for a new one from the Customers page.": "Les liens d’export marchent 24 heures. Demandez-en un nouveau depuis la page Clients.",
-    "Only the owner who asked for it can download it, signed in to their own account.": "Seul le propriétaire qui l’a demandé peut le télécharger, connecté à son compte."
+    "Only the owner who asked for it can download it, signed in to their own account.": "Seul le propriétaire qui l’a demandé peut le télécharger, connecté à son compte.",
+    "Everyone who came in to any of your businesses, and who has stopped coming anywhere.": "Toutes les personnes venues dans l’un de vos commerces, et celles qui ne viennent plus nulle part.",
+    "Stamps and notes belong to each business: you see them here, and each business’s team changes them.": "Les tampons et les notes appartiennent à chaque commerce : vous les voyez ici, et l’équipe de chacun les modifie.",
+    "At every business, newest first": "Dans tous les commerces, les plus récents d’abord",
+    "Written by each business’s team. Read only here; :name never sees them.": "Écrites par l’équipe de chaque commerce. En lecture seule ici ; :name ne les voit pas."
 }

@@ -7,6 +7,8 @@ namespace App\Http\Requests\Customers;
 use App\Enums\CustomerSegment;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
+use App\Models\Organization;
+use App\Models\OrganizationCustomer;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,16 +16,20 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 /**
- * The customers list (CHW-44, B4) of whoever runs the current business: a
- * tab, a first name to look for, a page.
+ * The customers list (CHW-44, B4) of whoever runs the current business, or
+ * across a franchise's sites for its head office (CHW-365, at network
+ * level): a tab, a first name to look for, a page.
  */
 class CustomersRequest extends FormRequest
 {
     public function authorize(): bool
     {
         $business = $this->business();
+        $organization = app(TenantContext::class)->organization();
 
-        return $business instanceof Business && Gate::allows('viewAny', [BusinessCustomer::class, $business]);
+        return $business instanceof Business
+            ? Gate::allows('viewAny', [BusinessCustomer::class, $business])
+            : $organization instanceof Organization && Gate::allows('viewAny', [OrganizationCustomer::class, $organization]);
     }
 
     /**
