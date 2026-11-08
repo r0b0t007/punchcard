@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Customers;
 
-use App\Models\Business;
 use App\Models\OrganizationCustomer;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -23,10 +23,10 @@ class ShowCustomerRequest extends CustomerRequest
         return $this->atNetwork() ? Gate::allows('view', $this->networkCustomer()) : parent::authorize();
     }
 
-    /** Working across the organization rather than inside one of its businesses. */
+    /** Working across the organization rather than inside one of its businesses (read from the tenant, no query). */
     public function atNetwork(): bool
     {
-        return ! $this->business() instanceof Business;
+        return app(TenantContext::class)->businessId() === null;
     }
 
     public function networkCustomer(): OrganizationCustomer

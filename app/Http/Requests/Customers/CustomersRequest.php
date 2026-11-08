@@ -22,14 +22,19 @@ use Illuminate\Validation\Rule;
  */
 class CustomersRequest extends FormRequest
 {
+    private ?Business $business = null;
+
     public function authorize(): bool
     {
         $business = $this->business();
+
+        if ($business instanceof Business) {
+            return Gate::allows('viewAny', [BusinessCustomer::class, $business]);
+        }
+
         $organization = app(TenantContext::class)->organization();
 
-        return $business instanceof Business
-            ? Gate::allows('viewAny', [BusinessCustomer::class, $business])
-            : $organization instanceof Organization && Gate::allows('viewAny', [OrganizationCustomer::class, $organization]);
+        return $organization instanceof Organization && Gate::allows('viewAny', [OrganizationCustomer::class, $organization]);
     }
 
     /**
@@ -44,9 +49,10 @@ class CustomersRequest extends FormRequest
         ];
     }
 
+    /** The business worked in, read once; null at network level. */
     public function business(): ?Business
     {
-        return app(TenantContext::class)->business();
+        return $this->business ??= app(TenantContext::class)->business();
     }
 
     public function tab(): CustomerSegment

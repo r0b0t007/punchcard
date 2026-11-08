@@ -35,7 +35,7 @@ final readonly class ListNetworkCustomers
     {
         $list = CustomerList::of(fn () => OrganizationCustomer::query()->where('organization_id', $organization->id), $segment, $search, $page,
             LocalMoment::timezoneOfOrganization($organization->id), $now);
-        $sites = $this->sites($organization, $list['userIds']);
+        $sites = self::sitesOf($organization->id, $list['userIds']);
         $list['customers'] = array_map(fn (array $row, int $userId): array => [...$row, 'sites' => $sites[$userId] ?? []], $list['customers'], $list['userIds']);
         // Who they are stays on the server: the page knows each customer by the network's reference alone.
         unset($list['userIds']);
@@ -44,14 +44,15 @@ final readonly class ListNetworkCustomers
     }
 
     /**
-     * The businesses each of these people is a customer of, by name, oldest business first.
+     * The businesses each of these people is a customer of, by name, oldest business first (the list, and one
+     * customer's page, DescribeNetworkCustomer).
      *
      * @param  list<int>  $userIds
      * @return array<int, list<string>>
      */
-    private function sites(Organization $organization, array $userIds): array
+    public static function sitesOf(int $organizationId, array $userIds): array
     {
-        $rows = BusinessCustomer::query()->where('organization_id', $organization->id)->whereIn('user_id', $userIds)
+        $rows = BusinessCustomer::query()->where('organization_id', $organizationId)->whereIn('user_id', $userIds)
             ->orderBy('business_id')->get(['user_id', 'business_id']);
         $names = Business::query()->whereKey($rows->pluck('business_id')->unique()->values()->all())->pluck('name', 'id');
         $sites = [];

@@ -8,8 +8,6 @@ use App\Actions\Tenancy\ResolveTenant;
 use App\Features\Automations;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
-use App\Models\Organization;
-use App\Models\OrganizationCustomer;
 use App\Models\User;
 use App\Support\Auth\Impersonation;
 use App\Support\Auth\PasskeyOffer;
@@ -17,7 +15,6 @@ use App\Support\Locales;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Middleware;
 use Laravel\Pennant\Feature;
@@ -166,19 +163,23 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
+     * The org admin working across the organization, so sees its customers across its sites (CHW-365). The same
+     * rule as OrganizationCustomerPolicy::viewAny (its org admin, at network level), read from the tenant so no page
+     * pays a query: change one, change the other.
+     */
+    private function seesNetworkCustomers(Request $request): bool
+    {
+        $context = app(TenantContext::class);
+
+        return $request->user() instanceof User && $context->businessId() === null && $context->organizationId() !== null
+            && $context->isOrgAdmin();
+    }
+
+    /**
      * Whether the user runs the business worked in, so manages its staff; no business, no staff page. The same
      * rule as BusinessMemberPolicy::viewAny (owner or org admin there), read from the tenant so no page pays a
      * query: change one, change the other.
      */
-    /** The org admin working across the organization: its customers across its sites (CHW-365). */
-    private function seesNetworkCustomers(Request $request): bool
-    {
-        $organization = app(TenantContext::class)->organization();
-
-        return $request->user() instanceof User && app(TenantContext::class)->businessId() === null && $organization instanceof Organization
-            && Gate::forUser($request->user())->allows('viewAny', [OrganizationCustomer::class, $organization]);
-    }
-
     private function managesStaff(Request $request): bool
     {
         $context = app(TenantContext::class);

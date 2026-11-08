@@ -10,7 +10,7 @@ export default function Sites({ names }: { names: string[] }) {
             <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="truncate">
                 {names.map((name, i) => (
-                    <span key={name}>
+                    <span key={i}>
                         {i > 0 ? ' · ' : null}
                         <bdi>{name}</bdi>
                     </span>

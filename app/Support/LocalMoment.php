@@ -35,12 +35,14 @@ final class LocalMoment
     }
 
     /**
-     * An organization's days, across its sites (a franchise's head office, CHW-365): its first business's
-     * (timezoneOfBusiness); the app's without one. Read in the caller's tenant, or bypass().
+     * An organization's days, across its sites (a franchise's head office, CHW-365): its first open business's
+     * (timezoneOfBusiness); with every business closed, its first one's; the app's without one. Read in the caller's
+     * tenant, or bypass().
      */
     public static function timezoneOfOrganization(int $organizationId): string
     {
-        $business = Business::query()->where('organization_id', $organizationId)->orderBy('id')->value('id');
+        $businesses = fn () => Business::query()->where('organization_id', $organizationId)->orderBy('id');
+        $business = $businesses()->unarchived()->value('id') ?? $businesses()->value('id');
 
         return $business === null ? (string) config('app.timezone') : self::timezoneOfBusiness((int) $business);
     }

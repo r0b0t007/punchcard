@@ -35,18 +35,21 @@ export type CustomerNote = {
  * write one, or delete one with the bin, after a confirmation (it is gone
  * for good). The customer never sees them here; their data export has them.
  * For a franchise's head office (CHW-365, design 23) every site's notes, read
- * only: each names its business, with no form and no bin.
+ * only: each names its business, with no form and no bin. Inside a franchisee,
+ * the line says its head office reads them too (design 23c).
  */
 export default function NotesCard({
     customer,
     notes,
     maxLength,
     readOnly = false,
+    seenByHeadOffice = false,
 }: {
     customer: { id: number; name: string };
     notes: CustomerNote[];
     maxLength: number;
     readOnly?: boolean;
+    seenByHeadOffice?: boolean;
 }) {
     const { t, tn, locale } = useTranslation();
     const form = useForm({ body: '' });
@@ -76,10 +79,15 @@ export default function NotesCard({
                           'Written by each business’s team. Read only here; :name never sees them.',
                           { name: <bdi>{customer.name}</bdi> },
                       )
-                    : tn(
-                          'For your team only. :name never sees them; they can ask for them like any data about them.',
-                          { name: <bdi>{customer.name}</bdi> },
-                      )}
+                    : seenByHeadOffice
+                      ? tn(
+                            'For your team and your head office. :name never sees them; they can ask for them like any data about them.',
+                            { name: <bdi>{customer.name}</bdi> },
+                        )
+                      : tn(
+                            'For your team only. :name never sees them; they can ask for them like any data about them.',
+                            { name: <bdi>{customer.name}</bdi> },
+                        )}
             </p>
             {readOnly ? null : (
                 <form onSubmit={submit} className="flex flex-col gap-2">

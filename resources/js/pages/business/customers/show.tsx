@@ -81,6 +81,7 @@ export default function CustomerPage({
     maxQty,
     notes,
     noteMax,
+    notesSeenByHeadOffice = false,
 }: {
     /** Inside one business, or across a franchise's sites for its head office (CHW-365). */
     level: 'business' | 'network';
@@ -98,6 +99,8 @@ export default function CustomerPage({
     maxQty: number;
     notes: CustomerNote[];
     noteMax: number;
+    /** Inside a franchisee: its head office reads these notes too, across its sites (CHW-365, design 23c). */
+    notesSeenByHeadOffice?: boolean;
 }) {
     const { t } = useTranslation();
     const network = level === 'network';
@@ -279,6 +282,7 @@ export default function CustomerPage({
                             notes={notes}
                             maxLength={noteMax}
                             readOnly={network}
+                            seenByHeadOffice={notesSeenByHeadOffice}
                         />
                     </div>
                 </div>

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Customers;
 
-use App\Enums\StampSource;
 use App\Models\Business;
-use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\CustomerNote;
 use App\Models\Organization;
@@ -51,13 +49,12 @@ final readonly class DescribeNetworkCustomer
             ->map(fn (mixed $name): string => (string) $name)->all();
         $shownHistory = CustomerHistory::of(
             StampEvent::query()->where('organization_id', $organization->id)->whereIn('enrollment_id', $enrollmentIds),
-            Reward::query()->whereIn('enrollment_id', $enrollmentIds)->whereIn('redeemed_business_id', array_keys($businesses)),
+            // Their cards are the organization's, so wherever one was redeemed is one of its businesses.
+            Reward::query()->whereIn('enrollment_id', $enrollmentIds)->whereNotNull('redeemed_business_id'),
             $theirs, $shown, $now, $businesses,
         );
         $notes = CustomerNote::query()->where('organization_id', $organization->id)->where('user_id', $customer->user_id)
             ->with('author:id,name,anonymised_at')->latest('id')->get();
-        $sites = array_values(BusinessCustomer::query()->where('organization_id', $organization->id)->where('user_id', $customer->user_id)
-            ->orderBy('business_id')->pluck('business_id')->map(fn (mixed $id): string => $businesses[(int) $id] ?? '')->all());
 
         return [
             'customer' => [
@@ -69,7 +66,7 @@ final readonly class DescribeNetworkCustomer
                 'lastVisitDays' => LocalMoment::daysSince($customer->last_visit_at, $timezone, $now),
                 'rewardsRedeemed' => $customer->rewards_redeemed,
                 'friendsCameIn' => $this->friendsCameIn($organization, $enrollmentIds),
-                'sites' => $sites,
+                'sites' => ListNetworkCustomers::sitesOf($organization->id, [$customer->user_id])[$customer->user_id] ?? [],
             ],
             'cards' => CustomerHistory::cards($theirs->values()),
             'history' => $shownHistory['history'],
@@ -98,9 +95,6 @@ final readonly class DescribeNetworkCustomer
      */
     private function friendsCameIn(Organization $organization, array $enrollmentIds): int
     {
-        return StampEvent::query()->where('organization_id', $organization->id)
-            ->whereIn('source', StampSource::presenceValues())
-            ->whereIn('enrollment_id', CardEnrollment::query()->where('organization_id', $organization->id)->whereIn('referred_by', $enrollmentIds)->select('id'))
-            ->distinct()->count('enrollment_id');
+        return CustomerHistory::friendsCameIn(StampEvent::query()->where('organization_id', $organization->id), $organization->id, $enrollmentIds);
     }
 }

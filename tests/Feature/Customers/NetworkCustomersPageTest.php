@@ -8,14 +8,18 @@ use App\Enums\RewardStatus;
 use App\Enums\StampSource;
 use App\Http\Middleware\SetTenant;
 use App\Models\Business;
+use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
 use App\Models\CustomerNote;
 use App\Models\Organization;
 use App\Models\OrganizationCustomer;
 use App\Models\Reward;
+use App\Models\StampEvent;
 use App\Models\User;
+use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\Tenants;
 
@@ -120,13 +124,41 @@ it('shows the head office one customer, read only, with every site\'s history an
             ->where('correctionLocations', []));
 });
 
-it('never lets the head office stamp or keep notes', function (): void {
-    $customer = ($this->network)($this->salma);
+it('never lets the head office stamp, take back or keep notes, whichever customer it names', function (): void {
+    $note = ($this->note)($this->tenants->a1, 'Prefers oat milk.');
+    $stamps = fn (): int => $this->context->bypass(fn (): int => StampEvent::query()->count());
+    $before = $stamps();
+    // The network's reference, and A1's own for the same person: at network level neither is found.
+    $ids = [($this->network)($this->salma)->id, $this->context->bypass(fn (): int => BusinessCustomer::query()
+        ->where('business_id', $this->tenants->a1->id)->where('user_id', $this->salma->user_id)->value('id'))];
+    $input = ['qty' => 1, 'enrollment' => $this->salma->id, 'location' => $this->tenants->locationOf($this->tenants->a1)->id, 'reason' => 'From HQ', 'key' => (string) Str::uuid()];
 
-    ($this->at)($this->admin, $this->tenants->orgA)->post(route('customers.stamps.store', $customer->id), [])->assertNotFound();
-    ($this->at)($this->admin, $this->tenants->orgA)->post(route('customers.notes.store', $customer->id), ['body' => 'From HQ.'])->assertNotFound();
+    foreach ($ids as $id) {
+        ($this->at)($this->admin, $this->tenants->orgA)->post(route('customers.stamps.store', $id), $input)->assertNotFound();
+        ($this->at)($this->admin, $this->tenants->orgA)->post(route('customers.corrections.store', $id), $input)->assertNotFound();
+        ($this->at)($this->admin, $this->tenants->orgA)->post(route('customers.notes.store', $id), ['body' => 'From HQ.'])->assertNotFound();
+        ($this->at)($this->admin, $this->tenants->orgA)->delete(route('customers.notes.destroy', [$id, $note->id]))->assertNotFound();
+    }
 
-    expect($this->context->bypass(fn () => CustomerNote::query()->count()))->toBe(0);
+    expect($stamps())->toBe($before)
+        ->and($this->context->bypass(fn () => CustomerNote::query()->pluck('id')->all()))->toBe([$note->id]);
+});
+
+it('counts the head office\'s days in an open business\'s time, its first one\'s once every business is closed', function (): void {
+    $this->context->bypass(function (): void {
+        $this->tenants->locationOf($this->tenants->a1)->forceFill(['timezone' => 'Asia/Dubai'])->save();
+        $this->tenants->locationOf($this->tenants->a2)->forceFill(['timezone' => 'America/New_York'])->save();
+    });
+    $timezone = fn (): string => $this->context->bypass(fn (): string => LocalMoment::timezoneOfOrganization($this->tenants->orgA->id));
+    $close = fn (Business $business) => $this->context->bypass(fn () => Business::query()->whereKey($business->id)->update(['archived_at' => now()]));
+
+    expect($timezone())->toBe('Asia/Dubai');
+
+    $close($this->tenants->a1);
+    expect($timezone())->toBe('America/New_York');
+
+    $close($this->tenants->a2);
+    expect($timezone())->toBe('Asia/Dubai');
 });
 
 it('keeps a franchisee to its own customers, and another organization out', function (): void {

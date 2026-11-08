@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Gate;
  */
 class CustomerRequest extends FormRequest
 {
+    private ?Business $business = null;
+
     private ?BusinessCustomer $customer = null;
 
     public function authorize(): bool
@@ -36,15 +38,25 @@ class CustomerRequest extends FormRequest
         ];
     }
 
+    /** The business worked in, read once; null at network level. */
     public function business(): ?Business
     {
-        return app(TenantContext::class)->business();
+        return $this->business ??= app(TenantContext::class)->business();
     }
 
+    /**
+     * The business's own customer, or a 404. Business only, on purpose: stamps, takings back and notes go through
+     * here, and a franchise's head office, working across its sites, only reads them (ShowCustomerRequest, CHW-365).
+     * Its policies would let it run any of its businesses, so at network level no customer is found here at all.
+     */
     public function customer(): BusinessCustomer
     {
+        $businessId = app(TenantContext::class)->businessId();
+
+        abort_if($businessId === null, 404);
+
         return $this->customer ??= BusinessCustomer::query()
-            ->where('business_id', $this->business()?->id)
+            ->where('business_id', $businessId)
             ->whereKey((int) $this->route('customer'))
             ->first() ?? abort(404);
     }

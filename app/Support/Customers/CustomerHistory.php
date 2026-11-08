@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Customers;
 
+use App\Enums\StampSource;
 use App\Models\CardEnrollment;
 use App\Models\Reward;
 use App\Models\StampEvent;
@@ -97,6 +98,20 @@ final class CustomerHistory
                     'toReward' => CustomerCard::stampsToReward($card, $enrollment),
                 ];
             })->all());
+    }
+
+    /**
+     * The friends a customer invited who came in (CHW-47): the organization's cards referred by theirs, with a stamp
+     * among $stamps proving a visit. A count only. The caller picks where a visit counts: one business, or every site.
+     *
+     * @param  Builder<StampEvent>  $stamps
+     * @param  array<int, int|string>  $enrollmentIds
+     */
+    public static function friendsCameIn(Builder $stamps, int $organizationId, array $enrollmentIds): int
+    {
+        return $stamps->whereIn('source', StampSource::presenceValues())
+            ->whereIn('enrollment_id', CardEnrollment::query()->where('organization_id', $organizationId)->whereIn('referred_by', $enrollmentIds)->select('id'))
+            ->distinct()->count('enrollment_id');
     }
 
     /** Who on the staff, by first name and initial; no one for an account since deleted. */

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Customers;
 
 use App\Actions\Counter\ScanLocations;
-use App\Enums\StampSource;
+use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\BusinessCustomer;
 use App\Models\CardEnrollment;
@@ -52,6 +52,7 @@ final readonly class DescribeCustomer
      *     locations: list<array{id: int, name: string}>,
      *     correctionLocations: list<array{id: int, name: string}>,
      *     notes: list<array{id: int, body: string, by: string|null, at: array{day: string, date: string, time: string}}>,
+     *     notesSeenByHeadOffice: bool,
      * }
      */
     public function handle(Business $business, BusinessCustomer $customer, int $shown, CarbonImmutable $now): array
@@ -98,6 +99,8 @@ final readonly class DescribeCustomer
                 'by' => CustomerHistory::staff($note->author),
                 'at' => LocalMoment::of($note->created_at, $timezone, $now),
             ])->all()),
+            // A franchisee's head office reads its notes across its sites (CHW-365, design 23c): the card says so.
+            'notesSeenByHeadOffice' => $this->context->organization()?->type === OrganizationType::Franchise,
         ];
     }
 
@@ -110,9 +113,6 @@ final readonly class DescribeCustomer
      */
     private function friendsCameIn(Business $business, array $enrollmentIds): int
     {
-        return $this->context->bypass(fn (): int => StampEvent::query()->where('business_id', $business->id)
-            ->whereIn('source', StampSource::presenceValues())
-            ->whereIn('enrollment_id', CardEnrollment::query()->where('organization_id', $business->organization_id)->whereIn('referred_by', $enrollmentIds)->select('id'))
-            ->distinct()->count('enrollment_id'));
+        return $this->context->bypass(fn (): int => CustomerHistory::friendsCameIn(StampEvent::query()->where('business_id', $business->id), $business->organization_id, $enrollmentIds));
     }
 }

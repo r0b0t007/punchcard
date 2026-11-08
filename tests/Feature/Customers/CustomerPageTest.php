@@ -103,6 +103,20 @@ it('shows the owner a customer: status, habits, card progress and what happened 
         ->where('more', false));
 });
 
+it('tells a franchisee its head office reads its notes, and an independent business that no one else does', function (): void {
+    ($this->stampAt)('2026-10-20 06:00:00');
+
+    ($this->open)(($this->summarised)())->assertOk()->assertInertia(fn (Assert $page): Assert => $page->where('notesSeenByHeadOffice', true));
+
+    $owner = $this->tenants->member(User::factory()->create(), $this->tenants->b1, BusinessRole::Owner);
+    $enrollment = $this->tenants->enroll($this->user, $this->tenants->cardB);
+    $this->tenants->stamp($enrollment, $this->tenants->b1, ['created_at' => Carbon::parse('2026-10-20 06:00:00')]);
+    $customer = ($this->summarised)($this->tenants->b1);
+
+    $this->actingAs($owner)->withSession([SetTenant::SESSION_KEY => 'business:'.$this->tenants->b1->id])->get(route('customers.show', $customer->id))
+        ->assertOk()->assertInertia(fn (Assert $page): Assert => $page->where('notesSeenByHeadOffice', false));
+});
+
 it('lists a redemption above the stamp it followed in the same second, as a scan does', function (): void {
     $stamp = ($this->stampAt)('2026-10-30 14:00:00', StampSource::Qr, values: ['staff_id' => $this->staff->id]);
     $reward = $this->context->bypass(fn (): Reward => tap(Reward::factory()->for($this->enrollment, 'enrollment')->create(), fn (Reward $reward) => $reward->forceFill([
