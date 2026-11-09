@@ -58,9 +58,10 @@ export default function BrandPage({
     sites: number | null;
 }) {
     const { t } = useTranslation();
-    const { data, setData, patch, processing, errors, isDirty } = useForm<{
-        brand_color: string | null;
-    }>({ brand_color: brand.brandColor });
+    const { data, setData, setDefaults, patch, processing, errors, isDirty } =
+        useForm<{
+            brand_color: string | null;
+        }>({ brand_color: brand.brandColor });
     const [preview, setPreview] = useState<Preview>('card');
     const [removing, setRemoving] = useState(false);
     const color = data.brand_color;
@@ -200,7 +201,11 @@ export default function BrandPage({
                         className="flex flex-col gap-3"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            patch(update.url(), { preserveScroll: true });
+                            patch(update.url(), {
+                                preserveScroll: true,
+                                // The saved colour is the one to compare with now: Save waits for the next change.
+                                onSuccess: () => setDefaults(),
+                            });
                         }}
                     >
                         <h2 id="brand-colour" className="font-semibold">
@@ -214,7 +219,6 @@ export default function BrandPage({
                         <BrandColorPicker
                             value={color}
                             organizationColor={null}
-                            withDefault={false}
                             onChange={(value) => setData('brand_color', value)}
                         />
                         {shade ? (
@@ -335,6 +339,8 @@ export default function BrandPage({
                                     onClick={() =>
                                         router.delete(removeCover.url(), {
                                             preserveScroll: true,
+                                            // A colour picked but not saved yet stays picked, as with the uploads.
+                                            preserveState: true,
                                             onStart: () => setRemoving(true),
                                             onFinish: () => setRemoving(false),
                                         })

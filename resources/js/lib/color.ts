@@ -113,7 +113,7 @@ export function suggestedShade(brand: string): string | null {
         return null;
     }
 
-    for (let step = 1; step <= 20; step++) {
+    for (let step = 1; step < 20; step++) {
         for (const toward of ['#000000', '#FFFFFF']) {
             const shade = mix(brand, toward, step / 20);
 
@@ -123,7 +123,8 @@ export function suggestedShade(brand: string): string | null {
         }
     }
 
-    return ESPRESSO;
+    // The last step: pure black, which cream always reads on.
+    return '#000000';
 }
 
 /** Two hex colours mixed channel by channel, `amount` of the second: #RRGGBB, upper case. */
@@ -143,6 +144,7 @@ function mix(from: string, to: string, amount: number): string {
     );
 }
 
+/** A hex colour's red, green and blue, 0 to 255 (#rgb or #rrggbb). */
 function channels(hex: string): number[] {
     const value = hex.replace('#', '');
     const full =
@@ -161,16 +163,8 @@ export function isHex(value: string): boolean {
 }
 
 function luminance(hex: string): number {
-    const value = hex.replace('#', '');
-    const full =
-        value.length === 3
-            ? value
-                  .split('')
-                  .map((c) => c + c)
-                  .join('')
-            : value;
-    const [r, g, b] = [0, 2, 4].map((i) => {
-        const channel = parseInt(full.slice(i, i + 2), 16) / 255;
+    const [r, g, b] = channels(hex).map((value) => {
+        const channel = value / 255;
 
         return channel <= 0.04045
             ? channel / 12.92

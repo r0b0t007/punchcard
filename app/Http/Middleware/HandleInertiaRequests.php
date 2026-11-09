@@ -71,7 +71,7 @@ class HandleInertiaRequests extends Middleware
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
                 // The brand page (CHW-135, B17): whoever acts for the organization (OrganizationPolicy::manageBrand).
-                'brand' => $this->managesBrand($request),
+                'brand' => $request->user() instanceof User && app(TenantContext::class)->actsForOrganization(),
                 // Counter mode (CHW-29): whoever works in the business worked in.
                 'counter' => $this->worksInBusiness($request),
                 // The staff page (CHW-146): whoever runs the business worked in.
@@ -175,19 +175,6 @@ class HandleInertiaRequests extends Middleware
 
         return $request->user() instanceof User && $context->businessId() === null && $context->organizationId() !== null
             && $context->isOrgAdmin();
-    }
-
-    /**
-     * Whether the user changes the organization's brand: its org admin at network level, or the owner of an
-     * independent café's or chain's only business. The same rule as OrganizationPolicy::manageBrand (actsFor), read
-     * from the tenant so no page pays a query: change one, change the other.
-     */
-    private function managesBrand(Request $request): bool
-    {
-        $context = app(TenantContext::class);
-
-        return $request->user() instanceof User && $context->organizationId() !== null && $context->isOrgAdmin()
-            && ($context->businessId() === null || $context->ownsTheAccount());
     }
 
     /**

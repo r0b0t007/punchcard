@@ -7,39 +7,50 @@ import { BRAND_SWATCHES, ESPRESSO, isHex } from '@/lib/color';
 import { cn } from '@/lib/utils';
 
 /**
- * The card's colour (B6): the organization's (null, "Default"), one of the
- * 8 swatches, or a custom hex. The colour only paints the card (ADR 0007).
- * The brand page (B17) picks the organization's own, so has no "Default".
+ * A colour (ADR 0007): "Default" (null: the organization's on a card, B6;
+ * punchcard's espresso on the brand page, B17), one of the swatches, or a
+ * custom hex. With no organization colour, "Default" already is espresso, so
+ * the Espresso swatch is left out rather than shown twice.
  */
 export default function BrandColorPicker({
     value,
     organizationColor,
     onChange,
-    withDefault = true,
 }: {
     value: string | null;
     organizationColor: string | null;
     onChange: (value: string | null) => void;
-    withDefault?: boolean;
 }) {
     const { t } = useTranslation();
+    const swatches = BRAND_SWATCHES.filter(
+        (swatch) => organizationColor !== null || swatch.hex !== ESPRESSO,
+    );
     const isSwatch = (hex: string | null) =>
-        BRAND_SWATCHES.some((swatch) => swatch.hex === hex?.toUpperCase());
+        swatches.some((swatch) => swatch.hex === hex?.toUpperCase());
     // What the owner typed, as typed; the card takes it once it is a whole hex colour.
     const [custom, setCustom] = useState(
         value !== null && !isSwatch(value) ? value : '',
     );
+    // A colour set from outside (B17's "Use this shade"): the field shows it, as if typed.
+    const [shown, setShown] = useState(value);
+
+    if (value !== shown) {
+        setShown(value);
+
+        if (value === null || isSwatch(value)) {
+            setCustom('');
+        } else if (custom.toUpperCase() !== value.toUpperCase()) {
+            setCustom(value);
+        }
+    }
+
     const options = [
-        ...(withDefault
-            ? [
-                  {
-                      label: t('Default'),
-                      hex: organizationColor ?? ESPRESSO,
-                      value: null as string | null,
-                  },
-              ]
-            : []),
-        ...BRAND_SWATCHES.map((swatch) => ({
+        {
+            label: t('Default'),
+            hex: organizationColor ?? ESPRESSO,
+            value: null as string | null,
+        },
+        ...swatches.map((swatch) => ({
             label: t(swatch.label),
             hex: swatch.hex,
             value: swatch.hex,

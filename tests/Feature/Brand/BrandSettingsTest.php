@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\BusinessRole;
+use App\Enums\BusinessStatus;
 use App\Http\Middleware\SetTenant;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
@@ -52,14 +53,20 @@ it('shows an independent café\'s owner its brand, named as its customers see it
         ->where('sites', null));
 });
 
-it('shows a franchise\'s head office its brand and how many open sites show it', function (): void {
-    $this->context->bypass(fn () => $this->tenants->a2->forceFill(['archived_at' => now()])->save());
+it('shows a franchise\'s head office its brand and how many sites show it: neither closed nor suspended', function (): void {
+    $sites = fn (): int => ($this->atHq)()->get(route('brand.edit'))->assertOk()->viewData('page')['props']['sites'];
 
-    ($this->atHq)()->get(route('brand.edit'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+    ($this->atHq)()->get(route('brand.edit'))->assertInertia(fn (Assert $page): Assert => $page
         ->where('brand.name', $this->tenants->orgA->name)
         ->where('brand.franchise', true)
         ->where('brand.brandForeground', null)
-        ->where('sites', 1));
+        ->where('sites', 2));
+
+    $this->context->bypass(fn () => $this->tenants->a2->forceFill(['archived_at' => now()])->save());
+    expect($sites())->toBe(1);
+
+    $this->context->bypass(fn () => $this->tenants->a1->forceFill(['status' => BusinessStatus::Suspended])->save());
+    expect($sites())->toBe(0);
 });
 
 it('draws the previews with a plain card when the program has no active card', function (): void {

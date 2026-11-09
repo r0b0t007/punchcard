@@ -16,7 +16,8 @@ use App\Support\Tenancy\TenantContext;
  * inside an independent café or chain (its only business, as customers see
  * it), else the organization's. The sample card is the program's first active
  * card, or none (the page draws a plain one). A franchise's head office also
- * reads how many open sites show the brand.
+ * reads how many sites show the brand: those operating, neither closed nor
+ * suspended.
  */
 final readonly class DescribeBrand
 {
@@ -52,7 +53,7 @@ final readonly class DescribeBrand
                 'stampsRequired' => $card->stamps_required,
                 'stampStyle' => $card->stamp_style,
             ] : null,
-            'sites' => $franchise ? Business::query()->unarchived()->count() : null,
+            'sites' => $franchise ? Business::query()->operating()->count() : null,
         ];
     }
 }
