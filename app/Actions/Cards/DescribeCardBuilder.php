@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Cards;
 
 use App\Enums\CardMode;
+use App\Enums\OrganizationType;
 use App\Enums\RewardType;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
@@ -31,13 +32,16 @@ final readonly class DescribeCardBuilder
      * @return array{
      *     card: array{id: int, active: bool, held: bool, bannerUrl: ?string}|null,
      *     fields: array<string, mixed>,
-     *     preview: array{businessName: string, logoUrl: ?string, organizationColor: ?string},
+     *     preview: array{businessName: string, logoUrl: ?string, organizationColor: ?string, franchise: bool},
      * }
      */
     public function handle(Organization $organization, ?LoyaltyCard $card): array
     {
         $businessId = $this->context->businessId();
         $business = $businessId === null ? null : Business::query()->whereKey($businessId)->first();
+        // A franchise's cards always show the organization's brand (CHW-135, design 24c): no colour of their own.
+        $franchise = $organization->type === OrganizationType::Franchise;
+        $fields = $card instanceof LoyaltyCard ? $this->fieldsOf($card) : $this->defaults();
 
         return [
             'card' => $card instanceof LoyaltyCard ? [
@@ -46,11 +50,12 @@ final readonly class DescribeCardBuilder
                 'held' => Invariants::isHeld($card),
                 'bannerUrl' => $card->bannerUrl(),
             ] : null,
-            'fields' => $card instanceof LoyaltyCard ? $this->fieldsOf($card) : $this->defaults(),
+            'fields' => $franchise ? [...$fields, 'brand_color' => null] : $fields,
             'preview' => [
                 'businessName' => $business->name ?? $organization->name,
                 'logoUrl' => $organization->logoUrl(),
                 'organizationColor' => $organization->brand_color,
+                'franchise' => $franchise,
             ],
         ];
     }

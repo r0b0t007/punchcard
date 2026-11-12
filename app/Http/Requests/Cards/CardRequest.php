@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Cards;
 
 use App\Enums\CardMode;
+use App\Enums\OrganizationType;
 use App\Enums\RewardType;
 use App\Enums\StampStyle;
 use App\Models\LoyaltyCard;
@@ -66,7 +67,8 @@ class CardRequest extends FormRequest
             'tiers' => ['exclude_unless:mode,progressive', Rule::requiredIf(fn (): bool => $this->input('mode') === CardMode::Progressive->value), 'nullable', 'array', 'min:1', 'max:10'],
             'tiers.*.stamps' => ['required', 'integer', 'between:1,50', 'distinct'],
             'tiers.*.reward' => ['required', 'string', 'max:120'],
-            'brand_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/D'],
+            // A franchise's cards show the organization's brand only (CHW-135): no colour of their own.
+            'brand_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/D', Rule::prohibitedIf(fn (): bool => $this->organization()?->type === OrganizationType::Franchise)],
             'stamp_style' => ['nullable', Rule::enum(StampStyle::class)],
             'info' => ['nullable', 'array'],
             'info.hours' => ['nullable', 'string', 'max:200'],

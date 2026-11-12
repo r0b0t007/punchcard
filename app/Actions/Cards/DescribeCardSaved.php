@@ -6,6 +6,7 @@ namespace App\Actions\Cards;
 
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Support\Branding\CardBrand;
 use App\Support\Branding\Contrast;
 
 /**
@@ -21,7 +22,7 @@ final readonly class DescribeCardSaved
      */
     public function handle(Organization $organization, LoyaltyCard $card, bool $published): array
     {
-        $brand = $card->brandColor() ?? $organization->brand_color;
+        $brand = CardBrand::of($card, $organization)['brandColor'];
 
         if ($brand !== null && Contrast::isWeak($brand)) {
             return ['type' => 'warning', 'message' => $published

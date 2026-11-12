@@ -1,6 +1,6 @@
-import { Head, Link, setLayoutProps, useForm } from '@inertiajs/react';
+import { Head, Link, setLayoutProps, useForm, usePage } from '@inertiajs/react';
 import { Info, Minus, Plus, Trash2, TriangleAlert } from 'lucide-react';
-import type { FormEvent } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import BannerUpload from '@/components/card-builder/banner-upload';
 import BrandColorPicker from '@/components/card-builder/brand-color-picker';
 import CardPreview from '@/components/card-builder/card-preview';
@@ -22,6 +22,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { ESPRESSO, isWeakBrand } from '@/lib/color';
 import { typedDir } from '@/lib/utils';
 import { centimes } from '@/lib/money';
+import { edit as brandEdit } from '@/routes/brand';
 import { create, edit, index, store, update } from '@/routes/cards';
 
 type CardMode = 'cyclic' | 'progressive';
@@ -60,6 +61,8 @@ type Props = {
         businessName: string;
         logoUrl: string | null;
         organizationColor: string | null;
+        /** A franchise's cards show the organization's brand only (CHW-135, design 24c): no picker. */
+        franchise: boolean;
     };
 };
 
@@ -93,6 +96,7 @@ const storedRewardValue = (type: RewardType, typed: string) =>
  */
 export default function CardsEdit({ card, fields, preview }: Props) {
     const { t } = useTranslation();
+    const { nav } = usePage().props;
     const held = card?.held ?? false;
     // A fixed amount shows in dirhams; the server stores centimes.
     const rewardValue =
@@ -455,27 +459,64 @@ export default function CardsEdit({ card, fields, preview }: Props) {
                     <Separator />
 
                     <section className="flex flex-col gap-6">
-                        <div className="grid gap-2">
-                            <Label>{t('Colour')}</Label>
-                            <BrandColorPicker
-                                value={data.brand_color}
-                                organizationColor={preview.organizationColor}
-                                onChange={(color) =>
-                                    setData('brand_color', color)
-                                }
-                            />
-                            {isWeakBrand(brand) ? (
-                                <Alert>
-                                    <TriangleAlert />
-                                    <AlertDescription>
+                        {preview.franchise ? (
+                            <div className="grid gap-2">
+                                <Label>{t('Colour')}</Label>
+                                <p
+                                    data-test="franchise-brand"
+                                    className="flex items-center gap-3 rounded-xl bg-muted p-3 text-sm"
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        // Runtime colours enter the UI only as CSS variables (design-tokens skill).
+                                        style={
+                                            {
+                                                '--card-brand': brand,
+                                            } as CSSProperties
+                                        }
+                                        className="size-7.5 shrink-0 rounded-full border bg-card-brand"
+                                    />
+                                    <span>
                                         {t(
-                                            'Only pure white or black text reads on this colour: a darker or lighter shade will look better.',
-                                        )}
-                                    </AlertDescription>
-                                </Alert>
-                            ) : null}
-                            <InputError message={errors.brand_color} />
-                        </div>
+                                            "Every card shows :name's brand colour.",
+                                            { name: preview.businessName },
+                                        )}{' '}
+                                        {nav.brand ? (
+                                            <Link
+                                                href={brandEdit()}
+                                                className="font-medium underline underline-offset-4"
+                                            >
+                                                {t('Change it in Brand')}
+                                            </Link>
+                                        ) : null}
+                                    </span>
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label>{t('Colour')}</Label>
+                                <BrandColorPicker
+                                    value={data.brand_color}
+                                    organizationColor={
+                                        preview.organizationColor
+                                    }
+                                    onChange={(color) =>
+                                        setData('brand_color', color)
+                                    }
+                                />
+                                {isWeakBrand(brand) ? (
+                                    <Alert>
+                                        <TriangleAlert />
+                                        <AlertDescription>
+                                            {t(
+                                                'Only pure white or black text reads on this colour: a darker or lighter shade will look better.',
+                                            )}
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : null}
+                                <InputError message={errors.brand_color} />
+                            </div>
+                        )}
 
                         <div className="grid gap-2">
                             <Label id="stamp-style-label">{t('Stamp')}</Label>

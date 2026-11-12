@@ -84,6 +84,7 @@ export default function TapCooldown({
         <>
             <Head title={t('Already stamped')} />
             <TapScreen
+                cover={card?.coverUrl}
                 actions={
                     <>
                         {enrollmentId !== null ? (

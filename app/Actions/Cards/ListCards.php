@@ -8,6 +8,7 @@ use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Support\Branding\CardBrand;
 use App\Support\Cards\CardChoice;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Collection;
@@ -54,7 +55,7 @@ final readonly class ListCards
         $chosen = $businessId === null ? null : CardChoice::pick($honoured->modelKeys(), [], $runningHere);
         // With no card running here, CardChoice still names one, which refuses taps.
         $forNewCustomers = in_array($chosen, $runningHere, true) ? $chosen : null;
-        $organizationColor = $this->context->bypass(fn (): mixed => Organization::query()->whereKey($this->context->organizationId())->value('brand_color'));
+        $organization = $this->context->bypass(fn (): ?Organization => Organization::query()->find($this->context->organizationId(), ['id', 'type', 'brand_color']));
 
         return array_values($cards->map(fn (LoyaltyCard $card): array => [
             'id' => $card->id,
@@ -64,8 +65,7 @@ final readonly class ListCards
             'rewardText' => $card->reward_text,
             'stampsRequired' => $card->stamps_required,
             'active' => $card->active,
-            'brandColor' => $card->brandColor() ?? (is_string($organizationColor) ? $organizationColor : null),
-            'brandForeground' => $card->brandForeground(),
+            ...CardBrand::of($card, $organization),
             'held' => $managesProgram ? in_array($card->id, $held, true) : null,
             'businesses' => $managesProgram ? array_values($card->operatingBusinesses->pluck('name')->all()) : null,
             'onlyRunningAt' => $managesProgram && $card->active

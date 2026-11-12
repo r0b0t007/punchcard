@@ -17,6 +17,7 @@ export default function TapPending({ card }: { card: TapCard | null }) {
         <>
             <Head title={t('Your first stamp is waiting')} />
             <TapScreen
+                cover={card?.coverUrl}
                 actions={
                     <>
                         <Button asChild size="lg">

@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\StampEvent;
 use App\Models\User;
+use App\Support\Branding\CardBrand;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 
@@ -39,7 +40,7 @@ final readonly class ListCustomerRewards
                 ->get(['id', 'organization_id', 'enrollment_id', 'reward_text', 'unlocked_at', 'stamp_event_id']);
             $organizations = Organization::query()
                 ->whereKey($rewards->pluck('organization_id')->unique()->all())
-                ->get(['id', 'name', 'brand_color'])
+                ->get(['id', 'name', 'type', 'brand_color'])
                 ->keyBy('id');
             // The card's own colour, else its organization's (ADR 0007, CHW-32).
             $cardOf = CardEnrollment::query()->whereKey($rewards->pluck('enrollment_id')->unique()->all())->pluck('card_id', 'id');
@@ -54,7 +55,7 @@ final readonly class ListCustomerRewards
                 'id' => $reward->id,
                 'rewardText' => $reward->reward_text,
                 'businessName' => $organizations->get($reward->organization_id)->name ?? '',
-                'brandColor' => $cards->get($cardOf->get($reward->enrollment_id))?->brandColor() ?? $organizations->get($reward->organization_id)?->brand_color,
+                ...CardBrand::of($cards->get($cardOf->get($reward->enrollment_id)), $organizations->get($reward->organization_id)),
                 'unlockedOn' => $reward->unlocked_at->copy()->setTimezone(LocalMoment::timezoneOf($locations->get($locationOf->get($reward->stamp_event_id))))->format('Y-m-d'),
             ])->all());
         });

@@ -102,32 +102,32 @@ Every feature PunchPass publicly shows, plus the ones any clone needs to actuall
 
 **Owner portal**
 
-| Feature               | Detail                                                                                                                                         | Source                            |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Business onboarding   | Account, business details, logo, verification (ID, address)                                                                                    | Confirmed                         |
-| Card builder          | Stamps required, reward text, logo, colours, live preview; edit anytime from phone                                                             | Confirmed                         |
-| Reward types          | Free item, % off, fixed discount, dollar-based rewards                                                                                         | Confirmed                         |
-| Multiple cards        | E.g. coffee card + food card; extra cards are a paid add-on                                                                                    | Confirmed                         |
-| Bonus stamps          | Extra stamps for food purchases, limited-time promos                                                                                           | Confirmed                         |
-| Promotions            | Time-limited deals, BOGO, fixed-price offers with terms                                                                                        | Confirmed                         |
-| Customer dashboard    | Every regular by name, visit count, last visit, "going quiet" list, top 10                                                                     | Confirmed                         |
-| Stats                 | Stamps given, rewards redeemed, visits chart, estimated revenue                                                                                | Confirmed (dashboard screenshots) |
-| Push campaigns        | Send to all or a segment (e.g. not seen in 14 days) in two taps                                                                                | Confirmed                         |
-| Marketing automation  | Premium plan: automated win-back sends                                                                                                         | Confirmed (plan list)             |
-| Unlimited staff users | Staff logins with limited rights                                                                                                               | Confirmed                         |
-| Manual stamp via QR   | For phones without NFC: staff scans customer QR and adds stamps                                                                                | Confirmed                         |
-| Multi-location        | Per-location stampers and stats; extra location add-on                                                                                         | Confirmed                         |
-| Subscription billing  | Trial, monthly/annual, upgrade (prorated) and downgrade (next cycle), cancel at period end                                                     | Confirmed (terms)                 |
-| Stamper management    | Register, rename, disable a lost stamper                                                                                                       | Addition                          |
-| Fraud controls        | Cooldown per customer per card, daily cap, anomaly alerts                                                                                      | Addition                          |
-| CSV export            | Customer list and stamp history                                                                                                                | Addition                          |
-| Progressive tiers     | Lifetime stamps never reset; each tier unlocks a different reward (e.g. 5 = 10% off, 10 = free item, 20 = VIP). Alternative to the cyclic card | Addition (Wallio has it)          |
-| Card design extras    | 5 to 50 stamps, several stamp styles (dot, ring, check, heart, star, logo), banner image, info fields (hours, phone, links)                    | Addition (Wallio has it)          |
-| Referral settings     | Turn referrals on or off, stamps for referrer and friend, monthly cap per customer                                                             | Addition                          |
-| QR-only plan          | No stamper; staff scan the customer's wallet member QR. Entry tier with zero hardware cost, upsell to the verified stamper                     | Addition                          |
-| Brand settings        | Organization logo, brand colour and cover applied to cards, tap screens, Wallet passes, push titles and email sender name (ADR 0007)           | Addition                          |
-| Franchise networks    | One card program shared by franchisees who each pay and run their own sites; HQ console, per-site attribution report (ADR 0006)                | Addition                          |
-| White-label           | Enterprise add-on: custom domain, the brand's own PWA name and icon, themed app chrome, branded email (ADR 0007)                               | Addition                          |
+| Feature               | Detail                                                                                                                                                                   | Source                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| Business onboarding   | Account, business details, logo, verification (ID, address)                                                                                                              | Confirmed                         |
+| Card builder          | Stamps required, reward text, logo, colours, live preview; edit anytime from phone                                                                                       | Confirmed                         |
+| Reward types          | Free item, % off, fixed discount, dollar-based rewards                                                                                                                   | Confirmed                         |
+| Multiple cards        | E.g. coffee card + food card; extra cards are a paid add-on                                                                                                              | Confirmed                         |
+| Bonus stamps          | Extra stamps for food purchases, limited-time promos                                                                                                                     | Confirmed                         |
+| Promotions            | Time-limited deals, BOGO, fixed-price offers with terms                                                                                                                  | Confirmed                         |
+| Customer dashboard    | Every regular by name, visit count, last visit, "going quiet" list, top 10                                                                                               | Confirmed                         |
+| Stats                 | Stamps given, rewards redeemed, visits chart, estimated revenue                                                                                                          | Confirmed (dashboard screenshots) |
+| Push campaigns        | Send to all or a segment (e.g. not seen in 14 days) in two taps                                                                                                          | Confirmed                         |
+| Marketing automation  | Premium plan: automated win-back sends                                                                                                                                   | Confirmed (plan list)             |
+| Unlimited staff users | Staff logins with limited rights                                                                                                                                         | Confirmed                         |
+| Manual stamp via QR   | For phones without NFC: staff scans customer QR and adds stamps                                                                                                          | Confirmed                         |
+| Multi-location        | Per-location stampers and stats; extra location add-on                                                                                                                   | Confirmed                         |
+| Subscription billing  | Trial, monthly/annual, upgrade (prorated) and downgrade (next cycle), cancel at period end                                                                               | Confirmed (terms)                 |
+| Stamper management    | Register, rename, disable a lost stamper                                                                                                                                 | Addition                          |
+| Fraud controls        | Cooldown per customer per card, daily cap, anomaly alerts                                                                                                                | Addition                          |
+| CSV export            | Customer list and stamp history                                                                                                                                          | Addition                          |
+| Progressive tiers     | Lifetime stamps never reset; each tier unlocks a different reward (e.g. 5 = 10% off, 10 = free item, 20 = VIP). Alternative to the cyclic card                           | Addition (Wallio has it)          |
+| Card design extras    | 5 to 50 stamps, several stamp styles (dot, ring, check, heart, star, logo), banner image, info fields (hours, phone, links)                                              | Addition (Wallio has it)          |
+| Referral settings     | Turn referrals on or off, stamps for referrer and friend, monthly cap per customer                                                                                       | Addition                          |
+| QR-only plan          | No stamper; staff scan the customer's wallet member QR. Entry tier with zero hardware cost, upsell to the verified stamper                                               | Addition                          |
+| Brand settings        | Organization logo, brand colour and cover applied to cards, tap screens, the card page and Wallet passes; push titles and email sender keep the business name (ADR 0007) | Addition                          |
+| Franchise networks    | One card program shared by franchisees who each pay and run their own sites; HQ console, per-site attribution report (ADR 0006)                                          | Addition                          |
+| White-label           | Enterprise add-on: custom domain, the brand's own PWA name and icon, themed app chrome, branded email (ADR 0007)                                                         | Addition                          |
 
 **Platform admin (you)**
 
@@ -285,7 +285,7 @@ Decisions in `docs/adr/0006` and `docs/adr/0007`; summary:
 - **Shared card program**: cards belong to the organization, so a customer's stamps add up across every franchisee. Each stamp and redemption records the business and location, which gives HQ a "stamps earned vs rewards redeemed" report per franchisee. punchcard reports it and does not move money between franchisees.
 - **Data inside a franchise**: any participating site sees the customer's progress at the counter; customer lists and marketing audiences for a franchisee only include customers who stamped there; HQ sees every member.
 - **Roles**: org\_admin (HQ), owner (one business), staff (optionally one location), customer, admin.
-- **Branding on every plan**: logo, brand colour and cover on the card, tap screens, Wallet pass, push titles and email sender name. The app chrome stays punchcard.
+- **Branding on every plan**: logo, brand colour and cover on the card, tap screens, card page and Wallet pass; a franchise's cards always show the organization's brand. Push titles and the email sender name keep the business's name, the place the customer visits. The app chrome stays punchcard.
 - **White-label (Enterprise add-on, Phase 4)**: custom domain with automatic TLS, the brand's own PWA name, icon and theme, branded email. Tag URLs, Wallet issuer accounts, the business portal and Filament stay on punchcard. A white-label PWA is a separate origin: separate sign-in and install, only that brand's cards, and passkeys do not carry over.
 
 ## Screen inventory

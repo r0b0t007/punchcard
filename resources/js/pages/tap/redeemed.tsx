@@ -35,6 +35,7 @@ export default function TapRedeemed({
         <>
             <Head title={t('Reward redeemed')} />
             <TapScreen
+                cover={card?.coverUrl}
                 actions={
                     <>
                         <Button asChild size="lg">

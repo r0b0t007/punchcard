@@ -53,7 +53,7 @@ final readonly class ListMyCards
             $cards = LoyaltyCard::query()->whereKey($enrollments->pluck('card_id')->unique()->all())->get()->keyBy('id');
             $organizations = Organization::query()
                 ->whereKey($enrollments->pluck('organization_id')->unique()->all())
-                ->get(['id', 'name', 'brand_color', 'logo_path'])
+                ->get(['id', 'name', 'type', 'brand_color', 'logo_path', 'cover_path'])
                 ->keyBy('id');
             $ready = Reward::query()
                 ->whereIn('enrollment_id', $enrollmentIds)
