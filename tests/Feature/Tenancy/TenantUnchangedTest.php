@@ -68,9 +68,9 @@ it('refuses every change sent from a page of another business, before reading it
     // Every one the business app has: a new one is guarded too, or opts out where it is defined (the switch, signing
     // out from an email's link: they act on no tenant's data).
     expect($guarded->map(fn (array $pair): string => $pair[0].' '.$pair[1]->getName())->sort()->values()->all())->toBe([
-        'DELETE counter.disarm', 'DELETE customers.notes.destroy', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
-        'PATCH automations.update', 'PATCH campaigns.cancel', 'PATCH campaigns.ticket', 'PATCH cards.status', 'PATCH stampers.status',
-        'POST business.qr-stand.printed', 'POST campaigns.store', 'POST cards.banner', 'POST cards.store', 'POST counter.arm', 'POST counter.scans.redeem',
+        'DELETE brand.cover.destroy', 'DELETE counter.disarm', 'DELETE customers.notes.destroy', 'DELETE staff.destroy', 'DELETE staff.invitations.destroy',
+        'PATCH automations.update', 'PATCH brand.update', 'PATCH campaigns.cancel', 'PATCH campaigns.ticket', 'PATCH cards.status', 'PATCH stampers.status',
+        'POST brand.cover', 'POST brand.logo', 'POST business.qr-stand.printed', 'POST campaigns.store', 'POST cards.banner', 'POST cards.store', 'POST counter.arm', 'POST counter.scans.redeem',
         'POST counter.scans.stamp', 'POST counter.scans.store', 'POST customers.corrections.store', 'POST customers.export', 'POST customers.notes.store', 'POST customers.stamps.store',
         'POST staff.invitations.store', 'POST verification.store',
         'PUT cards.update',

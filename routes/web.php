@@ -2,6 +2,7 @@
 
 use App\Enums\AutomationTrigger;
 use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\BusinessRegistrationController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CampaignOpenController;
@@ -93,6 +94,12 @@ Route::middleware(['auth', 'verified', 'tenant', EnsureTenantUnchanged::class, '
         Route::put('cards/{card}', [CardController::class, 'update'])->whereNumber('card')->name('cards.update');
         Route::patch('cards/{card}/status', [CardController::class, 'status'])->whereNumber('card')->name('cards.status');
         Route::post('cards/{card}/banner', [CardController::class, 'banner'])->whereNumber('card')->name('cards.banner');
+        // The organization's brand (CHW-135, B17): whoever may change it (OrganizationPolicy::manageBrand).
+        Route::get('brand', [BrandController::class, 'edit'])->name('brand.edit');
+        Route::patch('brand', [BrandController::class, 'update'])->name('brand.update');
+        Route::post('brand/logo', [BrandController::class, 'logo'])->name('brand.logo');
+        Route::post('brand/cover', [BrandController::class, 'cover'])->name('brand.cover');
+        Route::delete('brand/cover', [BrandController::class, 'destroyCover'])->name('brand.cover.destroy');
         // Counter mode (CHW-29, S1): whoever works in the business; {stamper} resolves in the tenant.
         Route::get('counter', [CounterController::class, 'show'])->name('counter.show');
         Route::post('counter/stampers/{stamper}/arm', [CounterController::class, 'arm'])->whereNumber('stamper')->middleware('throttle:counter-arm')->name('counter.arm');

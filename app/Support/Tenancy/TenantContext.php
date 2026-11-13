@@ -94,6 +94,19 @@ final class TenantContext
     }
 
     /**
+     * The user acts for the current organization: its org admin across all
+     * its businesses, or the owner of an independent café's or chain's only
+     * business, where the business is the organization. HQ working inside one
+     * franchisee acts for that franchisee, not for the organization.
+     * ReadsTenant::actsFor and the menu (HandleInertiaRequests) both read it.
+     */
+    public function actsForOrganization(): bool
+    {
+        return $this->organizationId !== null && $this->isOrgAdmin()
+            && ($this->businessId === null || $this->ownsTheAccount);
+    }
+
+    /**
      * The user holds an org_admin row here, so they manage the organization's
      * admins. Owning the account (an independent café's co-owner) runs the
      * organization but never grants a row: it would outlive their removal

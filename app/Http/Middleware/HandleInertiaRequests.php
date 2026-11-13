@@ -70,6 +70,8 @@ class HandleInertiaRequests extends Middleware
             'pwa' => null,
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
+                // The brand page (CHW-135, B17): whoever acts for the organization (OrganizationPolicy::manageBrand).
+                'brand' => $request->user() instanceof User && app(TenantContext::class)->actsForOrganization(),
                 // Counter mode (CHW-29): whoever works in the business worked in.
                 'counter' => $this->worksInBusiness($request),
                 // The staff page (CHW-146): whoever runs the business worked in.

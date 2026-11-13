@@ -5,6 +5,7 @@ import {
     LayoutGrid,
     Megaphone,
     Nfc,
+    Palette,
     Stamp,
     Users,
     Zap,
@@ -22,6 +23,7 @@ import { dashboard } from '@/routes';
 import { index as automations } from '@/routes/automations';
 import { index as campaigns } from '@/routes/campaigns';
 import { index as customers } from '@/routes/customers';
+import { edit as brand } from '@/routes/brand';
 import { index as cards } from '@/routes/cards';
 import { show as counter } from '@/routes/counter';
 import { index as staff } from '@/routes/staff';
@@ -46,6 +48,12 @@ const cardsNavItem: NavItem = {
     title: 'Cards',
     href: cards(),
     icon: CreditCard,
+};
+
+const brandNavItem: NavItem = {
+    title: 'Brand',
+    href: brand(),
+    icon: Palette,
 };
 
 const campaignsNavItem: NavItem = {
@@ -85,6 +93,7 @@ export function AppSidebar() {
         ...(nav.counter ? [counterNavItem] : []),
         ...(nav.customers ? [customersNavItem] : []),
         ...(nav.cards ? [cardsNavItem] : []),
+        ...(nav.brand ? [brandNavItem] : []),
         ...(nav.campaigns ? [campaignsNavItem] : []),
         ...(nav.automations ? [automationsNavItem] : []),
         ...(nav.stampers ? [stampersNavItem] : []),

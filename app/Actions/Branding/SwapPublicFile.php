@@ -33,24 +33,36 @@ final readonly class SwapPublicFile
         }
 
         try {
-            $old = DB::transaction(function () use ($model, $column, $path): mixed {
-                $locked = $model->newQuery()->whereKey($model->getKey())->lockForUpdate()->firstOrFail();
-                $old = $locked->getAttribute($column);
-                $locked->forceFill([$column => $path])->save();
-                $model->forceFill([$column => $path])->syncOriginal();
-
-                return $old;
-            });
+            $this->point($model, $column, $path);
         } catch (Throwable $failed) {
             $disk->delete($path);
 
             throw $failed;
         }
 
-        if (is_string($old) && $old !== $path) {
-            DB::afterCommit(fn () => $disk->delete($old));
-        }
-
         return $path;
+    }
+
+    /** The row points at no file any more (a cover removed, B17); the old file goes once that is committed. */
+    public function clear(Model $model, string $column): void
+    {
+        $this->point($model, $column, null);
+    }
+
+    /** Points the locked row at $path, then deletes the file it pointed at once the change is committed. */
+    private function point(Model $model, string $column, ?string $path): void
+    {
+        $old = DB::transaction(function () use ($model, $column, $path): mixed {
+            $locked = $model->newQuery()->whereKey($model->getKey())->lockForUpdate()->firstOrFail();
+            $old = $locked->getAttribute($column);
+            $locked->forceFill([$column => $path])->save();
+            $model->forceFill([$column => $path])->syncOriginal();
+
+            return $old;
+        });
+
+        if (is_string($old) && $old !== $path) {
+            DB::afterCommit(fn () => Storage::disk('public')->delete($old));
+        }
     }
 }
