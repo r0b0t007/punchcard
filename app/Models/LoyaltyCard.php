@@ -209,7 +209,11 @@ class LoyaltyCard extends Model implements TenantModel
             ->orderBy('id');
     }
 
-    /** The card's own brand colour (CHW-32), or null: it then shows its organization's (ADR 0007). */
+    /**
+     * The card's own brand colour (CHW-32), or null: it then shows its
+     * organization's (ADR 0007). Screens read CardBrand::of instead, which
+     * ignores it in a franchise (CHW-135).
+     */
     public function brandColor(): ?string
     {
         $brand = $this->colors['brand'] ?? null;

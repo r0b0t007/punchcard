@@ -42,7 +42,7 @@ final readonly class ListCustomerRewards
                 ->whereKey($rewards->pluck('organization_id')->unique()->all())
                 ->get(['id', 'name', 'type', 'brand_color'])
                 ->keyBy('id');
-            // The card's own colour, else its organization's (ADR 0007, CHW-32).
+            // CardBrand: the card's own colour, else its organization's; always the organization's in a franchise (CHW-135).
             $cardOf = CardEnrollment::query()->whereKey($rewards->pluck('enrollment_id')->unique()->all())->pluck('card_id', 'id');
             $cards = LoyaltyCard::query()->whereKey($cardOf->unique()->all())->get(['id', 'colors'])->keyBy('id');
             // The day it was unlocked where it was: the location of the stamp that unlocked it.

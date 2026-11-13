@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Branding;
 
-use App\Enums\OrganizationType;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
@@ -34,7 +33,7 @@ final readonly class DescribeBrand
     {
         $businessId = $this->context->businessId();
         $businessName = $businessId === null ? null : Business::query()->whereKey($businessId)->value('name');
-        $franchise = $organization->type === OrganizationType::Franchise;
+        $franchise = $organization->isFranchise();
         $card = LoyaltyCard::query()->where('active', true)->oldest('id')
             ->first(['id', 'name', 'reward_text', 'stamps_required', 'stamp_style']);
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Cards;
 
 use App\Enums\CardMode;
-use App\Enums\OrganizationType;
 use App\Enums\RewardType;
 use App\Models\Business;
 use App\Models\LoyaltyCard;
@@ -40,7 +39,7 @@ final readonly class DescribeCardBuilder
         $businessId = $this->context->businessId();
         $business = $businessId === null ? null : Business::query()->whereKey($businessId)->first();
         // A franchise's cards always show the organization's brand (CHW-135, design 24c): no colour of their own.
-        $franchise = $organization->type === OrganizationType::Franchise;
+        $franchise = $organization->isFranchise();
         $fields = $card instanceof LoyaltyCard ? $this->fieldsOf($card) : $this->defaults();
 
         return [

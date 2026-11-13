@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Requests\Cards;
 
 use App\Enums\CardMode;
-use App\Enums\OrganizationType;
 use App\Enums\RewardType;
 use App\Enums\StampStyle;
 use App\Models\LoyaltyCard;
@@ -29,6 +28,8 @@ use Illuminate\Validation\Validator;
  */
 class CardRequest extends FormRequest
 {
+    private ?Organization $organization = null;
+
     public function authorize(): bool
     {
         $card = $this->route('card');
@@ -42,10 +43,10 @@ class CardRequest extends FormRequest
         return $organization instanceof Organization && $this->user()?->can('create', [LoyaltyCard::class, $organization]) === true;
     }
 
-    /** The organization being worked in, a new card's. */
+    /** The organization being worked in, a new card's, read once. */
     public function organization(): ?Organization
     {
-        return app(TenantContext::class)->organization();
+        return $this->organization ??= app(TenantContext::class)->organization();
     }
 
     /**
@@ -68,7 +69,7 @@ class CardRequest extends FormRequest
             'tiers.*.stamps' => ['required', 'integer', 'between:1,50', 'distinct'],
             'tiers.*.reward' => ['required', 'string', 'max:120'],
             // A franchise's cards show the organization's brand only (CHW-135): no colour of their own.
-            'brand_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/D', Rule::prohibitedIf(fn (): bool => $this->organization()?->type === OrganizationType::Franchise)],
+            'brand_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/D', Rule::prohibitedIf(fn (): bool => $this->organization()?->isFranchise() === true)],
             'stamp_style' => ['nullable', Rule::enum(StampStyle::class)],
             'info' => ['nullable', 'array'],
             'info.hours' => ['nullable', 'string', 'max:200'],

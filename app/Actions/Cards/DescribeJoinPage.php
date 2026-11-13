@@ -43,6 +43,8 @@ final readonly class DescribeJoinPage
                 return ['card' => null, 'available' => false, 'joined' => false, 'invited' => false];
             }
 
+            $business->loadMissing('organization');
+
             return [
                 'card' => CustomerCard::of($business, $card, stamps: $enrollment->current_stamps ?? 0),
                 'available' => true,

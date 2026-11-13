@@ -21,7 +21,8 @@ use Carbon\CarbonImmutable;
 /**
  * My cards (CHW-27, C5): every card the customer holds, the most recently
  * used first (CardEnrollment::lastUsedFirst), each as its program shows it
- * (CustomerCard::ofProgram: the card's colour, else its organization's)
+ * (CustomerCard::ofProgram, colours from CardBrand: the card's, else its
+ * organization's; always the organization's in a franchise)
  * with the organization's logo, the rewards ready on it, how many local
  * days ago they last stamped in person (a tap, a scan or by hand, in that
  * location's timezone) and whether the card is paused. A progressive card

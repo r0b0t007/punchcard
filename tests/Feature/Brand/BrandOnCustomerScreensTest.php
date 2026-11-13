@@ -46,6 +46,11 @@ it('paints an independent café\'s card with its own colour, else the brand, wit
 
     expect(CardBrand::of($this->tenants->cardB, $orgB))->toBe(['brandColor' => '#A63D2A', 'brandForeground' => '#FBF6EE'])
         ->and(CardBrand::of(null, null))->toBe(['brandColor' => null, 'brandForeground' => null]);
+
+    // A card stored with its colour but no valid text colour still gets one that reads.
+    ($this->set)($this->tenants->cardB, ['colors' => ['brand' => '#A63D2A', 'foreground' => 'white']]);
+
+    expect(CardBrand::of($this->tenants->cardB, $orgB))->toBe(['brandColor' => '#A63D2A', 'brandForeground' => Contrast::readableForeground('#A63D2A')]);
 });
 
 it('paints a franchise\'s cards with its brand only, whatever colour a card kept', function (): void {
@@ -93,4 +98,30 @@ it('gives a franchise\'s cards no colour of their own in the builder', function 
     ($this->atHq)()->put(route('cards.update', $this->tenants->cardA->id), [...$fields, 'brand_color' => null])->assertSessionHasNoErrors();
 
     expect($this->context->bypass(fn () => LoyaltyCard::query()->findOrFail($this->tenants->cardA->id)->colors))->toBeNull();
+});
+
+it('gives no shade advice on saving a franchise\'s card, which has no colour to change', function (): void {
+    ($this->set)($this->tenants->orgA, ['brand_color' => '#808080']);
+    $fields = [
+        'name' => 'Atlas card', 'mode' => 'cyclic', 'stamps_required' => 8, 'reward_type' => 'item',
+        'reward_text' => 'A free coffee', 'cooldown_min' => 20, 'daily_cap' => 5,
+    ];
+
+    ($this->atHq)()->put(route('cards.update', $this->tenants->cardA->id), $fields)
+        ->assertInertiaFlash('toast.type', 'success')
+        ->assertInertiaFlash('toast.message', 'Card saved.');
+});
+
+it('drops the colours a franchise\'s cards kept from before, and only theirs', function (): void {
+    $colors = ['brand' => '#A63D2A', 'foreground' => '#FBF6EE'];
+    ($this->set)($this->tenants->cardA, ['colors' => $colors]);
+    ($this->set)($this->tenants->cardB, ['colors' => $colors]);
+
+    $migration = require database_path('migrations/2026_11_13_000100_clear_card_colours_in_franchises.php');
+    $migration->up();
+
+    $colorsOf = fn (LoyaltyCard $card): mixed => $this->context->bypass(fn () => LoyaltyCard::query()->findOrFail($card->id)->colors);
+
+    expect($colorsOf($this->tenants->cardA))->toBeNull()
+        ->and($colorsOf($this->tenants->cardB))->toBe($colors);
 });
