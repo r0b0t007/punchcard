@@ -13,6 +13,7 @@ use App\Support\Auth\Impersonation;
 use App\Support\Auth\PasskeyOffer;
 use App\Support\Locales;
 use App\Support\Tenancy\TenantContext;
+use App\Support\Wallet\AppleWalletConfig;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Inertia;
@@ -68,6 +69,8 @@ class HandleInertiaRequests extends Middleware
             'impersonating' => fn (): ?array => $this->impersonating($request),
             // The installable app the page belongs to, if any (UsePwa, CHW-35).
             'pwa' => null,
+            // Which Wallets a customer can add a card to (CHW-38): Apple once the server has its certificate.
+            'wallet' => fn (): array => ['apple' => AppleWalletConfig::isComplete()],
             'nav' => fn (): array => [
                 'cards' => $request->user()?->can('viewAny', LoyaltyCard::class) ?? false,
                 // The brand page (CHW-135, B17): whoever acts for the organization (OrganizationPolicy::manageBrand).

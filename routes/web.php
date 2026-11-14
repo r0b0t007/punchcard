@@ -33,6 +33,7 @@ use App\Http\Controllers\StartController;
 use App\Http\Controllers\TapController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\WalletPassController;
 use App\Http\Middleware\EnsureTenantUnchanged;
 use App\Http\Middleware\NeverCache;
 use App\Http\Middleware\RedirectToOnboarding;
@@ -200,6 +201,8 @@ Route::middleware(['auth', NeverCache::class, 'pwa:customer'])->group(function (
     Route::get('app/qr', [MemberQrController::class, 'show'])->name('app.qr');
     Route::get('app/cards/{enrollment}', [MyCardsController::class, 'show'])->whereNumber('enrollment')->name('app.cards.show');
     Route::patch('app/cards/{enrollment}/follow', [MyCardsController::class, 'follow'])->whereNumber('enrollment')->name('app.cards.follow');
+    // Add to Apple Wallet (CHW-38, C2 and C6): the card as a signed pass.
+    Route::get('app/cards/{enrollment}/wallet/apple', [WalletPassController::class, 'apple'])->whereNumber('enrollment')->middleware('throttle:wallet')->name('app.cards.wallet.apple');
     // Got it on My cards' notice of a reward staff redeemed with a scan (CHW-228).
     Route::patch('app/rewards/{reward}/notice', [MyCardsController::class, 'dismissRedeemNotice'])->whereNumber('reward')->middleware('throttle:30,1')->name('rewards.notice.dismiss');
     // A phone's notifications on or off (CHW-41), from lib/push.ts once the browser has (un)subscribed.
