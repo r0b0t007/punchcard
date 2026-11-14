@@ -327,6 +327,15 @@ it('summarises who came in before, for every business or one', function (): void
     ]);
 });
 
+it('refuses a business that is not an id, and summarises nobody', function (string $business): void {
+    ($this->stampAt)('2026-10-30 10:00:00');
+
+    $this->artisan('punchcard:customers:summarise', ['--business' => $business])
+        ->expectsOutput(__('The business must be its id, a number.'))->assertFailed();
+
+    expect($this->context->bypass(fn (): int => BusinessCustomer::query()->count()))->toBe(0);
+})->with(['abc', 'cafe-hafa', '']);
+
 it('names a customer by first name and initial only', function (string $name, ?string $short): void {
     expect((new User(['name' => $name]))->shortName())->toBe($short);
 })->with([
