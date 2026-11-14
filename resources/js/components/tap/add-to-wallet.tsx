@@ -6,9 +6,11 @@ import { useTranslation } from '@/hooks/use-translation';
 import { apple } from '@/routes/app/cards/wallet';
 
 /**
- * Apple's "Add to Apple Wallet" badges (design 25a), one per language, from
- * Apple's badge files: resources/images/wallet/add-to-apple-wallet-{en,fr,ar}.svg.
- * Until they are added, an outline button takes the badge's place.
+ * Apple's "Add to Apple Wallet" badges (design 25a), one per language, as
+ * Apple ships them (its RGB SVGs, unchanged): resources/images/wallet/
+ * add-to-apple-wallet-{en,fr,ar}.svg. Their own grey hairline is the outline
+ * Apple asks for on a dark page. A language without one shows the English one;
+ * with none at all, an outline button takes the badge's place.
  */
 const BADGES = import.meta.glob<string>(
     '../../../images/wallet/add-to-apple-wallet-*.svg',
@@ -87,7 +89,7 @@ export default function AddToWallet({
                     <a
                         href={href}
                         data-test="add-to-apple-wallet"
-                        className="rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:ring-1 dark:ring-muted-foreground"
+                        className="rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                         <img
                             src={badge}
