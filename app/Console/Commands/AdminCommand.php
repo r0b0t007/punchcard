@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Actions\Auth\NotEligibleForAdmin;
 use App\Actions\Auth\SetPlatformAdmin;
+use App\Console\Commands\Concerns\ReadsTextInput;
 use App\Enums\PlatformRole;
 use App\Models\User;
 use Illuminate\Console\Attributes\Description;
@@ -22,10 +23,12 @@ use Illuminate\Support\Str;
 #[Description('Grant or revoke the platform admin role (Filament at /admin)')]
 class AdminCommand extends Command
 {
+    use ReadsTextInput;
+
     public function handle(SetPlatformAdmin $setPlatformAdmin): int
     {
         // Fortify keeps emails lowercase; Postgres compares them as typed.
-        $user = User::query()->notAnonymised()->where('email', Str::lower((string) $this->argument('email')))->first();
+        $user = User::query()->notAnonymised()->where('email', Str::lower($this->textArgument('email')))->first();
 
         if (! $user instanceof User) {
             $this->error('No user with that email.');
