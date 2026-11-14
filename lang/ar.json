@@ -1312,5 +1312,12 @@
     "Wallet pass preview: :name, :collected of :required stamps": "معاينة بطاقة Wallet: :name، :collected من :required أختام",
     "Brand colour saved.": "حُفظ لون العلامة.",
     "Every card shows :name's brand colour.": "كل بطاقة تأخذ لون علامة :name.",
-    "Change it in Brand": "غيّره في العلامة"
+    "Change it in Brand": "غيّره في العلامة",
+    "Member": "العضو",
+    "Your card": "بطاقتك",
+    ":card at :organization": ":card لدى :organization",
+    "Stamps: %@": "الأختام: %@",
+    "Member :number": "العضو :number",
+    "Google Wallet is coming soon.": "Google Wallet قريبًا.",
+    "Google Wallet is coming soon. To add this card to Apple Wallet, open this page on your iPhone.": "Google Wallet قريبًا. لإضافة هذه البطاقة إلى Apple Wallet، افتح هذه الصفحة على iPhone."
 }

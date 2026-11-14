@@ -265,7 +265,7 @@ Plus the `card_business` pivot, Cashier's `subscriptions` tables (billable: orga
 | GET /api/me/qr                                                                      | Customer                 | Rotating signed member token                                                           |
 | GET /api/venues?lat=&lng=&r=                                                        | Customer                 | Map and list of nearby businesses                                                      |
 | POST /api/push/subscribe                                                            | Customer, staff          | Store web push subscription                                                            |
-| GET /wallet/apple/{serial}.pkpass                                                   | Customer                 | Download Apple pass                                                                    |
+| GET /app/cards/{enrollment}/wallet/apple                                            | Customer                 | Download the customer's card as an Apple pass (CHW-38)                                 |
 | /v1/devices/... , /v1/passes/...                                                    | Apple                    | Apple Wallet web service (register, updates, log)                                      |
 | GET /wallet/google/{enrollment}                                                     | Customer                 | Signed "Save to Google Wallet" JWT link                                                |
 | CRUD /api/business/cards, /promotions, /campaigns, /automations, /locations, /staff | Owner                    | Portal management                                                                      |

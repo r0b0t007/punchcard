@@ -12,9 +12,9 @@ import {
 } from 'lucide-react';
 import type { PushSettings } from '@/components/push/phone-notifications';
 import PushAsk from '@/components/push/push-ask';
+import AddToWallet from '@/components/tap/add-to-wallet';
 import { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
-import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { ReferralPanel } from '@/components/referrals/referral-panel';
 import type { Referral } from '@/components/referrals/referral-panel';
 import { Badge } from '@/components/ui/badge';
@@ -309,7 +309,7 @@ export default function MyCard({
                     />
                 ) : null}
 
-                <WalletPlaceholders />
+                <AddToWallet enrollmentId={id} />
 
                 <Section title={t('Your stamps')}>
                     {history.length === 0 ? (

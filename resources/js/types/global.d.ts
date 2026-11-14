@@ -38,6 +38,8 @@ declare module '@inertiajs/core' {
             tenant: ShownTenant | null;
             /** The installable app the page belongs to (UsePwa, CHW-35). */
             pwa: Pwa;
+            /** Which Wallets a customer can add a card to (CHW-38): Apple once the server has its certificate. */
+            wallet: { apple: boolean };
             /** On settings pages: the user is a customer, so they use the customer layout (CHW-27). */
             customer: boolean;
             sidebarOpen: boolean;

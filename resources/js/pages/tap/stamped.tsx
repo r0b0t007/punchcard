@@ -1,10 +1,10 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import PushAsk from '@/components/push/push-ask';
 import type { PushSettings } from '@/components/push/phone-notifications';
+import AddToWallet from '@/components/tap/add-to-wallet';
 import InstallSheet from '@/components/tap/install-sheet';
 import TapScreen, { TapLoyaltyCard } from '@/components/tap/tap-screen';
 import type { TapCard } from '@/components/tap/tap-screen';
-import WalletPlaceholders from '@/components/tap/wallet-placeholders';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { momentLabel } from '@/lib/local-moment';
@@ -98,7 +98,7 @@ export default function TapStamped({
                         </>
                     ) : (
                         <>
-                            <WalletPlaceholders />
+                            <AddToWallet enrollmentId={enrollmentId} />
                             {enrollmentId !== null ? (
                                 <Button asChild size="lg">
                                     <Link href={show(enrollmentId)}>

@@ -1312,5 +1312,12 @@
     "Wallet pass preview: :name, :collected of :required stamps": "Aperçu du pass Wallet : :name, :collected tampons sur :required",
     "Brand colour saved.": "Couleur de marque enregistrée.",
     "Every card shows :name's brand colour.": "Chaque carte prend la couleur de marque de :name.",
-    "Change it in Brand": "La changer dans Marque"
+    "Change it in Brand": "La changer dans Marque",
+    "Member": "Membre",
+    "Your card": "Votre carte",
+    ":card at :organization": ":card chez :organization",
+    "Stamps: %@": "Tampons : %@",
+    "Member :number": "Membre :number",
+    "Google Wallet is coming soon.": "Google Wallet arrive bientôt.",
+    "Google Wallet is coming soon. To add this card to Apple Wallet, open this page on your iPhone.": "Google Wallet arrive bientôt. Pour ajouter cette carte à Cartes Apple, ouvrez cette page sur votre iPhone."
 }

@@ -316,6 +316,10 @@ class AppServiceProvider extends ServiceProvider
             ->by('reward-screen:'.$request->user()?->getAuthIdentifier().':'.$request->route('reward')));
         RateLimiter::for('reward-window', fn (Request $request): Limit => Limit::perMinute(30)
             ->by('reward-window:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // Add to Apple Wallet (CHW-38): signing a pass costs a little; a customer adds a card now and then.
+        RateLimiter::for('wallet', fn (Request $request): Limit => Limit::perMinute(10)
+            ->by('wallet:'.$request->user()?->getAuthIdentifier()));
     }
 
     /**
