@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ReadsTextInput;
 use App\Models\LoginLink;
 use App\Models\User;
 use App\Support\Nfc\FakeTap;
@@ -21,6 +22,8 @@ use Illuminate\Console\Command;
 #[Description('Print a working email sign-in link for an address (local and testing only)')]
 class LoginLinkCommand extends Command
 {
+    use ReadsTextInput;
+
     public function handle(): int
     {
         if (! $this->laravel->environment(FakeTap::ENVIRONMENTS)) {
@@ -29,7 +32,7 @@ class LoginLinkCommand extends Command
             return self::FAILURE;
         }
 
-        $this->line(LoginLink::for(User::normalizeEmail((string) $this->argument('email')))->signedUrl());
+        $this->line(LoginLink::for(User::normalizeEmail($this->textArgument('email')))->signedUrl());
 
         return self::SUCCESS;
     }

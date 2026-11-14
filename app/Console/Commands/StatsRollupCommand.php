@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Stats\RollUpEndedDays;
+use App\Console\Commands\Concerns\ReadsTextInput;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -20,19 +21,21 @@ use Illuminate\Console\Command;
 #[Description('Roll up businesses\' daily figures from their stamps')]
 class StatsRollupCommand extends Command
 {
+    use ReadsTextInput;
+
     public function handle(RollUpEndedDays $rollUpEndedDays): int
     {
-        $business = $this->option('business');
-        $from = $this->option('from');
+        $business = $this->textOption('business');
+        $from = $this->textOption('from');
 
         // A real day, as written: 2026-02-31 would quietly become 3 March.
-        if ($from !== null && (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $from, $parts) !== 1 || ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]))) {
+        if ($from !== null && (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $from, $parts) !== 1 || ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]))) {
             $this->error(__('The first day must be a date, as 2026-01-31.'));
 
             return self::INVALID;
         }
 
-        if ($business !== null && ! ctype_digit((string) $business)) {
+        if ($business !== null && ! ctype_digit($business)) {
             $this->error(__('The business must be its id, a number.'));
 
             return self::INVALID;

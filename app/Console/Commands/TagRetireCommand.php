@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Actions\Stampers\RetireTag;
 use App\Actions\Stampers\SiteName;
 use App\Actions\Stampers\StamperRefused;
+use App\Console\Commands\Concerns\ReadsTextInput;
 use App\Models\Stamper;
 use App\Support\Nfc\TagUid;
 use Illuminate\Console\Attributes\Description;
@@ -24,10 +25,12 @@ use InvalidArgumentException;
 #[Description('Retire a lost or stolen NFC tag for good')]
 class TagRetireCommand extends Command
 {
+    use ReadsTextInput;
+
     public function handle(RetireTag $retireTag): int
     {
         try {
-            $uid = TagUid::normalise((string) $this->argument('uid'));
+            $uid = TagUid::normalise($this->textArgument('uid'));
         } catch (InvalidArgumentException $invalid) {
             $this->error($invalid->getMessage());
 
