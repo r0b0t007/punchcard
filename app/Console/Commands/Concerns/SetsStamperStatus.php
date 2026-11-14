@@ -15,10 +15,12 @@ use App\Enums\StamperStatus;
  */
 trait SetsStamperStatus
 {
+    use ReadsTextInput;
+
     private function setStatus(SetStamperStatus $setStamperStatus, StamperStatus $status): int
     {
         try {
-            $change = $setStamperStatus->handle((string) $this->argument('uid'), $status);
+            $change = $setStamperStatus->handle($this->textArgument('uid'), $status);
         } catch (StamperRefused $refused) {
             $this->error($refused->getMessage());
 

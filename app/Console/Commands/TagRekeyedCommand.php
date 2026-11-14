@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Actions\Stampers\RecordRekey;
 use App\Actions\Stampers\StamperRefused;
+use App\Console\Commands\Concerns\ReadsTextInput;
 use App\Models\Stamper;
 use App\Support\Nfc\TagUid;
 use Illuminate\Console\Attributes\Description;
@@ -28,17 +29,19 @@ use InvalidArgumentException;
 #[Description('Record that an NFC tag was re-provisioned to a new key version')]
 class TagRekeyedCommand extends Command
 {
+    use ReadsTextInput;
+
     public function handle(RecordRekey $recordRekey): int
     {
         try {
-            $uid = TagUid::normalise((string) $this->argument('uid'));
+            $uid = TagUid::normalise($this->textArgument('uid'));
         } catch (InvalidArgumentException $invalid) {
             $this->error($invalid->getMessage());
 
             return self::FAILURE;
         }
 
-        $version = (string) $this->argument('version');
+        $version = $this->textArgument('version');
 
         if (! ctype_digit($version) || (int) $version < 2) {
             $this->error(__('The version is the key version the tag now has: a whole number, 2 or more.'));

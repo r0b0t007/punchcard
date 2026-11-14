@@ -20,6 +20,8 @@ use Closure;
  */
 trait FindsStamperSite
 {
+    use ReadsTextInput;
+
     /**
      * @param  Closure(string, Business, ?Location, ?string): Stamper  $action  uid, business, location, label
      * @param  Closure(Stamper, string): string  $done  the stamper and where it is, to the line printed
@@ -42,10 +44,8 @@ trait FindsStamperSite
             return self::FAILURE;
         }
 
-        $label = $this->option('label');
-
         try {
-            $stamper = $action((string) $this->argument('uid'), $business, $location, is_string($label) ? $label : null);
+            $stamper = $action($this->textArgument('uid'), $business, $location, $this->textOption('label'));
         } catch (StamperRefused $refused) {
             $this->error($refused->getMessage());
 
@@ -60,7 +60,7 @@ trait FindsStamperSite
     /** By slug first, so a business whose slug is all digits is still found by it; then by id. */
     private function namedBusiness(TenantContext $context): ?Business
     {
-        $named = (string) $this->argument('business');
+        $named = $this->textArgument('business');
 
         return $context->bypass(fn (): ?Business => Business::query()->where('slug', $named)->first()
             ?? (ctype_digit($named) ? Business::query()->whereKey((int) $named)->first() : null));
@@ -69,13 +69,13 @@ trait FindsStamperSite
     /** @return Location|false|null null when none is named, false when the named one does not exist */
     private function namedLocation(TenantContext $context): Location|false|null
     {
-        $named = $this->option('location');
+        $named = $this->textOption('location');
 
         if ($named === null) {
             return null;
         }
 
-        $location = ctype_digit((string) $named)
+        $location = ctype_digit($named)
             ? $context->bypass(fn (): ?Location => Location::query()->whereKey((int) $named)->first())
             : null;
 
