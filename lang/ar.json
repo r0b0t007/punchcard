@@ -1310,5 +1310,7 @@
     "Add a cover photo": "أضف صورة غلاف",
     "Uploading…": "جارٍ الرفع…",
     "Wallet pass preview: :name, :collected of :required stamps": "معاينة بطاقة Wallet: :name، :collected من :required أختام",
-    "Brand colour saved.": "حُفظ لون العلامة."
+    "Brand colour saved.": "حُفظ لون العلامة.",
+    "Every card shows :name's brand colour.": "كل بطاقة تأخذ لون علامة :name.",
+    "Change it in Brand": "غيّره في العلامة"
 }

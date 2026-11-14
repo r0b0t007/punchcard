@@ -64,6 +64,7 @@ export default function TapStamped({
         <>
             <Head title={rewards.length > 0 ? t('Reward unlocked') : added} />
             <TapScreen
+                cover={card?.coverUrl}
                 actions={
                     toRedeem ? (
                         <>

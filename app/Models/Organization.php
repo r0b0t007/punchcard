@@ -176,6 +176,12 @@ class Organization extends Model implements TenantModel
         return $this->cover_path === null ? null : Storage::disk('public')->url($this->cover_path);
     }
 
+    /** A franchise: a head office and franchisees' sites, all under its one brand (CHW-135). */
+    public function isFranchise(): bool
+    {
+        return $this->type === OrganizationType::Franchise;
+    }
+
     /**
      * The text colour that reads on the brand colour, 4.5:1 or more (ADR 0007,
      * Contrast::readableForeground); null with no brand colour.

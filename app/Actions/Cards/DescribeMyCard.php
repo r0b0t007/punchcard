@@ -51,13 +51,14 @@ final readonly class DescribeMyCard
     {
         return $this->context->bypass(function () use ($enrollment, $viewer, $now): array {
             $card = LoyaltyCard::query()->findOrFail($enrollment->card_id);
-            $organization = Organization::query()->whereKey($enrollment->organization_id)->firstOrFail(['id', 'name', 'brand_color', 'logo_path', 'archived_at']);
+            $organization = Organization::query()->whereKey($enrollment->organization_id)->firstOrFail(['id', 'name', 'type', 'brand_color', 'logo_path', 'cover_path', 'archived_at']);
 
             return [
                 'id' => $enrollment->id,
                 'card' => CustomerCard::ofProgram($organization, $card, CustomerCard::stampsOf($card, $enrollment)),
                 'logoUrl' => $organization->logoUrl(),
-                'bannerUrl' => $card->bannerUrl(),
+                // The card's banner, else its organization's cover (CHW-135, design 24b).
+                'bannerUrl' => $card->bannerUrl() ?? $organization->coverUrl(),
                 'paused' => ! $card->active,
                 'tiers' => $this->tiers($card, $enrollment),
                 // "Invite a friend" (CHW-47, design 20a): their link and this month's stamps from it; none while off.

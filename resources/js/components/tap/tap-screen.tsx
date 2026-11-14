@@ -16,21 +16,26 @@ export type TapCard = {
     /** The text colour the card stores for its own brand colour (CHW-32). */
     brandForeground?: string | null;
     stampStyle: StampStyle | null;
+    /** The card's banner, else its organization's cover (CHW-135, design 24b). */
+    coverUrl?: string | null;
 };
 
 /**
  * The frame of the tap result screens (C1, C2, cooldown, refused; Claude
  * Design "Punchcard Tap Flow"): content from the top, one primary action at
  * thumb height. The café's brand colour reaches only the card and the café's
- * monogram (ADR 0007).
+ * monogram (ADR 0007); its cover, when it has one, runs full width on top
+ * (CHW-135, design 24b).
  */
 export default function TapScreen({
     children,
     actions,
+    cover,
     className,
 }: {
     children: ReactNode;
     actions?: ReactNode;
+    cover?: string | null;
     /** E.g. min-h-0 inside the customer layout, which already fills the screen (CHW-27). */
     className?: string;
 }) {
@@ -41,6 +46,14 @@ export default function TapScreen({
                 className,
             )}
         >
+            {cover ? (
+                <img
+                    src={cover}
+                    alt=""
+                    data-test="tap-cover"
+                    className="h-36 w-full object-cover"
+                />
+            ) : null}
             <div className="flex flex-col gap-7 px-6 pt-5">{children}</div>
             {actions ? (
                 <div className="mt-auto flex flex-col gap-3 px-6 pt-8 pb-8">

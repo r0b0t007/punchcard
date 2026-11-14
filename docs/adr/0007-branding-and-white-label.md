@@ -14,9 +14,11 @@ issuer account signs every pass.
 **All plans: branding on the customer-facing surfaces a business owns.**
 
 - Organization brand: name, logo, brand colour, optional cover image. Cards inherit it; a business in a franchise cannot
-  override the franchise card's look.
-- Branded surfaces: the loyalty card, the tap landing screens (C1 to C4 and cooldown), the Wallet pass (logo, colours,
-  strip image, organization name), push titles, and the business name as email sender name.
+  override the franchise card's look, and a franchise's cards have no colour of their own (amended 2026-11-12, CHW-135).
+- Branded surfaces: the loyalty card, the tap landing screens (C1 to C4 and cooldown, with the cover on top), the card
+  page (the cover when the card has no banner), the Wallet pass (logo, colours, strip image, organization name).
+- Push titles and the email sender name use the business's name, the place the customer visits (in a franchise the
+  franchisee's, e.g. "Atlas Coffee Tangier"), not the organization's (amended 2026-11-12, CHW-135).
 - The app chrome (navigation, buttons, backgrounds) stays punchcard. A brand colour only sets `--card-brand` and
   `--card-brand-foreground`, with the foreground computed server-side for 4.5:1 contrast.
 

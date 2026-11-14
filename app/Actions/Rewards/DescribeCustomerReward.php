@@ -10,6 +10,7 @@ use App\Models\LoyaltyCard;
 use App\Models\Organization;
 use App\Models\Reward;
 use App\Models\User;
+use App\Support\Branding\CardBrand;
 use App\Support\LocalMoment;
 use App\Support\Tenancy\TenantContext;
 
@@ -34,7 +35,7 @@ final readonly class DescribeCustomerReward
     public function handle(Reward $reward, User $user): array
     {
         return $this->context->bypass(function () use ($reward, $user): array {
-            $organization = Organization::query()->find($reward->organization_id, ['id', 'name', 'brand_color']);
+            $organization = Organization::query()->find($reward->organization_id, ['id', 'name', 'type', 'brand_color']);
             $card = LoyaltyCard::query()->whereKey(CardEnrollment::query()->whereKey($reward->enrollment_id)->select('card_id'))->first(['id', 'colors']);
             $until = $reward->redeem_window_until;
             $redeemed = null;
@@ -52,7 +53,7 @@ final readonly class DescribeCustomerReward
                 'id' => $reward->id,
                 'rewardText' => $reward->reward_text,
                 'businessName' => $organization->name ?? '',
-                'brandColor' => $card?->brandColor() ?? $organization?->brand_color,
+                ...CardBrand::of($card, $organization),
                 'status' => $reward->status->value,
                 'verified' => $user->hasVerifiedEmail(),
                 'windowSeconds' => OpenRedeemWindow::SECONDS,

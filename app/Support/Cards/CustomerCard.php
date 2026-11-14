@@ -10,26 +10,27 @@ use App\Models\CardEnrollment;
 use App\Models\Location;
 use App\Models\LoyaltyCard;
 use App\Models\Organization;
+use App\Support\Branding\CardBrand;
 use LogicException;
 
 /**
  * A business's card as a customer screen shows it (the TapCard type in
  * resources/js/components/tap/tap-screen.tsx): the tap results (DescribeTap)
- * and the join page (CHW-31). The brand colour is the card's, else the
- * organization's (ADR 0007, CHW-32), with the text colour the card stores
- * for its own. Pass the business with its organization loaded. The stamps
+ * and the join page (CHW-31). Its colours are CardBrand's (the card's, else
+ * the organization's; always the organization's in a franchise), and its
+ * cover the card's banner, else the organization's cover (CHW-135, design
+ * 24b). Pass the business with its organization loaded. The stamps
  * shown never pass the card's slots: a card made shorter (CHW-32) shows a
  * customer above the new count, or an older tap, as a full card.
  */
 final class CustomerCard
 {
     /**
-     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
+     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string, coverUrl: ?string}
      */
     public static function of(Business $business, LoyaltyCard $card, ?Location $location = null, int $stamps = 0): array
     {
-        // The organization is read only for a card without its own colour.
-        return self::shape($business->name, $location?->name, $card, $card->brandColor() ?? $business->organization->brand_color, $stamps);
+        return self::shape($business->name, $location?->name, $card, $business->organization, $stamps);
     }
 
     /**
@@ -72,28 +73,28 @@ final class CustomerCard
      * The card as a whole program shows it, under its organization's name
      * (My cards, CHW-27): a franchise's card is held at every franchisee.
      *
-     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
+     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string, coverUrl: ?string}
      */
     public static function ofProgram(Organization $organization, LoyaltyCard $card, int $stamps = 0): array
     {
-        return self::shape($organization->name, null, $card, $card->brandColor() ?? $organization->brand_color, $stamps);
+        return self::shape($organization->name, null, $card, $organization, $stamps);
     }
 
     /**
-     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string}
+     * @return array{businessName: string, locationName: ?string, cardName: string, stampsRequired: int, stampsCollected: int, rewardText: string, brandColor: ?string, brandForeground: ?string, stampStyle: ?string, coverUrl: ?string}
      */
-    private static function shape(string $name, ?string $locationName, LoyaltyCard $card, ?string $brandColor, int $stamps): array
+    private static function shape(string $name, ?string $locationName, LoyaltyCard $card, Organization $organization, int $stamps): array
     {
         return [
+            ...CardBrand::of($card, $organization),
             'businessName' => $name,
             'locationName' => $locationName,
             'cardName' => $card->name,
             'stampsRequired' => $card->stamps_required,
             'stampsCollected' => max(0, min($stamps, $card->stamps_required)),
             'rewardText' => $card->reward_text,
-            'brandColor' => $brandColor,
-            'brandForeground' => $card->brandForeground(),
             'stampStyle' => $card->stamp_style,
+            'coverUrl' => $card->bannerUrl() ?? $organization->coverUrl(),
         ];
     }
 }

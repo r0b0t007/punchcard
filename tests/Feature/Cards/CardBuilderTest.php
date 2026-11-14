@@ -12,6 +12,7 @@ use App\Models\Business;
 use App\Models\CardEnrollment;
 use App\Models\LoyaltyCard;
 use App\Models\User;
+use App\Support\Branding\Contrast;
 use App\Support\Cards\CustomerCard;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -270,7 +271,8 @@ it('shows each card in its own colours, else its organization\'s colour', functi
     $this->context->bypass(fn () => $this->tenants->orgB->forceFill(['brand_color' => '#112233'])->save());
     $listed = fn () => ($this->inB1)()->get(route('cards.index'));
 
-    $listed()->assertInertia(fn ($page) => $page->where('cards.0.brandColor', '#112233')->where('cards.0.brandForeground', null));
+    // The text colour on the organization's brand is the server's too (CHW-135).
+    $listed()->assertInertia(fn ($page) => $page->where('cards.0.brandColor', '#112233')->where('cards.0.brandForeground', Contrast::readableForeground('#112233')));
 
     $this->context->bypass(fn () => LoyaltyCard::query()->findOrFail($this->tenants->cardB->id)->forceFill(['colors' => ['brand' => '#0F4C81', 'foreground' => '#FBF6EE']])->save());
     $listed()->assertInertia(fn ($page) => $page->where('cards.0.brandColor', '#0F4C81')->where('cards.0.brandForeground', '#FBF6EE'));
@@ -320,7 +322,8 @@ it('shows customers the card\'s own brand colour, else the organization\'s', fun
 
     expect(CustomerCard::of($business, $card)['brandColor'])->toBe('#112233');
 
-    expect(CustomerCard::of($business, $card)['brandForeground'])->toBeNull();
+    // The text colour on the organization's brand is the server's too (CHW-135).
+    expect(CustomerCard::of($business, $card)['brandForeground'])->toBe(Contrast::readableForeground('#112233'));
 
     $card->colors = ['brand' => '#0F4C81', 'foreground' => '#FBF6EE'];
     expect(CustomerCard::of($business, $card))->brandColor->toBe('#0F4C81')->brandForeground->toBe('#FBF6EE');
