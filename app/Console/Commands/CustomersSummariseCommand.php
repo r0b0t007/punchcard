@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Actions\Customers\CustomersOfBusiness;
 use App\Actions\Customers\SummariseCustomer;
+use App\Console\Commands\Concerns\ReadsTextInput;
 use App\Models\Business;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Console\Attributes\Description;
@@ -33,12 +34,20 @@ use Illuminate\Support\Facades\Cache;
 #[Description('Summarise businesses\' customers from their stamps')]
 class CustomersSummariseCommand extends Command
 {
+    use ReadsTextInput;
+
     /** Set when a full run finished: the visit days (CHW-45) and the network rows (CHW-365) are filled from the ledger. */
     public const string DONE = 'punchcard:customers:summarised:network';
 
     public function handle(SummariseCustomer $summariseCustomer, CustomersOfBusiness $customersOfBusiness, TenantContext $context): int
     {
-        $business = $this->option('business');
+        $business = $this->textOption('business');
+
+        if ($business !== null && ! ctype_digit($business)) {
+            $this->error(__('The business must be its id, a number.'));
+
+            return self::INVALID;
+        }
 
         if ($this->option('once') && Cache::has(self::DONE)) {
             $this->info(__('Customers already summarised.'));
